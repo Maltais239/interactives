@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vocabulary Matching Game</title>
+  <!-- Montserrat Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet" />
+  <!-- Confetti Library -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+  <style>
+    /* include borders/padding in width calculations */
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Montserrat', sans-serif;
+      background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+      display: flex;
+      justify-content: center;
+      padding: 40px 20px;
+      user-select: none; /* Prevent text selection during drag */
+    }
+    .game-area {
+      background: #fff;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #7c3aed;
+      margin-bottom: 20px;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .progress-bar {
+      width: 100%;
+      background: #f3f4f6;
+      border-radius: 12px;
+      overflow: hidden;
+      height: 24px;
+      margin-bottom: 20px;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0;
+      background: #f472b6;
+      transition: width .3s;
+    }
+    .game-container {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 24px;
+      margin-top: 20px;
+    }
+    @media (max-width: 600px) {
+      .game-container {
+        grid-template-columns: 1fr;
+      }
+    }
+    .column {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    /* Center the column headings */
+    .column h2 {
+      width: 100%;
+      text-align: center;
+      margin: 0 0 12px;
+    }
+    .cards {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+    .card {
+      background: #ede9fe;
+      border: 2px solid #a78bfa;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      padding: 8px 12px;
+      width: 100%;
+      text-align: center;
+      cursor: grab;
+      transition: transform .2s, background .3s, box-shadow .2s;
+      line-height: 1.2;
+    }
+    .card:active, .card.dragging {
+      cursor: grabbing;
+      transform: scale(0.98);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    }
+    .card.hide { 
+      visibility: hidden;
+    }
+    .definition {
+      background: #e0f7fa;
+      border: 2px solid #5eead4;
+      border-radius: 12px;
+      padding: 12px 16px;
+      width: 100%;
+      transition: background .2s, border-color .2s;
+    }
+    .definition.over {
+      border-color: #7c3aed;
+      background: #f3f0ff;
+    }
+    .correct {
+      background: #d1fae5 !important;
+      border-color: #34d399 !important;
+      color: #065f46;
+      cursor: not-allowed;
+    }
+    .shake {
+      animation: shake .5s;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+    #message {
+      font-size: 1.3rem;
+      margin-top: 14px;
+      color: #10b981;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+      display: none;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .controls {
+      text-align: center;
+      margin-top: 20px;
+    }
+    button {
+      background: #f472b6;
+      color: #fff;
+      border: none;
+      padding: 12px 28px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 1rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      transition: transform .2s, background .3s;
+    }
+    button:hover {
+      transform: scale(1.05);
+      background: #ec4899;
+    }
+    canvas { position: fixed; pointer-events: none; top: 0; left: 0; width: 100%; height: 100%; }
+    .ghost {
+      position: absolute;
+      pointer-events: none;
+      opacity: 0.75;
+      transform: rotate(3deg);
+      z-index: 1000;
+      background: #ede9fe;
+      border: 2px solid #a78bfa;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      padding: 8px 12px;
+      text-align: center;
+      line-height: 1.2;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-area">
+    <h1>Vocabulary Matching Game</h1>
+    <div class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Progress"><div class="progress-fill"></div></div>
+    <div id="message" role="alert">You did it! 🎉</div>
+    <div class="game-container">
+      <div class="column">
+        <h2 id="terms-heading" style="color:#7c3aed;">Terms</h2>
+        <div id="terms" class="cards" role="list" aria-labelledby="terms-heading"></div>
+      </div>
+      <div class="column">
+        <h2 id="defs-heading" style="color:#5eead4;">Definitions</h2>
+        <div id="definitions" class="cards" role="list" aria-labelledby="defs-heading"></div>
+      </div>
+    </div>
+    <div class="controls"><button id="resetBtn">Reset &amp; Shuffle</button></div>
+  </div>
+  <canvas id="confettiCanvas"></canvas>
+  <script>
+    /** Teacher Customization: Swap your term/definition pairs here **/
+    const vocabList = [
+      { term: 'Particle model of matter', def: 'A scientific idea that all matter is made of tiny particles in constant motion.' },
+      { term: 'Particle', def: 'A very small piece of matter (like an atom or molecule).' },
+      { term: 'Temperature', def: 'A measure of how hot or cold something is, based on how fast its particles move.' },
+      { term: 'Heating', def: 'Adding thermal energy to a substance so its particles move faster.' },
+      { term: 'Cooling', def: 'Removing thermal energy from a substance so its particles move slower.' }
+    ];
+
+    const termsContainer = document.getElementById('terms');
+    const defsContainer  = document.getElementById('definitions');
+    const progressFill   = document.querySelector('.progress-fill');
+    const progressBar    = document.querySelector('.progress-bar');
+    const messageEl      = document.getElementById('message');
+    const resetBtn       = document.getElementById('resetBtn');
+    const confettiCanvas = document.getElementById('confettiCanvas');
+    const confettiInstance = (window.confetti && confettiCanvas)
+      ? window.confetti.create(confettiCanvas, { resize: true, useWorker: true })
+      : null;
+    
+    // Create an AudioContext for sound effects
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    let matches = 0;
+    const total = vocabList.length;
+    let draggedElement = null;
+    let ghostElement = null;
+    
+    // Function to play a success sound without external files
+    function playSuccessSound() {
+        if (!audioCtx || audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        if (!audioCtx) return;
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); 
+
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
+        oscillator.start(audioCtx.currentTime);
+        oscillator.stop(audioCtx.currentTime + 0.5);
+    }
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function initGame() {
+      matches = 0;
+      updateProgress();
+      termsContainer.innerHTML = '';
+      defsContainer.innerHTML  = '';
+      messageEl.style.display = 'none';
+
+      const terms = shuffle([...vocabList]);
+      const defs  = shuffle([...vocabList]);
+
+      terms.forEach((item, index) => {
+        const originalIndex = vocabList.findIndex(v => v.term === item.term);
+        const card = document.createElement('div');
+        card.className = 'card term';
+        card.draggable = true;
+        card.textContent = item.term;
+        card.dataset.index = originalIndex;
+        card.setAttribute('role', 'listitem');
+        card.setAttribute('aria-grabbed', 'false');
+        card.setAttribute('aria-dropeffect', 'move');
+        termsContainer.appendChild(card);
+      });
+
+      defs.forEach((item, index) => {
+        const originalIndex = vocabList.findIndex(v => v.def === item.def);
+        const slot = document.createElement('div');
+        slot.className = 'definition';
+        slot.textContent = item.def;
+        slot.dataset.index = originalIndex;
+        slot.setAttribute('role', 'listitem');
+        slot.setAttribute('aria-dropeffect', 'move');
+        defsContainer.appendChild(slot);
+      });
+
+      addEventListeners();
+    }
+    
+    function addEventListeners() {
+      // Mouse events
+      termsContainer.addEventListener('dragstart', handleDragStart);
+      termsContainer.addEventListener('dragend', handleDragEnd);
+      termsContainer.addEventListener('drag', handleMouseDrag);
+
+      // Touch events
+      termsContainer.addEventListener('touchstart', handleDragStart, { passive: false });
+      termsContainer.addEventListener('touchend', handleDragEnd);
+      termsContainer.addEventListener('touchmove', handleDrag, { passive: false });
+
+      defsContainer.addEventListener('dragover', handleDragOver);
+      defsContainer.addEventListener('dragleave', handleDragLeave);
+      defsContainer.addEventListener('drop', handleDrop);
+    }
+    
+    // --- Drag and Drop Handlers ---
+    
+    function handleDragStart(e) {
+      // Don't drag already correct items
+      if (e.target.classList.contains('correct')) {
+        e.preventDefault();
+        return;
+      }
+      draggedElement = e.target;
+      draggedElement.classList.add('dragging');
+      draggedElement.setAttribute('aria-grabbed', 'true');
+      
+      setTimeout(() => {
+          if (draggedElement) draggedElement.classList.add('hide');
+      }, 0);
+      
+      // For mouse drag, hide the native drag preview
+      if (e.dataTransfer) {
+        e.dataTransfer.setData('text/plain', draggedElement.dataset.index);
+        e.dataTransfer.effectAllowed = 'move';
+        const dragImage = new Image();
+        dragImage.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        e.dataTransfer.setDragImage(dragImage, 0, 0);
+      }
+      
+      // Create and style the ghost element
+      ghostElement = draggedElement.cloneNode(true);
+      const rect = draggedElement.getBoundingClientRect();
+      ghostElement.style.width = `${rect.width}px`;
+      ghostElement.style.height = `${rect.height}px`;
+      ghostElement.classList.remove('card', 'term');
+      ghostElement.classList.add('ghost');
+      document.body.appendChild(ghostElement);
+
+      // Position ghost on touch start
+      if(e.touches) {
+          const touch = e.touches[0];
+          ghostElement.style.left = `${touch.pageX - (ghostElement.offsetWidth / 2)}px`;
+          ghostElement.style.top = `${touch.pageY - (ghostElement.offsetHeight / 2)}px`;
+      }
+    }
+
+    function handleMouseDrag(e) {
+        if (ghostElement) {
+            if (e.pageX !== 0 || e.pageY !== 0) {
+                 ghostElement.style.left = `${e.pageX - (ghostElement.offsetWidth / 2)}px`;
+                 ghostElement.style.top = `${e.pageY - (ghostElement.offsetHeight / 2)}px`;
+            }
+        }
+    }
+
+    function handleDrag(e) {
+        if (!draggedElement) return;
+        e.preventDefault(); // Prevents scrolling on touch devices
+        
+        const touch = e.touches[0];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+
+        if(ghostElement) {
+            ghostElement.style.left = `${touch.pageX - (ghostElement.offsetWidth / 2)}px`;
+            ghostElement.style.top = `${touch.pageY - (ghostElement.offsetHeight / 2)}px`;
+        }
+        
+        document.querySelectorAll('.definition.over').forEach(el => el.classList.remove('over'));
+
+        if (target && target.classList.contains('definition') && !target.classList.contains('correct')) {
+            target.classList.add('over');
+        }
+    }
+    
+    function handleDragEnd(e) {
+      if (ghostElement) {
+        ghostElement.remove();
+        ghostElement = null;
+      }
+      if (!draggedElement) return;
+
+      // For touch events, find the drop target
+      if (e.type === 'touchend') {
+        const touch = e.changedTouches[0];
+        const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (dropTarget && dropTarget.classList.contains('definition')) {
+            handleDrop({ target: dropTarget, preventDefault: () => {} });
+        }
+      }
+      
+      draggedElement.classList.remove('hide');
+      draggedElement.classList.remove('dragging');
+      draggedElement.setAttribute('aria-grabbed', 'false');
+      document.querySelectorAll('.definition.over').forEach(el => el.classList.remove('over'));
+      draggedElement = null; // Reset dragged element
+    }
+    
+    function handleDragOver(e) {
+      e.preventDefault();
+      const target = e.target;
+      if (target.classList.contains('definition') && !target.classList.contains('correct')) {
+        target.classList.add('over');
+      }
+    }
+    
+    function handleDragLeave(e) {
+      e.target.classList.remove('over');
+    }
+    
+    function handleDrop(e) {
+      e.preventDefault();
+      if (!draggedElement) return;
+      
+      const slot = e.target;
+      slot.classList.remove('over');
+      
+      const termIdx = draggedElement.dataset.index;
+      const defIdx = slot.dataset.index;
+      
+      if (termIdx === defIdx) {
+        handleCorrectMatch(slot);
+      } else {
+        handleIncorrectMatch();
+      }
+    }
+    
+    function handleCorrectMatch(slot) {
+      slot.classList.add('correct');
+      draggedElement.classList.add('correct');
+      draggedElement.draggable = false;
+      draggedElement.setAttribute('aria-grabbed', 'false');
+      slot.setAttribute('aria-disabled', 'true');
+      draggedElement.setAttribute('aria-disabled', 'true');
+      
+      matches++;
+      playSuccessSound();
+      updateProgress();
+      
+      if (matches === total) {
+        win();
+      }
+    }
+    
+    function handleIncorrectMatch() {
+        if (!draggedElement) return;
+        const elementToShake = draggedElement;
+        elementToShake.classList.add('shake');
+        setTimeout(() => {
+            elementToShake.classList.remove('shake');
+        }, 500);
+    }
+    
+    function updateProgress() {
+      const percentage = total > 0 ? (matches / total) * 100 : 0;
+      progressFill.style.width = `${percentage}%`;
+      progressBar.setAttribute('aria-valuenow', percentage);
+    }
+
+    function win() {
+      messageEl.style.display = 'block';
+      if (confettiInstance) {
+        confettiInstance({ particleCount: 200, spread: 70, origin: { y: 0.6 } });
+      }
+    }
+
+    resetBtn.addEventListener('click', initGame);
+    document.addEventListener('DOMContentLoaded', initGame);
+  </script>
+</body>
+</html>
