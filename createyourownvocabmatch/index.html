@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vocabulary Matching Game</title>
+  <!-- Montserrat Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet" />
+  <!-- Confetti Library -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+  <style>
+    /* include borders/padding in width calculations */
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin:0; font-family:'Montserrat',sans-serif; background:linear-gradient(135deg,#f5f3ff,#ede9fe); display:flex; justify-content:center; padding:40px 20px; }
+    .game-area { background:#fff; padding:30px; border-radius:16px; box-shadow:0 4px 16px rgba(0,0,0,0.1); width:100%; max-width:960px; margin:0 auto; }
+    h1 { color:#7c3aed; margin-bottom:20px; text-shadow:1px 1px 2px rgba(0,0,0,0.1); text-align:center; }
+    .loader { margin-bottom:20px; text-align:center; }
+    .loader textarea { width:100%; max-width:800px; height:120px; padding:10px; font-size:1rem; border:2px solid #a78bfa; border-radius:8px; }
+    .loader button { margin-top:8px; background:#5e35b1; color:#fff; border:none; padding:8px 16px; border-radius:8px; cursor:pointer; transition:background .2s; }
+    .loader button:hover { background:#4527a0; }
+    .progress-bar { width:100%; background:#f3f4f6; border-radius:12px; overflow:hidden; height:24px; margin-bottom:20px; }
+    .progress-fill { height:100%; width:0; background:#f472b6; transition:width .3s; }
+    .game-container { display:grid; grid-template-columns:1fr 2fr; gap:24px; margin-top:20px; }
+    @media (max-width:600px){ .game-container{grid-template-columns:1fr;} }
+    .column{display:flex; flex-direction:column; align-items:flex-start;}
+    .column h2{width:100%; text-align:center; margin:0 0 12px;}
+    .cards{display:flex; flex-direction:column; gap:12px; width:100%;}
+    .card{background:#ede9fe; border:2px solid #a78bfa; border-radius:12px; box-shadow:0 4px 8px rgba(0,0,0,0.1); padding:8px 12px; width:100%; text-align:center; cursor:grab; transition:transform .2s,background .3s; user-select:none; line-height:1.2;}
+    .card:active{cursor:grabbing; transform:scale(0.98);} .card.hide{visibility:hidden;}
+    .definition{background:#e0f7fa; border:2px solid #5eead4; border-radius:12px; padding:12px 16px; width:100%; transition:background .2s,border-color .2s;}
+    .definition.over{border-color:#7c3aed; background:#f3f0ff;}
+    .correct{background:#d1fae5!important; border-color:#34d399!important; color:#065f46;}
+    .shake{animation:shake .5s;}@keyframes shake{0%,100%{transform:translateX(0);}20%,60%{transform:translateX(-8px);}40%,80%{transform:translateX(8px);}}
+    #message{font-size:1.3rem; margin-top:14px; color:#10b981; text-shadow:1px 1px 2px rgba(0,0,0,0.1); display:none; text-align:center; margin-bottom:20px;}
+    .controls{ text-align:center; margin-top:20px; }
+    .controls button{background:#f472b6;color:#fff;border:none;padding:12px 28px;border-radius:12px;cursor:pointer;transition:transform .2s,background .3s;} .controls button:hover{transform:scale(1.05);background:#ec4899;}
+    canvas{position:fixed;pointer-events:none;top:0;left:0;width:100%;height:100%;}
+  </style>
+</head>
+<body>
+  <div class="game-area">
+    <div class="loader">
+      <textarea id="termInput" placeholder="Paste each pair as a paragraph:\nTerm on first line\nDefinition on second line\n\nBlank line between entries"></textarea><br>
+      <button id="loadBtn">Load Vocabulary</button>
+    </div>
+    <h1>Vocabulary Matching Game</h1>
+    <div class="progress-bar"><div class="progress-fill"></div></div>
+    <div id="message">You did it! 🎉</div>
+    <div class="game-container">
+      <div class="column">
+        <h2 style="color:#7c3aed;">Terms</h2>
+        <div id="terms" class="cards"></div>
+      </div>
+      <div class="column">
+        <h2 style="color:#5eead4;">Definitions</h2>
+        <div id="definitions" class="cards"></div>
+      </div>
+    </div>
+    <div class="controls"><button id="resetBtn">Reset &amp; Shuffle</button></div>
+  </div>
+  <audio id="successSound" src="https://freesound.org/data/previews/522/522193_10299972-lq.mp3"></audio>
+  <canvas id="confettiCanvas"></canvas>
+  <script>
+    let currentVocab = [];
+    let matches = 0;
+    let draggedElement = null;
+    const termsContainer = document.getElementById('terms');
+    const defsContainer  = document.getElementById('definitions');
+    const progressFill   = document.querySelector('.progress-fill');
+    const messageEl      = document.getElementById('message');
+    const resetBtn       = document.getElementById('resetBtn');
+    const loadBtn        = document.getElementById('loadBtn');
+    const termInput      = document.getElementById('termInput');
+    const successSound   = document.getElementById('successSound');
+    const confettiCanvas = document.getElementById('confettiCanvas');
+    const confettiInstance = (window.confetti && confettiCanvas)
+      ? window.confetti.create(confettiCanvas,{resize:true}) : null;
+
+    function shuffle(a) {
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function initGame(list) {
+      currentVocab = list || [];
+      matches = 0;
+      progressFill.style.width = '0%';
+      messageEl.style.display = 'none';
+      termsContainer.innerHTML = '';
+      defsContainer.innerHTML  = '';
+
+      const terms = shuffle([...currentVocab]);
+      const defs  = shuffle([...currentVocab]);
+
+      terms.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'card term';
+        card.draggable  = true;
+        card.textContent = item.term;
+        card.dataset.index = currentVocab.indexOf(item);
+        card.addEventListener('dragstart', dragStart);
+        card.addEventListener('dragend', dragEnd);
+        termsContainer.appendChild(card);
+      });
+
+      defs.forEach(item => {
+        const slot = document.createElement('div');
+        slot.className = 'definition';
+        slot.textContent  = item.def;
+        slot.dataset.index = currentVocab.indexOf(item);
+        slot.addEventListener('dragover', dragOver);
+        slot.addEventListener('dragleave', dragLeave);
+        slot.addEventListener('drop', drop);
+        defsContainer.appendChild(slot);
+      });
+    }
+
+    function dragStart(e) {
+      draggedElement = e.target;
+      e.dataTransfer.setData('text/plain', draggedElement.dataset.index);
+      setTimeout(() => {
+        if (draggedElement && draggedElement.classList) {
+          draggedElement.classList.add('hide');
+        }
+      }, 0);
+    }
+
+    function dragEnd() {
+      if (draggedElement && draggedElement.classList) {
+        draggedElement.classList.remove('hide');
+      }
+      draggedElement = null;
+    }
+
+    function dragOver(e) {
+      e.preventDefault();
+      if (e.currentTarget && e.currentTarget.classList) {
+        e.currentTarget.classList.add('over');
+      }
+    }
+
+    function dragLeave(e) {
+      if (e.currentTarget && e.currentTarget.classList) {
+        e.currentTarget.classList.remove('over');
+      }
+    }
+
+    function drop(e) {
+      e.preventDefault();
+      const slot = e.currentTarget;
+      if (slot && slot.classList) {
+        slot.classList.remove('over');
+      }
+      const termIdx = e.dataTransfer.getData('text/plain');
+      if (!draggedElement) return;
+      const defIdx = slot ? slot.dataset.index : null;
+      if (draggedElement && draggedElement.classList) {
+        draggedElement.classList.remove('hide');
+      }
+      if (termIdx === defIdx) {
+        if (slot && slot.classList) slot.classList.add('correct');
+        if (draggedElement && draggedElement.classList) draggedElement.classList.add('correct');
+        draggedElement.draggable = false;
+        matches++;
+        successSound.play();
+        progressFill.style.width = `${(matches / currentVocab.length) * 100}%`;
+        if (matches === currentVocab.length) win();
+      } else {
+        if (draggedElement && draggedElement.classList) {
+          draggedElement.classList.add('shake');
+          setTimeout(() => draggedElement.classList.remove('shake'), 500);
+        }
+      }
+      draggedElement = null;
+    }
+
+    function win() {
+      if (messageEl && messageEl.style) {
+        messageEl.style.display = 'block';
+      }
+      if (confettiInstance) {
+        confettiInstance({ particleCount: 200, spread: 70, origin: { y: 0.6 } });
+      }
+    }
+
+    resetBtn.addEventListener('click', () => initGame([]));
+    loadBtn.addEventListener('click', () => {
+      const paragraphs = termInput.value.trim().split(/\n\s*\n/);
+      const list = paragraphs.map(p => {
+        const lines = p.split(/\n+/);
+        const term = lines.shift().trim();
+        const def  = lines.join(' ').trim();
+        return { term, def };
+      }).filter(item => item.term && item.def);
+      initGame(list);
+    });
+
+    document.addEventListener('DOMContentLoaded', () => initGame([]));
+  </script>
+</body>
+</html>
