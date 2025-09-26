@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Who Wants to Be an Albertan Millionaire?</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap');
+
+        :root {
+            --background-dark: #020024;
+            --container-bg: #000428;
+            --box-bg: #0c0c2c;
+            --gold: #ffc107;
+            --orange: #ff9800;
+            --text-light: white;
+            --border-color: #aaa;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--background-dark);
+            color: var(--text-light);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        #game-container {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+            height: 100%;
+        }
+        
+        #main-content {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background-color: var(--container-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.2);
+            flex-grow: 1;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            color: var(--gold);
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px #000000;
+        }
+
+        #lifelines {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .lifeline-btn {
+            background: linear-gradient(145deg, #4CAF50, #2e7d32);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1.1em;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .lifeline-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0,0,0,0.4);
+        }
+        
+        .lifeline-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        #question-box {
+            background-color: var(--box-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.4;
+        }
+
+        #answers-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .answer-btn {
+            background: linear-gradient(145deg, var(--container-bg), #004e92);
+            color: var(--text-light);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            font-size: 1.3em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .answer-btn:hover:not(:disabled) {
+            background: linear-gradient(145deg, var(--orange), #e65100);
+            transform: scale(1.02);
+        }
+
+        .answer-btn.correct { background: linear-gradient(145deg, #4caf50, #2e7d32); }
+        .answer-btn.incorrect { background: linear-gradient(145deg, #f44336, #c62828); }
+        .answer-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+        
+        #feedback {
+            font-size: 1.5em;
+            margin-top: 10px;
+            font-weight: bold;
+            min-height: 50px;
+        }
+
+        #next-btn {
+            background: linear-gradient(145deg, var(--gold), #ff8f00);
+            color: var(--box-bg);
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: none;
+        }
+        
+        #next-btn:hover { transform: scale(1.05); }
+
+        /* Money Ladder Styles */
+        #money-ladder-container {
+            width: 280px;
+            flex-shrink: 0;
+            background-color: var(--container-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 15px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #money-ladder-container h2 {
+            color: var(--gold);
+            margin-top: 0;
+            text-align: center;
+            font-size: 1.5em;
+        }
+
+        #money-ladder {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            text-align: right;
+            display: flex;
+            flex-direction: column-reverse;
+            flex-grow: 1;
+            justify-content: space-around;
+        }
+
+        #money-ladder li {
+            padding: 5px 10px;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+            font-size: 1.1em;
+            font-weight: bold;
+            color: var(--border-color);
+        }
+
+        #money-ladder li.achieved { color: var(--gold); }
+
+        #money-ladder li.current {
+            background-color: var(--orange);
+            color: var(--box-bg);
+            transform: scale(1.1);
+            box-shadow: 0 0 15px var(--orange);
+        }
+
+        /* Confetti Styles */
+        .confetti {
+            position: fixed;
+            top: -10%;
+            pointer-events: none;
+            z-index: 9999;
+            animation: fall linear forwards;
+        }
+
+        @keyframes fall {
+            0% {
+                transform: translateY(-10vh) translateX(0px) rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(110vh) translateX(var(--x-end)) rotateX(var(--rotX-end)) rotateY(var(--rotY-end)) rotateZ(var(--rotZ-end));
+                opacity: 0;
+            }
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 950px) {
+            #game-container {
+                flex-direction: column-reverse;
+            }
+            #money-ladder-container {
+                width: 100%;
+                box-sizing: border-box;
+                margin-bottom: 20px;
+            }
+            #money-ladder {
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            #money-ladder li { font-size: 0.9em; margin: 2px; }
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 1.8em; }
+            #answers-grid { grid-template-columns: 1fr; }
+            .answer-btn, #question-box { font-size: 1.2em; }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="main-content">
+            <h1>Who Wants to Be an Albertan Millionaire?</h1>
+            <div id="lifelines">
+                <button class="lifeline-btn" id="lifeline-5050" onclick="use5050()">50/50</button>
+                <button class="lifeline-btn" id="lifeline-ask" onclick="useAskTheClass()">Ask the Class</button>
+                <button class="lifeline-btn" id="lifeline-hint" onclick="useTeacherHint()">Teacher's Hint</button>
+            </div>
+            <div id="question-box">Welcome! Click "Start Game" to begin.</div>
+            <div id="answers-grid">
+                <button class="answer-btn" onclick="checkAnswer(0)"></button>
+                <button class="answer-btn" onclick="checkAnswer(1)"></button>
+                <button class="answer-btn" onclick="checkAnswer(2)"></button>
+                <button class="answer-btn" onclick="checkAnswer(3)"></button>
+            </div>
+            <div id="feedback">
+                <button id="next-btn" onclick="nextQuestion()">Start Game</button>
+            </div>
+        </div>
+        <div id="money-ladder-container">
+            <h2>Prize Money</h2>
+            <ol id="money-ladder"></ol>
+        </div>
+    </div>
+
+    <script>
+        const questions = [
+            { question: "These people were the very first to live in the place we now call Alberta...", options: ["Settlers", "First Nations", "Immigrants", "Francophones"], answer: 1, money: "$100" },
+            { question: "This group came to Alberta from many different countries to make a new home.", options: ["Immigrants", "Métis", "First Nations", "Francophones"], answer: 0, money: "$500" },
+            { question: "This group's ancestors were First Nations and European fur traders...", options: ["Francophones", "Settlers", "Métis", "Immigrants"], answer: 2, money: "$1,000" },
+            { question: "These people speak French as their first language...", options: ["Immigrants", "Francophones", "Métis", "First Nations"], answer: 1, money: "$5,000" },
+            { question: "These people came to Alberta to build farms and new communities on the prairies...", options: ["First Nations", "Francophones", "Immigrants", "Settlers"], answer: 3, money: "$10,000" },
+            { question: "This group includes nations like the Cree, Blackfoot, and Dene...", options: ["First Nations", "Métis", "Settlers", "Immigrants"], answer: 0, money: "$50,000" },
+            { question: "This group started towns like Beaumont and St. Paul...", options: ["Settlers", "Métis", "Immigrants", "Francophones"], answer: 3, money: "$100,000" },
+            { question: "The sash, a brightly coloured, woven belt, is a very important symbol for this group.", options: ["First Nations", "Immigrants", "Métis", "Settlers"], answer: 2, money: "$250,000" },
+            { question: "These people often lived in sod houses (or 'soddies') on the prairies.", options: ["Settlers", "First Nations", "Francophones", "Immigrants"], answer: 0, money: "$500,000" },
+            { question: "More recently, this group has arrived from countries like the Philippines and Nigeria...", options: ["Métis", "Immigrants", "Settlers", "Francophones"], answer: 1, money: "$1,000,000" }
+        ];
+
+        let currentQuestionIndex = -1;
+        const questionBox = document.getElementById('question-box');
+        const answerBtns = document.querySelectorAll('.answer-btn');
+        const feedbackBox = document.getElementById('feedback');
+        const nextBtn = document.getElementById('next-btn');
+        const moneyLadder = document.getElementById('money-ladder');
+
+        function setupGame() {
+            currentQuestionIndex = -1;
+            nextBtn.textContent = 'Start Game';
+            nextBtn.style.display = 'inline-block';
+            questionBox.textContent = 'Welcome! Click "Start Game" to begin.';
+            answerBtns.forEach(btn => btn.style.display = 'none');
+            document.querySelectorAll('.lifeline-btn').forEach(btn => btn.disabled = false);
+            feedbackBox.innerHTML = '';
+            feedbackBox.appendChild(nextBtn);
+            populateMoneyLadder();
+        }
+
+        function populateMoneyLadder() {
+            moneyLadder.innerHTML = '';
+            questions.slice().reverse().forEach((q, index) => {
+                const li = document.createElement('li');
+                li.textContent = `${questions.length - index}: ${q.money}`;
+                li.id = `money-level-${questions.length - 1 - index}`;
+                moneyLadder.appendChild(li);
+            });
+        }
+
+        function displayQuestion() {
+            answerBtns.forEach(btn => {
+                btn.classList.remove('correct', 'incorrect');
+                btn.disabled = false;
+                btn.style.display = 'flex';
+            });
+
+            const currentQuestion = questions[currentQuestionIndex];
+            questionBox.textContent = currentQuestion.question;
+            answerBtns.forEach((btn, index) => {
+                btn.textContent = currentQuestion.options[index];
+            });
+            nextBtn.style.display = 'none';
+
+            document.querySelectorAll('#money-ladder li').forEach(li => li.classList.remove('current'));
+            document.getElementById(`money-level-${currentQuestionIndex}`).classList.add('current');
+        }
+
+        function checkAnswer(selectedIndex) {
+            answerBtns.forEach(btn => btn.disabled = true);
+            const currentQuestion = questions[currentQuestionIndex];
+            const moneyLevelEl = document.getElementById(`money-level-${currentQuestionIndex}`);
+
+            if (selectedIndex === currentQuestion.answer) {
+                if (window.navigator.vibrate) window.navigator.vibrate(100);
+                triggerConfetti();
+                answerBtns[selectedIndex].classList.add('correct');
+                feedbackBox.innerHTML = `Correct! You've won ${currentQuestion.money}!`;
+                moneyLevelEl.classList.remove('current');
+                moneyLevelEl.classList.add('achieved');
+
+                if (currentQuestionIndex < questions.length - 1) {
+                    nextBtn.textContent = 'Next Question';
+                    nextBtn.style.display = 'inline-block';
+                    feedbackBox.appendChild(nextBtn);
+                } else {
+                    questionBox.textContent = 'Congratulations!';
+                    feedbackBox.innerHTML = 'You are an Albertan Millionaire!';
+                    nextBtn.textContent = 'Play Again';
+                    nextBtn.style.display = 'inline-block';
+                    feedbackBox.appendChild(nextBtn);
+                    currentQuestionIndex = -2;
+                }
+            } else {
+                if (window.navigator.vibrate) window.navigator.vibrate([200, 50, 200]);
+                answerBtns[selectedIndex].classList.add('incorrect');
+                answerBtns[currentQuestion.answer].classList.add('correct');
+                feedbackBox.innerHTML = 'Oh no, that was not correct. Game Over!';
+                nextBtn.textContent = 'Play Again';
+                nextBtn.style.display = 'inline-block';
+                feedbackBox.appendChild(nextBtn);
+                moneyLevelEl.classList.remove('current');
+                currentQuestionIndex = -2;
+            }
+        }
+
+        function nextQuestion() {
+            if (currentQuestionIndex === -2) {
+                setupGame();
+                return;
+            }
+            currentQuestionIndex++;
+            feedbackBox.innerHTML = '';
+            displayQuestion();
+        }
+
+        function use5050() {
+            if (currentQuestionIndex < 0) return;
+            const currentQuestion = questions[currentQuestionIndex];
+            let wrongAnswers = [0, 1, 2, 3].filter(index => index !== currentQuestion.answer);
+            wrongAnswers.splice(Math.floor(Math.random() * wrongAnswers.length), 1);
+            wrongAnswers.forEach(index => { answerBtns[index].style.display = 'none'; });
+            document.getElementById('lifeline-5050').disabled = true;
+        }
+
+        function useAskTheClass() {
+            if (currentQuestionIndex < 0) return;
+            questionBox.innerHTML += "<br><br><strong>Class, please vote on the correct answer!</strong>";
+            document.getElementById('lifeline-ask').disabled = true;
+        }
+
+        function useTeacherHint() {
+            if (currentQuestionIndex < 0) return;
+            questionBox.innerHTML += "<br><br><strong>Teacher, please provide a hint!</strong>";
+            document.getElementById('lifeline-hint').disabled = true;
+        }
+
+        function triggerConfetti() {
+            const confettiCount = 150;
+            const colors = ['#ffc107', '#ff9800', '#ffffff', '#4CAF50', '#004e92', '#f44336'];
+
+            for (let i = 0; i < confettiCount; i++) {
+                const confetti = document.createElement('div');
+                confetti.classList.add('confetti');
+
+                confetti.style.left = Math.random() * 100 + 'vw';
+                
+                // Set random values for the keyframe animation to create drift and tumble
+                confetti.style.setProperty('--x-end', `${Math.random() * 200 - 100}px`);
+                confetti.style.setProperty('--rotX-end', `${Math.random() * 720}deg`);
+                confetti.style.setProperty('--rotY-end', `${Math.random() * 720}deg`);
+                confetti.style.setProperty('--rotZ-end', `${Math.random() * 720}deg`);
+
+                // Set random color, shape, and size
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                const size = Math.random() * 8 + 6; // 6px to 14px
+                confetti.style.width = size + 'px';
+                confetti.style.height = (Math.random() > 0.4 ? size : size / 2) + 'px'; // Create some rectangles
+                if (Math.random() > 0.5) {
+                    confetti.style.borderRadius = '50%';
+                }
+                
+                // Set random animation duration and delay
+                confetti.style.animationDuration = `${Math.random() * 3 + 4}s`; // 4 to 7 seconds
+                confetti.style.animationDelay = `${Math.random() * 0.5}s`;
+
+                document.body.appendChild(confetti);
+                confetti.addEventListener('animationend', () => {
+                    confetti.remove();
+                });
+            }
+        }
+
+        window.onload = setupGame;
+    </script>
+</body>
+</html>
