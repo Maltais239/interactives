@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Math Task Cards</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        /* --- Card Flip Styles --- */
+        .card-flipper {
+            perspective: 1000px;
+            cursor: pointer;
+        }
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .card-flipper.is-flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+        }
+        .card-back {
+            transform: rotateY(180deg);
+        }
+
+        /* --- Place Value Chart Styles (Copied from previous file) --- */
+        .place-value-chart-wrapper {
+            position: relative;
+            margin: 1rem 0; /* Adjusted margin for smaller cards */
+            width: 100%;
+        }
+        .place-value-chart {
+            display: flex;
+            width: 100%;
+            border: 1px solid #9ca3af;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            font-size: 0.35rem; /* Adjusted for game card size */
+            text-align: center;
+            font-weight: 600;
+        }
+        .pv-group { display: flex; flex-direction: column; flex-grow: 1; }
+        .pv-group-header { padding: 0.2rem 0; border-bottom: 1px solid #9ca3af; color: white; }
+        .pv-sub-columns { display: flex; flex-grow: 1; }
+        .pv-cell {
+            flex: 1;
+            padding: 0.4rem 0;
+            border-right: 1px solid #9ca3af;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.2;
+        }
+        .pv-group:last-child .pv-cell:last-child, .pv-cell:last-child { border-right: none; }
+        .decimal-point {
+            position: absolute;
+            top: 85%;
+            left: 75%;
+            transform: translate(-50%, -50%);
+            width: 0.5rem;
+            height: 0.5rem;
+            background-color: #dc2626;
+            border-radius: 9999px;
+            border: 1.5px solid white;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 flex flex-col items-center min-h-screen">
+
+    <div class="w-full max-w-5xl text-center mb-6">
+        <h1 class="text-4xl font-bold text-gray-800">Interactive Task Cards</h1>
+        <p class="text-gray-600 mt-2">Click a card to flip it and see the answer. Get a new set of challenges anytime!</p>
+    </div>
+
+    <div id="controls" class="w-full max-w-5xl p-4 bg-white rounded-lg shadow-md mb-8">
+        <button id="new-cards-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition transform hover:scale-105">
+            Get New Cards
+        </button>
+    </div>
+
+    <!-- Container for the interactive cards -->
+    <div id="game-board" class="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-8 flex-grow">
+        <!-- Cards will be generated here -->
+    </div>
+    
+    <script>
+        const placeValueChartHTML = `<div class="place-value-chart-wrapper">
+            <div class="place-value-chart">
+                <div class="pv-group" style="flex-grow: 3;"><div class="pv-group-header" style="background-color: #f97316;">Millions</div><div class="pv-sub-columns"><div class="pv-cell" style="background-color: #fed7aa;">Hundred Millions</div><div class="pv-cell" style="background-color: #fed7aa;">Ten Millions</div><div class="pv-cell" style="background-color: #fed7aa;">Millions</div></div></div>
+                <div class="pv-group" style="flex-grow: 3;"><div class="pv-group-header" style="background-color: #3b82f6;">Thousands</div><div class="pv-sub-columns"><div class="pv-cell" style="background-color: #bfdbfe;">Hundred Thousands</div><div class="pv-cell" style="background-color: #bfdbfe;">Ten Thousands</div><div class="pv-cell" style="background-color: #bfdbfe;">Thousands</div></div></div>
+                <div class="pv-group" style="flex-grow: 3;"><div class="pv-group-header" style="background-color: #ef4444;">Ones</div><div class="pv-sub-columns"><div class="pv-cell" style="background-color: #fecaca;">Hundreds</div><div class="pv-cell" style="background-color: #fecaca;">Tens</div><div class="pv-cell" style="background-color: #fecaca;">Ones</div></div></div>
+                <div class="pv-group" style="flex-grow: 3;"><div class="pv-group-header" style="background-color: #eab308;">Decimals</div><div class="pv-sub-columns"><div class="pv-cell" style="background-color: #fef08a;">Tenths</div><div class="pv-cell" style="background-color: #fef08a;">Hundredths</div><div class="pv-cell" style="background-color: #fef08a;">Thousandths</div></div></div>
+            </div>
+            <div class="decimal-point"></div>
+        </div>`;
+
+        const allCardsData = [
+           { id: 1, question: 'What place value is 3 places to the right of the ones place?', answer: 'Thousandths', visual: placeValueChartHTML },
+           { id: 2, question: 'What place value is 4 places to the left of the ones place?', answer: 'Ten-thousands', visual: placeValueChartHTML },
+           { id: 3, question: 'The digit 7 is in the tens place. What place value is the same number of places to the right of the ones place?', answer: 'Tenths place', visual: '' },
+           { id: 4, question: 'Explain how the tenths place is related to the tens place.', answer: 'Both are one place away from ones, but tenths is to the right (÷10) and tens is to the left (x10).', visual: '' },
+           { id: 5, question: 'What place value is the mirror of the hundreds place?', answer: 'Hundredths', visual: placeValueChartHTML },
+           { id: 6, question: 'The digit 5 is in the ten-thousands place. Which place value is the same number of places to the right of ones?', answer: 'Ten-thousandths', visual: placeValueChartHTML },
+           { id: 7, question: 'True or False: The thousandths place is the mirror of the thousands place.', answer: 'True', visual: ''},
+           { id: 8, question: 'Write this number in words: 4,206,319', answer: 'Four million, two hundred six thousand, three hundred nineteen', visual: ''},
+           { id: 9, question: 'Write this number in numerals: Nine million, seventy-four thousand, two hundred nine', answer: '9,074,209', visual: ''},
+           { id: 10, question: 'Write in words: 63.478', answer: 'Sixty-three and four hundred seventy-eight thousandths', visual: ''},
+           { id: 11, question: 'Write in numerals: Three and seventy-two thousandths', answer: '3.072', visual: ''},
+           { id: 12, question: 'Plot 0.3 and 0.7 on a number line between 0 and 1.', answer: '0.3 is less than halfway, 0.7 is more than halfway.', visual: `<svg class="w-full h-16 mt-2" viewBox="0 0 300 40"><line x1="10" y1="20" x2="290" y2="20" stroke="black" stroke-width="2"/><line x1="10" y1="15" x2="10" y2="25" stroke="black" stroke-width="2"/><text x="8" y="38" font-size="10" text-anchor="middle">0</text><line x1="290" y1="15" x2="290" y2="25" stroke="black" stroke-width="2"/><text x="290" y="38" font-size="10" text-anchor="middle">1</text><line x1="38" y1="18" x2="38" y2="22" stroke="gray" stroke-width="1"/><line x1="66" y1="18" x2="66" y2="22" stroke="gray" stroke-width="1"/><line x1="94" y1="15" x2="94" y2="25" stroke="black" stroke-width="1.5"/><line x1="122" y1="18" x2="122" y2="22" stroke="gray" stroke-width="1"/><line x1="150" y1="15" x2="150" y2="25" stroke="gray" stroke-width="1.5"/><text x="150" y="12" font-size="8" text-anchor="middle">0.5</text><line x1="178" y1="18" x2="178" y2="22" stroke="gray" stroke-width="1"/><line x1="206" y1="15" x2="206" y2="25" stroke="black" stroke-width="1.5"/><line x1="234" y1="18" x2="234" y2="22" stroke="gray" stroke-width="1"/><line x1="262" y1="18" x2="262" y2="22" stroke="gray" stroke-width="1"/><circle cx="94" cy="20" r="3" fill="blue"/><text x="94" y="12" font-size="8" text-anchor="middle" font-weight="bold">0.3</text><circle cx="206" cy="20" r="3" fill="blue"/><text x="206" y="12" font-size="8" text-anchor="middle" font-weight="bold">0.7</text></svg>` }
+        ];
+
+        const colors = ['green-500', 'blue-500', 'orange-500', 'red-500', 'purple-500', 'cyan-500', 'yellow-500', 'lime-500', 'pink-500', 'teal-500', 'indigo-500', 'gray-500'];
+
+        let currentPage = 0;
+        const cardsPerPage = 4;
+
+        function generateNewCards() {
+            const gameBoard = document.getElementById('game-board');
+            gameBoard.innerHTML = '';
+            
+            const startIndex = currentPage * cardsPerPage;
+            const selectedCards = allCardsData.slice(startIndex, startIndex + cardsPerPage);
+
+            selectedCards.forEach(cardData => {
+                const originalIndex = allCardsData.findIndex(c => c.id === cardData.id);
+                const color = colors[originalIndex % colors.length];
+
+                const flipper = document.createElement('div');
+                flipper.className = 'card-flipper aspect-video'; // Changed to landscape aspect ratio
+
+                const inner = document.createElement('div');
+                inner.className = 'card-inner';
+
+                // Card Front
+                const front = document.createElement('div');
+                front.className = `card-front bg-white rounded-2xl border-[16px] border-${color} shadow-lg overflow-hidden flex flex-col`;
+                front.innerHTML = `
+                    <div class="flex flex-col h-full p-6 text-center">
+                        <p class="font-bold text-gray-700 text-lg">Task ${cardData.id}</p>
+                        <div class="flex-grow flex items-center justify-center py-4">
+                            <p class="text-2xl text-gray-800">${cardData.question}</p>
+                        </div>
+                        <div class="w-full">${cardData.visual || ''}</div>
+                    </div>
+                `;
+
+                // Card Back
+                const back = document.createElement('div');
+                back.className = `card-back bg-white rounded-2xl border-[16px] border-${color} shadow-lg overflow-hidden flex flex-col items-center justify-center p-6 text-center`;
+                back.innerHTML = `
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">Answer</h3>
+                    <p class="text-gray-600 text-2xl">${cardData.answer}</p>
+                `;
+                
+                inner.appendChild(front);
+                inner.appendChild(back);
+                flipper.appendChild(inner);
+                gameBoard.appendChild(flipper);
+
+                flipper.addEventListener('click', () => {
+                    flipper.classList.toggle('is-flipped');
+                });
+            });
+        }
+
+        document.getElementById('new-cards-btn').addEventListener('click', () => {
+            const numPages = Math.ceil(allCardsData.length / cardsPerPage);
+            currentPage = (currentPage + 1) % numPages;
+            generateNewCards();
+        });
+        
+        // Initial load
+        generateNewCards();
+    </script>
+</body>
+</html>
