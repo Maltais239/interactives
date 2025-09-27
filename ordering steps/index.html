@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cacao Steps Drag and Drop</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Poppins', sans-serif; }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-blue-100 to-purple-100 flex items-start justify-center p-8">
+  <div class="bg-white shadow-xl rounded-lg overflow-hidden w-full max-w-6xl">
+    <!-- Shortened Passage -->
+    <div class="p-6">
+      <h2 class="text-2xl font-semibold mb-4">From Tree to Treat</h2>
+      <p class="mb-4">Chocolate starts as seeds inside cacao pods. Farmers cut ripe pods from the trees, scoop out the seeds, ferment them under banana leaves for 2–5 days, and then sun‑dry them up to two weeks.</p>
+      <p class="mb-4">Dried seeds are shipped to factories, cleaned, and roasted. Removing the shells leaves the nibs, which are ground into a paste and mixed with sugar, milk, and extra cocoa butter.</p>
+      <p class="mb-4">The mixture is <em>conched</em> for about six hours to refine texture, then tempered to make the chocolate smooth and glossy.</p>
+    </div>
+    <!-- Drag & Drop Game -->
+    <div class="p-6 flex flex-col items-center">
+      <h3 class="text-xl font-medium mb-4">Drag the steps into the correct order</h3>
+      <div id="cards" class="flex flex-wrap justify-center gap-4 mb-6">
+        <div class="card p-4 bg-white border border-gray-300 shadow-sm rounded cursor-grab hover:shadow-md transition-shadow transform hover:-translate-y-1" draggable="true" id="Drying">Drying</div>
+        <div class="card p-4 bg-white border border-gray-300 shadow-sm rounded cursor-grab hover:shadow-md transition-shadow transform hover:-translate-y-1" draggable="true" id="Roasting">Roasting</div>
+        <div class="card p-4 bg-white border border-gray-300 shadow-sm rounded cursor-grab hover:shadow-md transition-shadow transform hover:-translate-y-1" draggable="true" id="Conching">Conching</div>
+        <div class="card p-4 bg-white border border-gray-300 shadow-sm rounded cursor-grab hover:shadow-md transition-shadow transform hover:-translate-y-1" draggable="true" id="Tempering">Tempering</div>
+      </div>
+      <div id="dropzones" class="flex items-center gap-4 mb-6">
+        <div class="drop-zone w-32 h-16 bg-gray-50 border-2 border-dashed border-gray-300 rounded flex items-center justify-center"></div>
+        <div class="text-2xl">→</div>
+        <div class="drop-zone w-32 h-16 bg-gray-50 border-2 border-dashed border-gray-300 rounded flex items-center justify-center"></div>
+        <div class="text-2xl">→</div>
+        <div class="drop-zone w-32 h-16 bg-gray-50 border-2 border-dashed border-gray-300 rounded flex items-center justify-center"></div>
+        <div class="text-2xl">→</div>
+        <div class="drop-zone w-32 h-16 bg-gray-50 border-2 border-dashed border-gray-300 rounded flex items-center justify-center"></div>
+      </div>
+      <div class="flex gap-6">
+        <button id="checkBtn" class="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white font-semibold rounded-xl shadow hover:bg-purple-700 transition-colors focus:outline-none focus:ring-4 focus:ring-purple-200"><span class="text-lg">✓</span>Check Order</button>
+        <button id="resetBtn" class="flex items-center gap-2 px-6 py-3 bg-white border-2 border-purple-600 text-purple-600 font-semibold rounded-xl shadow hover:bg-purple-50 transition-colors focus:outline-none focus:ring-4 focus:ring-purple-200"><span class="text-lg">↻</span>Reset</button>
+      </div>
+    </div>
+  </div>
+<script>
+  let dragged, origin;
+  document.querySelectorAll('.card').forEach(card => {
+    card.addEventListener('dragstart', () => {
+      dragged = card;
+      origin = card.parentElement;
+      setTimeout(() => card.classList.add('opacity-50'), 0);
+      // Clear any previous check styling
+      document.querySelectorAll('.drop-zone').forEach(z => {
+        z.classList.remove('border-green-500', 'border-red-500', 'bg-green-50', 'bg-red-50');
+        if (!z.classList.contains('border-dashed')) {
+          z.classList.add('border-dashed', 'border-gray-300');
+        }
+      });
+    });
+    card.addEventListener('dragend', () => card.classList.remove('opacity-50'));
+  });
+
+  document.querySelectorAll('.drop-zone').forEach(zone => {
+    zone.addEventListener('dragover', e => e.preventDefault());
+    zone.addEventListener('dragenter', () => zone.classList.add('bg-purple-50'));
+    zone.addEventListener('dragleave', () => zone.classList.remove('bg-purple-50'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('bg-purple-50');
+      // Remove previous check styling on drop
+      zone.classList.remove('border-green-500', 'border-red-500', 'bg-green-50', 'bg-red-50');
+      if (!zone.classList.contains('border-dashed')) {
+        zone.classList.add('border-dashed', 'border-gray-300');
+      }
+      if (dragged) {
+        if (zone.firstChild) {
+          const existing = zone.firstChild;
+          origin.appendChild(existing);
+        }
+        zone.appendChild(dragged);
+      }
+    });
+  });
+
+  document.getElementById('checkBtn').addEventListener('click', () => {
+    const correct = ['Drying','Roasting','Conching','Tempering'];
+    document.querySelectorAll('.drop-zone').forEach((zone, i) => {
+      const child = zone.children[0];
+      if (child && child.id === correct[i]) {
+        zone.classList.add('border-green-500','bg-green-50');
+        zone.classList.remove('border-dashed','border-gray-300');
+      } else {
+        zone.classList.add('border-red-500','bg-red-50');
+        zone.classList.remove('border-dashed','border-gray-300');
+      }
+    });
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    const cards = document.getElementById('cards');
+    document.querySelectorAll('.card').forEach(card => cards.appendChild(card));
+    document.querySelectorAll('.drop-zone').forEach(zone => {
+      zone.innerHTML = '';
+      zone.className = 'drop-zone w-32 h-16 bg-gray-50 border-2 border-dashed border-gray-300 rounded flex items-center justify-center';
+    });
+  });
+</script>
+</body>
+</html>
