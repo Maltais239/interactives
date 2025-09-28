@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Schedule</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f9ff; overscroll-behavior-y: contain; min-height: 100vh; }
+        .activity-item { touch-action: none; cursor: grab; transition: transform .2s, box-shadow .2s, opacity .2s; width:100%; display:flex; align-items:center; gap:.75rem; padding:.75rem; border-radius:.5rem; box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -1px rgba(0,0,0,.06); border:1px solid transparent; position:relative; user-select:none; }
+        .activity-item.dragging { opacity:.4!important; cursor:grabbing; }
+        .activity-item.done { opacity:.6; text-decoration:line-through; }
+        .activity-item.done::after { content:'✔'; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:2.5rem; color:#10b981; opacity:.8; z-index:10; }
+        .activity-item .icon { font-size:1.75rem; flex-shrink:0; pointer-events:none; }
+        .activity-item .label { font-size:.9rem; pointer-events:none; }
+        .schedule-slot { border:2px dashed #93c5fd; background:#f9fafb; border-radius:.5rem; width:100%; min-height:3.5rem; display:flex; align-items:center; justify-content:center; }
+        .drag-over { background:#dbeafe!important; border-color:#60a5fa!important; }
+        .ghost-image { position:absolute; pointer-events:none; opacity:.75; transform:scale(.95); z-index:1000; display:flex; align-items:center; gap:.75rem; padding:.75rem; border-radius:.5rem; box-shadow:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -2px rgba(0,0,0,.05); border:1px solid transparent; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-5xl mx-auto bg-white p-6 rounded-xl shadow-xl">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-blue-600">Today's Visual Schedule</h1>
+            <p class="text-gray-600">Drag activities to plan your day. Touch to drag on mobile. Click to mark done.</p>
+        </header>
+        <div class="flex flex-col md:flex-row gap-8">
+            <aside class="md:w-1/3 bg-sky-50 p-4 rounded-lg shadow">
+                <h2 class="text-xl font-semibold text-sky-700 mb-4 text-center">Activity Choices</h2>
+                <div id="activityBank" class="space-y-3"></div>
+            </aside>
+            <main class="md:w-2/3">
+                <h2 class="text-xl font-semibold text-indigo-700 mb-4 text-center">My Day</h2>
+                <div id="scheduleArea" class="flex flex-col space-y-4"></div>
+                <div class="mt-8 text-center"><button id="resetButton" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-6 rounded-lg shadow">Reset Schedule</button></div>
+            </main>
+        </div>
+    </div>
+    <div id="ghost" class="ghost-image" style="display:none;"></div>
+
+    <script>
+        const activities = [
+            { id: 'arrival', label: 'Arrival', icon: '🏫', classes: ['bg-gray-100','border-gray-300','text-gray-700'] },
+            { id: 'meeting', label: 'Morning Meeting', icon: '📅', classes: ['bg-blue-100','border-blue-300','text-blue-700'] },
+            { id: 'work', label: 'Morning Work', icon: '✏️', classes: ['bg-yellow-100','border-yellow-300','text-yellow-700'] },
+            { id: 'snack', label: 'Snack', icon: '🍎', classes: ['bg-red-100','border-red-300','text-red-700'] },
+            { id: 'recess', label: 'Recess', icon: '🚶‍♂️', classes: ['bg-green-100','border-green-300','text-green-700'] },
+            { id: 'literacy', label: 'Literacy Centers', icon: '📚', classes: ['bg-indigo-100','border-indigo-300','text-indigo-700'] },
+            { id: 'math', label: 'Math', icon: '🔢', classes: ['bg-orange-100','border-orange-300','text-orange-700'] },
+            { id: 'art', label: 'Art/Sensory', icon: '🎨', classes: ['bg-purple-100','border-purple-300','text-purple-700'] },
+            { id: 'lunch', label: 'Lunch', icon: '🍽️', classes: ['bg-pink-100','border-pink-300','text-pink-700'] },
+            { id: 'bathroom', label: 'Bathroom', icon: '🚻', classes: ['bg-cyan-100','border-cyan-300','text-cyan-700'] },
+            { id: 'choice', label: 'Choice Time', icon: '🧩', classes: ['bg-lime-100','border-lime-300','text-lime-700'] },
+            { id: 'music', label: 'Music/PE', icon: '🎵', classes: ['bg-rose-100','border-rose-300','text-rose-700'] },
+            { id: 'packup', label: 'Pack Up', icon: '🏠', classes: ['bg-stone-100','border-stone-300','text-stone-700'] }
+        ];
+        const numberOfScheduleSlots = activities.length;
+
+        let activityBank, scheduleArea, resetButton;
+        let draggedItem = null;
+        let touchId = null;
+        const ghost = document.getElementById('ghost');
+
+        function createActivityElement(act) {
+            const el = document.createElement('div');
+            el.classList.add('activity-item', 'border');
+            act.classes.forEach(c => el.classList.add(c));
+            el.setAttribute('draggable', true);
+            el.dataset.id = act.id;
+            el.innerHTML = `<span class="icon">${act.icon}</span><span class="label">${act.label}</span>`;
+            el.addEventListener('dragstart', onDragStart);
+            el.addEventListener('dragend', onDragEnd);
+            el.addEventListener('click', () => el.classList.toggle('done'));
+            return el;
+        }
+
+        function createSlot() {
+            const slot = document.createElement('div');
+            slot.className = 'schedule-slot';
+            slot.addEventListener('dragover', onDragOver);
+            slot.addEventListener('dragleave', onDragLeave);
+            slot.addEventListener('drop', onDrop);
+            return slot;
+        }
+
+        function populateActivityBank() {
+            activityBank.innerHTML = '';
+            activities.forEach(act => {
+                const inSchedule = scheduleArea.querySelector(`[data-id="${act.id}"]`);
+                if (!inSchedule) activityBank.append(createActivityElement(act));
+            });
+        }
+
+        function populateSchedule() {
+            scheduleArea.innerHTML = '';
+            for (let i = 0; i < numberOfScheduleSlots; i++) scheduleArea.append(createSlot());
+        }
+
+        function onDragOver(e) {
+            e.preventDefault();
+            const slot = e.target.closest('.schedule-slot');
+            const bank = e.target.closest('#activityBank');
+            if (slot && !slot.querySelector('.activity-item')) {
+                slot.classList.add('drag-over');
+                e.dataTransfer.dropEffect = 'move';
+            } else if (bank) {
+                bank.classList.add('drag-over');
+                e.dataTransfer.dropEffect = 'move';
+            }
+        }
+
+        function onDragLeave(e) {
+            const slot = e.target.closest('.schedule-slot');
+            const bank = e.target.closest('#activityBank');
+            if (slot) slot.classList.remove('drag-over');
+            if (bank) bank.classList.remove('drag-over');
+        }
+
+        function onDrop(e) {
+            e.preventDefault();
+            const slot = e.target.closest('.schedule-slot');
+            const bank = e.target.closest('#activityBank');
+            if (slot && draggedItem && !slot.querySelector('.activity-item')) {
+                slot.classList.remove('drag-over');
+                slot.append(draggedItem);
+            } else if (bank && draggedItem) {
+                bank.classList.remove('drag-over');
+                bank.append(draggedItem);
+            }
+        }
+
+        function onDragStart(e) {
+            if (!(e.target instanceof Element) || !e.target.classList.contains('activity-item')) return;
+            draggedItem = e.target;
+            setTimeout(() => draggedItem.classList.add('dragging'), 0);
+            e.dataTransfer.setDragImage(new Image(), 0, 0);
+        }
+
+        function onDragEnd() {
+            if (!draggedItem) return;
+            draggedItem.classList.remove('dragging');
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            ghost.style.display = 'none';
+            draggedItem = null;
+        }
+
+        document.addEventListener('dragstart', e => {
+            if (e.target instanceof Element && e.target.classList.contains('activity-item')) setGhostContent(e.target);
+        });
+        document.addEventListener('drag', e => updateGhostPosition(e.clientX, e.clientY));
+
+        function onTouchStart(e) {
+            const item = e.target.closest('.activity-item'); if (!item) return;
+            e.preventDefault(); touchId = e.changedTouches[0].identifier; draggedItem = item;
+            item.classList.add('dragging'); setGhostContent(item);
+            updateGhostPosition(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+        }
+        function onTouchMove(e) {
+            if (!draggedItem) return; e.preventDefault(); const t = Array.from(e.changedTouches).find(t => t.identifier === touchId); if (!t) return;
+            updateGhostPosition(t.clientX, t.clientY);
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            const slot = document.elementFromPoint(t.clientX, t.clientY).closest('.schedule-slot');
+            const bank = document.elementFromPoint(t.clientX, t.clientY).closest('#activityBank');
+            if (slot && !slot.querySelector('.activity-item')) slot.classList.add('drag-over');
+            else if (bank) bank.classList.add('drag-over');
+        }
+        function onTouchEnd(e) {
+            if (!draggedItem) return; e.preventDefault(); const t = Array.from(e.changedTouches).find(t => t.identifier === touchId); if (!t) return;
+            const slot = document.elementFromPoint(t.clientX, t.clientY).closest('.schedule-slot');
+            const bank = document.elementFromPoint(t.clientX, t.clientY).closest('#activityBank');
+            if (slot && !slot.querySelector('.activity-item')) slot.append(draggedItem);
+            else if (bank) bank.append(draggedItem);
+            onDragEnd(); touchId = null;
+        }
+
+        function setGhostContent(target) {
+            ghost.innerHTML = target.innerHTML;
+            ghost.className = 'ghost-image ' + [...target.classList].filter(c => !['activity-item','dragging','done'].includes(c)).join(' ');
+            ghost.style.display = 'flex';
+        }
+        function updateGhostPosition(x, y) {
+            ghost.style.left = `${x - ghost.offsetWidth/2}px`;
+            ghost.style.top = `${y - ghost.offsetHeight/2}px`;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            activityBank = document.getElementById('activityBank');
+            scheduleArea = document.getElementById('scheduleArea');
+            resetButton = document.getElementById('resetButton');
+            populateSchedule(); populateActivityBank();
+            resetButton.addEventListener('click', () => { populateSchedule(); populateActivityBank(); });
+            activityBank.addEventListener('dragover', onDragOver);
+            activityBank.addEventListener('dragleave', onDragLeave);
+            activityBank.addEventListener('drop', onDrop);
+            document.addEventListener('touchstart', onTouchStart, { passive: false });
+            document.addEventListener('touchmove', onTouchMove, { passive: false });
+            document.addEventListener('touchend', onTouchEnd, { passive: false });
+        });
+    </script>
+</body>
+</html>
