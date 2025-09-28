@@ -35,6 +35,17 @@
     .controls{ text-align:center; margin-top:20px; }
     .controls button{background:#f472b6;color:#fff;border:none;padding:12px 28px;border-radius:12px;cursor:pointer;transition:transform .2s,background .3s;} .controls button:hover{transform:scale(1.05);background:#ec4899;}
     canvas{position:fixed;pointer-events:none;top:0;left:0;width:100%;height:100%;}
+    /* Style for the original card being dragged */
+    .card.dragging { opacity: 0.4; }
+    /* Style for the custom ghost element */
+    .ghost {
+      position: fixed;
+      pointer-events: none; /* Let events pass through */
+      z-index: 100;
+      opacity: 0.75;
+      transform: rotate(3deg);
+      background: #f3f0ff;
+    }
   </style>
 </head>
 <body>
@@ -64,6 +75,7 @@
     let currentVocab = [];
     let matches = 0;
     let draggedElement = null;
+    let ghostElement = null; // To hold our touch-drag ghost
     const termsContainer = document.getElementById('terms');
     const defsContainer  = document.getElementById('definitions');
     const progressFill   = document.querySelector('.progress-fill');
@@ -103,6 +115,10 @@
         card.dataset.index = currentVocab.indexOf(item);
         card.addEventListener('dragstart', dragStart);
         card.addEventListener('dragend', dragEnd);
+        // Add touch events for mobile
+        card.addEventListener('touchstart', touchStart, { passive: false });
+        card.addEventListener('touchmove', touchMove, { passive: false });
+        card.addEventListener('touchend', touchEnd);
         termsContainer.appendChild(card);
       });
 
@@ -118,19 +134,102 @@
       });
     }
 
+    // --- Touch Event Handlers ---
+    let currentDropTarget = null;
+
+    function touchStart(e) {
+      e.preventDefault();
+      draggedElement = e.target;
+      draggedElement.classList.add('dragging');
+
+      // Create and position the ghost element
+      ghostElement = document.createElement('div');
+      ghostElement.className = 'card ghost';
+      ghostElement.textContent = draggedElement.textContent;
+      ghostElement.style.width = `${draggedElement.offsetWidth}px`;
+      document.body.appendChild(ghostElement);
+      
+      const touch = e.touches[0];
+      ghostElement.style.left = `${touch.clientX - ghostElement.offsetWidth / 2}px`;
+      ghostElement.style.top = `${touch.clientY - ghostElement.offsetHeight / 2}px`;
+    }
+
+    function touchMove(e) {
+      e.preventDefault();
+      if (!draggedElement || !ghostElement) return;
+
+      const touch = e.touches[0];
+      
+      // Move the ghost element
+      ghostElement.style.left = `${touch.clientX - ghostElement.offsetWidth / 2}px`;
+      ghostElement.style.top = `${touch.clientY - ghostElement.offsetHeight / 2}px`;
+      
+      // Find what's under the finger
+      const elementUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+      
+      // Clean up previous hover state
+      if (currentDropTarget && currentDropTarget !== elementUnder) {
+        currentDropTarget.classList.remove('over');
+        currentDropTarget = null;
+      }
+      
+      // Set new hover state if it's a definition
+      if (elementUnder && elementUnder.classList.contains('definition')) {
+        elementUnder.classList.add('over');
+        currentDropTarget = elementUnder;
+      }
+    }
+
+    function touchEnd(e) {
+      if (!draggedElement) return;
+
+      // Clean up ghost element
+      if (ghostElement) {
+        ghostElement.remove();
+        ghostElement = null;
+      }
+      draggedElement.classList.remove('dragging');
+
+      if (currentDropTarget) {
+        currentDropTarget.classList.remove('over');
+        // Manually create an object to mimic the drop event
+        const mockEvent = { 
+          currentTarget: currentDropTarget, 
+          dataTransfer: { getData: () => draggedElement.dataset.index }
+        };
+        // Reuse the existing drop logic
+        drop(mockEvent); 
+      }
+      
+      draggedElement = null;
+      currentDropTarget = null;
+    }
+
+
     function dragStart(e) {
       draggedElement = e.target;
       e.dataTransfer.setData('text/plain', draggedElement.dataset.index);
+
+      // --- Create Custom Ghost Element for Desktop Drag ---
+      const ghost = document.createElement('div');
+      ghost.className = 'card ghost';
+      ghost.textContent = draggedElement.textContent;
+      ghost.style.width = `${draggedElement.offsetWidth}px`;
+      document.body.appendChild(ghost);
+      e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, ghost.offsetHeight / 2);
+      
+      // The browser creates a snapshot, so we can remove our element
+      setTimeout(() => document.body.removeChild(ghost), 0);
+      
+      // Style the original element
       setTimeout(() => {
-        if (draggedElement && draggedElement.classList) {
-          draggedElement.classList.add('hide');
-        }
+        if (draggedElement) draggedElement.classList.add('dragging');
       }, 0);
     }
 
     function dragEnd() {
       if (draggedElement && draggedElement.classList) {
-        draggedElement.classList.remove('hide');
+        draggedElement.classList.remove('dragging');
       }
       draggedElement = null;
     }
@@ -149,7 +248,9 @@
     }
 
     function drop(e) {
-      e.preventDefault();
+      // Allow both real and mock events
+      if (e.preventDefault) e.preventDefault();
+      
       const slot = e.currentTarget;
       if (slot && slot.classList) {
         slot.classList.remove('over');
@@ -158,12 +259,16 @@
       if (!draggedElement) return;
       const defIdx = slot ? slot.dataset.index : null;
       if (draggedElement && draggedElement.classList) {
-        draggedElement.classList.remove('hide');
+        draggedElement.classList.remove('dragging');
       }
       if (termIdx === defIdx) {
         if (slot && slot.classList) slot.classList.add('correct');
         if (draggedElement && draggedElement.classList) draggedElement.classList.add('correct');
         draggedElement.draggable = false;
+        // Make it non-touchable as well
+        draggedElement.removeEventListener('touchstart', touchStart);
+        draggedElement.removeEventListener('touchmove', touchMove);
+        draggedElement.removeEventListener('touchend', touchEnd);
         matches++;
         successSound.play();
         progressFill.style.width = `${(matches / currentVocab.length) * 100}%`;
@@ -202,3 +307,4 @@
   </script>
 </body>
 </html>
+
