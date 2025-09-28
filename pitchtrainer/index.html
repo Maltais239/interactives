@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chromatic Ascent - Pitch Trainer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .feedback-correct { transition: background-color 0.1s ease-in-out, transform 0.1s ease-in-out; background-color: #10B981 !important; transform: scale(1.05); }
+        .feedback-incorrect { transition: background-color 0.1s ease-in-out, transform 0.1s ease-in-out; background-color: #EF4444 !important; transform: scale(0.95); }
+        .feedback-actual { transition: background-color 0.1s ease-in-out; background-color: #F59E0B !important; }
+        #progress-bar-fill { transition: width 0.3s ease-out; }
+        #intro button { background-color: #22c55e; color: white; padding: 0.5rem 1rem; font-size: 0.9rem; margin-top: 0.5rem; border-radius: 0.375rem; transition: background-color 0.2s; }
+        #intro button:hover { background-color: #16a34a; }
+        .note-btn { min-width: 4rem; }
+        /* Style for replay button */
+        #replay-note-button { transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; }
+        #replay-note-button.hidden { opacity: 0; transform: scale(0.9); pointer-events: none; }
+
+    </style>
+</head>
+<body class="bg-gradient-to-tl from-gray-900 via-purple-900 to-gray-900 min-h-screen flex flex-col items-center justify-center p-4 text-white">
+
+    <h1 class="text-4xl md:text-5xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">Chromatic Ascent</h1>
+    <p class="text-gray-300 mb-8 text-sm md:text-base">Train your ear, one note at a time.</p>
+
+    <div class="game-area bg-gray-800/70 backdrop-blur-sm p-6 md:p-10 rounded-xl shadow-2xl w-full max-w-2xl text-center flex flex-col items-center">
+
+        <div class="w-full mb-6">
+            <div class="flex justify-between text-xs text-gray-400 mb-1">
+                <span>Progress to Next Note</span>
+                <span id="progress-text">0 / 20</span>
+            </div>
+            <div class="w-full bg-gray-700 rounded-full h-2.5">
+                <div id="progress-bar-fill" class="bg-gradient-to-r from-purple-500 to-pink-500 h-2.5 rounded-full" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-center gap-4 mb-6">
+            <button id="play-note" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-lg text-xl transition duration-200 ease-in-out shadow-lg flex items-center gap-2">
+                <i class="fas fa-play"></i> Play Note
+            </button>
+            <button id="replay-note-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 rounded-full text-lg transition duration-200 ease-in-out shadow-lg flex items-center justify-center aspect-square hidden" title="Replay Note">
+                <i class="fas fa-redo"></i>
+            </button>
+        </div>
+
+        <div id="note-buttons" class="mt-4 flex flex-wrap justify-center gap-3 w-full" style="display: none;">
+            </div>
+
+        <div id="status" class="mt-6 text-xl font-medium text-gray-100 min-h-[1.5em]">Begin your ascent!</div>
+        <div id="response-time" class="mt-1 text-sm text-gray-400 min-h-[1em]"></div>
+        <div id="reminder" class="mt-3 text-sm text-yellow-400 italic font-medium min-h-[1.2em]"></div>
+
+    </div>
+
+    <div id="intro" class="mt-6 text-left p-5 bg-gray-800/70 backdrop-blur-sm rounded-lg w-full max-w-2xl" style="display: none;">
+        </div>
+
+    <div class="absolute top-4 right-4 text-xs flex gap-4 items-center">
+        <button id="reset-progress" class="bg-red-700 hover:bg-red-800 text-white text-xs font-bold py-1 px-3 rounded-md transition duration-200 ease-in-out flex items-center gap-1">
+             <i class="fas fa-undo text-xs"></i> Reset
+        </button>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Audio Setup ---
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            let audioCtx;
+            try {
+                audioCtx = new AudioContext();
+            } catch (e) {
+                console.error("Web Audio API is not supported.", e);
+                document.getElementById('status').textContent = "Audio features not supported in this browser.";
+                document.getElementById('play-note').disabled = true;
+                document.getElementById('reset-progress').disabled = true;
+                return;
+            }
+
+            // --- Configuration ---
+            const unlockSequence = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const octavesToUse = [3, 4, 5];
+            const correctThreshold = 20;
+            const reminderInterval = 10;
+            const noteDuration = 0.8;
+            const feedbackDuration = 1000;
+            const baseMidiNoteC4 = 60;
+            const defaultWaveform = 'sine';
+
+            const examples = {
+                'C': ['My Girl - The Temptations (bassline)', 'Twinkle Twinkle Little Star (starts C)', 'Do-Re-Mi (starts C)'],
+                'C#': ["Crazy Train - Ozzy Osbourne (riff)", "The Simpsons Theme (opening melody)"],
+                'D': ['Money for Nothing - Dire Straits (riff)', 'Smoke on the Water - Deep Purple (riff uses D in G minor blues scale)'],
+                'D#': ["Sweet Child o' Mine - GNR (intro riff uses D#/Eb)", "Billie Jean - MJ (bassline implies D#)"],
+                'E': ['Jaws Theme (E-F oscillation)', 'Iron Man - Black Sabbath (riff starts E)'],
+                'F': ['Jaws Theme (E-F oscillation)', 'Happy Birthday (often starts F or C)'],
+                'F#': ["Enter Sandman - Metallica (main riff F#)", "Beat It - MJ (synth riff F#)"],
+                'G': ['Sweet Home Alabama - L. Skynyrd (D-C-G progression)', 'Knockin\' on Heaven\'s Door - Dylan/GNR (G-D-Am-C)'],
+                'G#': ["Axel F - Harold Faltermeyer (synth theme G#)"],
+                'A': ['Highway to Hell - AC/DC (riff A)', 'Stairway to Heaven - Led Zep (intro Am)'],
+                'A#': ["Super Mario Bros. Theme (main melody starts A#/Bb)"],
+                'B': ["Under the Bridge - RHCP (intro B)", "Hells Bells - AC/DC (bell B)"]
+            };
+
+            // --- State Variables ---
+            let currentSet = [unlockSequence[0]];
+            let totalCorrect = 0;
+            let playCount = 0;
+            let currentStimPitch = null; // e.g., C#4
+            let currentStimNote = null; // e.g., C#
+            let currentStimOctave = null; // e.g., 4
+            let targetLabel = null;
+            let noteStartTime = 0;
+            let isGuessingPhase = false; // Track if waiting for user guess
+
+            // --- DOM References ---
+            const playBtn = document.getElementById('play-note');
+            const replayBtn = document.getElementById('replay-note-button'); // Added Replay Button Ref
+            const buttonsContainer = document.getElementById('note-buttons');
+            const statusDiv = document.getElementById('status');
+            const reminderDiv = document.getElementById('reminder');
+            const introDiv = document.getElementById('intro');
+            const responseTimeDiv = document.getElementById('response-time');
+            const resetBtn = document.getElementById('reset-progress');
+            const progressBarFill = document.getElementById('progress-bar-fill');
+            const progressText = document.getElementById('progress-text');
+
+            // --- Local Storage ---
+            const LS_KEY = 'chromaticAscentProgress_v2';
+            function saveProgress() {
+                try {
+                    localStorage.setItem(LS_KEY, JSON.stringify({ currentSet: currentSet }));
+                } catch (e) { console.error("Could not save progress", e); }
+            }
+
+            function loadProgress() {
+                try {
+                    const savedData = localStorage.getItem(LS_KEY);
+                    if (savedData) {
+                        const parsedData = JSON.parse(savedData);
+                        if (Array.isArray(parsedData.currentSet) && parsedData.currentSet.every(note => unlockSequence.includes(note))) {
+                            currentSet = parsedData.currentSet;
+                        }
+                    }
+                } catch (e) {
+                    console.error("Could not load progress", e);
+                    currentSet = [unlockSequence[0]];
+                    localStorage.removeItem(LS_KEY);
+                }
+                if (!currentSet || currentSet.length === 0) {
+                    currentSet = [unlockSequence[0]];
+                }
+            }
+
+            // --- Utility Functions ---
+            const randomChoice = arr => arr[Math.floor(Math.random() * arr.length)];
+            const pitchToFreq = (note, octave) => {
+                const noteMap = {'C':0,'C#':1,'D':2,'D#':3,'E':4,'F':5,'F#':6,'G':7,'G#':8,'A':9,'A#':10,'B':11};
+                const midiNote = baseMidiNoteC4 + noteMap[note] + (octave - 4) * 12;
+                return 440 * Math.pow(2, (midiNote - 69) / 12);
+            };
+
+            // --- Audio Playback ---
+            function playTone(note, octave, isReplay = false) { // Added isReplay flag
+                if (!note || !octave) {
+                    console.error("Attempted to play tone with invalid note or octave:", note, octave);
+                    return;
+                }
+                if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+                const freq = pitchToFreq(note, octave);
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = defaultWaveform;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + 0.05);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + noteDuration);
+                osc.connect(gain).connect(audioCtx.destination);
+                osc.start(audioCtx.currentTime);
+                osc.stop(audioCtx.currentTime + noteDuration);
+
+                // Only reset start time on the *initial* play, not replays
+                if (!isReplay) {
+                    noteStartTime = performance.now();
+                }
+            }
+
+            // --- UI Update Functions ---
+            function updateProgressDisplay() {
+                const progressPercent = currentSet.length < unlockSequence.length
+                    ? (totalCorrect / correctThreshold) * 100
+                    : 100;
+                progressBarFill.style.width = `${progressPercent}%`;
+                progressText.textContent = currentSet.length < unlockSequence.length
+                    ? `${totalCorrect} / ${correctThreshold}`
+                    : `All Notes Unlocked!`;
+            }
+
+            function setupButtons() {
+                buttonsContainer.innerHTML = '';
+                const fragment = document.createDocumentFragment();
+                currentSet.forEach(note => {
+                    const btn = document.createElement('button');
+                    btn.textContent = note;
+                    btn.className = 'note-btn bg-gray-600 hover:bg-purple-600 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out text-lg';
+                    btn.dataset.note = note;
+                    btn.onclick = () => handleGuess(note);
+                    fragment.appendChild(btn);
+                });
+                if (currentSet.length < unlockSequence.length) {
+                    const oobBtn = document.createElement('button');
+                    oobBtn.textContent = 'Other';
+                    oobBtn.className = 'note-btn bg-gray-700 hover:bg-gray-500 text-gray-300 font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out text-lg';
+                    oobBtn.dataset.note = 'Out of Bounds';
+                    oobBtn.onclick = () => handleGuess('Out of Bounds');
+                    fragment.appendChild(oobBtn);
+                }
+                buttonsContainer.appendChild(fragment);
+            }
+
+            function showIntroduction(note) {
+                introDiv.innerHTML = '';
+                introDiv.style.display = 'block';
+                const header = document.createElement('h2');
+                header.className = "text-xl font-semibold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500";
+                header.textContent = `New Note Unlocked: ${note}`;
+                introDiv.appendChild(header);
+                const playNewBtn = document.createElement('button');
+                playNewBtn.textContent = `Play ${note} (Octave 4)`;
+                playNewBtn.onclick = (e) => { e.stopPropagation(); playTone(note, 4); };
+                introDiv.appendChild(playNewBtn);
+                if (examples[note] && examples[note].length) {
+                    const p = document.createElement('p');
+                    p.className = "mt-4 mb-1 text-sm font-medium text-gray-300";
+                    p.textContent = 'Found In:';
+                    const ul = document.createElement('ul');
+                    ul.className = "list-disc list-inside text-sm text-gray-400";
+                    examples[note].forEach(text => {
+                        const li = document.createElement('li'); li.textContent = text; ul.appendChild(li);
+                    });
+                    introDiv.appendChild(p); introDiv.appendChild(ul);
+                } else {
+                    const p = document.createElement('p');
+                    p.className = "mt-3 text-sm text-gray-400";
+                    p.textContent = 'No song examples available yet.';
+                    introDiv.appendChild(p);
+                }
+            }
+
+            // --- Game Logic ---
+            function handleGuess(guess) {
+                if (!isGuessingPhase) return; // Prevent guessing if not in guessing phase
+
+                const responseTime = ((performance.now() - noteStartTime) / 1000).toFixed(2);
+                responseTimeDiv.textContent = `Response time: ${responseTime}s`;
+
+                isGuessingPhase = false; // Exit guessing phase
+                playBtn.disabled = false;
+                replayBtn.classList.add('hidden'); // Hide replay button after guess
+                buttonsContainer.style.display = 'none';
+
+                const noteIsInCurrentSet = currentSet.includes(currentStimNote);
+                let correct = false;
+                let correctNoteForFeedback = noteIsInCurrentSet ? currentStimNote : 'Out of Bounds';
+
+                if (guess === 'Out of Bounds') { correct = !noteIsInCurrentSet; }
+                else { correct = (guess === currentStimNote && noteIsInCurrentSet); }
+
+                const guessButton = buttonsContainer.querySelector(`button[data-note="${guess}"]`);
+                const correctButton = buttonsContainer.querySelector(`button[data-note="${correctNoteForFeedback}"]`);
+
+                if (correct) {
+                    statusDiv.textContent = 'Correct!';
+                    statusDiv.className = 'mt-6 text-xl font-medium text-green-400 min-h-[1.5em]';
+                    totalCorrect++;
+                    if(guessButton) guessButton.classList.add('feedback-correct');
+                } else {
+                    statusDiv.textContent = `Incorrect. Played ${correctNoteForFeedback}, you guessed ${guess}.`;
+                    statusDiv.className = 'mt-6 text-xl font-medium text-red-400 min-h-[1.5em]';
+                    if(guessButton) guessButton.classList.add('feedback-incorrect');
+                    if(correctButton && correctButton !== guessButton) { correctButton.classList.add('feedback-actual'); }
+                }
+
+                setTimeout(() => {
+                    if (guessButton) guessButton.classList.remove('feedback-correct', 'feedback-incorrect');
+                    if (correctButton) correctButton.classList.remove('feedback-actual');
+                }, feedbackDuration);
+
+                updateProgressDisplay();
+
+                if (totalCorrect >= correctThreshold && currentSet.length < unlockSequence.length) {
+                    const nextNoteIndex = currentSet.length;
+                    const nextNote = unlockSequence[nextNoteIndex];
+                    currentSet.push(nextNote);
+                    statusDiv.textContent += ` Level up! Unlocked: ${nextNote}`;
+                    totalCorrect = 0;
+                    updateProgressDisplay(); // Reset bar for new level
+                    setupButtons();
+                    showIntroduction(nextNote);
+                    saveProgress();
+                } else if (currentSet.length === unlockSequence.length && totalCorrect >= correctThreshold) {
+                    statusDiv.textContent = "Chromatic Ascent Complete!";
+                }
+            }
+
+            function proceedWithPlay() {
+                playBtn.disabled = true;
+                replayBtn.classList.add('hidden'); // Ensure replay is hidden initially
+                introDiv.style.display = 'none';
+                introDiv.innerHTML = '';
+                playCount++;
+                responseTimeDiv.textContent = '';
+                reminderDiv.textContent = (playCount % reminderInterval === 0) ? 'Reminder: Try humming your anchor melody!' : '';
+
+                const playInBounds = Math.random() < 0.75 || currentSet.length === unlockSequence.length;
+                currentStimOctave = randomChoice(octavesToUse); // Store the selected octave
+
+                if (playInBounds) { currentStimNote = randomChoice(currentSet); }
+                else {
+                    const outOfBoundsNotes = unlockSequence.filter(note => !currentSet.includes(note));
+                    currentStimNote = randomChoice(outOfBoundsNotes);
+                }
+                currentStimPitch = `${currentStimNote}${currentStimOctave}`;
+                targetLabel = currentSet.includes(currentStimNote) ? currentStimNote : 'Out of Bounds';
+
+                statusDiv.textContent = 'Listen...';
+                statusDiv.className = 'mt-6 text-xl font-medium text-gray-100 min-h-[1.5em]';
+                setupButtons();
+                buttonsContainer.style.display = 'flex';
+                playTone(currentStimNote, currentStimOctave, false); // Play the initial tone (not a replay)
+
+                isGuessingPhase = true; // Enter guessing phase
+                replayBtn.classList.remove('hidden'); // Show replay button
+            }
+
+            // --- Event Listeners ---
+            playBtn.onclick = () => {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume().then(proceedWithPlay).catch(e => console.error("AudioContext resume failed:", e));
+                } else { proceedWithPlay(); }
+            };
+
+            // Added Replay Button Listener
+            replayBtn.onclick = () => {
+                if (isGuessingPhase && currentStimNote && currentStimOctave) {
+                    // Play the same note again without resetting timer or state
+                    playTone(currentStimNote, currentStimOctave, true); // Pass true for isReplay
+                }
+            };
+
+            resetBtn.onclick = () => {
+                if (confirm("Reset all progress?")) {
+                    localStorage.removeItem(LS_KEY);
+                    currentSet = [unlockSequence[0]];
+                    totalCorrect = 0; playCount = 0;
+                    isGuessingPhase = false; // Reset guessing state
+                    replayBtn.classList.add('hidden'); // Hide replay button
+                    statusDiv.textContent = "Progress Reset. Begin your ascent!";
+                    statusDiv.className = 'mt-6 text-xl font-medium text-gray-100 min-h-[1.5em]';
+                    reminderDiv.textContent = ''; responseTimeDiv.textContent = '';
+                    updateProgressDisplay(); setupButtons();
+                    showIntroduction(currentSet[0]);
+                    console.log("Progress reset.");
+                }
+            };
+
+            // --- Initialization ---
+            loadProgress();
+            updateProgressDisplay();
+            setupButtons();
+            replayBtn.classList.add('hidden'); // Ensure replay button is hidden on load
+            if (currentSet.length === 1 && currentSet[0] === unlockSequence[0]) {
+                showIntroduction(currentSet[0]);
+            } else { introDiv.style.display = 'none'; }
+        });
+    </script>
+</body>
+</html>
