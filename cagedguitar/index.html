@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guitar Neck - CAGED Shapes & Triads</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* Styles remain largely the same, focusing on highlighting */
+        body { font-family: 'Inter', sans-serif; background-color: #f0f0f0; }
+        .fretboard-container { padding: 20px; overflow-x: auto; max-width: 100%; background-color: #e5e7eb; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .fretboard { display: flex; flex-direction: column; background: linear-gradient(to bottom, #a05a2c, #8b4513); border-radius: 5px; padding: 2px 5px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.2); position: relative; min-width: 950px; }
+        .string { display: flex; align-items: center; height: 20px; position: relative; margin-bottom: 2px; }
+        .string:last-child { margin-bottom: 0; }
+        .string::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: var(--string-thickness, 1.5px); background-color: #d1d5db; transform: translateY(-50%); z-index: 1; }
+        .string[data-string="0"] { --string-thickness: 2.5px; } .string[data-string="1"] { --string-thickness: 2.3px; }
+        .string[data-string="2"] { --string-thickness: 2.1px; } .string[data-string="3"] { --string-thickness: 1.9px; }
+        .string[data-string="4"] { --string-thickness: 1.7px; } .string[data-string="5"] { --string-thickness: 1.5px; }
+        .fret-marker-container { height: 100%; display: flex; justify-content: center; align-items: center; position: absolute; z-index: 3; }
+        .fret-marker { width: 18px; height: 18px; background-color: transparent; border-radius: 50%; cursor: pointer; display: flex; justify-content: center; align-items: center; font-size: 10px; font-weight: bold; color: white; transition: all 0.1s ease-in-out; position: absolute; border: 1px solid transparent; box-sizing: border-box; }
+        .fret-marker:hover { background-color: rgba(255, 255, 255, 0.3); transform: scale(1.1); }
+        .fret-marker.selected { background-color: #3b82f6; transform: scale(1.1); border-color: white; }
+        .fret-marker.highlight { background-color: #f59e0b; transform: scale(1.1); }
+
+        /* Highlighting for notes WITHIN the displayed shape */
+        .fret-marker.in-shape {
+            border: 2px solid white; /* Outline all notes in the shape */
+            transform: scale(1.15);
+        }
+        .fret-marker.in-shape.highlight-root { background-color: #ef4444; } /* Red Root */
+        .fret-marker.in-shape.highlight-third { background-color: #3b82f6; } /* Blue Third */
+        .fret-marker.in-shape.highlight-fifth { background-color: #22c55e; } /* Green Fifth */
+        /* Notes in shape but not R,3,5 just get the border */
+
+        /* Open string markers */
+        .open-string-marker { background-color: rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.2); }
+        .open-string-marker:hover { background-color: rgba(255, 255, 255, 0.4); }
+        .open-string-marker.selected { background-color: #3b82f6; border-color: white;}
+        .open-string-marker.in-shape { border: 2px solid white; transform: scale(1.15); }
+        .open-string-marker.in-shape.highlight-root { background-color: #ef4444; }
+        .open-string-marker.in-shape.highlight-third { background-color: #3b82f6; }
+        .open-string-marker.in-shape.highlight-fifth { background-color: #22c55e; }
+
+        .fret-line { position: absolute; top: 0; bottom: 0; width: 3px; background-color: #a1a1aa; z-index: 2; border-radius: 1px; box-shadow: 1px 0 2px rgba(0,0,0,0.4); }
+        .fret-line.nut { width: 6px; background-color: #e5e7eb; box-shadow: 2px 0 3px rgba(0,0,0,0.5); }
+        .fret-numbers { display: flex; margin-top: 8px; position: relative; height: 18px; min-width: 950px; }
+        .fret-number { position: absolute; text-align: center; font-size: 11px; color: #333; transform: translateX(-50%); }
+        .fret-number-0 { font-weight: bold; }
+        .inlay-dot { position: absolute; width: 8px; height: 8px; background-color: rgba(229, 231, 235, 0.7); border-radius: 50%; top: calc(130px / 2 + 2px); transform: translate(-50%, -50%); z-index: 0; }
+        .inlay-dot.double1 { top: 56px; transform: translate(-50%, -50%); }
+        .inlay-dot.double2 { top: 78px; transform: translate(-50%, -50%); }
+        .caged-button { padding: 6px 12px; margin: 0 4px; border-radius: 6px; font-weight: 500; font-size: 14px; transition: all 0.2s ease; cursor: pointer; background-color: #6b7280; color: white; border: none; }
+        .caged-button:hover { background-color: #4b5563; }
+        .caged-button.active { background-color: #8b5cf6; color: white; }
+        .caged-button:disabled { background-color: #d1d5db; color: #9ca3af; cursor: not-allowed; }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <h1 class="text-2xl font-bold mb-2 text-gray-700">Interactive Guitar Fretboard - CAGED Shapes & Triads</h1>
+    <div id="note-display" class="mb-2 text-xl font-semibold text-indigo-600 min-h-[1.5em]">
+        Click a fret or open string to see the note
+    </div>
+
+    <div id="caged-controls" class="mb-4 flex items-center">
+        <span class="mr-2 text-sm font-medium text-gray-600">Show CAGED Shape for Selected Root:</span>
+        <button class="caged-button" data-shape="C" disabled>C</button>
+        <button class="caged-button" data-shape="A" disabled>A</button>
+        <button class="caged-button" data-shape="G" disabled>G</button>
+        <button class="caged-button" data-shape="E" disabled>E</button>
+        <button class="caged-button" data-shape="D" disabled>D</button>
+    </div>
+
+    <div class="fretboard-container">
+        <div id="fretboard" class="fretboard"></div>
+        <div id="fret-numbers" class="fret-numbers"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM References ---
+            const fretboard = document.getElementById('fretboard');
+            const noteDisplay = document.getElementById('note-display');
+            const fretNumbersContainer = document.getElementById('fret-numbers');
+            const cagedControls = document.getElementById('caged-controls');
+
+            // --- Constants ---
+            const numFrets = 14;
+            const numStrings = 6;
+            const openNotes = ['E', 'A', 'D', 'G', 'B', 'E']; // Low E to High E
+            const chromaticScale = ['E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C', 'C#', 'D', 'D#'];
+            const inlayFrets = [3, 5, 7, 9, 12];
+
+            // --- Fret Geometry Calculation (Same as before) ---
+            const scaleLength = 648; const nutWidth = 50; const fretRatio = Math.pow(2, 1/12);
+            let fretPositions = [nutWidth]; let fretWidths = [nutWidth];
+            let currentPos = nutWidth; let remainingLength = scaleLength;
+            for (let f = 1; f <= numFrets + 1; f++) {
+                const width = remainingLength - (remainingLength / fretRatio);
+                const pixelWidth = (width / scaleLength) * (900 - nutWidth);
+                fretWidths.push(pixelWidth); currentPos += pixelWidth; fretPositions.push(currentPos);
+            }
+            const totalWidth = fretPositions[numFrets];
+            fretboard.style.minWidth = `${totalWidth + fretWidths[numFrets+1] + 10}px`;
+            fretNumbersContainer.style.minWidth = `${totalWidth + fretWidths[numFrets+1] + 10}px`;
+
+            // --- State Variables ---
+            let selectedNote = null; // Note name (e.g., "C")
+            let selectedFretMarker = null; // The DOM element clicked
+            let activeCagedShape = null; // e.g., "C", "A", "G", "E", "D"
+
+            // --- CAGED Shape Definitions (Based on Open Position Shapes) ---
+            // Each note in pattern: { string: index (0-5), fret: absolute fret for OPEN chord, interval: R/3/5/opt (opt = optional/doubled) }
+            // baseRootNote: The root note of the open chord shape (e.g., 'C', 'A', 'G', 'E', 'D')
+            // baseRootFret: The lowest fret number containing the root note in the open shape pattern.
+            // baseRootString: The string index containing that lowest root note.
+            const cagedShapes = {
+                'C': {
+                    baseRootNote: 'C', baseRootFret: 1, baseRootString: 4, // C on B string, 1st fret
+                    pattern: [
+                        { string: 1, fret: 3, interval: 'R' }, // A string (C)
+                        { string: 2, fret: 2, interval: '3' }, // D string (E)
+                        { string: 3, fret: 0, interval: '5' }, // G string (G) - Open
+                        { string: 4, fret: 1, interval: 'R' }, // B string (C)
+                        { string: 5, fret: 0, interval: '3' }  // High E string (E) - Open
+                        // Optional: { string: 0, fret: 3, interval: '5' } // Low E string (G)
+                    ]
+                },
+                'A': {
+                    baseRootNote: 'A', baseRootFret: 0, baseRootString: 1, // A on A string, open
+                    pattern: [
+                        { string: 1, fret: 0, interval: 'R' }, // A string (A) - Open
+                        { string: 2, fret: 2, interval: '5' }, // D string (E)
+                        { string: 3, fret: 2, interval: 'R' }, // G string (A)
+                        { string: 4, fret: 2, interval: '3' }, // B string (C#)
+                        { string: 5, fret: 0, interval: '5' }  // High E string (E) - Open
+                        // Optional: { string: 0, fret: 0, interval: '5' } // Low E string (E) - Open
+                    ]
+                },
+                'G': {
+                    baseRootNote: 'G', baseRootFret: 0, baseRootString: 3, // G on G string, open
+                    pattern: [
+                        { string: 0, fret: 3, interval: 'R' }, // Low E string (G)
+                        { string: 1, fret: 2, interval: '3' }, // A string (B)
+                        { string: 2, fret: 0, interval: '5' }, // D string (D) - Open
+                        { string: 3, fret: 0, interval: 'R' }, // G string (G) - Open
+                        { string: 4, fret: 0, interval: '3' }, // B string (B) - Open
+                        { string: 5, fret: 3, interval: 'R' }  // High E string (G)
+                    ]
+                },
+                'E': {
+                    baseRootNote: 'E', baseRootFret: 0, baseRootString: 0, // E on Low E string, open
+                    pattern: [
+                        { string: 0, fret: 0, interval: 'R' }, // Low E string (E) - Open
+                        { string: 1, fret: 2, interval: '5' }, // A string (B)
+                        { string: 2, fret: 2, interval: 'R' }, // D string (E)
+                        { string: 3, fret: 1, interval: '3' }, // G string (G#)
+                        { string: 4, fret: 0, interval: '5' }, // B string (B) - Open
+                        { string: 5, fret: 0, interval: 'R' }  // High E string (E) - Open
+                    ]
+                },
+                'D': {
+                    baseRootNote: 'D', baseRootFret: 0, baseRootString: 2, // D on D string, open
+                    pattern: [
+                        // Low E, A usually omitted
+                        { string: 2, fret: 0, interval: 'R' }, // D string (D) - Open
+                        { string: 3, fret: 2, interval: '5' }, // G string (A)
+                        { string: 4, fret: 3, interval: 'R' }, // B string (D)
+                        { string: 5, fret: 2, interval: '3' }  // High E string (F#)
+                    ]
+                }
+            };
+
+
+            // --- Note Calculation ---
+            function getNote(stringIndex, fretIndex) {
+                const openNote = openNotes[stringIndex];
+                const openNoteIndex = chromaticScale.indexOf(openNote);
+                if (openNoteIndex === -1) return '?';
+                const noteIndex = (openNoteIndex + fretIndex) % chromaticScale.length;
+                return chromaticScale[noteIndex];
+            }
+
+            function getMajorTriadNotes(rootNote) {
+                const rootIndex = chromaticScale.indexOf(rootNote);
+                if (rootIndex === -1) return null;
+                const thirdIndex = (rootIndex + 4) % 12; // Major Third
+                const fifthIndex = (rootIndex + 7) % 12; // Perfect Fifth
+                return { 'R': chromaticScale[rootIndex], '3': chromaticScale[thirdIndex], '5': chromaticScale[fifthIndex] };
+            }
+
+            // --- Fretboard Creation (Same as previous version) ---
+            function createFretboard() {
+                fretboard.innerHTML = '';
+                fretNumbersContainer.innerHTML = '';
+                for (let s = numStrings - 1; s >= 0; s--) {
+                    const stringDiv = document.createElement('div');
+                    stringDiv.className = 'string'; stringDiv.dataset.string = s;
+                    const openMarkerContainer = document.createElement('div');
+                    openMarkerContainer.className = 'fret-marker-container open-string-container';
+                    openMarkerContainer.style.left = `0px`; openMarkerContainer.style.width = `${fretWidths[0]}px`;
+                    const openMarker = document.createElement('div');
+                    openMarker.className = 'fret-marker open-string-marker';
+                    openMarker.dataset.string = s; openMarker.dataset.fret = 0; openMarker.dataset.note = getNote(s, 0);
+                    openMarker.addEventListener('click', handleMarkerClick);
+                    openMarkerContainer.appendChild(openMarker); stringDiv.appendChild(openMarkerContainer);
+                    for (let f = 1; f <= numFrets; f++) {
+                        const markerContainer = document.createElement('div');
+                        markerContainer.className = 'fret-marker-container';
+                        markerContainer.style.left = `${fretPositions[f-1]}px`; markerContainer.style.width = `${fretWidths[f]}px`;
+                        const marker = document.createElement('div');
+                        marker.className = 'fret-marker';
+                        marker.dataset.string = s; marker.dataset.fret = f; marker.dataset.note = getNote(s, f);
+                        marker.addEventListener('click', handleMarkerClick);
+                        markerContainer.appendChild(marker); stringDiv.appendChild(markerContainer);
+                    }
+                    fretboard.appendChild(stringDiv);
+                }
+                const nutLine = document.createElement('div');
+                nutLine.className = 'fret-line nut'; nutLine.style.left = `${fretPositions[0]}px`;
+                fretboard.appendChild(nutLine);
+                for (let f = 1; f <= numFrets; f++) {
+                    const fretLine = document.createElement('div');
+                    fretLine.className = 'fret-line'; fretLine.style.left = `${fretPositions[f]}px`;
+                    fretboard.appendChild(fretLine);
+                }
+                const fretNumber0 = document.createElement('div');
+                fretNumber0.className = 'fret-number fret-number-0'; fretNumber0.textContent = '0';
+                fretNumber0.style.left = `${fretWidths[0] / 2}px`; fretNumbersContainer.appendChild(fretNumber0);
+                for (let f = 1; f <= numFrets; f++) {
+                    const fretNumberDiv = document.createElement('div');
+                    fretNumberDiv.className = 'fret-number'; fretNumberDiv.textContent = f;
+                    const numberLeftPos = fretPositions[f-1] + fretWidths[f] / 2;
+                    fretNumberDiv.style.left = `${numberLeftPos}px`; fretNumbersContainer.appendChild(fretNumberDiv);
+                }
+                inlayFrets.forEach(fretNum => {
+                    const inlayLeft = fretPositions[fretNum - 1] + fretWidths[fretNum] / 2;
+                    if (fretNum === 12) {
+                        const inlayDot1 = document.createElement('div'); inlayDot1.className = 'inlay-dot double1'; inlayDot1.style.left = `${inlayLeft}px`; fretboard.appendChild(inlayDot1);
+                        const inlayDot2 = document.createElement('div'); inlayDot2.className = 'inlay-dot double2'; inlayDot2.style.left = `${inlayLeft}px`; fretboard.appendChild(inlayDot2);
+                    } else {
+                        const inlayDot = document.createElement('div'); inlayDot.className = 'inlay-dot'; inlayDot.style.left = `${inlayLeft}px`; fretboard.appendChild(inlayDot);
+                    }
+                });
+            }
+
+            // --- Event Handlers ---
+            function handleMarkerClick(event) {
+                clearHighlights(false);
+                selectedFretMarker = event.target;
+                selectedNote = selectedFretMarker.dataset.note;
+                const string = selectedFretMarker.dataset.string;
+                const fret = selectedFretMarker.dataset.fret;
+                activeCagedShape = null;
+
+                const displayString = fret == 0 ? "Open" : `Fret ${fret}`;
+                noteDisplay.textContent = `Selected: ${selectedNote} (String ${Number(string) + 1}, ${displayString})`;
+
+                highlightSingleNote(selectedNote, selectedFretMarker);
+                enableCagedButtons();
+            }
+
+            function handleCagedButtonClick(event) {
+                const button = event.target;
+                const shapeType = button.dataset.shape;
+                console.log(`CAGED button clicked: ${shapeType}, Selected Root Note: ${selectedNote}`);
+
+                if (!selectedNote) {
+                    noteDisplay.textContent = "Please select a root note on the fretboard first!";
+                    return;
+                }
+
+                if (shapeType === activeCagedShape) { // Toggle off
+                    console.log(`Toggling OFF shape: ${shapeType}`);
+                    clearHighlights(true); // Keep selected note marker visible
+                    activeCagedShape = null;
+                    noteDisplay.textContent = `Selected: ${selectedNote}`;
+                    setActiveCagedButton(null);
+                } else { // Toggle on
+                    console.log(`Toggling ON shape: ${shapeType} for root ${selectedNote}`);
+                    clearHighlights(true); // Clear previous highlights but keep selected marker
+                    activeCagedShape = shapeType;
+                    // Highlight the specific shape based on the *selectedNote* name
+                    const shapeDisplayed = highlightTransposedShape(selectedNote, shapeType);
+                    if (shapeDisplayed) {
+                        noteDisplay.textContent = `${selectedNote} Major - ${shapeType} Shape`;
+                        setActiveCagedButton(shapeType);
+                    } else {
+                        activeCagedShape = null;
+                        noteDisplay.textContent = `Selected: ${selectedNote} (${shapeType} shape doesn't fit for this root)`;
+                        setActiveCagedButton(null);
+                    }
+                }
+            }
+
+            // --- Highlighting Logic ---
+            function clearHighlights(keepSelectedMarker = false) {
+                console.log(`Clearing highlights... (keepSelectedMarker: ${keepSelectedMarker})`);
+                const allMarkers = fretboard.querySelectorAll('.fret-marker');
+                allMarkers.forEach(m => {
+                    if (keepSelectedMarker && m === selectedFretMarker) {
+                         m.classList.remove('highlight', 'highlight-root', 'highlight-third', 'highlight-fifth', 'in-shape');
+                         m.classList.add('selected');
+                         m.textContent = selectedNote; // Restore original note name if needed
+                    } else {
+                        m.classList.remove('selected', 'highlight', 'highlight-root', 'highlight-third', 'highlight-fifth', 'in-shape');
+                        m.textContent = '';
+                    }
+                });
+                setActiveCagedButton(null);
+                if (!keepSelectedMarker) {
+                     selectedFretMarker = null;
+                     selectedNote = null;
+                }
+            }
+
+            function highlightSingleNote(noteToHighlight, clickedMarkerElement) {
+                 console.log(`Highlighting single note: ${noteToHighlight}`);
+                const allMarkers = fretboard.querySelectorAll('.fret-marker');
+                allMarkers.forEach(m => { // Clear others first
+                    if (m !== clickedMarkerElement) {
+                        m.classList.remove('highlight', 'selected', 'highlight-root', 'highlight-third', 'highlight-fifth', 'in-shape');
+                        m.textContent = '';
+                    }
+                });
+                allMarkers.forEach(m => { // Highlight matches
+                    if (m.dataset.note === noteToHighlight && m !== clickedMarkerElement) {
+                        m.classList.add('highlight');
+                        m.textContent = noteToHighlight;
+                    }
+                });
+                if (clickedMarkerElement) { // Ensure clicked is 'selected'
+                    clickedMarkerElement.classList.remove('highlight');
+                    clickedMarkerElement.classList.add('selected');
+                    clickedMarkerElement.textContent = noteToHighlight;
+                }
+            }
+
+            // --- UPDATED: Function to highlight transposed CAGED shape (full shape) ---
+            function highlightTransposedShape(targetRootNote, shapeType) {
+                console.log(`Highlighting TRANSPOSED shape for ${targetRootNote} - ${shapeType} shape`);
+                const targetTriad = getMajorTriadNotes(targetRootNote); // Still need triad for coloring R/3/5
+                if (!targetTriad) {
+                    console.error("Could not calculate target triad for root:", targetRootNote);
+                    return false;
+                }
+                console.log("Target Triad:", targetTriad);
+
+                const baseShapeDefinition = cagedShapes[shapeType]; // Use the full shapes
+                const baseRootNote = baseShapeDefinition.baseRootNote;
+
+                // Calculate the interval shift needed from the base shape's root to the target root
+                const baseRootIndex = chromaticScale.indexOf(baseRootNote);
+                const targetRootIndex = chromaticScale.indexOf(targetRootNote);
+                if (baseRootIndex === -1 || targetRootIndex === -1) {
+                    console.error("Invalid root note provided");
+                    return false;
+                }
+                const fretShift = (targetRootIndex - baseRootIndex + 12) % 12; // Semitone difference
+                console.log(`Base root ${baseRootNote}, Target root ${targetRootNote}. Shift: ${fretShift} semitones`);
+
+                // --- Clear previous highlights (keep initially selected marker) ---
+                clearHighlights(true);
+
+                // --- Highlight the transposed shape ---
+                let shapeDisplayedSuccessfully = true;
+                baseShapeDefinition.pattern.forEach(pos => {
+                    const targetString = pos.string; // String index remains the same
+                    const targetFret = pos.fret + fretShift; // Apply shift
+
+                    if (targetString >= 0 && targetString < numStrings && targetFret >= 0 && targetFret <= numFrets) {
+                        const shapeMarker = fretboard.querySelector(`.fret-marker[data-string="${targetString}"][data-fret="${targetFret}"]`);
+                        if (shapeMarker) {
+                            // Determine the interval based on the *target* triad
+                            const actualNote = shapeMarker.dataset.note;
+                            let interval = '?';
+                            let intervalClass = '';
+                            if (actualNote === targetTriad.R) { interval = 'R'; intervalClass = 'highlight-root'; }
+                            else if (actualNote === targetTriad['3']) { interval = '3'; intervalClass = 'highlight-third'; }
+                            else if (actualNote === targetTriad['5']) { interval = '5'; intervalClass = 'highlight-fifth'; }
+                            else {
+                                // This note is part of the shape pattern but not the core R/3/5 triad
+                                // (e.g., a doubled root or fifth in the full chord voicing)
+                                interval = actualNote; // Display the note name instead of interval
+                                console.log(`Note ${actualNote} at S:${targetString+1} F:${targetFret} is part of shape, but not core R/3/5.`);
+                            }
+
+                            // Apply styles
+                            shapeMarker.classList.remove('selected', 'highlight'); // Clear other styles
+                            shapeMarker.classList.add('in-shape'); // Outline all shape notes
+                            if (intervalClass) { // Add color only for R/3/5
+                                shapeMarker.classList.add(intervalClass);
+                            }
+                            shapeMarker.textContent = interval; // Show R/3/5 or note name
+
+                             // Ensure the original selected marker gets the correct styling within the shape
+                             if (selectedFretMarker && shapeMarker === selectedFretMarker) {
+                                 selectedFretMarker.classList.remove('selected'); // Remove generic blue selection
+                             }
+
+                        } else {
+                            console.warn(`Marker not found for transposed shape at S:${targetString+1} F:${targetFret}`);
+                            shapeDisplayedSuccessfully = false; // Part of shape off board
+                        }
+                    } else {
+                         console.warn(`Transposed shape position off board: S:${targetString+1} F:${targetFret}`);
+                        shapeDisplayedSuccessfully = false; // Part of shape off board
+                    }
+                });
+
+                return shapeDisplayedSuccessfully;
+            }
+
+
+            // --- UI Control ---
+            function enableCagedButtons() {
+                cagedControls.querySelectorAll('.caged-button').forEach(btn => btn.disabled = false);
+            }
+            function disableCagedButtons() {
+                 cagedControls.querySelectorAll('.caged-button').forEach(btn => {
+                    btn.disabled = true; btn.classList.remove('active');
+                });
+            }
+            function setActiveCagedButton(shapeType) {
+                 cagedControls.querySelectorAll('.caged-button').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.shape === shapeType);
+                });
+            }
+
+            // --- Initialization ---
+            createFretboard();
+            disableCagedButtons(); // Buttons start disabled
+
+            // Add event listeners to CAGED buttons
+            cagedControls.querySelectorAll('.caged-button').forEach(button => {
+                button.addEventListener('click', handleCagedButtonClick);
+            });
+
+        });
+    </script>
+
+</body>
+</html>
