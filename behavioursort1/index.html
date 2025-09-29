@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Animal Behavior Sorter 🐾</title>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600&family=Fredoka:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --migration: #81D4FA;
+      --hibernation: #FFD6E8;
+      --adaptation: #C9FFC9;
+      --primary: #388E3C;
+      --text: #333;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f5f5f5;
+      font-family: 'Fredoka', sans-serif;
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .container {
+      width: 100%; max-width: 1000px;
+      padding: 2rem;
+    }
+    h1 {
+      font-family: 'Baloo 2', cursive;
+      font-size: 2.5rem;
+      color: var(--primary);
+      text-align: center;
+      margin-bottom: 0.5rem;
+    }
+    p.instructions {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      font-size: 1rem;
+    }
+    #card-bank {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      justify-content: center;
+      margin-bottom: 2rem;
+      padding: 0.5rem;
+      background: white;
+      border-radius: 0.8rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .card {
+      background: white;
+      border: 2px solid var(--primary);
+      border-radius: 1.2rem;
+      padding: 0.6rem 1rem;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: transform 0.2s;
+      user-select: none;
+      flex: none;
+      align-self: flex-start;
+    }
+    .card.selected { transform: scale(1.03); }
+    .card.correct { background: #B5E7A0; border-color: #2E7D32; }
+    .card.incorrect { background: #FFCDD2; border-color: #C62828; }
+    #board {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: nowrap;
+    }
+    .zone {
+      background: white;
+      border: 3px dashed var(--primary);
+      border-radius: 0.8rem;
+      flex: 1 1 280px;
+      min-height: 240px;
+      display: flex;
+      flex-direction: column;
+    }
+    .zone header {
+      padding: 0.5rem;
+      text-align: center;
+      font-family: 'Baloo 2', cursive;
+      font-size: 1.2rem;
+    }
+    .zone[data-type='Migration']       { border-color: var(--migration); }
+    .zone[data-type='Hibernation']     { border-color: var(--hibernation); }
+    .zone[data-type='Adaptation']      { border-color: var(--adaptation); }
+    .zone[data-type='Migration'] header { background: var(--migration); }
+    .zone[data-type='Hibernation'] header { background: var(--hibernation); }
+    .zone[data-type='Adaptation'] header  { background: var(--adaptation); }
+    .zone header h2 { color: white; margin: 0; }
+    .dropzone {
+      flex: 1;
+      padding: 0.8rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      background: #f9f9f9;
+      align-content: flex-start;
+      align-items: flex-start;
+    }
+    #controls {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 0.6rem;
+      padding: 0.8rem 1.4rem;
+      font-family: 'Baloo 2', cursive;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #2E7D32; }
+    #message {
+      text-align: center;
+      margin-top: 1rem;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Animal Behavior Sorter 🐾</h1>
+    <p class="instructions">Tap a card to select it, then tap a category to place. Press <strong>Check Answers</strong> when ready!</p>
+    <div id="card-bank"></div>
+    <div id="board">
+      <div class="zone" data-type="Migration">
+        <header>Migration</header>
+        <div class="dropzone"></div>
+      </div>
+      <div class="zone" data-type="Hibernation">
+        <header>Hibernation</header>
+        <div class="dropzone"></div>
+      </div>
+      <div class="zone" data-type="Adaptation">
+        <header>Adaptation</header>
+        <div class="dropzone"></div>
+      </div>
+    </div>
+    <div id="controls">
+      <button id="checkBtn">Check Answers</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+    <div id="message"></div>
+  </div>
+  <script>
+    // Card data: text|category
+    const cards = [
+      'Groundhog burrow|Hibernation',
+      'Black bear winter sleep|Hibernation',
+      'Squirrel deep sleep|Hibernation',
+      'Deer find shelter|Adaptation',
+      'Fox grows thick fur|Adaptation',
+      'Snowshoe hare turns white|Adaptation',
+      'Monarch butterflies long journey\|Migration',
+      'Geese fly in V|Migration',
+      'Caribou long trek|Migration',
+      'Whales travel south|Migration',
+      'Owl hunts at night|Adaptation',
+      'Hedgehog curls for cold|Hibernation'
+    ];
+    const bank = document.getElementById('card-bank');
+    let selectedCard = null;
+
+    // Shuffle array in place
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    // Render the bank of cards
+    function renderBank() {
+      bank.innerHTML = '';
+      shuffle([...cards]).forEach(item => {
+        const [text, season] = item.split('|');
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.textContent = text;
+        card.dataset.season = season;
+        bank.appendChild(card);
+      });
+    }
+    renderBank();
+
+    // Handle selection and placement
+    document.addEventListener('click', e => {
+      const card = e.target.closest('.card');
+      if (card) {
+        if (selectedCard) selectedCard.classList.remove('selected');
+        selectedCard = card;
+        card.classList.add('selected');
+        return;
+      }
+      const zone = e.target.closest('.dropzone');
+      if (zone && selectedCard) {
+        zone.appendChild(selectedCard);
+        selectedCard.classList.remove('selected');
+        selectedCard = null;
+      }
+    });
+
+    // Check answers
+    document.getElementById('checkBtn').addEventListener('click', () => {
+      let correctCount = 0;
+      document.querySelectorAll('.card').forEach(card => {
+        card.classList.remove('correct', 'incorrect');
+        const dropzone = card.closest('.dropzone');
+        if (!dropzone) {
+          card.classList.add('incorrect');
+          return;
+        }
+        const seasonType = dropzone.closest('.zone').dataset.type;
+        if (seasonType === card.dataset.season) {
+          card.classList.add('correct');
+          correctCount++;
+        } else {
+          card.classList.add('incorrect');
+        }
+      });
+      const message = document.getElementById('message');
+      message.textContent = `You got ${correctCount} of ${cards.length} correct!`;
+    });
+
+    // Reset game
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      document.querySelectorAll('.dropzone').forEach(z => z.innerHTML = '');
+      document.getElementById('message').textContent = '';
+      renderBank();
+      selectedCard = null;
+    });
+  </script>
+</body>
+</html>
