@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Seasons Explorer – Slick Edition</title>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600&family=Fredoka:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --summer: #FFE57F;
+      --autumn: #FFB74D;
+      --winter: #81D4FA;
+      --spring: #A5D6A7;
+      --primary: #5E35B1;
+      --text: #333;
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; padding:0; background:#f9f8ff; font-family:'Fredoka',sans-serif; color:var(--text); display:flex; justify-content:center; }
+    .container { width:100%; max-width:1100px; padding:2rem; }
+    h1 { font-family:'Baloo 2',cursive; font-size:2.5rem; color:var(--primary); text-align:center; margin-bottom:.5rem; }
+    p.instructions { text-align:center; margin-bottom:1.5rem; font-size:1rem; }
+    #card-bank { display:flex; flex-wrap:wrap; gap:.8rem; justify-content:center; margin-bottom:2rem; padding:.5rem; background:white; border-radius:1rem; box-shadow:0 4px 12px rgba(0,0,0,.05); }
+    .card { background:white; border:2px solid var(--primary); border-radius:2rem; padding:.6rem 1rem; font-size:1rem; cursor:grab; box-shadow:0 2px 6px rgba(0,0,0,.1); transition:transform .3s,box-shadow .3s; user-select:none; touch-action:none; }
+    .card:hover { transform:translateY(-4px); box-shadow:0 6px 16px rgba(0,0,0,.15); }
+    .card.selected { transform:translateY(-2px) scale(1.02); border-color:#4527a0; }
+    .card.correct { background:#b6fcb6; border-color:#159415; }
+    .card.incorrect { background:#ffd0d0; border-color:#e12a2a; }
+    #board { display:grid; grid-template-columns:repeat(4,1fr); gap:1.2rem; }
+    .zone { position:relative; background:white; border-radius:1rem; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.1); transition:transform .3s; }
+    .zone:hover { transform:translateY(-4px); }
+    .zone header { background:var(--primary); padding:.6rem; text-align:center; }
+    .zone[data-season='Summer'] header { background:var(--summer); }
+    .zone[data-season='Autumn'] header { background:var(--autumn); }
+    .zone[data-season='Winter'] header { background:var(--winter); }
+    .zone[data-season='Spring'] header { background:var(--spring); }
+    .zone header h2 { margin:0; font-family:'Baloo 2',cursive; font-size:1.25rem; color:#fff; }
+    .dropzone { min-height:180px; padding:1rem; display:flex; flex-wrap:wrap; gap:.6rem; align-content:flex-start; background:#faf8ff; transition:background .3s; touch-action:none; }
+    .dropzone.dragover { background:#fff3e0; }
+    #controls { display:flex; justify-content:center; gap:1rem; margin-top:2rem; }
+    button { background:var(--primary); color:white; border:none; border-radius:.6rem; padding:.8rem 1.4rem; font-family:'Baloo 2',cursive; font-size:1rem; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,.1); transition:background .3s; }
+    button:hover { background:#4527a0; }
+    #message { text-align:center; margin-top:1rem; font-weight:bold; }
+    .confetti-piece { position:absolute; width:8px; height:8px; background:red; opacity:.8; pointer-events:none; animation:fall 2.5s linear forwards; }
+    @keyframes fall { to { transform:translateY(100vh) rotate(360deg); opacity:0; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Seasons Explorer 🌞🍂❄️🌸</h1>
+    <p class="instructions">Tap a card to select it, then tap a season area to place it. Press <strong>Check Answers</strong>!</p>
+    <div id="card-bank"></div>
+    <div id="board">
+      <div class="zone" data-season="Summer"><header><h2>Summer</h2></header><div class="dropzone"></div></div>
+      <div class="zone" data-season="Autumn"><header><h2>Autumn</h2></header><div class="dropzone"></div></div>
+      <div class="zone" data-season="Winter"><header><h2>Winter</h2></header><div class="dropzone"></div></div>
+      <div class="zone" data-season="Spring"><header><h2>Spring</h2></header><div class="dropzone"></div></div>
+    </div>
+    <div id="controls"><button id="checkBtn">Check Answers ✅</button><button id="resetBtn">Reset 🔄</button></div>
+    <div id="message"></div>
+  </div>
+  <script>
+    const cards = [
+      { text: '☀️ Long daylight', season: 'Summer' },
+      { text: '🍃 Hot sunny day', season: 'Summer' },
+      { text: '🌻 Crops growing', season: 'Summer' },
+      { text: '💧 Rivers flowing fast', season: 'Spring' },
+      { text: '🍂 Leaves falling', season: 'Autumn' },
+      { text: '🎃 Pumpkin harvest', season: 'Autumn' },
+      { text: '🦅 Geese flying south', season: 'Autumn' },
+      { text: '❄️ Snow on ground', season: 'Winter' },
+      { text: '🐻 Bear hibernating', season: 'Winter' },
+      { text: '🌱 Buds on trees', season: 'Spring' },
+      { text: '🌸 Flowers blooming', season: 'Spring' },
+      { text: '🌦️ Thunderstorms', season: 'Spring' }
+    ];
+    const bank = document.getElementById('card-bank');
+    let selectedCard = null;
+    function shuffle(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+    function renderBank() { bank.innerHTML = ''; shuffle([...cards]).forEach(c => { const card = document.createElement('div'); card.className = 'card'; card.textContent = c.text; card.dataset.season = c.season; bank.appendChild(card); }); }
+    renderBank();
+    // Card selection anywhere
+    document.addEventListener('click', e => {
+      const card = e.target.closest('.card');
+      if (!card) return;
+      if (selectedCard) selectedCard.classList.remove('selected');
+      selectedCard = card;
+      card.classList.add('selected');
+    });
+    document.querySelectorAll('.dropzone').forEach(zone => { zone.addEventListener('click', () => { if (selectedCard) { zone.appendChild(selectedCard); selectedCard.classList.remove('selected'); selectedCard = null; } }); });
+    document.getElementById('checkBtn').addEventListener('click', () => { let correct = 0; document.querySelectorAll('.card').forEach(card => { const zoneElem = card.parentElement.closest('.zone'); card.classList.remove('correct','incorrect'); if (!zoneElem) { card.classList.add('incorrect'); return; } const zone = zoneElem.dataset.season; if (zone === card.dataset.season) { card.classList.add('correct'); correct++; } else { card.classList.add('incorrect'); } }); const total = cards.length; const msg = document.getElementById('message'); msg.textContent = `You sorted ${correct} of ${total} correctly!`; if (correct === total) { for (let i = 0; i < 80; i++) { const c = document.createElement('div'); c.className = 'confetti-piece'; c.style.background = `hsl(${Math.random() * 360},80%,60%)`; c.style.left = Math.random() * 100 + 'vw'; document.body.appendChild(c); setTimeout(() => c.remove(), 2500); } } });
+    document.getElementById('resetBtn').addEventListener('click', () => { document.querySelectorAll('.dropzone').forEach(z => z.innerHTML = ''); document.getElementById('message').textContent = ''; renderBank(); });
+  </script>
+</body>
+</html>
