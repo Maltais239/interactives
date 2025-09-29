@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Science Definition Match</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Light Blue-Green BG, Coral Buttons, Colored Terms */
+            --bg: #a7d7c5; --panel: #F4E4C6; --btn: #f7a072; --btn-hover: #f4845f;
+            --item-border: #999; --slot-border: #aaa; --definition-bg: #fff; --text-dark: #333;
+            --correct-border: #16a34a; --incorrect-border: #ef4444; --unplaced-border: #f97316;
+            --feedback-border-width: 3px;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: 'Poppins', sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: start; min-height: 100vh; background-color: var(--bg); padding: 20px; }
+        h1 { font-size: 2.5em; color: #fff; margin-bottom: 0.5em; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1); }
+        p { color: #fff; margin-bottom: 1.5em; }
+        .game-container { background: var(--panel); width: 100%; max-width: 800px; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); position: relative; /* Touch drag fix */ }
+        #term-pool { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; padding: 15px; background-color: rgba(255, 255, 255, 0.7); border-radius: 8px; margin-bottom: 25px; min-height: 60px; }
+        .term-item { padding: 8px 15px; border: 1px solid var(--item-border); border-radius: 5px; cursor: grab; user-select: none; position: relative; font-weight: bold; color: var(--text-dark); touch-action: none; transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s; text-align: center; min-width: 100px; }
+        /* Term Colors */
+        .term-color-1 { background-color: #b19cd9; border-color: #9a82c2; } /* Purple */
+        .term-color-2 { background-color: #a7c7e7; border-color: #90adc9; } /* Blue */
+        .term-color-3 { background-color: #ffb347; border-color: #e09d3f; } /* Orange */
+        .term-color-4 { background-color: #fdfd96; border-color: #c9c97a; } /* Yellow */
+        .term-color-5 { background-color: #77dd77; border-color: #68bf68; } /* Green */
+        .term-color-6 { background-color: #ffb6c1; border-color: #e0a0aa; } /* Pink */
+        .term-color-7 { background-color: #ff6961; border-color: #e05c55; } /* Salmon */
+        .term-color-8 { background-color: #aec6cf; border-color: #9aabb3; } /* Pastel Blue */
+        .term-color-9 { background-color: #dea5a4; border-color: #c59190; } /* Dusty Rose */
+        .term-color-10{ background-color: #b2d8d8; border-color: #9ccfcf; } /* Powder Blue */
+
+        .term-item.dragging { opacity: 0.7; cursor: grabbing; position: absolute; z-index: 1000; box-shadow: 0 5px 15px rgba(0,0,0,0.2); transform: scale(1.05); transition: none; }
+        .term-item.native-dragging { opacity: 0.3; }
+        #definitions-area { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+        .definition-row { display: flex; align-items: stretch; gap: 10px; }
+        .term-slot { width: 160px; min-height: 55px; border: 2px dashed var(--slot-border); border-radius: 5px; display: flex; justify-content: center; align-items: center; background-color: rgba(255, 255, 255, 0.5); transition: background-color 0.3s, border-style 0.3s; flex-shrink: 0; }
+        .term-slot.over { background-color: #fef9c3; border-style: solid; border-color: #fde047; }
+
+        /* Style for term dropped into a slot - REMOVED border override */
+        .term-slot .term-item {
+            cursor: default; margin: 0; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+             /* border: 1px solid var(--item-border) !important; */ /* REMOVED: Let color class border show */
+             box-shadow: none;
+             /* Override dragging styles */
+             position: static !important; transform: none !important; opacity: 1 !important;
+        }
+
+        .definition-text { flex-grow: 1; padding: 10px 15px; background-color: var(--definition-bg); border: 1px solid var(--item-border); border-radius: 5px; font-size: 0.9em; line-height: 1.4; color: var(--text-dark); display: flex; align-items: center; }
+        /* Feedback Styles on the SLOT */
+         .term-slot.correct { border: var(--feedback-border-width) solid var(--correct-border) !important; background-color: rgba(209, 250, 229, 0.5) !important; /* Light green tint */}
+         .term-slot.incorrect { border: var(--feedback-border-width) solid var(--incorrect-border) !important; background-color: rgba(254, 226, 226, 0.5) !important; /* Light red tint */}
+         /* Style for items left in pool */
+         .term-item.unplaced { border: var(--feedback-border-width) solid var(--unplaced-border) !important; }
+        .controls { text-align: center; margin-top: 1.5em;}
+        .controls button { background: var(--btn); color: #fff; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; margin: 10px 5px; font-size: 1.2rem; font-family: 'Poppins', sans-serif; transition: background .3s; }
+        .controls button:hover { background: var(--btn-hover); }
+    </style>
+</head>
+<body>
+    <h1>Science Definition Match</h1>
+    <p>Drag the correct term from the pool into the box next to its definition.</p>
+
+    <div class="game-container">
+        <div id="term-pool">
+            </div>
+
+        <div id="definitions-area">
+            </div>
+
+        <div class="controls">
+            <button id="check-btn">Check Answers</button>
+            <button id="reset-btn">Reset</button>
+        </div>
+    </div>
+
+    <script>
+    /**
+     * Definition Matching Game v6
+     * - Reduced to 10 terms
+     * - Fixed drag/drop into slots (Touch)
+     * - Fixed "greyed out" term style in slot
+     * - Colored draggable terms
+     * - Light Blue-Green background
+     */
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // REDUCED DEFINITIONS LIST (10 items)
+        const DEFINITIONS = [
+             { term: "Earth", definition: "The planet we live on, which has land, water, air, plants, and animals." },
+             { term: "Landform", definition: "A natural feature of the Earth's surface, like a mountain or valley." },
+             { term: "Mountain", definition: "A very high, natural place on Earth, higher than a hill." },
+             { term: "Prairie", definition: "A large, flat area of grassland." },
+             { term: "Wetland", definition: "An area of land that is often wet and has many plants and animals." },
+             { term: "Ocean", definition: "A large body of saltwater that covers most of the Earth’s surface." },
+             { term: "Freshwater", definition: "Water that is not salty, found in rivers and lakes." },
+             { term: "Saltwater", definition: "Water that contains salt, found in seas and oceans." },
+             { term: "Rotation", definition: "The spinning of Earth on its axis." },
+             { term: "UNESCO Site", definition: "A place that is important to the world and protected for its cultural or natural value." },
+        ];
+
+        const termPool = document.getElementById('term-pool');
+        const definitionsArea = document.getElementById('definitions-area');
+        const gameContainer = document.querySelector('.game-container');
+
+        let draggedTermElement = null;
+        let offsetX = 0, offsetY = 0;
+        let isTouchDragging = false;
+
+        function initializeGame() {
+            termPool.innerHTML = '';
+            definitionsArea.innerHTML = '';
+            draggedTermElement = null;
+            isTouchDragging = false;
+
+            const shuffledDefinitions = [...DEFINITIONS].sort(() => Math.random() - 0.5);
+            shuffledDefinitions.forEach(item => {
+                const row = document.createElement('div'); row.className = 'definition-row';
+                const slot = document.createElement('div'); slot.className = 'term-slot';
+                slot.dataset.correctTerm = item.term;
+                addDropZoneListeners(slot); // Add listeners
+                const definition = document.createElement('div'); definition.className = 'definition-text'; definition.textContent = item.definition;
+                row.appendChild(slot); row.appendChild(definition); definitionsArea.appendChild(row);
+            });
+
+            let terms = DEFINITIONS.map(item => item.term);
+            terms.sort(() => Math.random() - 0.5);
+            terms.forEach((term, index) => {
+                const termEl = document.createElement('div'); termEl.className = 'term-item';
+                termEl.classList.add('term-color-' + ((index % 10) + 1)); // Cycle through 10 colors
+                termEl.draggable = true; termEl.id = `term-${term.toLowerCase().replace(/\s+/g, '-')}-${index}`;
+                termEl.dataset.term = term; termEl.textContent = term;
+                addDraggableListeners(termEl); // Add listeners
+                termPool.appendChild(termEl);
+            });
+        }
+
+        // --- Listener Helper Functions ---
+        function addDraggableListeners(element) {
+            element.addEventListener('dragstart', handleDragStartTerm);
+            element.addEventListener('dragend', handleDragEndTerm);
+            element.addEventListener('pointerdown', handlePointerDownTerm);
+        }
+        function addDropZoneListeners(element) {
+            element.addEventListener('dragover', handleDragOverSlot);
+            element.addEventListener('dragleave', handleDragLeaveSlot);
+            element.addEventListener('drop', handleDropSlot);
+        }
+
+        // --- Draggable Term Event Handlers ---
+        function handleDragStartTerm(e) { /* ... unchanged ... */ if (e.pointerType === 'touch') { e.preventDefault(); return; } draggedTermElement = e.target; e.dataTransfer.setData('text/term-id', e.target.id); e.dataTransfer.effectAllowed = 'move'; setTimeout(() => { e.target.classList.add('native-dragging'); }, 0); isTouchDragging = false; }
+        function handleDragEndTerm(e) { /* ... unchanged ... */ if (draggedTermElement && draggedTermElement.classList.contains('term-item')) { draggedTermElement.classList.remove('native-dragging'); } document.querySelectorAll('.term-slot.over').forEach(zone => zone.classList.remove('over')); isTouchDragging = false; draggedTermElement = null; document.body.style.userSelect = ''; }
+        function handlePointerDownTerm(e) { /* ... unchanged ... */ if (e.button !== 0 || draggedTermElement) return; draggedTermElement = e.currentTarget; isTouchDragging = e.pointerType === 'touch'; if (isTouchDragging) { e.preventDefault(); draggedTermElement.setPointerCapture(e.pointerId); const rect = draggedTermElement.getBoundingClientRect(); offsetX = e.clientX - rect.left; offsetY = e.clientY - rect.top; draggedTermElement.classList.add('dragging'); handlePointerMoveTerm(e); } else { try { draggedTermElement.setPointerCapture(e.pointerId); } catch (err) {} } document.addEventListener('pointermove', handlePointerMoveTerm); document.addEventListener('pointerup', handlePointerUpTerm); document.addEventListener('pointercancel', handlePointerUpTerm); document.body.style.userSelect = 'none'; }
+        function handlePointerMoveTerm(e) { /* ... unchanged ... */ if (!draggedTermElement || !draggedTermElement.hasPointerCapture(e.pointerId)) return; if (isTouchDragging) { e.preventDefault(); const gameRect = gameContainer.getBoundingClientRect(); let newX = e.clientX - gameRect.left - offsetX; let newY = e.clientY - gameRect.top - offsetY; draggedTermElement.style.left = `${newX}px`; draggedTermElement.style.top = `${newY}px`; } let elementUnderPointer = null; const originalVisibility = isTouchDragging ? draggedTermElement.style.visibility : ''; if (isTouchDragging) { draggedTermElement.style.visibility = 'hidden'; } elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY); if (isTouchDragging) { draggedTermElement.style.visibility = originalVisibility; } let currentDropTarget = elementUnderPointer ? elementUnderPointer.closest('.term-slot') : null; document.querySelectorAll('.term-slot.over').forEach(t => t.classList.remove('over')); if(currentDropTarget) { currentDropTarget.classList.add('over'); } }
+
+        // --- Pointer Up - Handles TOUCH drops --- (REVISED LOGIC)
+        function handlePointerUpTerm(e) {
+            if (!draggedTermElement || !draggedTermElement.hasPointerCapture(e.pointerId)) {
+                 cleanUpDragListeners(); return;
+            }
+            const currentTermElement = draggedTermElement; // Keep reference
+
+            // Hide dragging style to accurately find element below release point
+            currentTermElement.classList.remove('dragging');
+            currentTermElement.style.left = '';
+            currentTermElement.style.top = '';
+            currentTermElement.style.visibility = 'hidden'; // Hide briefly
+
+            // Find target under pointer *at the moment of release*
+            let elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY);
+            let finalDropTarget = elementUnderPointer ? elementUnderPointer.closest('.term-slot') : null;
+
+            // Make element visible again
+             currentTermElement.style.visibility = '';
+
+            // Clean up global listeners and hover state
+             cleanUpDragListeners();
+             document.querySelectorAll('.term-slot.over').forEach(t => t.classList.remove('over'));
+
+             // Handle placement logic specifically for TOUCH
+             if (isTouchDragging) {
+                if (finalDropTarget) { // Dropped onto a slot
+                    // *** Use the helper function for consistency ***
+                    moveItemToSlot(currentTermElement, finalDropTarget);
+                } else { // Dropped outside a slot -> return to pool
+                    returnItemToPool(currentTermElement);
+                }
+             } else { // Mouse Up (cleanup only, drop handles placement)
+                  currentTermElement.classList.remove('native-dragging');
+             }
+
+             // Common cleanup
+             try { currentTermElement.releasePointerCapture(e.pointerId); } catch (err) {}
+             draggedTermElement = null;
+             isTouchDragging = false;
+             offsetX = 0;
+             offsetY = 0;
+         }
+
+        // --- Drop Slot Event Handlers ---
+        function handleDragOverSlot(e) { /* ... unchanged ... */ e.preventDefault(); if (!this.querySelector('.term-item')) { this.classList.add('over'); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; } else { if (e.dataTransfer) e.dataTransfer.dropEffect = 'none'; } }
+        function handleDragLeaveSlot(e) { /* ... unchanged ... */ if (!this.contains(e.relatedTarget)) { this.classList.remove('over'); } }
+
+        // --- Drop handler - Handles MOUSE drops --- (REVISED LOGIC)
+        function handleDropSlot(e) {
+            e.preventDefault();
+            const dropSlot = this;
+            dropSlot.classList.remove('over');
+
+            // Ignore if touch or slot already has an item
+            if (isTouchDragging || dropSlot.querySelector('.term-item')) { return; }
+
+            const droppedTermId = e.dataTransfer.getData('text/term-id');
+            const droppedElement = document.getElementById(droppedTermId);
+
+            if (droppedElement && dropSlot.classList.contains('term-slot')) {
+                 // *** Use the helper function for consistency ***
+                 moveItemToSlot(droppedElement, dropSlot);
+                 droppedElement.classList.remove('native-dragging'); // Ensure this is removed
+            }
+            // Reset potentially lingering state from drag start
+            draggedTermElement = null;
+        }
+
+        // --- Helper functions for moving items ---
+        function returnItemToPool(itemElement) {
+            if (itemElement && !termPool.contains(itemElement)) {
+                itemElement.style.border = ''; // Clear feedback border
+                itemElement.classList.remove('unplaced');
+                termPool.appendChild(itemElement);
+            }
+        }
+
+        function moveItemToSlot(itemElement, targetSlot) {
+            if (!itemElement || !targetSlot) return;
+            // If slot already has an item, move it back to pool first
+            const currentItemInSlot = targetSlot.querySelector('.term-item');
+            if (currentItemInSlot && currentItemInSlot !== itemElement) {
+                returnItemToPool(currentItemInSlot);
+            }
+            // Move the new item into the slot
+            targetSlot.innerHTML = ''; // Clear slot first
+            targetSlot.appendChild(itemElement);
+             // Clear potential feedback borders when item is moved/placed
+            itemElement.style.border = '';
+            itemElement.classList.remove('unplaced');
+            targetSlot.classList.remove('correct', 'incorrect'); // Clear slot feedback
+        }
+
+        // --- Control Button Listeners --- (Simplified feedback style)
+        document.getElementById('check-btn').addEventListener('click', () => {
+             document.querySelectorAll('.term-slot').forEach(slot => slot.classList.remove('correct', 'incorrect'));
+             document.querySelectorAll('.term-item').forEach(item => { item.classList.remove('unplaced'); item.style.border = ''; }); // Clear all feedback first
+
+             let allSlotsFilled = true; let allMatchesCorrect = true;
+             document.querySelectorAll('.term-slot').forEach(slot => {
+                const expectedTerm = slot.dataset.correctTerm;
+                const placedItem = slot.querySelector('.term-item');
+                if (placedItem) {
+                    const placedTerm = placedItem.dataset.term;
+                    if (placedTerm === expectedTerm) { slot.classList.add('correct'); }
+                    else { slot.classList.add('incorrect'); allMatchesCorrect = false; }
+                } else { allSlotsFilled = false; allMatchesCorrect = false; }
+             });
+             Array.from(termPool.children).forEach(item => {
+                 if (item.classList.contains('term-item')) { item.classList.add('unplaced'); allMatchesCorrect = false; }
+             });
+             if (allSlotsFilled && allMatchesCorrect) { console.log("All definitions matched correctly!"); }
+        });
+        document.getElementById('reset-btn').addEventListener('click', () => {
+             document.querySelectorAll('.term-item').forEach(item => item.style.border = '');
+             document.querySelectorAll('.term-slot').forEach(slot => slot.classList.remove('correct', 'incorrect'));
+            initializeGame();
+        });
+
+        // --- Initial Game Setup ---
+        initializeGame();
+
+        // --- Helper to remove global listeners --- (Moved for use in PointerUp)
+        function cleanUpDragListeners() {
+            document.removeEventListener('pointermove', handlePointerMoveTerm);
+            document.removeEventListener('pointerup', handlePointerUpTerm);
+            document.removeEventListener('pointercancel', handlePointerUpTerm);
+            document.body.style.userSelect = '';
+        }
+
+    });
+    </script>
+
+</body>
+</html>
