@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Money Sorting Activity</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+            overscroll-behavior-y: contain; /* Prevent pull-to-refresh on touch devices */
+        }
+        /* Draggable Money Item Styling */
+        .money-item {
+            touch-action: none; /* Prevent default touch actions like scroll */
+            cursor: grab;
+            display: inline-flex; /* Use inline-flex for better sizing */
+            align-items: center;
+            justify-content: center;
+            padding: 0.25rem; /* Base padding */
+            border-radius: 0.375rem; /* rounded-md */
+            border: 1px solid #ccc; /* Default border */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin: 0.25rem;
+            user-select: none; /* Prevent text selection */
+            transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.2s ease; /* Added opacity transition */
+            min-width: 60px; /* Increased minimum width */
+            min-height: 50px; /* Increased minimum height */
+            vertical-align: middle; /* Align items nicely when wrapped */
+            background-color: #fff; /* Default background */
+        }
+         /* Text-based items need more padding */
+        .money-item.text-based {
+            padding: 0.5rem 1rem;
+        }
+        .money-item:active { cursor: grabbing; }
+        /* Style for the original item *while* it's being dragged (mouse or touch) */
+        .money-item.dragging-source {
+             opacity: 0.5; /* Make original semi-transparent */
+             cursor: grabbing;
+        }
+        /* Style for items dropped in the amount box */
+        #amountBox .money-item {
+            cursor: pointer; /* Indicate they can be clicked to remove */
+        }
+
+        /* Image styling - LARGER */
+        .money-image {
+            max-height: 60px; /* Increased Max height for images */
+            max-width: 110px;  /* Increased Max width for bills */
+            object-fit: contain; /* Scale image nicely */
+            pointer-events: none; /* Prevent image interfering with drag */
+        }
+        .money-image.coin {
+             max-width: 55px; /* Increased max width for coins */
+             max-height: 55px; /* Increased max height for coins */
+             border-radius: 50%; /* Make coin images appear round */
+        }
+
+        /* Specific colors for text-based items or fallbacks */
+        /* These won't apply if an image is present due to the :has(img) rule below */
+        .money-item[data-value="100"]:not(:has(img)) { background-color: #e9d8a6; border-color: #d4b67c; }
+        .money-item[data-value="50"]:not(:has(img)) { background-color: #fca5a5; border-color: #f87171; }
+        /* Add more specific fallbacks if needed for other values */
+
+        /* Make items with images have transparent background/border */
+        .money-item:has(img) {
+            padding: 3px; /* Adjusted padding */
+            background-color: transparent; /* Remove white background */
+            border-color: transparent; /* Remove border */
+            box-shadow: none; /* Remove shadow for cleaner look */
+        }
+        .money-item:has(img.coin) {
+            width: 60px; /* Increased fixed size for coin containers */
+            height: 60px;
+            border-radius: 50%;
+            overflow: hidden; /* Ensures image stays within round bounds */
+        }
+         .money-item:has(img:not(.coin)) { /* Bills */
+             min-width: 115px; /* Increased bill width */
+             height: 65px; /* Increased height */
+             border-radius: 0.25rem; /* Slight radius for bill container */
+         }
+
+
+        /* Drop Zone Styling */
+        #amountBox {
+            border: 3px dashed #9ca3af; /* Gray dashed border */
+            background-color: #f9fafb; /* Light gray background */
+            min-height: 150px;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+            display: flex;
+            flex-wrap: wrap; /* Allow items to wrap */
+            align-content: flex-start; /* Align items to the top */
+            gap: 0.5rem; /* Space between items */
+            padding: 0.75rem; /* p-3 */
+        }
+        #amountBox.drag-over {
+            background-color: #e5e7eb; /* Darker gray when dragging over */
+            border-color: #6b7280; /* Darker border when dragging over */
+        }
+
+        /* Ghost image style for touch drag */
+        .ghost-image {
+            position: absolute;
+            pointer-events: none; /* Ghost should not intercept touch/mouse events */
+            opacity: 0.75;
+            transform: scale(0.95); /* Slightly smaller to differentiate */
+            z-index: 1000; /* Ensure it's on top */
+            border-radius: 0.375rem; /* Match item radius */
+            background-color: transparent; /* Match item style */
+            border: none; /* Match item style */
+            padding: 3px; /* Match item style */
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2); /* Add shadow to ghost */
+        }
+        /* Specific ghost styles for text items */
+         .ghost-image.text-based {
+             background-color: #fff; /* Restore background for text-based ghosts */
+             border: 1px solid #ccc; /* Restore border */
+             padding: 0.5rem 1rem; /* Restore padding */
+         }
+        .ghost-image img { /* Style image within ghost - LARGER */
+             max-height: 60px;
+             max-width: 110px;
+             object-fit: contain;
+        }
+         .ghost-image img.coin {
+             max-width: 55px;
+             max-height: 55px;
+             border-radius: 50%;
+         }
+         /* Ensure ghost text items have text color */
+         .ghost-image:not(:has(img)) {
+             color: #333; /* Or inherit from original */
+         }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-lg">
+        <h1 class="text-2xl font-bold text-center text-indigo-700 mb-2">Make the Amount</h1>
+        <p class="text-center text-gray-600 mb-6">Drag money from the palette into the box below. Click money in the box to return it.</p>
+
+        <div class="flex flex-col md:flex-row gap-6">
+            <div class="md:w-1/3 bg-gray-50 p-4 rounded-lg border">
+                <h2 class="text-lg font-semibold text-center text-gray-800 mb-3">Available Money</h2>
+                <div id="moneyPalette" class="flex flex-wrap justify-center items-center gap-2">
+                    {/* Money items will be populated by JavaScript */}
+                </div>
+            </div>
+
+            <div class="md:w-2/3">
+                <div class="bg-blue-100 border border-blue-300 p-4 rounded-lg text-center mb-4">
+                    <h2 class="text-lg font-semibold text-blue-800">Target Amount:</h2>
+                    <p id="targetAmount" class="text-3xl font-bold text-blue-900">$0.00</p>
+                </div>
+
+                <div id="amountBox" class="w-full p-4 rounded-lg bg-gray-100 border-2 border-dashed border-gray-400 min-h-[200px]"></div>
+
+                <div class="mt-4 p-3 bg-green-100 border border-green-300 rounded-lg text-center">
+                    <h3 class="text-md font-semibold text-green-800">Current Total in Box:</h3>
+                    <p id="currentTotal" class="text-2xl font-bold text-green-900">$0.00</p>
+                </div>
+
+                <div class="mt-6 text-center">
+                    <button id="checkButton" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-5 rounded-lg shadow mr-3 transition-colors disabled:opacity-50" disabled>
+                        Check Work
+                    </button>
+                    <button id="resetButton" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg shadow transition-colors">
+                        Reset Box
+                    </button>
+                </div>
+                <div id="feedback" class="mt-4 text-center font-semibold min-h-[1.5em]"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        let targetValue = 0; // Will be set by generateNewTargetValue
+        const moneyTypes = [
+            // Defines the types of money available, their values, labels, types (bill/coin), and image URLs
+            { value: 100, label: '$100', type: 'bill', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/100_front.jpg' },
+            { value: 50, label: '$50', type: 'bill', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/50_front.jpg' },
+            { value: 20, label: '$20', type: 'bill', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/20_front.jpg' },
+            { value: 10, label: '$10', type: 'bill', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/10_back.jpg' },
+            { value: 5, label: '$5', type: 'bill', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/5_front.jpg' },
+            { value: 2, label: '$2', type: 'coin', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/png-clipart-canada-toonie-loonie-canadian-dollar-royal-canadian-mint-silver-coin-gold-world-thumbnail.png' },
+            { value: 1, label: '$1', type: 'coin', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/2022-canadian-1-dollar-common-loon-loonie-coin-1-800x800.png' },
+            { value: 0.25, label: '25¢', type: 'coin', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/2020-canadian-25-cent-caribou-quarter-coin-1-800x800.jpg' },
+            { value: 0.10, label: '10¢', type: 'coin', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/Canadian_Dime_-_reverse.png' },
+            { value: 0.05, label: '5¢', type: 'coin', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/Canadian_Nickel_-_reverse.png' }
+            // Note: Placeholder images or local paths can be used if external URLs are problematic.
+        ];
+
+        // --- DOM References ---
+        // Variables to store references to HTML elements for easy access
+        let moneyPalette, amountBox, targetAmountEl, currentTotalEl, checkButton, resetButton, feedbackDiv;
+
+        // --- State ---
+        // Variables to manage the state of the drag-and-drop operations and game logic
+        let draggedItem = null; // The HTML element currently being dragged
+        let draggedValue = null; // The monetary value of the dragged item
+        let isDraggingFromPalette = false; // Boolean to track if the drag originated from the palette
+        let ghostImageElement = null; // The visual clone of the item shown during touch drag
+        let isTouchDragging = false; // Boolean to indicate if a touch drag is in progress
+        let touchOffsetX = 0, touchOffsetY = 0; // Offsets for positioning the ghost image during touch drag
+        let originalItemVisibility = ''; // Stores the original visibility style of an item being dragged from the amount box
+
+        // --- Functions ---
+
+        /**
+         * Formats a number as currency (e.g., $10.50).
+         * @param {number} value - The numerical value to format.
+         * @returns {string} The formatted currency string.
+         */
+        function formatCurrency(value) {
+            return '$' + value.toFixed(2);
+        }
+
+        /**
+         * Creates a DOM element for a money item.
+         * @param {object} money - The money object (from moneyTypes array).
+         * @param {boolean} isClone - True if the item is a clone for the amount box (enables click to return).
+         * @returns {HTMLElement} The created money item div.
+         */
+        function createMoneyElement(money, isClone = false) {
+            const div = document.createElement('div');
+            div.classList.add('money-item');
+            div.setAttribute('draggable', true); // Make the item draggable
+            div.setAttribute('data-value', money.value); // Store its monetary value
+
+            // If no image URL, create a text-based item
+            if (!money.imageUrl) {
+                 div.classList.add(`money-item[data-value="${money.value}"]`); // For specific text-based styling
+                 div.classList.add('text-based');
+                 div.textContent = money.label;
+            }
+
+            // If an image URL is provided, create an image element
+            if (money.imageUrl) {
+                const img = document.createElement('img');
+                img.src = money.imageUrl;
+                img.alt = money.label; // Alt text for accessibility
+                img.classList.add('money-image');
+                if (money.type === 'coin') img.classList.add('coin'); // Special styling for coins
+
+                // Fallback if image fails to load
+                img.onerror = () => {
+                    console.warn(`Image failed to load: ${money.imageUrl}. Displaying text label instead.`);
+                    img.alt = `Error loading ${money.label}`; // Update alt text
+                    div.textContent = money.label; // Display text label
+                    div.classList.add('text-based'); // Apply text-based styling
+                    img.remove(); // Remove the broken image element
+                };
+                div.appendChild(img);
+            }
+
+            // Add event listeners for drag-and-drop and touch interactions
+            div.addEventListener('dragstart', handleDragStart);
+            div.addEventListener('dragend', handleDragEnd);
+            div.addEventListener('touchstart', handleTouchStart, { passive: false }); // passive:false to allow preventDefault
+
+            // If it's a clone (in the amountBox), add click listener to return it to palette
+            if (isClone) {
+                div.addEventListener('click', handleItemClick);
+            }
+
+            return div;
+        }
+
+
+        /**
+         * Populates the money palette with draggable money items.
+         */
+        function populatePalette() {
+            if (!moneyPalette) return;
+            moneyPalette.innerHTML = ''; // Clear existing items
+            moneyTypes.forEach(money => {
+                const paletteItem = createMoneyElement(money, false); // false: not a clone
+                moneyPalette.appendChild(paletteItem);
+            });
+        }
+
+        /**
+         * Calculates the total value of money items in the amount box.
+         * @returns {number} The total monetary value, rounded to 2 decimal places.
+         */
+        function calculateTotal() {
+            let total = 0;
+            const itemsInBox = amountBox.querySelectorAll('.money-item');
+            itemsInBox.forEach(item => {
+                total += parseFloat(item.dataset.value);
+            });
+            return Math.round(total * 100) / 100; // Handle potential floating point inaccuracies
+        }
+
+        /**
+         * Updates the display of the current total in the amount box.
+         * Also enables/disables the "Check Work" button based on whether the total is zero.
+         */
+        function updateTotalDisplay() {
+            const total = calculateTotal();
+            currentTotalEl.textContent = formatCurrency(total);
+            checkButton.disabled = total === 0; // Disable check button if box is empty
+        }
+
+        /**
+         * Generates a new random target monetary value, ensuring it's a multiple of 0.05.
+         * Ensures the new target is different from the current one.
+         */
+        function generateNewTargetValue() {
+            const maxDollars = 25; // Max whole dollar amount
+            const dollars = Math.floor(Math.random() * maxDollars) + 1; // Random dollars (1 to maxDollars)
+
+            // Generate cents as a multiple of 5 (0, 5, 10, ..., 95)
+            const fiveCentUnits = Math.floor(Math.random() * 20); // Generates a number from 0 to 19
+            const cents = fiveCentUnits * 5; // This will result in 0, 5, 10, ..., 95
+
+            let newTarget = dollars + cents / 100;
+            newTarget = Math.round(newTarget * 100) / 100; // Round to 2 decimal places for safety, though should be fine.
+
+            // Ensure the new target is different from the old one
+            if (newTarget === targetValue) {
+                // If the new target is the same as the old one, recursively call the function to get a different value.
+                return generateNewTargetValue();
+            }
+            targetValue = newTarget;
+            targetAmountEl.textContent = formatCurrency(targetValue);
+            // console.log("New Target Value (multiple of 0.05):", targetValue); // For debugging
+        }
+
+        // --- Drag & Drop Handlers (Mouse) ---
+
+        /**
+         * Handles the start of a drag operation (mouse).
+         * @param {DragEvent} e - The drag event.
+         */
+        function handleDragStart(e) {
+            draggedItem = e.target; // The item being dragged
+            draggedValue = draggedItem.dataset.value; // Its monetary value
+            isDraggingFromPalette = (draggedItem.parentElement === moneyPalette); // Check origin
+
+            // Apply styling to the source item (slight delay for visual effect)
+            setTimeout(() => {
+                if (draggedItem && !isDraggingFromPalette) { // Dragging from amount box
+                    draggedItem.classList.add('dragging-source'); // e.g., reduce opacity
+                } else if (draggedItem && isDraggingFromPalette) { // Dragging from palette
+                     draggedItem.style.opacity = '0.7'; // Visual cue for palette item
+                }
+            }, 0);
+
+            e.dataTransfer.setData('text/plain', draggedValue); // Set data for the drop
+            e.dataTransfer.effectAllowed = isDraggingFromPalette ? 'copy' : 'move'; // 'copy' from palette, 'move' within/from box
+        }
+
+        /**
+         * Handles the end of a drag operation (mouse).
+         * @param {DragEvent} e - The drag event.
+         */
+        function handleDragEnd(e) {
+            // Cleanup styling and state (slight delay to ensure drop processing completes)
+            setTimeout(() => {
+                 if (draggedItem) {
+                     draggedItem.classList.remove('dragging-source');
+                     draggedItem.style.opacity = ''; // Reset opacity
+                 }
+                 // Ensure any lingering dragging-source classes are removed (e.g., if drop failed outside a valid target)
+                 document.querySelectorAll('.money-item.dragging-source').forEach(el => el.classList.remove('dragging-source'));
+
+                // Reset state variables
+                draggedItem = null;
+                draggedValue = null;
+                isDraggingFromPalette = false;
+                amountBox.classList.remove('drag-over'); // Remove drag-over styling from amount box
+            }, 0);
+        }
+
+        /**
+         * Handles when a dragged item is over the amount box (mouse).
+         * @param {DragEvent} e - The drag event.
+         */
+        function handleDragOver(e) {
+            e.preventDefault(); // Necessary to allow a drop
+            // Check if the target is the amountBox itself or an empty area within it
+            if (e.target === amountBox || !e.target.closest('.money-item')) {
+                 amountBox.classList.add('drag-over'); // Visual feedback for droppable area
+                 e.dataTransfer.dropEffect = isDraggingFromPalette ? 'copy' : 'move';
+            } else {
+                 // If dragging over an existing item in the box, don't show 'drag-over' on the box
+                 amountBox.classList.remove('drag-over');
+                 e.dataTransfer.dropEffect = 'none'; // Indicate not a valid drop *directly* on another item
+            }
+        }
+
+        /**
+         * Handles when a dragged item leaves the amount box (mouse).
+         * @param {DragEvent} e - The drag event.
+         */
+        function handleDragLeave(e) {
+             // Remove drag-over styling if mouse leaves the amountBox or its direct children area
+             if (e.target === amountBox || !amountBox.contains(e.relatedTarget)) {
+                 amountBox.classList.remove('drag-over');
+             }
+        }
+
+        /**
+         * Handles the drop of an item into the amount box (mouse).
+         * @param {DragEvent} e - The drag event.
+         */
+        function handleDrop(e) {
+            e.preventDefault(); // Prevent default drop behavior
+            amountBox.classList.remove('drag-over'); // Remove visual feedback
+            if (!draggedValue) return; // No item was being dragged
+
+             // Ensure drop is directly onto the amountBox or an empty area within it
+             if (e.target === amountBox || !e.target.closest('.money-item')) {
+                 const moneyType = moneyTypes.find(m => m.value == draggedValue); // Find money details
+                 if (!moneyType) return; // Should not happen if draggedValue is set
+
+                 if (isDraggingFromPalette) {
+                     // If from palette, create a new clone in the amount box
+                     const newItem = createMoneyElement(moneyType, true); // true: is a clone
+                     amountBox.appendChild(newItem);
+                 } else if (draggedItem) {
+                     // If from amount box (reordering), move the original item
+                     amountBox.appendChild(draggedItem);
+                     draggedItem.classList.remove('dragging-source'); // Remove dragging style
+                 }
+                 updateTotalDisplay(); // Recalculate and display new total
+             }
+        }
+
+        // --- Touch Event Handlers ---
+        let touchStartX = 0, touchStartY = 0; // Store initial touch coordinates
+        const touchMoveThreshold = 15; // Pixels to move before initiating a drag (prevents accidental drags on tap)
+
+        /**
+         * Handles the start of a touch interaction on a money item.
+         * @param {TouchEvent} e - The touch event.
+         */
+        function handleTouchStart(e) {
+            const targetItem = e.currentTarget; // The item touched
+            if (!targetItem || !targetItem.draggable) return; // Ignore if not a draggable item
+
+            isTouchDragging = false; // Reset drag state
+            draggedItem = targetItem;
+            draggedValue = draggedItem.dataset.value;
+            isDraggingFromPalette = (draggedItem.parentElement === moneyPalette);
+
+            const touch = e.touches[0]; // Get the first touch point
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            const rect = draggedItem.getBoundingClientRect();
+            // Calculate offset of touch within the item, for accurate ghost positioning
+            touchOffsetX = touch.clientX - rect.left;
+            touchOffsetY = touch.clientY - rect.top;
+
+            // e.preventDefault(); // Can be called here or in touchmove if needed to prevent scrolling immediately
+        }
+
+        /**
+         * Handles the movement of a touch on the screen.
+         * @param {TouchEvent} e - The touch event.
+         */
+        function handleTouchMove(e) {
+            if (!draggedItem) return; // No item selected for dragging
+
+            const touch = e.touches[0];
+            const touchX = touch.clientX;
+            const touchY = touch.clientY;
+
+            if (!isTouchDragging) {
+                // Check if movement exceeds the threshold to start a drag
+                if (Math.abs(touchX - touchStartX) > touchMoveThreshold || Math.abs(touchY - touchStartY) > touchMoveThreshold) {
+                    isTouchDragging = true;
+                    e.preventDefault(); // Prevent scrolling once dragging starts
+
+                    // Create and style the ghost image
+                    ghostImageElement = draggedItem.cloneNode(true); // Clone the dragged item
+                    ghostImageElement.classList.add('ghost-image');
+                    if (!draggedItem.querySelector('img')) { // Check if it's a text-based item
+                        ghostImageElement.classList.add('text-based');
+                    }
+                    // Set ghost size explicitly to match original
+                    ghostImageElement.style.width = `${draggedItem.offsetWidth}px`;
+                    ghostImageElement.style.height = `${draggedItem.offsetHeight}px`;
+
+                    // Copy essential computed styles for visual consistency of the ghost
+                    const originalStyles = window.getComputedStyle(draggedItem);
+                    ghostImageElement.style.backgroundColor = draggedItem.querySelector('img') ? 'transparent' : originalStyles.backgroundColor;
+                    ghostImageElement.style.borderColor = draggedItem.querySelector('img') ? 'transparent' : originalStyles.borderColor;
+                    ghostImageElement.style.borderWidth = originalStyles.borderWidth;
+                    ghostImageElement.style.borderRadius = originalStyles.borderRadius;
+                    ghostImageElement.style.color = originalStyles.color; // For text-based items
+                    document.body.appendChild(ghostImageElement); // Add ghost to body for absolute positioning
+
+
+                    // If dragging from amount box, hide the original item
+                    if (!isDraggingFromPalette) {
+                        originalItemVisibility = draggedItem.style.visibility;
+                        draggedItem.style.visibility = 'hidden';
+                    }
+                    draggedItem.classList.add('dragging-source'); // Apply dragging style to original (e.g. opacity)
+                }
+            }
+
+            if (isTouchDragging) {
+                e.preventDefault(); // Continue preventing default actions (like scroll)
+                if (ghostImageElement) {
+                    // Position the ghost image at the touch point, adjusted by the initial offset
+                    ghostImageElement.style.left = `${touchX - touchOffsetX}px`;
+                    ghostImageElement.style.top = `${touchY - touchOffsetY}px`;
+                }
+
+                // Check what's under the touch point for drag-over effect
+                if (ghostImageElement) ghostImageElement.style.display = 'none'; // Temporarily hide ghost to check element underneath
+                const elementUnderTouch = document.elementFromPoint(touchX, touchY);
+                if (ghostImageElement) ghostImageElement.style.display = ''; // Show ghost again
+
+                if (amountBox === elementUnderTouch || amountBox.contains(elementUnderTouch)) {
+                    amountBox.classList.add('drag-over');
+                } else {
+                    amountBox.classList.remove('drag-over');
+                }
+            }
+        }
+
+        /**
+         * Handles the end of a touch interaction.
+         * @param {TouchEvent} e - The touch event.
+         */
+        function handleTouchEnd(e) {
+             if (!draggedItem) { // If no item was being tracked
+                isTouchDragging = false; return;
+            }
+
+            let dropped = false; // Flag to see if a drop occurred
+            if (isTouchDragging) { // Only process drop if it was a drag, not a tap
+                // Temporarily hide ghost to accurately find element at touch end point
+                if (ghostImageElement) ghostImageElement.style.display = 'none';
+                const endTargetElement = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+                if (ghostImageElement) ghostImageElement.style.display = ''; // Show ghost again
+
+                // Check if the drop target is the amountBox or within it
+                const finalTargetBox = endTargetElement === amountBox || amountBox.contains(endTargetElement);
+
+                // Restore visibility of original item if it was hidden
+                if (!isDraggingFromPalette) {
+                     draggedItem.style.visibility = originalItemVisibility;
+                }
+
+                if (finalTargetBox) {
+                    const moneyType = moneyTypes.find(m => m.value == draggedValue);
+                    if (moneyType) {
+                        if (isDraggingFromPalette) {
+                            // Create a new item in the amount box if dragged from palette
+                            const newItem = createMoneyElement(moneyType, true);
+                            amountBox.appendChild(newItem);
+                        } else {
+                            // Move the item to the amount box if dragged from within (or another box, if implemented)
+                            amountBox.appendChild(draggedItem);
+                        }
+                        updateTotalDisplay();
+                        dropped = true;
+                    }
+                }
+            }
+
+            // Cleanup after drag/touch operation
+            if (draggedItem) {
+                draggedItem.classList.remove('dragging-source');
+                draggedItem.style.visibility = originalItemVisibility; // Reset visibility
+                draggedItem.style.opacity = ''; // Reset opacity
+            }
+            if (ghostImageElement) {
+                ghostImageElement.remove(); // Remove the ghost image from DOM
+                ghostImageElement = null;
+            }
+            amountBox.classList.remove('drag-over'); // Clear drag-over styling
+
+            // Handle tap: if it wasn't a drag and the item is in the amountBox, treat as a click to return
+            const touchEndTargetItem = e.target.closest('.money-item');
+            if (!isTouchDragging && touchEndTargetItem === draggedItem && draggedItem.parentElement === amountBox) {
+                 handleItemClick({ currentTarget: draggedItem });
+            }
+
+            // Reset all drag/touch state variables
+            draggedItem = null;
+            draggedValue = null;
+            isTouchDragging = false;
+            isDraggingFromPalette = false;
+            originalItemVisibility = '';
+        }
+
+
+        // --- Click Handler to Return Item ---
+        /**
+         * Handles clicking an item in the amount box to return it (conceptually) to the palette.
+         * @param {MouseEvent|TouchEvent} e - The event.
+         */
+        function handleItemClick(e) {
+            const clickedItem = e.currentTarget; // The item that was clicked
+            if (clickedItem.parentElement === amountBox) { // Ensure it's in the amount box
+                clickedItem.remove(); // Remove it from the DOM
+                updateTotalDisplay(); // Update the total
+                setFeedback(''); // Clear any previous feedback
+            }
+        }
+
+        // --- Check and Reset Functions ---
+        /**
+         * Checks if the current total in the box matches the target amount.
+         * Provides feedback to the user.
+         */
+        function checkWork() {
+            const currentTotal = calculateTotal();
+            // Using a small tolerance for floating point comparison
+            if (Math.abs(currentTotal - targetValue) < 0.001) {
+                setFeedback('Correct! Getting next target...', 'success');
+                checkButton.disabled = true; // Disable button while transitioning
+                // After a short delay, generate a new target and reset the box
+                setTimeout(() => {
+                    generateNewTargetValue();
+                    resetBox(); // Clears the amount box for the new target
+                }, 1500);
+
+            } else if (currentTotal > targetValue) {
+                setFeedback(`Too much! You have ${formatCurrency(currentTotal)}. Try removing some money.`, 'error');
+            } else {
+                setFeedback(`Not enough! You have ${formatCurrency(currentTotal)}. Try adding more money.`, 'error');
+            }
+        }
+
+        /**
+         * Clears all money items from the amount box and resets the total display.
+         */
+        function resetBox() {
+            amountBox.innerHTML = ''; // Clear the box
+            updateTotalDisplay(); // Update total (will be $0.00)
+            setFeedback(''); // Clear feedback messages
+            checkButton.disabled = true; // Disable check button as box is empty
+        }
+
+        /**
+         * Sets the feedback message displayed to the user.
+         * @param {string} message - The message to display.
+         * @param {string} type - The type of message ('success', 'error', 'info').
+         */
+         function setFeedback(message, type = 'info') {
+            feedbackDiv.textContent = message;
+            // Reset classes first, then add specific type class
+            feedbackDiv.className = 'feedback mt-4 text-center font-semibold min-h-[1.5em]';
+            switch (type) {
+                case 'success': feedbackDiv.classList.add('text-green-600'); break;
+                case 'error': feedbackDiv.classList.add('text-red-600'); break;
+                // 'info' or default will use the base classes (typically neutral color)
+            }
+        }
+
+
+        // --- Initialization ---
+        /**
+         * Initializes the money sorting activity when the DOM is fully loaded.
+         * Sets up DOM references, populates the palette, generates the first target, and attaches event listeners.
+         */
+        function initializeActivity() {
+            // Get references to all necessary DOM elements
+            moneyPalette = document.getElementById('moneyPalette');
+            amountBox = document.getElementById('amountBox');
+            targetAmountEl = document.getElementById('targetAmount');
+            currentTotalEl = document.getElementById('currentTotal');
+            checkButton = document.getElementById('checkButton');
+            resetButton = document.getElementById('resetButton');
+            feedbackDiv = document.getElementById('feedback');
+
+            // Basic check to ensure all critical elements are found
+            if (!moneyPalette || !amountBox || !targetAmountEl || !currentTotalEl || !checkButton || !resetButton || !feedbackDiv) {
+                console.error("Initialization failed: One or more essential HTML elements not found. Check element IDs.");
+                // Optionally, display a user-friendly error message on the page
+                document.body.innerHTML = '<p style="color: red; text-align: center; padding-top: 20px;">Error: Could not initialize the activity. Please contact support.</p>';
+                return;
+            }
+
+            generateNewTargetValue(); // Set the initial target amount
+            populatePalette(); // Fill the money palette with items
+
+            // Add event listeners for drag-and-drop on the amount box
+            amountBox.addEventListener('dragover', handleDragOver);
+            amountBox.addEventListener('dragleave', handleDragLeave);
+            amountBox.addEventListener('drop', handleDrop);
+
+            // Add event listeners for buttons
+            checkButton.addEventListener('click', checkWork);
+            resetButton.addEventListener('click', resetBox);
+
+            // Global touch listeners for move/end, as these can occur outside the originating element
+            // passive: false is important for touchmove to allow preventDefault() to stop scrolling
+            document.addEventListener('touchmove', handleTouchMove, { passive: false });
+            document.addEventListener('touchend', handleTouchEnd); // touchend doesn't typically need passive:false
+
+            updateTotalDisplay(); // Set initial current total display (should be $0.00)
+
+            console.log("Money Sorting Activity Initialized Successfully");
+        }
+
+        // Wait for the DOM to be fully loaded before initializing the activity
+        document.addEventListener('DOMContentLoaded', initializeActivity);
+
+    </script>
+</body>
+</html>
