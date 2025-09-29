@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <title>Life Cycles Activity (Touch Enabled)</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e0f2fe; /* Light blue background */
+            display: flex;
+            flex-direction: column; /* Stack game and attribution */
+            justify-content: flex-start; /* Align top */
+            align-items: center; /* Center horizontally */
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+            overscroll-behavior-y: contain; /* Prevent pull-to-refresh on touch devices */
+        }
+        .game-container {
+            background-color: #ffffff;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 900px;
+            width: 100%;
+            border: 4px solid #7dd3fc; /* Sky blue border */
+            margin-bottom: 15px; /* Space for attribution */
+        }
+        .title {
+            color: #075985; /* Darker blue */
+            margin-bottom: 20px;
+            font-size: 2.0rem;
+            font-weight: 700;
+        }
+        /* Animal Selection Area */
+        #animalSelection {
+            margin-bottom: 30px;
+        }
+        .selection-title {
+             font-size: 1.5rem;
+             font-weight: 600;
+             color: #0369a1; /* Medium blue */
+             margin-bottom: 15px;
+        }
+        .animal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .animal-button {
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            color: white;
+        }
+        .animal-button:hover { transform: translateY(-2px); }
+        .animal-button:active { transform: translateY(1px); }
+        /* Specific animal button colors */
+        .animal-button[data-animal="butterfly"] { background-color: #f97316; } /* Orange */
+        .animal-button[data-animal="frog"] { background-color: #22c55e; } /* Green */
+        .animal-button[data-animal="tree"] { background-color: #84cc16; } /* Lime Green */
+
+        /* Game Area (Hidden initially) */
+        #gameArea {
+            display: none; /* Initially hidden */
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px dashed #bae6fd; /* Light blue dashed line */
+        }
+        .game-title {
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: #0369a1;
+            margin-bottom: 20px;
+        }
+        .instructions {
+            font-size: 1.0rem;
+            color: #374151;
+            margin-bottom: 25px;
+        }
+
+        /* Palette and Drop Zones Layout */
+        .activity-layout {
+            display: flex;
+            flex-direction: column; /* Stack palette above drop zones on small screens */
+            gap: 30px;
+            align-items: center; /* Center items when stacked */
+        }
+        @media (min-width: 768px) { /* Side-by-side on medium screens and up */
+             .activity-layout {
+                 flex-direction: row;
+                 justify-content: space-around;
+                 align-items: flex-start; /* Align tops */
+             }
+        }
+
+        /* Stages Palette */
+        .stages-palette {
+            background-color: #f0f9ff; /* Very light blue */
+            border-radius: 15px;
+            padding: 20px;
+            border: 2px solid #7dd3fc;
+            width: 100%;
+            max-width: 350px; /* Max width for palette */
+            min-height: 120px; /* Ensure it has some height even when empty */
+        }
+        .palette-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #0ea5e9; /* Bright blue */
+            margin-bottom: 15px;
+        }
+        .stages-list {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            min-height: 100px; /* Ensure some space */
+        }
+        /* Style for draggable items */
+        .stage-item {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 5px; /* Reduced padding for images */
+            width: 90px;
+            height: 90px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center; /* Center content */
+            text-align: center;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+            cursor: grab;
+            transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.2s ease;
+            user-select: none; /* Prevent text selection during drag */
+            border: 2px solid #e0f2fe;
+            position: relative; /* Needed for z-index */
+            z-index: 10;
+            overflow: hidden; /* Hide parts of image if needed */
+            touch-action: none; /* Crucial for preventing default touch behaviors */
+        }
+         .stage-item:active { /* Mouse active state */
+             cursor: grabbing;
+             /* transform: scale(0.95); Handled by .dragging for consistency */
+             /* box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); */
+         }
+         .stage-item.dragging { /* Visual feedback for the original item being dragged (mouse or touch) */
+            opacity: 0.4;
+            transform: scale(0.95); /* Slight shrink for original */
+         }
+        /* Style for Emoji */
+        .stage-emoji {
+            font-size: 2.5rem;
+            margin-bottom: 5px;
+            pointer-events: none;
+            line-height: 1;
+        }
+        /* Style for Image */
+        .stage-image {
+             max-width: 50px; /* Control image size */
+             max-height: 50px;
+             margin-bottom: 3px;
+             pointer-events: none;
+             object-fit: contain; /* Ensure image scales nicely */
+        }
+        .stage-text {
+             font-size: 0.75rem;
+             font-weight: 500;
+             color: #475569;
+             pointer-events: none;
+             line-height: 1.1; /* Adjust line height for text */
+        }
+
+        /* Drop Zones Area */
+        .sequence-area {
+            width: 100%;
+            max-width: 450px;
+        }
+        .sequence-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #0ea5e9;
+            margin-bottom: 15px;
+        }
+        .drop-zones {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            min-height: 120px; /* Ensure it has some height even when empty */
+        }
+        .drop-zone {
+            background-color: #f0f9ff;
+            border: 3px dashed #7dd3fc;
+            border-radius: 15px;
+            width: 100px;
+            height: 100px;
+            display: flex; /* For centering content if needed */
+            justify-content: center; /* Center content horizontally */
+            align-items: center; /* Center content vertically */
+            padding-top: 0;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+            position: relative;
+        }
+        .drop-zone-number {
+            position: absolute;
+            top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #0ea5e9;
+            z-index: 1; /* Behind item */
+        }
+        .drop-zone.drag-over { /* Used for both mouse and touch drag-over */
+            background-color: #e0f2fe;
+            border-color: #0ea5e9;
+        }
+        .drop-zone .stage-item { /* Item when it's INSIDE a drop zone */
+            transform: scale(0.9); /* Make it slightly smaller */
+            cursor: pointer; /* For returning to palette on click */
+            margin-top: 10px; /* Adjust to be below number */
+            z-index: 2; /* Above number */
+            opacity: 1; /* Ensure fully opaque */
+        }
+
+        /* Ghost image style for touch drag */
+        .ghost-image {
+            position: absolute;
+            pointer-events: none; /* Ghost should not interfere with touch events */
+            opacity: 0.7;
+            transform: scale(0.9); /* Slightly smaller */
+            z-index: 1000; /* Ensure it's on top */
+            /* Copy relevant styles from .stage-item for visual consistency */
+            background-color: #ffffff;
+            border: 2px solid #e0f2fe;
+            border-radius: 10px;
+            padding: 5px;
+            width: 90px;
+            height: 90px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+
+        /* Buttons and Feedback */
+        .action-controls {
+            margin-top: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        .button-row {
+             display: flex;
+             justify-content: center;
+             gap: 15px;
+             flex-wrap: wrap;
+        }
+        .check-button, .reset-sequence-button {
+            color: white;
+            padding: 12px 25px;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .check-button { background-color: #16a34a; }
+        .check-button:hover:not(:disabled) { background-color: #15803d; }
+        .reset-sequence-button { background-color: #f59e0b; }
+        .reset-sequence-button:hover { background-color: #d97706; }
+
+        .check-button:active, .reset-sequence-button:active { transform: translateY(1px); }
+        .check-button:disabled { background-color: #9ca3af; opacity: 0.7; cursor: not-allowed; }
+
+        .feedback-message {
+            margin-top: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            min-height: 1.5em;
+            color: #4b5563;
+            transition: color 0.3s ease;
+        }
+        .change-animal-button {
+             margin-top: 10px;
+             background-color: #60a5fa;
+             color: white;
+             padding: 8px 15px;
+             border-radius: 8px;
+             font-size: 0.9rem;
+             font-weight: 500;
+             cursor: pointer;
+             border: none;
+             transition: background-color 0.2s ease;
+        }
+        .change-animal-button:hover { background-color: #3b82f6; }
+
+        /* Attribution Style */
+        .attribution {
+            font-size: 0.75rem;
+            color: #6b7280; /* Gray */
+            margin-top: 10px;
+            text-align: center;
+        }
+        .attribution a {
+            color: #3b82f6; /* Blue link */
+            text-decoration: underline;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="title">Life Cycles Activity</h1>
+
+        <div id="animalSelection">
+            <h2 class="selection-title">Choose an Animal</h2>
+            <div class="animal-buttons">
+                <button class="animal-button" data-animal="butterfly">🦋 Butterfly</button>
+                <button class="animal-button" data-animal="frog">🐸 Frog</button>
+                <button class="animal-button" data-animal="tree">🌳 Tree</button>
+            </div>
+        </div>
+
+        <div id="gameArea">
+            <h2 id="gameTitle" class="game-title"></h2>
+            <p class="instructions">Drag the stages from the palette and drop them into the correct order below. Click an item in a zone to return it to the palette.</p>
+
+            <div class="activity-layout">
+                <div class="stages-palette">
+                    <h3 class="palette-title">Life Cycle Stages</h3>
+                    <div id="stagesPalette" class="stages-list">
+                        </div>
+                </div>
+
+                <div class="sequence-area">
+                     <h3 class="sequence-title">Correct Sequence</h3>
+                    <div id="dropZones" class="drop-zones">
+                        </div>
+                </div>
+            </div>
+
+            <div class="action-controls">
+                 <div class="button-row">
+                    <button id="resetSequenceButton" class="reset-sequence-button">Reset Sequence</button>
+                    <button id="checkButton" class="check-button" disabled>Check Sequence</button>
+                 </div>
+                <div id="feedbackMessage" class="feedback-message"></div>
+                <button id="changeAnimalButton" class="change-animal-button">Choose a Different Animal</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="attribution">
+        Icons created by Freepik - <a href="https://www.flaticon.com" title="Flaticon">Flaticon</a>
+    </div>
+
+    <script>
+        // --- Game Data ---
+        const lifeCycles = {
+            butterfly: {
+                name: "Butterfly",
+                stages: [
+                    { id: 'egg', text: 'Eggs', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/butterflyeggs.png', order: 1 },
+                    { id: 'larva', text: 'Larva (Caterpillar)', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/caterpillar.png', order: 2 },
+                    { id: 'pupa', text: 'Pupa (Chrysalis)', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/chrysalis.png', order: 3 },
+                    { id: 'adult', text: 'Adult Butterfly', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/summer.png', order: 4 }
+                ]
+            },
+            frog: {
+                name: "Frog",
+                stages: [
+                    { id: 'egg', text: 'Eggs', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/eggs.png', order: 1 },
+                    { id: 'tadpole', text: 'Tadpole', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/tadpole%20(1).png', order: 2 },
+                    { id: 'froglet', text: 'Froglet', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/Froglet.png', order: 3 },
+                    { id: 'adult', text: 'Adult Frog', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/frog-.png', order: 4 }
+                ]
+            },
+            tree: {
+                name: "Tree",
+                stages: [
+                    { id: 'seed', text: 'Seed', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/sunflower-seed.png', order: 1 },
+                    { id: 'seedling', text: 'Seedling', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/sprout.png', order: 2 },
+                    { id: 'sapling', text: 'Sapling', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/sapling.png', order: 3 },
+                    { id: 'adult', text: 'Adult Tree', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/tree.png', order: 4 }
+                ]
+            }
+        };
+
+        // --- Game State ---
+        let currentAnimalId = null;
+        let currentAnimalStages = [];
+        let draggedStageElement = null; // The original DOM element being dragged
+        let ghostImageElement = null;   // The visual clone for touch dragging
+        let droppedItemsMap = new Map(); // Map of { dropZoneOrder: stageId }
+        let isTouchDragging = false;    // Flag to distinguish touch drag from click
+        let touchOffsetX = 0;           // Offset of touch from top-left of dragged item
+        let touchOffsetY = 0;
+
+        // --- DOM References ---
+        let animalSelectionDiv, gameAreaDiv, gameTitleEl, stagesPaletteDiv, dropZonesDiv, checkButton, feedbackMessageEl, changeAnimalButton, resetSequenceButton;
+
+        // --- Utility Functions ---
+        function shuffleArray(array) {
+            let currentIndex = array.length, randomIndex;
+            while (currentIndex !== 0) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        }
+
+        // --- UI Creation Functions ---
+        function createStageElement(stage) {
+            const div = document.createElement('div');
+            div.classList.add('stage-item');
+            div.setAttribute('data-id', stage.id);
+            div.setAttribute('draggable', true); // For mouse drag
+
+            const textP = document.createElement('p');
+            textP.classList.add('stage-text');
+            textP.textContent = stage.text;
+
+            if (stage.imageUrl) {
+                const img = document.createElement('img');
+                img.src = stage.imageUrl;
+                img.alt = stage.text;
+                img.classList.add('stage-image');
+                img.onerror = () => {
+                    const errorText = document.createElement('span');
+                    errorText.textContent = `[IMG ERR]`;
+                    errorText.style.fontSize = '0.7rem';
+                    errorText.style.color = 'red';
+                    div.insertBefore(errorText, textP);
+                    img.remove();
+                };
+                div.appendChild(img);
+            } else {
+                const emojiSpan = document.createElement('span');
+                emojiSpan.classList.add('stage-emoji');
+                emojiSpan.textContent = stage.emoji || '?';
+                if (stage.isPlaceholder) emojiSpan.classList.add('placeholder');
+                div.appendChild(emojiSpan);
+            }
+            div.appendChild(textP);
+
+            // Mouse drag listeners
+            div.addEventListener('dragstart', handleDragStart);
+            div.addEventListener('dragend', handleDragEnd);
+            // Touch listeners
+            div.addEventListener('touchstart', handleTouchStart, { passive: false });
+            // Click listener handled by delegation on container
+            return div;
+        }
+
+        function createDropZoneElement(orderNumber, totalZones) {
+            const div = document.createElement('div');
+            div.classList.add('drop-zone');
+            div.setAttribute('data-order', orderNumber.toString());
+            if (totalZones > 4) {
+                div.style.width = '85px';
+                div.style.height = '85px';
+            }
+
+            const numberSpan = document.createElement('span');
+            numberSpan.classList.add('drop-zone-number');
+            numberSpan.textContent = orderNumber.toString();
+            div.appendChild(numberSpan);
+
+            // Mouse drop listeners
+            div.addEventListener('dragover', handleDragOver);
+            div.addEventListener('dragleave', handleDragLeave);
+            div.addEventListener('drop', handleDrop);
+            // Touch drop is handled by document touchend + elementFromPoint
+            // Click listener handled by delegation
+            return div;
+        }
+
+        // --- Drag & Drop Handlers (Mouse) ---
+        function handleDragStart(e) {
+            if (checkButton.disabled && e.target.closest('.drop-zone')) {
+                 e.preventDefault(); return;
+            }
+            draggedStageElement = e.target;
+            e.dataTransfer.setData('text/plain', draggedStageElement.dataset.id);
+            e.dataTransfer.effectAllowed = 'move';
+            setTimeout(() => { if (draggedStageElement) draggedStageElement.classList.add('dragging'); }, 0);
+        }
+
+        function handleDragEnd(e) {
+            setTimeout(() => { // Use timeout to ensure drop logic completes
+                if (draggedStageElement && draggedStageElement.classList.contains('dragging')) {
+                    draggedStageElement.classList.remove('dragging');
+                }
+                draggedStageElement = null;
+                document.querySelectorAll('.drop-zone.drag-over').forEach(zone => zone.classList.remove('drag-over'));
+            }, 0);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            const targetZone = e.target.closest('.drop-zone');
+            if (targetZone && !targetZone.querySelector('.stage-item')) {
+                targetZone.classList.add('drag-over');
+                e.dataTransfer.dropEffect = 'move';
+            } else {
+                e.dataTransfer.dropEffect = 'none';
+            }
+        }
+
+        function handleDragLeave(e) {
+            const targetZone = e.target.closest('.drop-zone');
+            if (targetZone && !targetZone.contains(e.relatedTarget)) {
+                targetZone.classList.remove('drag-over');
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const targetDropZone = e.target.closest('.drop-zone');
+            if (!targetDropZone || !draggedStageElement || targetDropZone.querySelector('.stage-item')) {
+                if (draggedStageElement) draggedStageElement.classList.remove('dragging');
+                draggedStageElement = null;
+                return;
+            }
+            performDrop(targetDropZone, draggedStageElement.dataset.id, draggedStageElement);
+        }
+
+        // --- Touch Event Handlers ---
+        let touchStartX = 0;
+        let touchStartY = 0;
+        const touchMoveThreshold = 10; // Pixels to move before it's considered a drag
+
+        function handleTouchStart(e) {
+            const targetItem = e.target.closest('.stage-item');
+            if (!targetItem || !targetItem.draggable) return;
+            // Prevent dragging from a completed sequence
+            if (checkButton.disabled && targetItem.closest('.drop-zone')) {
+                return;
+            }
+
+            isTouchDragging = false;
+            draggedStageElement = targetItem;
+            const touch = e.touches[0];
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+
+            const rect = draggedStageElement.getBoundingClientRect();
+            touchOffsetX = touch.clientX - rect.left;
+            touchOffsetY = touch.clientY - rect.top;
+            // e.preventDefault(); // Prevent scroll only if drag confirmed
+        }
+
+        function handleTouchMove(e) {
+            if (!draggedStageElement) return;
+
+            const touch = e.touches[0];
+            const touchX = touch.clientX;
+            const touchY = touch.clientY;
+
+            if (!isTouchDragging) {
+                const deltaX = Math.abs(touchX - touchStartX);
+                const deltaY = Math.abs(touchY - touchStartY);
+                if (deltaX > touchMoveThreshold || deltaY > touchMoveThreshold) {
+                    isTouchDragging = true;
+                    draggedStageElement.classList.add('dragging'); // Style original item
+
+                    // Create and style the ghost image
+                    ghostImageElement = draggedStageElement.cloneNode(true);
+                    ghostImageElement.classList.remove('dragging'); // Ghost doesn't need this
+                    ghostImageElement.classList.add('ghost-image');
+                    document.body.appendChild(ghostImageElement);
+                    ghostImageElement.style.left = `${touchX - touchOffsetX}px`;
+                    ghostImageElement.style.top = `${touchY - touchOffsetY}px`;
+                }
+            }
+
+            if (isTouchDragging) {
+                e.preventDefault(); // Prevent scrolling now that we are dragging
+                if (ghostImageElement) {
+                    ghostImageElement.style.left = `${touchX - touchOffsetX}px`;
+                    ghostImageElement.style.top = `${touchY - touchOffsetY}px`;
+                }
+
+                // Highlight drop zones
+                let originalVisibility = '';
+                if (draggedStageElement) { // Temporarily hide original
+                    originalVisibility = draggedStageElement.style.visibility;
+                    draggedStageElement.style.visibility = 'hidden';
+                }
+                // Ghost already has pointer-events:none
+                const elementUnderTouch = document.elementFromPoint(touchX, touchY);
+                if (draggedStageElement) draggedStageElement.style.visibility = originalVisibility; // Restore
+
+                dropZones.forEach(zone => {
+                    if (zone === elementUnderTouch || zone.contains(elementUnderTouch)) {
+                        if (!zone.querySelector('.stage-item')) {
+                            zone.classList.add('drag-over');
+                        }
+                    } else {
+                        zone.classList.remove('drag-over');
+                    }
+                });
+            }
+        }
+
+        function handleTouchEnd(e) {
+            if (!draggedStageElement) return;
+
+            let finalTargetDropZone = null;
+            if (isTouchDragging) {
+                let originalVisibility = '';
+                if (draggedStageElement) {
+                    originalVisibility = draggedStageElement.style.visibility;
+                    draggedStageElement.style.visibility = 'hidden';
+                }
+                const endTargetElement = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+                if (draggedStageElement) draggedStageElement.style.visibility = originalVisibility;
+
+                finalTargetDropZone = endTargetElement ? endTargetElement.closest('.drop-zone') : null;
+
+                if (finalTargetDropZone && !finalTargetDropZone.querySelector('.stage-item')) {
+                    performDrop(finalTargetDropZone, draggedStageElement.dataset.id, draggedStageElement);
+                }
+            }
+            // else it was a tap, click handler will manage it.
+
+            // Cleanup
+            if (draggedStageElement) draggedStageElement.classList.remove('dragging');
+            if (ghostImageElement) {
+                ghostImageElement.remove();
+                ghostImageElement = null;
+            }
+            dropZones.forEach(zone => zone.classList.remove('drag-over'));
+            draggedStageElement = null;
+            isTouchDragging = false;
+        }
+
+        // --- Common Drop Logic (for both mouse and touch) ---
+        function performDrop(targetDropZone, stageId, itemElement) {
+            const zoneOrder = targetDropZone.dataset.order;
+            const originalParent = itemElement.parentElement;
+
+            targetDropZone.appendChild(itemElement); // Move the original element
+
+            droppedItemsMap.set(zoneOrder, stageId);
+
+            // If item was in another drop zone, clear its old state
+            if (originalParent && originalParent.classList.contains('drop-zone') && originalParent !== targetDropZone) {
+                droppedItemsMap.delete(originalParent.dataset.order);
+            }
+
+            updateCheckButtonState();
+            setFeedback('');
+        }
+
+
+        // --- Click Handler (for returning items) ---
+        function handleDropZoneClick(e) {
+            // This function is now primarily for returning items from drop zones
+            // Definition clicks are handled by the global container click listener
+            if (isTouchDragging) return; // Don't process as click if a drag just ended
+
+            const clickedItem = e.target.closest('.stage-item');
+            const parentZone = e.target.closest('.drop-zone');
+
+            // Only return item if it's in a drop zone and check button is enabled (sequence not confirmed)
+            if (clickedItem && parentZone && parentZone.contains(clickedItem) && !checkButton.disabled) {
+                const zoneOrder = parentZone.dataset.order;
+                droppedItemsMap.delete(zoneOrder);
+                stagesPaletteDiv.appendChild(clickedItem); // Move element to palette
+                updateCheckButtonState();
+                setFeedback('');
+                parentZone.style.borderColor = '#7dd3fc'; // Reset border
+            }
+        }
+
+
+        // --- Game Logic Functions ---
+        function initializeAnimal(animalId) {
+            console.log("Initializing animal:", animalId);
+            if (!lifeCycles[animalId]) { console.error("Invalid animal ID:", animalId); return; }
+
+            currentAnimalId = animalId;
+            currentAnimalStages = lifeCycles[animalId].stages;
+            gameTitleEl.textContent = `${lifeCycles[animalId].name} Life Cycle`;
+
+            droppedItemsMap.clear();
+            stagesPaletteDiv.innerHTML = '';
+            dropZonesDiv.innerHTML = '';
+            setFeedback('');
+            checkButton.disabled = true;
+
+            console.log("Creating drop zones");
+            currentAnimalStages.forEach((stage, index) => {
+                const zone = createDropZoneElement(index + 1, currentAnimalStages.length);
+                dropZonesDiv.appendChild(zone);
+            });
+
+            console.log("Populating palette");
+            const shuffledStages = shuffleArray([...currentAnimalStages]);
+            shuffledStages.forEach(stage => {
+                const stageEl = createStageElement(stage);
+                stagesPaletteDiv.appendChild(stageEl);
+            });
+
+            animalSelectionDiv.style.display = 'none';
+            gameAreaDiv.style.display = 'block';
+            console.log("Initialization complete");
+        }
+
+        function resetCurrentSequenceBoard() {
+            if (!currentAnimalId) return;
+            console.log("Resetting sequence");
+
+            droppedItemsMap.clear();
+            stagesPaletteDiv.innerHTML = '';
+            dropZonesDiv.querySelectorAll('.stage-item').forEach(item => item.remove());
+
+            const shuffledStages = shuffleArray([...currentAnimalStages]);
+            shuffledStages.forEach(stage => {
+                const stageEl = createStageElement(stage);
+                stagesPaletteDiv.appendChild(stageEl);
+            });
+
+            setFeedback('');
+            checkButton.disabled = true;
+            dropZonesDiv.querySelectorAll('.drop-zone').forEach(zone => {
+                zone.style.borderColor = '#7dd3fc';
+            });
+        }
+
+
+        function updateCheckButtonState() {
+            checkButton.disabled = droppedItemsMap.size === 0;
+        }
+
+        function setFeedback(message, type = 'info') {
+            feedbackMessageEl.textContent = message;
+            feedbackMessageEl.className = 'feedback-message'; // Reset classes
+            switch (type) {
+                case 'success': feedbackMessageEl.classList.add('text-green-600'); break;
+                case 'error': feedbackMessageEl.classList.add('text-red-600'); break;
+                case 'warning': feedbackMessageEl.classList.add('text-yellow-600'); break;
+                default: feedbackMessageEl.classList.add('text-gray-600'); break;
+            }
+        }
+
+        function checkSequence() {
+            if (droppedItemsMap.size !== currentAnimalStages.length) {
+                setFeedback('Please place all stages in the sequence.', 'warning');
+                return;
+            }
+
+            let isCorrect = true;
+            dropZonesDiv.querySelectorAll('.drop-zone').forEach(zone => {
+                 zone.style.borderColor = '#7dd3fc';
+            });
+
+            currentAnimalStages.forEach(correctStage => {
+                const dropZoneOrder = correctStage.order.toString();
+                const placedStageId = droppedItemsMap.get(dropZoneOrder);
+                const zoneEl = dropZonesDiv.querySelector(`.drop-zone[data-order="${dropZoneOrder}"]`);
+
+                if (placedStageId !== correctStage.id) {
+                    isCorrect = false;
+                    if (zoneEl) zoneEl.style.borderColor = '#f87171';
+                } else {
+                    if (zoneEl) zoneEl.style.borderColor = '#4ade80';
+                }
+            });
+
+            if (isCorrect) {
+                setFeedback(`Correct! Well done sequencing the ${lifeCycles[currentAnimalId].name} life cycle!`, 'success');
+                checkButton.disabled = true;
+            } else {
+                setFeedback('Not quite right. Try rearranging the stages.', 'error');
+                checkButton.disabled = false;
+                setTimeout(() => {
+                    dropZonesDiv.querySelectorAll('.drop-zone').forEach(zone => {
+                        if (zone.style.borderColor === 'rgb(248, 113, 113)') {
+                            zone.style.borderColor = '#7dd3fc';
+                        }
+                     });
+                }, 1500);
+            }
+        }
+
+        function returnToAnimalSelection() {
+            gameAreaDiv.style.display = 'none';
+            animalSelectionDiv.style.display = 'block';
+            currentAnimalId = null;
+            currentAnimalStages = [];
+            droppedItemsMap.clear();
+            setFeedback('');
+            stagesPaletteDiv.innerHTML = '';
+            dropZonesDiv.innerHTML = '';
+        }
+
+        // --- Initial Setup ---
+        function initializeApp() {
+            animalSelectionDiv = document.getElementById('animalSelection');
+            gameAreaDiv = document.getElementById('gameArea');
+            gameTitleEl = document.getElementById('gameTitle');
+            stagesPaletteDiv = document.getElementById('stagesPalette');
+            dropZonesDiv = document.getElementById('dropZones');
+            checkButton = document.getElementById('checkButton');
+            feedbackMessageEl = document.getElementById('feedbackMessage');
+            changeAnimalButton = document.getElementById('changeAnimalButton');
+            resetSequenceButton = document.getElementById('resetSequenceButton');
+
+            document.querySelectorAll('.animal-button').forEach(button => {
+                button.addEventListener('click', (e) => initializeAnimal(e.target.dataset.animal));
+            });
+            checkButton.addEventListener('click', checkSequence);
+            changeAnimalButton.addEventListener('click', returnToAnimalSelection);
+            resetSequenceButton.addEventListener('click', resetCurrentSequenceBoard);
+
+            // Global listeners for touch move and end
+            document.addEventListener('touchmove', handleTouchMove, { passive: false });
+            document.addEventListener('touchend', handleTouchEnd);
+
+             console.log("App Initialized");
+        }
+
+        document.addEventListener('DOMContentLoaded', initializeApp);
+
+    </script>
+</body>
+</html>
