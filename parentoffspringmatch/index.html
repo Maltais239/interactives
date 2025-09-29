@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Matching Game - Parent & Offspring</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            /* Light Blue/Coral color palette */
+            --bg: #a7d7c5;
+            --panel: #F4E4C6;
+            --btn: #f7a072;
+            --btn-hover: #f4845f;
+            --item-bg: #fff;
+            --item-border: #ccc;
+            --selected-border: #f7a072; /* Coral */
+            --correct-border: #22c55e; /* Green */
+            --incorrect-flash: #ef4444; /* Red */
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        h1 { font-size: 2.5rem; color: #fff; margin: 5px 0; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1); }
+        p { color: #fff; margin: 0 0 20px; }
+
+        .game-container {
+            background: var(--panel);
+            width: 100%;
+            max-width: 800px;
+            padding: 20px;
+            border-radius: 10px;
+            position: relative;
+        }
+
+        .matching-area {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .match-column {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            flex-basis: 45%;
+            min-width: 160px;
+        }
+
+        .match-item {
+            background-color: var(--item-bg);
+            border: 3px solid var(--item-border);
+            border-radius: 8px;
+            padding: 10px 15px;
+            width: 150px;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: border-color 0.2s, transform 0.1s, opacity 0.3s;
+            text-align: center;
+        }
+
+        .match-item:hover:not(.correct) { border-color: #aaa; }
+        .match-item.selected { border-color: var(--selected-border); transform: scale(1.05); }
+        .match-item.correct { border-color: var(--correct-border); cursor: default; opacity: 0.6; transform: scale(0.98); }
+        .match-item.incorrect { animation: incorrect-flash 0.5s ease; }
+        @keyframes incorrect-flash {
+            0%, 100% { border-color: var(--incorrect-flash); transform: scale(1.0); }
+            50% { border-color: var(--incorrect-flash); transform: scale(1.03); }
+        }
+
+        .item-emoji { font-size: 1.8em; line-height: 1; pointer-events: none; user-select: none; }
+        .item-text { font-size: 0.9em; pointer-events: none; user-select: none; }
+
+        .controls { text-align: center; }
+        .controls button { background: var(--btn); color: #fff; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; margin: 10px 5px; font-size: 1.2rem; font-family: 'Poppins', sans-serif; transition: background .3s; }
+        .controls button:hover { background: var(--btn-hover); }
+
+    </style>
+</head>
+<body>
+    <h1>Parent & Offspring Match</h1>
+    <p>Click a parent, then click its matching offspring.</p>
+
+    <div class="game-container">
+        <div class="matching-area">
+            <div id="parent-column" class="match-column">
+                </div>
+            <div id="offspring-column" class="match-column">
+                </div>
+        </div>
+
+        <div class="controls">
+            <button id="reset-btn" type="button">Reset</button>
+        </div>
+    </div>
+
+    <script>
+    /**
+     * Matching Game - Parent & Offspring v3
+     * - Removed Flower/Seedling pair, kept Tree/Seedling.
+     * - Includes completion celebration (alert + confetti)
+     */
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // --- UPDATED PAIRS ARRAY ---
+        const PAIRS = [
+            { parent: { key: 'dog', name: 'Dog', emoji: '🐕'}, offspring: { key: 'puppy', name: 'Puppy', emoji: '🐶'}, matchId: 'pair-dog'},
+            { parent: { key: 'cat', name: 'Cat', emoji: '🐈'}, offspring: { key: 'kitten', name: 'Kitten', emoji: '🐱'}, matchId: 'pair-cat'},
+            { parent: { key: 'tree', name: 'Tree', emoji: '🌳'}, offspring: { key: 'seedling', name: 'Seedling', emoji: '🌱'}, matchId: 'pair-tree'}, // Kept this one
+            { parent: { key: 'chicken', name: 'Chicken', emoji: '🐔'}, offspring: { key: 'chick', name: 'Chick', emoji: '🐥'}, matchId: 'pair-chicken'},
+            { parent: { key: 'cow', name: 'Cow', emoji: '🐄'}, offspring: { key: 'calf', name: 'Calf', emoji: '🐮'}, matchId: 'pair-cow'},
+            { parent: { key: 'human', name: 'Person', emoji: '🧑'}, offspring: { key: 'baby', name: 'Baby', emoji: '👶'}, matchId: 'pair-human'},
+            { parent: { key: 'pig', name: 'Pig', emoji: '🐖'}, offspring: { key: 'piglet', name: 'Piglet', emoji: '🐷'}, matchId: 'pair-pig'},
+            { parent: { key: 'duck', name: 'Duck', emoji: '🦆'}, offspring: { key: 'duckling', name: 'Duckling', emoji: '🐥'}, matchId: 'pair-duck'},
+            // Removed the Flower/Seedling pair from here
+        ];
+        // --- End of UPDATED PAIRS ---
+
+        const parentColumn = document.getElementById('parent-column');
+        const offspringColumn = document.getElementById('offspring-column');
+
+        let selectedItem = null; // { element: HTMLElement, matchId: string }
+
+        function initializeGame() {
+            parentColumn.innerHTML = '';
+            offspringColumn.innerHTML = '';
+            selectedItem = null;
+
+            let parents = PAIRS.map(p => ({ ...p.parent, matchId: p.matchId }));
+            let offspring = PAIRS.map(p => ({ ...p.offspring, matchId: p.matchId }));
+
+            shuffleArray(parents);
+            shuffleArray(offspring);
+
+            parents.forEach(item => createItemElement(item, parentColumn));
+            offspring.forEach(item => createItemElement(item, offspringColumn));
+
+            document.querySelectorAll('.match-item').forEach(el => {
+                el.removeEventListener('click', handleItemClick); // Remove previous before adding
+                el.addEventListener('click', handleItemClick);
+            });
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function createItemElement(itemData, columnElement) {
+            const itemEl = document.createElement('div');
+            itemEl.className = 'match-item';
+            itemEl.id = `${itemData.key}-${itemData.name.toLowerCase().replace(' ','-')}`;
+            itemEl.dataset.matchId = itemData.matchId;
+
+            itemEl.innerHTML = `
+                <span class="item-emoji" role="img" aria-label="${itemData.name}">${itemData.emoji}</span>
+                <span class="item-text">${itemData.name}</span>
+            `;
+            columnElement.appendChild(itemEl);
+        }
+
+        function handleItemClick(event) {
+            const clickedEl = event.currentTarget;
+            const clickedMatchId = clickedEl.dataset.matchId;
+
+            if (clickedEl.classList.contains('correct')) { return; }
+
+            if (selectedItem === null) {
+                document.querySelectorAll('.match-item.selected').forEach(el => el.classList.remove('selected'));
+                clickedEl.classList.add('selected');
+                selectedItem = { element: clickedEl, matchId: clickedMatchId };
+            } else {
+                const storedEl = selectedItem.element;
+                const storedMatchId = selectedItem.matchId;
+
+                if (clickedEl === storedEl) {
+                    clickedEl.classList.remove('selected');
+                    selectedItem = null;
+                    return;
+                }
+
+                storedEl.classList.remove('selected');
+
+                if (clickedMatchId === storedMatchId) { // Correct Match!
+                    storedEl.classList.add('correct');
+                    clickedEl.classList.add('correct');
+                    selectedItem = null;
+                    checkWinCondition();
+                } else { // Incorrect Match
+                    clickedEl.classList.add('incorrect');
+                    storedEl.classList.add('incorrect');
+                    setTimeout(() => {
+                        clickedEl.classList.remove('incorrect');
+                        if (selectedItem?.element !== storedEl) { // Check storedEl wasn't re-selected
+                           storedEl.classList.remove('incorrect');
+                        }
+                    }, 500);
+                    selectedItem = null;
+                }
+            }
+        }
+
+        function checkWinCondition() {
+            const totalItems = PAIRS.length * 2; // Uses updated PAIRS length
+            const matchedItems = document.querySelectorAll('.match-item.correct').length;
+
+            if (matchedItems === totalItems) {
+                console.log("All pairs matched!");
+                if (typeof confetti === 'function') {
+                     confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 } });
+                     setTimeout(() => confetti({ particleCount: 100, spread: 120, startVelocity: 20, origin: { x: 0.2, y: 0.5 } }), 200);
+                     setTimeout(() => confetti({ particleCount: 100, spread: 120, startVelocity: 20, origin: { x: 0.8, y: 0.5 } }), 300);
+                }
+                setTimeout(() => {
+                    alert("Congratulations! ✨ You matched all the pairs!");
+                }, 500);
+            }
+        }
+
+        document.getElementById('reset-btn').addEventListener('click', initializeGame);
+        initializeGame();
+
+    });
+    </script>
+</body>
+</html>
