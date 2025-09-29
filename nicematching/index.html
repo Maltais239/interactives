@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Definition Match Pro - Creator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f0f4f8; --bg-secondary: #ffffff;
+            --text-primary: #333a45; --text-secondary: #555f6e;
+            --accent-primary: #0077cc; --accent-primary-hover: #005fa3;
+            --accent-secondary: #5cb85c; --accent-secondary-hover: #4cae4c; /* Green for share/download */
+            --border-color: #d1d9e6; --item-bg: #e9ecef; --item-border: #ced4da;
+            --slot-border: #adb5bd; --slot-bg-over: #e6f2ff;
+            --correct-color: #28a745; --incorrect-color: #dc3545; --unplaced-color: #fd7e14;
+            --feedback-border-width: 3px; --shadow-light: 0 4px 6px rgba(0, 0, 0, 0.05);
+            --shadow-medium: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Poppins', sans-serif; background-color: var(--bg-primary);
+            color: var(--text-primary); line-height: 1.6; padding: 20px;
+            display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+        }
+        .page-header { text-align: center; margin-bottom: 30px; }
+        .page-header h1 { font-size: 2.2em; font-weight: 700; color: var(--accent-primary); margin-bottom: 8px; }
+        .page-header p { font-size: 0.95em; color: var(--text-secondary); max-width: 700px; margin: 0 auto; }
+        .main-layout-container { display: flex; gap: 25px; width: 100%; max-width: 1200px; }
+        .generator-column, .game-column {
+            background-color: var(--bg-secondary); padding: 25px;
+            border-radius: 12px; box-shadow: var(--shadow-light);
+        }
+        .generator-column { flex: 0 0 350px; height: fit-content; }
+        .game-column { flex-grow: 1; position: relative; }
+        h2 {
+            font-size: 1.5em; font-weight: 600; color: var(--text-primary);
+            margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;
+        }
+        #generator-area label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 0.9em; color: var(--text-secondary); }
+        #custom-definitions {
+            width: 100%; min-height: 120px; margin-bottom: 15px; padding: 12px;
+            font-family: 'Poppins', sans-serif; font-size: 0.85em;
+            border: 1px solid var(--border-color); border-radius: 8px; resize: vertical; line-height: 1.5;
+        }
+        .generator-controls, .sharing-controls { text-align: center; margin-top: 15px; }
+        /* #share-link-output removed */
+        .info-message {
+            font-size: 0.85em; color: var(--text-secondary); background-color: #e9ecef;
+            padding: 10px; border-radius: 5px; text-align: center; margin-top: 15px;
+            border-left: 4px solid var(--accent-primary);
+        }
+        #term-pool {
+            display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; padding: 15px;
+            background-color: var(--bg-primary); border-radius: 8px; margin-bottom: 25px;
+            min-height: 70px; border: 1px dashed var(--slot-border);
+        }
+        .term-item {
+            padding: 10px 18px; background-color: var(--item-bg); border: 1px solid var(--item-border);
+            border-radius: 8px; cursor: grab; user-select: none; font-weight: 500;
+            color: var(--text-primary); 
+            touch-action: none;
+            transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s;
+            text-align: center; min-width: 100px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .term-item:hover { border-color: var(--accent-primary); box-shadow: var(--shadow-medium); }
+        .term-item.dragging {
+            opacity: 0.6; cursor: grabbing; position: absolute; z-index: 1000;
+            box-shadow: var(--shadow-medium); transform: scale(1.05); transition: none; 
+            background-color: var(--accent-primary); color: white; border-color: var(--accent-primary-hover);
+        }
+        .term-item.native-dragging { opacity: 0.3; }
+        #definitions-area { display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px; }
+        .definition-row { display: flex; align-items: stretch; gap: 12px; }
+        .term-slot {
+            width: 180px; min-height: 60px; border: 2px dashed var(--slot-border); border-radius: 8px;
+            display: flex; justify-content: center; align-items: center;
+            background-color: rgba(255, 255, 255, 0.7); transition: background-color 0.2s, border-style 0.2s, border-color 0.2s;
+            flex-shrink: 0;
+        }
+        .term-slot.over { background-color: var(--slot-bg-over); border-style: solid; border-color: var(--accent-primary); }
+        .term-slot .term-item { 
+            cursor: default; margin: 0; width: calc(100% - 8px); height: calc(100% - 8px);
+            display: flex; justify-content: center; align-items: center;
+            border: 1px solid var(--item-border) !important; box-shadow: none;
+            position: static !important; transform: none !important; opacity: 1 !important;
+            background-color: var(--item-bg); color: var(--text-primary);
+        }
+        .definition-text {
+            flex-grow: 1; padding: 12px 18px; background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.9em;
+            line-height: 1.5; color: var(--text-primary); display: flex; align-items: center;
+        }
+        .term-slot.correct { border: var(--feedback-border-width) solid var(--correct-color) !important; background-color: rgba(40, 167, 69, 0.1) !important; }
+        .term-slot.incorrect { border: var(--feedback-border-width) solid var(--incorrect-color) !important; background-color: rgba(220, 53, 69, 0.1) !important; }
+        .term-item.unplaced { border: var(--feedback-border-width) solid var(--unplaced-color) !important; background-color: rgba(253, 126, 20, 0.1); }
+        .controls { text-align: center; margin-top: 20px;}
+        .controls button, #generate-btn, /* #share-btn removed */ #download-btn {
+            background: var(--accent-primary); color: #fff; border: none; padding: 12px 25px;
+            border-radius: 8px; cursor: pointer; margin: 5px 8px; 
+            font-size: 1em; font-weight: 500; font-family: 'Poppins', sans-serif;
+            transition: background-color .2s, transform 0.1s; box-shadow: var(--shadow-light);
+        }
+        /* #share-btn removed */ #download-btn { background: var(--accent-secondary); }
+        .controls button:hover, #generate-btn:hover, /* #share-btn:hover removed */ #download-btn:hover {
+            background: var(--accent-primary-hover); transform: translateY(-1px);
+        }
+        /* #share-btn:hover removed */ #download-btn:hover { background: var(--accent-secondary-hover); }
+        .controls button:active, #generate-btn:active, /* #share-btn:active removed */ #download-btn:active { transform: translateY(0px); }
+        /* #share-btn[disabled] removed */ #download-btn[disabled] { background: #cccccc; cursor: not-allowed; transform: none; }
+
+        @media (max-width: 900px) {
+            .main-layout-container { flex-direction: column; }
+            .generator-column { flex: 0 0 auto; width: 100%; margin-bottom: 20px; }
+        }
+        @media (max-width: 600px) {
+            body { padding: 15px; }
+            .generator-column, .game-column { padding: 20px; }
+            .term-item { padding: 8px 12px; font-size: 0.9em; }
+            .term-slot { width: 150px; min-height: 50px; }
+            .definition-text { font-size: 0.85em; padding: 10px 12px;}
+            .controls button, #generate-btn, /* #share-btn removed */ #download-btn { padding: 10px 18px; font-size: 0.9em; width: auto; min-width: 120px;}
+            h2 { font-size: 1.3em; }
+        }
+    </style>
+</head>
+<body>
+    <header class="page-header">
+        <h1>Definition Match Pro</h1>
+        <p>Drag terms to their definitions. Create your own vocabulary sets for a fun learning experience!</p>
+    </header>
+
+    <div class="main-layout-container">
+        <aside class="generator-column" id="generator-area">
+              <h2>Create Your Set</h2>
+              <label for="custom-definitions">Paste Terms & Definitions:</label>
+              <textarea id="custom-definitions" rows="6" placeholder="Example:
+Thrust
+A force that moves something forward.
+
+Drag
+A force that opposes movement."></textarea>
+              <div class="generator-controls">
+                  <button id="generate-btn">Generate Game</button>
+              </div>
+
+              <div class="sharing-controls">
+                  <h2>Share Your Set</h2>
+                  <button id="download-btn" disabled>Download HTML File</button>
+                  <div id="info-msg" class="info-message" style="display: none;"></div>
+              </div>
+        </aside>
+
+        <main class="game-column" id="game-area">
+            <div id="term-pool"></div>
+            <div id="definitions-area"></div>
+            <div class="controls">
+                <button id="check-btn">Check Answers</button>
+                <button id="reset-btn">Reset Game</button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        const DEFAULT_DEFINITIONS = [
+            { term: "Thrust", definition: "A force that moves something forward or in the direction of movement." },
+            { term: "Drag", definition: "A force that opposes or resists movement through a fluid (like air)." }
+        ];
+
+        let currentDefinitions = []; 
+
+        const termPool = document.getElementById('term-pool');
+        const definitionsArea = document.getElementById('definitions-area');
+        const gameArea = document.getElementById('game-area'); 
+        const customInput = document.getElementById('custom-definitions'); 
+        const generateBtn = document.getElementById('generate-btn'); 
+        const checkBtn = document.getElementById('check-btn'); 
+        const resetBtn = document.getElementById('reset-btn'); 
+        // const shareBtn = document.getElementById('share-btn'); // Removed
+        const downloadBtn = document.getElementById('download-btn'); 
+        // const shareLinkOutput = document.getElementById('share-link-output'); // Removed
+        const infoMsg = document.getElementById('info-msg'); 
+        // const infoLoaded = document.getElementById('info-loaded'); // Removed
+        const generatorColumn = document.getElementById('generator-area'); 
+
+        let draggedTermElement = null; 
+        let offsetX = 0, offsetY = 0; 
+        let isTouchDragging = false; 
+
+        function initializeGame(definitionsArray) {
+            const localTermPool = document.getElementById('term-pool');
+            const localDefinitionsArea = document.getElementById('definitions-area');
+            
+            if (!localTermPool || !localDefinitionsArea) {
+                console.error("Initialization failed: Missing core game DOM elements.");
+                if (typeof showMessage === "function") showMessage("Core game elements missing!", 'error');
+                return;
+            }
+
+            // References to optional/creator-specific elements that might not exist in downloaded file
+            const localShareBtn = document.getElementById('share-btn'); // Will be null
+            const localDownloadBtn = document.getElementById('download-btn'); // Will be null in downloaded file context
+            const localInfoLoaded = document.getElementById('info-loaded'); // Will be null
+            const localShareLinkOutput = document.getElementById('share-link-output'); // Will be null
+
+
+            if (!definitionsArray || definitionsArray.length === 0) {
+                console.error("Initialization failed: No definitions provided.");
+                if (typeof showMessage === "function") showMessage("No definitions loaded.", 'error');
+                localTermPool.innerHTML = '<p style="color: var(--text-secondary); font-style: italic;">No game loaded.</p>';
+                localDefinitionsArea.innerHTML = '';
+                // Check if these elements exist (they primarily exist in the creator tool)
+                if (localShareBtn) localShareBtn.disabled = true; 
+                if (localDownloadBtn) localDownloadBtn.disabled = true; 
+                return;
+            }
+
+            currentDefinitions = [...definitionsArray]; 
+
+            localTermPool.innerHTML = ''; 
+            localDefinitionsArea.innerHTML = ''; 
+            draggedTermElement = null; 
+            isTouchDragging = false; 
+            if (localInfoLoaded) localInfoLoaded.style.display = 'none'; // Defensively check
+
+            const shuffledDefinitions = [...definitionsArray].sort(() => Math.random() - 0.5);
+
+            shuffledDefinitions.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'definition-row';
+                
+                const slot = document.createElement('div');
+                slot.className = 'term-slot';
+                slot.dataset.correctTerm = item.term; 
+                addDropZoneListeners(slot); 
+                
+                const definitionText = document.createElement('div');
+                definitionText.className = 'definition-text';
+                definitionText.textContent = item.definition;
+                
+                row.appendChild(slot);
+                row.appendChild(definitionText);
+                localDefinitionsArea.appendChild(row);
+            });
+
+            let terms = definitionsArray.map(item => item.term);
+            terms.sort(() => Math.random() - 0.5);
+
+            terms.forEach((term, index) => {
+                const termEl = document.createElement('div');
+                termEl.className = 'term-item';
+                termEl.draggable = true; 
+                termEl.id = `term-${term.replace(/\W/g, '')}-${index}`; 
+                termEl.dataset.term = term; 
+                termEl.textContent = term;
+                addDraggableListeners(termEl); 
+                localTermPool.appendChild(termEl);
+            });
+
+            clearFeedback(); 
+
+            if (localShareBtn) localShareBtn.disabled = false; 
+            if (localDownloadBtn) localDownloadBtn.disabled = false; 
+            if (localShareLinkOutput) localShareLinkOutput.value = ''; 
+            if (typeof showMessage === "function") showMessage(''); 
+        }
+
+        function parseCustomInput(inputText) {
+            const pairs = [];
+            const blocks = inputText.trim().split(/\n\s*\n/); 
+            blocks.forEach(block => {
+                const lines = block.trim().split('\n').filter(line => line.trim() !== ''); 
+                if (lines.length >= 2) { 
+                    const term = lines[0].trim();
+                    const definition = lines.slice(1).join(' ').trim(); 
+                    if (term && definition) { 
+                        pairs.push({ term, definition });
+                    }
+                }
+            });
+            return pairs;
+        }
+
+        function showMessage(text, type = 'info') { 
+            if (!infoMsg) return; 
+            infoMsg.textContent = text;
+            infoMsg.style.color = type === 'error' ? 'var(--incorrect-color)' : 'var(--text-secondary)';
+            infoMsg.style.borderLeftColor = type === 'error' ? 'var(--incorrect-color)' : 'var(--accent-primary)';
+            infoMsg.style.display = text ? 'block' : 'none';
+        }
+        
+        function addDraggableListeners(element) {
+            element.addEventListener('dragstart', handleDragStartTerm); 
+            element.addEventListener('dragend', handleDragEndTerm);     
+            element.addEventListener('pointerdown', handlePointerDownTerm); 
+        }
+
+        function addDropZoneListeners(element) {
+            element.addEventListener('dragover', handleDragOverSlot);   
+            element.addEventListener('dragleave', handleDragLeaveSlot); 
+            element.addEventListener('drop', handleDropSlot);           
+        }
+
+        function handleDragStartTerm(e) {
+            if (e.pointerType === 'touch' || isTouchDragging) {
+                e.preventDefault();
+                return;
+            }
+            draggedTermElement = e.target;
+            e.dataTransfer.setData('text/term-id', e.target.id);
+            e.dataTransfer.effectAllowed = 'move';
+            setTimeout(() => { if(e.target) e.target.classList.add('native-dragging'); }, 0);
+        }
+
+        function handleDragEndTerm(e) {
+            if (draggedTermElement && draggedTermElement.classList.contains('term-item')) {
+                draggedTermElement.classList.remove('native-dragging', 'dragging');
+            }
+            document.querySelectorAll('.term-slot.over').forEach(zone => zone.classList.remove('over'));
+            if (!isTouchDragging) {
+                draggedTermElement = null;
+            }
+            document.body.style.userSelect = ''; 
+        }
+
+        function handlePointerDownTerm(e) {
+            if (e.button !== 0 || draggedTermElement) return; 
+            
+            draggedTermElement = e.currentTarget; 
+            
+            try {
+                draggedTermElement.setPointerCapture(e.pointerId);
+            } catch(err) {
+                console.warn("Could not capture pointer:", err);
+            }
+            
+            isTouchDragging = e.pointerType === 'touch' || e.pointerType === 'pen';
+
+            const rect = draggedTermElement.getBoundingClientRect();
+            offsetX = e.clientX - rect.left; 
+            offsetY = e.clientY - rect.top;   
+
+            draggedTermElement.classList.add('dragging'); 
+            const gameRect = gameArea.getBoundingClientRect();
+            gameArea.appendChild(draggedTermElement); 
+            draggedTermElement.style.position = 'absolute'; 
+            draggedTermElement.style.left = `${e.clientX - gameRect.left - offsetX}px`;
+            draggedTermElement.style.top = `${e.clientY - gameRect.top - offsetY}px`;
+
+            document.addEventListener('pointermove', handlePointerMoveTerm);
+            document.addEventListener('pointerup', handlePointerUpTerm);
+            document.addEventListener('pointercancel', handlePointerUpTerm); 
+            document.body.style.userSelect = 'none'; 
+            if (isTouchDragging) e.preventDefault(); 
+        }
+
+        function handlePointerMoveTerm(e) {
+            if (!draggedTermElement) return;
+            
+            e.preventDefault(); 
+
+            const gameRect = gameArea.getBoundingClientRect();
+            let newX = e.clientX - gameRect.left - offsetX;
+            let newY = e.clientY - gameRect.top - offsetY;
+            draggedTermElement.style.left = `${newX}px`;
+            draggedTermElement.style.top = `${newY}px`;
+
+            const originalVisibility = draggedTermElement.style.visibility;
+            draggedTermElement.style.visibility = 'hidden';
+            let elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY);
+            draggedTermElement.style.visibility = originalVisibility;
+            
+            let currentDropTarget = elementUnderPointer ? elementUnderPointer.closest('.term-slot') : null;
+
+            document.querySelectorAll('.term-slot.over').forEach(t => t.classList.remove('over'));
+            if (currentDropTarget && !currentDropTarget.querySelector('.term-item')) {
+                currentDropTarget.classList.add('over');
+            }
+        }
+
+        function handlePointerUpTerm(e) {
+            if (!draggedTermElement) return; 
+
+            const currentTermElement = draggedTermElement; 
+            
+            try {
+                if (currentTermElement.hasPointerCapture && currentTermElement.hasPointerCapture(e.pointerId)) {
+                   currentTermElement.releasePointerCapture(e.pointerId);
+                }
+            } catch(err) {
+                console.warn("Could not release pointer capture:", err);
+            }
+
+            const originalVisibility = currentTermElement.style.visibility;
+            currentTermElement.style.visibility = 'hidden'; 
+            let elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY);
+            currentTermElement.style.visibility = originalVisibility; 
+            let finalDropTarget = elementUnderPointer ? elementUnderPointer.closest('.term-slot') : null;
+
+            currentTermElement.classList.remove('dragging', 'native-dragging');
+            currentTermElement.style.left = '';
+            currentTermElement.style.top = '';
+            document.querySelectorAll('.term-slot.over').forEach(t => t.classList.remove('over'));
+
+            if (finalDropTarget && !finalDropTarget.querySelector('.term-item')) {
+                moveItemToSlot(currentTermElement, finalDropTarget);
+            } else {
+                returnItemToPool(currentTermElement);
+            }
+            
+            cleanUpDragListeners(); 
+            draggedTermElement = null; 
+            isTouchDragging = false; 
+            offsetX = 0; offsetY = 0; 
+        }
+
+
+        function handleDragOverSlot(e) {
+            e.preventDefault(); 
+            if (!this.querySelector('.term-item') || (draggedTermElement && this.contains(draggedTermElement))) {
+                this.classList.add('over');
+                if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+            } else {
+                if (e.dataTransfer) e.dataTransfer.dropEffect = 'none'; 
+            }
+        }
+
+        function handleDragLeaveSlot(e) {
+            if (!this.contains(e.relatedTarget)) {
+                this.classList.remove('over');
+            }
+        }
+
+        function handleDropSlot(e) {
+            e.preventDefault();
+            const dropSlot = this;
+            dropSlot.classList.remove('over');
+            
+            if (isTouchDragging || (dropSlot.querySelector('.term-item') && dropSlot.querySelector('.term-item') !== draggedTermElement)) {
+                return;
+            }
+
+            const droppedTermId = e.dataTransfer.getData('text/term-id');
+            const droppedElement = document.getElementById(droppedTermId);
+
+            if (droppedElement && dropSlot.classList.contains('term-slot')) {
+                moveItemToSlot(droppedElement, dropSlot);
+                droppedElement.classList.remove('native-dragging'); 
+            }
+            draggedTermElement = null; 
+        }
+
+        function moveItemToSlot(itemElement, targetSlot) {
+            if (!itemElement || !targetSlot) return;
+
+            const currentItemInSlot = targetSlot.querySelector('.term-item');
+            if (currentItemInSlot && currentItemInSlot !== itemElement) {
+                returnItemToPool(currentItemInSlot);
+            }
+            
+            targetSlot.innerHTML = ''; 
+            targetSlot.appendChild(itemElement); 
+            itemElement.style.position = 'static'; 
+            itemElement.style.left = ''; 
+            itemElement.style.top = ''; 
+            itemElement.style.transform = '';
+            clearFeedbackForItem(itemElement); 
+            targetSlot.classList.remove('correct', 'incorrect'); 
+        }
+
+        function returnItemToPool(itemElement) {
+            if (itemElement && !termPool.contains(itemElement)) { 
+                clearFeedbackForItem(itemElement);
+                itemElement.style.position = 'static'; 
+                itemElement.style.left = ''; 
+                itemElement.style.top = '';
+                termPool.appendChild(itemElement);
+            } else if (itemElement && termPool.contains(itemElement)) {
+                itemElement.style.position = 'static';
+                itemElement.style.left = ''; 
+                itemElement.style.top = '';
+            }
+        }
+
+        function clearFeedback() {
+            document.querySelectorAll('.term-slot').forEach(slot => slot.classList.remove('correct', 'incorrect'));
+            document.querySelectorAll('.term-item').forEach(item => {
+                item.classList.remove('unplaced');
+                item.style.border = ''; 
+            });
+            const gameMessageElInFile = document.getElementById('game-message');
+            if(gameMessageElInFile) {
+                gameMessageElInFile.style.display = 'none';
+            }
+        }
+        
+        function clearFeedbackForItem(itemElement) {
+            if (itemElement) {
+                itemElement.classList.remove('unplaced');
+                itemElement.style.border = ''; 
+            }
+        }
+
+        function cleanUpDragListeners() {
+            document.removeEventListener('pointermove', handlePointerMoveTerm);
+            document.removeEventListener('pointerup', handlePointerUpTerm);
+            document.removeEventListener('pointercancel', handlePointerUpTerm);
+            document.body.style.userSelect = ''; 
+        }
+
+        if (checkBtn) {
+            checkBtn.addEventListener('click', () => {
+                clearFeedback(); 
+                let allSlotsFilled = true;
+                let allMatchesCorrect = true;
+
+                document.querySelectorAll('.term-slot').forEach(slot => {
+                    const expectedTerm = slot.dataset.correctTerm;
+                    const placedItem = slot.querySelector('.term-item');
+                    if (placedItem) {
+                        const placedTerm = placedItem.dataset.term;
+                        if (placedTerm === expectedTerm) {
+                            slot.classList.add('correct');
+                        } else {
+                            slot.classList.add('incorrect');
+                            allMatchesCorrect = false;
+                        }
+                    } else { 
+                        allSlotsFilled = false;
+                        allMatchesCorrect = false; 
+                    }
+                });
+
+                Array.from(termPool.children).forEach(item => {
+                    if (item.classList.contains('term-item')) { 
+                        item.classList.add('unplaced');
+                        allMatchesCorrect = false; 
+                    }
+                });
+
+                if (allSlotsFilled && allMatchesCorrect) {
+                    showMessage("Congratulations! All definitions matched correctly!", 'info');
+                } else if (!allSlotsFilled && termPool.children.length === 0 && !allMatchesCorrect) {
+                     showMessage("Some definitions are incorrect. Please review your answers.", 'error');
+                } else {
+                     showMessage("Check your answers. Some terms might be unplaced or incorrect.", 'error');
+                }
+            });
+        }
+
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                initializeGame(currentDefinitions); 
+            });
+        }
+
+        if (generateBtn) {
+            generateBtn.addEventListener('click', () => {
+                const inputText = customInput.value;
+                const parsed = parseCustomInput(inputText);
+                if (parsed.length > 0) {
+                    initializeGame(parsed);
+                    if(generatorColumn) generatorColumn.style.border = ''; 
+                    showMessage(''); 
+                } else {
+                    showMessage("Could not parse input. Ensure format: Term on line 1, Definition on line 2 (or more), with a blank line between each entry.", 'error');
+                    if(generatorColumn) generatorColumn.style.border = '2px solid var(--incorrect-color)'; 
+                }
+            });
+        }
+
+        // Share button functionality removed
+        
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', () => {
+                if (currentDefinitions.length === 0) {
+                    showMessage("Generate a game first before attempting to download.", 'error');
+                    return;
+                }
+
+                const functionsToInject = [
+                    initializeGame, 
+                    addDraggableListeners, addDropZoneListeners, handleDragStartTerm, handleDragEndTerm,
+                    handlePointerDownTerm, 
+                    handlePointerMoveTerm, 
+                    handlePointerUpTerm,   
+                    handleDragOverSlot, handleDragLeaveSlot, handleDropSlot,
+                    moveItemToSlot, returnItemToPool, 
+                    clearFeedback, 
+                    clearFeedbackForItem, cleanUpDragListeners
+                ].map(fn => fn.toString()).join('\n\n');
+                
+                let pageCSS = "";
+                for (let sheet of document.styleSheets) {
+                    try {
+                        if (sheet.cssRules) {
+                             Array.from(sheet.cssRules).forEach(rule => pageCSS += rule.cssText + '\n');
+                        }
+                    } catch (e) {
+                        console.warn("Could not read CSS rules from stylesheet:", sheet.href, e);
+                    }
+                }
+                if (!pageCSS && document.querySelector('style')) { 
+                     pageCSS = document.querySelector('style').innerHTML;
+                }
+
+                const gameMessageCSS = `
+        #game-message {
+            display: none; padding: 12px 15px; margin-bottom: 20px; 
+            border-radius: 8px; text-align: center; font-weight: 500;
+            font-size: 0.95em; box-shadow: var(--shadow-light);
+            transition: opacity 0.3s ease-in-out;
+        }
+        @media (max-width: 600px) { #game-message { font-size: 0.9em; padding: 10px; } }`;
+
+                const gameHTML = `
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Definition Match Game (Standalone)</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+${pageCSS}
+${gameMessageCSS}
+.generator-column, .page-header p, .sharing-controls, #info-loaded, #info-msg, #custom-definitions, #generate-btn, #share-btn, #download-btn, #share-link-output, label[for="custom-definitions"], .generator-controls h2, .sharing-controls h2 { display: none !important; }
+.main-layout-container { display: block !important; max-width: 800px; margin: 20px auto;} 
+.game-column { box-shadow: none; border: 1px solid var(--border-color); margin-top: 20px; }
+body { justify-content: flex-start; }
+.page-header h1 { margin-bottom: 20px; }
+</style>
+</head><body>
+<header class="page-header"><h1>Definition Match Game</h1></header>
+<div class="main-layout-container">
+<main class="game-column" id="game-area">
+<div id="term-pool"></div>
+<div id="definitions-area"></div>
+<div id="game-message"></div> 
+<div class="controls"><button id="check-btn">Check Answers</button><button id="reset-btn">Reset Game</button></div>
+</main></div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const gameDefinitionsFromCreator = ${JSON.stringify(currentDefinitions)};
+    
+    const termPool = document.getElementById('term-pool');
+    const definitionsArea = document.getElementById('definitions-area');
+    const gameArea = document.getElementById('game-area'); 
+    const checkBtn = document.getElementById('check-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const gameMessageEl = document.getElementById('game-message'); 
+
+    let currentDefinitions; 
+    let draggedTermElement = null; 
+    let offsetX = 0, offsetY = 0; 
+    let isTouchDragging = false;
+
+    function showMessage(text, type = 'info') { // Stub for injected initializeGame
+        console.log("[Standalone Game Stub Message]: type=" + type + ", text=" + text);
+    }
+
+    function showGameMessage(message, type) {
+        if (!gameMessageEl) return;
+        gameMessageEl.textContent = message;
+        gameMessageEl.style.opacity = '0';
+        gameMessageEl.style.display = 'block';
+        if (type === 'success') {
+            gameMessageEl.style.backgroundColor = 'var(--correct-color)'; gameMessageEl.style.color = '#fff';
+        } else if (type === 'error') {
+            gameMessageEl.style.backgroundColor = 'var(--incorrect-color)'; gameMessageEl.style.color = '#fff';
+        } else { 
+            gameMessageEl.style.backgroundColor = 'var(--accent-primary)'; gameMessageEl.style.color = '#fff';
+        }
+        setTimeout(() => { gameMessageEl.style.opacity = '1'; }, 50);
+        setTimeout(() => {
+            gameMessageEl.style.opacity = '0';
+            setTimeout(() => { gameMessageEl.style.display = 'none'; }, 300); 
+        }, 5000);
+    }
+
+    ${functionsToInject}
+
+    if (checkBtn) {
+        checkBtn.addEventListener('click', () => {
+            clearFeedback(); 
+            let allSlotsFilled = true; let allMatchesCorrect = true;
+            document.querySelectorAll('.term-slot').forEach(slot => {
+                const expectedTerm = slot.dataset.correctTerm;
+                const placedItem = slot.querySelector('.term-item');
+                if (placedItem) {
+                    const placedTerm = placedItem.dataset.term;
+                    if (placedTerm === expectedTerm) { slot.classList.add('correct'); } 
+                    else { slot.classList.add('incorrect'); allMatchesCorrect = false; }
+                } else { allSlotsFilled = false; allMatchesCorrect = false; }
+            });
+            Array.from(termPool.children).forEach(item => {
+                if (item.classList.contains('term-item')) { item.classList.add('unplaced'); allMatchesCorrect = false; }
+            });
+            
+            if (allSlotsFilled && allMatchesCorrect) { 
+                showGameMessage("Congratulations! All definitions matched correctly!", "success"); 
+            } else if (!allSlotsFilled && termPool.children.length === 0 && !allMatchesCorrect) {
+                showGameMessage("Some definitions are incorrect. Please review your answers.", "error");
+            } else { 
+                showGameMessage("Check your answers. Some terms might be unplaced or incorrect.", "info");
+            }
+        });
+    }
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => { initializeGame(gameDefinitionsFromCreator); });
+    }
+
+    initializeGame(gameDefinitionsFromCreator);
+});
+</scr` + `ipt></body></html>`;
+                try {
+                    const blob = new Blob([gameHTML], { type: 'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'definition_match_game.html'; 
+                    document.body.appendChild(a); 
+                    a.click(); 
+                    document.body.removeChild(a); 
+                    URL.revokeObjectURL(url); 
+                    showMessage("HTML file download initiated.");
+                } catch (error) {
+                    console.error("Error creating download file:", error);
+                    showMessage("Failed to create the download file.", 'error');
+                }
+            });
+        }
+
+        // Initial Page Load: Always load default definitions
+        initializeGame(DEFAULT_DEFINITIONS); 
+        if(customInput) {
+             customInput.placeholder = `Example:
+Term 1
+Definition for Term 1. Can be multiple lines.
+
+Term 2
+Definition for Term 2.`;
+        }
+        
+    });
+    </script>
+</body>
+</html>
