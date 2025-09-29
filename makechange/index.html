@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cashier Change Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            overscroll-behavior-y: contain;
+        }
+        .money-item {
+            touch-action: none; cursor: grab; display: inline-flex; align-items: center; justify-content: center; padding: 3px;
+            border-radius: 0.375rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin: 0.25rem; user-select: none;
+            transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.2s ease; vertical-align: middle; background-color: transparent; border-color: transparent;
+        }
+        .money-item:active { cursor: grabbing; }
+        .money-item.dragging-source { opacity: 0.5; cursor: grabbing; }
+        #changeGivenBox .money-item { cursor: pointer; }
+        .money-image { max-height: 60px; max-width: 110px; object-fit: contain; pointer-events: none; }
+        .money-image.coin { max-width: 55px; max-height: 55px; border-radius: 50%; }
+        .money-item:has(img.coin) { width: 60px; height: 60px; border-radius: 50%; overflow: hidden; }
+        .money-item:has(img:not(.coin)) { min-width: 115px; height: 65px; border-radius: 0.25rem; }
+        #changeGivenBox {
+            border: 3px dashed #9ca3af; background-color: #f9fafb; min-height: 150px;
+            transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+            display: flex; flex-wrap: wrap; align-content: flex-start; gap: 0.5rem; padding: 0.75rem;
+        }
+        #changeGivenBox.drag-over { background-color: #e5e7eb; border-color: #6b7280; }
+        .ghost-image {
+            position: absolute; pointer-events: none; opacity: 0.75; transform: scale(0.95); z-index: 1000;
+            border-radius: 0.375rem; background-color: transparent; padding: 3px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .ghost-image img { max-height: 60px; max-width: 110px; object-fit: contain; }
+        .ghost-image img.coin { max-width: 55px; max-height: 55px; border-radius: 50%; }
+
+        /* Feedback Animation */
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 20%, 40%, 60%, 80% { transform: translateX(5px); } }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+
+        .feedback-container.feedback-error, #changeGivenBox.feedback-error { border-color: #ef4444; animation: shake 0.5s ease-in-out; }
+        .feedback-container.feedback-success, #changeGivenBox.feedback-success { border-color: #22c55e; animation: pulse 0.5s ease-in-out; }
+
+        .difficulty-btn { transition: all 0.2s ease; }
+        .difficulty-btn.active { transform: translateY(-2px) scale(1.05); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-5xl mx-auto bg-white p-6 rounded-xl shadow-lg">
+        <h1 class="text-3xl font-bold text-center text-purple-700 mb-2">Cashier Change Challenge</h1>
+        <p class="text-center text-gray-600 mb-4">Select a difficulty, calculate the change, and drag money from the till to pay the customer.</p>
+
+        <div class="flex justify-center gap-3 mb-6">
+             <button data-difficulty="easy" class="difficulty-btn bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow">Easy</button>
+             <button data-difficulty="normal" class="difficulty-btn bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow active">Normal</button>
+             <button data-difficulty="hard" class="difficulty-btn bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow">Hard</button>
+        </div>
+
+        <div class="flex flex-col lg:flex-row gap-8">
+            <div class="lg:w-1/2 bg-gray-50 p-4 rounded-lg border-2">
+                <h2 class="text-xl font-semibold text-center text-gray-800 mb-3">Your Till</h2>
+                <div id="moneyTill" class="flex flex-wrap justify-center items-center gap-2 min-h-[200px]"></div>
+            </div>
+
+            <div class="lg:w-1/2">
+                <div class="space-y-4 mb-4 text-center">
+                    <div class="bg-red-100 border border-red-300 p-3 rounded-lg"><h2 class="text-md font-semibold text-red-800">Original Total:</h2><p id="totalCost" class="text-2xl font-bold text-red-900">$0.00</p></div>
+                    <div class="bg-orange-100 border border-orange-300 p-3 rounded-lg"><h2 class="text-md font-semibold text-orange-800">Rounded Total (for Cash):</h2><p id="roundedTotal" class="text-2xl font-bold text-orange-900">$0.00</p></div>
+                    <div class="bg-blue-100 border border-blue-300 p-3 rounded-lg"><h2 class="text-md font-semibold text-blue-800">Customer Paid:</h2><p id="amountPaid" class="text-2xl font-bold text-blue-900">$0.00</p></div>
+                </div>
+
+                <div id="timerContainer" class="text-center mb-4" style="display: none;">
+                    <p class="text-2xl font-bold text-red-600">Time Left: <span id="timer">30</span>s</p>
+                </div>
+
+                <div id="changeDueContainer" class="bg-yellow-100 border-2 border-yellow-400 p-4 rounded-lg text-center mb-4" style="display: none;">
+                    <h2 class="text-xl font-bold text-yellow-800">Change Due:</h2>
+                    <p id="changeDue" class="text-4xl font-extrabold text-yellow-900">$0.00</p>
+                </div>
+
+                <div id="changeGivenBox" class="w-full p-4 rounded-lg"></div>
+
+                <div id="totalContainer" class="mt-4 p-3 bg-green-100 border border-green-300 rounded-lg text-center transition-colors duration-300 feedback-container">
+                    <h3 class="text-md font-semibold text-green-800">Change You've Given:</h3>
+                    <p id="currentTotal" class="text-2xl font-bold text-green-900">$0.00</p>
+                </div>
+
+                <div class="mt-6 flex flex-wrap justify-center items-center gap-3">
+                    <button id="checkButton" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:opacity-50 disabled:scale-100" disabled>Check Change</button>
+                    <button id="clearButton" class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg shadow transition-colors">Clear Change</button>
+                    <button id="newTransactionButton" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg shadow transition-colors">New Transaction</button>
+                </div>
+                <div id="feedback" class="mt-4 text-center text-lg font-semibold min-h-[1.5em]"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const moneyTypes = [
+            { value: 100, label: '$100', type: 'bill', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/100_front.jpg' }, { value: 50, label: '$50', type: 'bill', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/50_front.jpg' },
+            { value: 20, label: '$20', type: 'bill', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/20_front.jpg' }, { value: 10, label: '$10', type: 'bill', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/10_back.jpg' },
+            { value: 5, label: '$5', type: 'bill', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/5_front.jpg' }, { value: 2, label: '$2', type: 'coin', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/png-clipart-canada-toonie-loonie-canadian-dollar-royal-canadian-mint-silver-coin-gold-world-thumbnail.png' },
+            { value: 1, label: '$1', type: 'coin', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/2022-canadian-1-dollar-common-loon-loonie-coin-1-800x800.png' }, { value: 0.25, label: '25¢', type: 'coin', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/2020-canadian-25-cent-caribou-quarter-coin-1-800x800.jpg' },
+            { value: 0.10, label: '10¢', type: 'coin', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/Canadian_Dime_-_reverse.png' }, { value: 0.05, label: '5¢', type: 'coin', imageUrl: 'https://raw.githubusercontent.com/Maltais239/Images/main/Canadian_Nickel_-_reverse.png' }
+        ];
+        let moneyTill, changeGivenBox, totalCostEl, amountPaidEl, changeDueEl, currentTotalEl, checkButton, newTransactionButton, feedbackDiv, roundedTotalEl, clearButton, totalContainer, changeDueContainer, timerContainer, timerEl;
+        let totalCost = 0, amountPaid = 0, changeDue = 0, difficulty = 'normal', timerInterval = null, timeLeft = 30;
+        let draggedItem = null, draggedValue = null, isDraggingFromTill = false, ghostImageElement = null, isTouchDragging = false, touchOffsetX = 0, touchOffsetY = 0, originalItemVisibility = '';
+
+        function formatCurrency(value) { return '$' + value.toFixed(2); }
+
+        function createMoneyElement(money, isClone = false) {
+            const div = document.createElement('div');
+            div.className = 'money-item';
+            div.setAttribute('draggable', true);
+            div.setAttribute('data-value', money.value);
+            const img = document.createElement('img');
+            img.src = money.imageUrl; img.alt = money.label; img.className = 'money-image';
+            if (money.type === 'coin') img.classList.add('coin');
+            img.onerror = () => { div.innerHTML = money.label; };
+            div.appendChild(img);
+            div.addEventListener('dragstart', handleDragStart); div.addEventListener('dragend', handleDragEnd);
+            div.addEventListener('touchstart', handleTouchStart, { passive: false });
+            if (isClone) { div.addEventListener('click', handleItemClick); }
+            return div;
+        }
+
+        function populateTill() {
+            if (!moneyTill) return;
+            moneyTill.innerHTML = '';
+            moneyTypes.forEach(money => moneyTill.appendChild(createMoneyElement(money, false)));
+        }
+        
+        function calculateTotalInBox() {
+            let total = 0;
+            changeGivenBox.querySelectorAll('.money-item').forEach(item => { total += parseFloat(item.dataset.value); });
+            return Math.round(total * 100) / 100;
+        }
+
+        function updateTotalDisplay() {
+            const total = calculateTotalInBox();
+            currentTotalEl.textContent = formatCurrency(total);
+            checkButton.disabled = total === 0;
+        }
+
+        function generateNewTransaction() {
+            stopTimer();
+            totalCost = Math.floor(Math.random() * 99) + (Math.floor(Math.random() * 100) * 0.01) + 0.01;
+            totalCost = Math.round(totalCost * 100) / 100;
+            const roundedTotalCost = Math.round(totalCost * 20) / 20;
+            const paymentOptions = [5, 10, 20, 50, 100].filter(bill => bill > roundedTotalCost);
+            if (paymentOptions.length > 0) {
+                amountPaid = paymentOptions[Math.floor(Math.random() * paymentOptions.length)];
+            } else {
+                amountPaid = Math.ceil(roundedTotalCost / 10) * 10;
+                if (amountPaid <= roundedTotalCost) amountPaid += 10;
+            }
+            changeDue = Math.round((amountPaid - roundedTotalCost) * 100) / 100;
+
+            totalCostEl.textContent = formatCurrency(totalCost);
+            roundedTotalEl.textContent = formatCurrency(roundedTotalCost);
+            amountPaidEl.textContent = formatCurrency(amountPaid);
+            changeDueEl.textContent = formatCurrency(changeDue);
+
+            changeDueContainer.style.display = difficulty === 'easy' ? 'block' : 'none';
+            timerContainer.style.display = difficulty === 'hard' ? 'block' : 'none';
+
+            resetChangeBox();
+            if (difficulty === 'hard') startTimer();
+        }
+
+        function resetChangeBox() {
+            changeGivenBox.innerHTML = '';
+            updateTotalDisplay();
+            setFeedback('');
+            changeGivenBox.className = 'w-full p-4 rounded-lg';
+            totalContainer.className = 'mt-4 p-3 bg-green-100 border border-green-300 rounded-lg text-center transition-colors duration-300 feedback-container';
+        }
+
+        function handleDragStart(e) { /* ... same as before ... */ } function handleDragEnd() { /* ... same ... */ } function handleDragOver(e) { /* ... same ... */ } function handleDragLeave(e) { /* ... same ... */ } function handleDrop(e) { /* ... same ... */ } function handleTouchStart(e) { /* ... same ... */ } function handleTouchMove(e) { /* ... same ... */ } function handleTouchEnd(e) { /* ... same ... */ }
+        // Minimalist stubs for brevity - logic is identical to previous version for drag/drop
+        let touchStartX = 0, touchStartY = 0; const touchMoveThreshold = 15;
+        function handleDragStart(e) { draggedItem = e.target; draggedValue = draggedItem.dataset.value; isDraggingFromTill = (draggedItem.parentElement === moneyTill); setTimeout(() => { if (draggedItem && !isDraggingFromTill) { draggedItem.classList.add('dragging-source'); } else if (draggedItem && isDraggingFromTill) { draggedItem.style.opacity = '0.7'; } }, 0); e.dataTransfer.setData('text/plain', draggedValue); e.dataTransfer.effectAllowed = 'copy'; }
+        function handleDragEnd() { setTimeout(() => { if (draggedItem) { draggedItem.classList.remove('dragging-source'); draggedItem.style.opacity = ''; } document.querySelectorAll('.money-item.dragging-source').forEach(el => el.classList.remove('dragging-source')); draggedItem = null; draggedValue = null; isDraggingFromTill = false; changeGivenBox.classList.remove('drag-over'); }, 0); }
+        function handleDragOver(e) { e.preventDefault(); if (e.target === changeGivenBox || !e.target.closest('.money-item')) { changeGivenBox.classList.add('drag-over'); e.dataTransfer.dropEffect = 'copy'; } }
+        function handleDragLeave(e) { if (e.target === changeGivenBox || !changeGivenBox.contains(e.relatedTarget)) { changeGivenBox.classList.remove('drag-over'); } }
+        function handleDrop(e) { e.preventDefault(); changeGivenBox.classList.remove('drag-over'); if (!draggedValue) return; if (e.target === changeGivenBox || !e.target.closest('.money-item')) { const moneyType = moneyTypes.find(m => m.value == draggedValue); if (moneyType) { const newItem = createMoneyElement(moneyType, true); changeGivenBox.appendChild(newItem); updateTotalDisplay(); } } }
+        function handleTouchStart(e) { isTouchDragging = false; draggedItem = e.currentTarget; draggedValue = draggedItem.dataset.value; isDraggingFromTill = (draggedItem.parentElement === moneyTill); const touch = e.touches[0]; touchStartX = touch.clientX; touchStartY = touch.clientY; const rect = draggedItem.getBoundingClientRect(); touchOffsetX = touch.clientX - rect.left; touchOffsetY = touch.clientY - rect.top; }
+        function handleTouchMove(e) { if (!draggedItem) return; const touch = e.touches[0]; if (!isTouchDragging) { if (Math.abs(touch.clientX - touchStartX) > touchMoveThreshold || Math.abs(touch.clientY - touchStartY) > touchMoveThreshold) { isTouchDragging = true; e.preventDefault(); ghostImageElement = draggedItem.cloneNode(true); ghostImageElement.classList.add('ghost-image'); ghostImageElement.style.width = `${draggedItem.offsetWidth}px`; ghostImageElement.style.height = `${draggedItem.offsetHeight}px`; document.body.appendChild(ghostImageElement); if (!isDraggingFromTill) { originalItemVisibility = draggedItem.style.visibility; draggedItem.style.visibility = 'hidden'; } draggedItem.classList.add('dragging-source'); } } if (isTouchDragging) { e.preventDefault(); ghostImageElement.style.left = `${touch.clientX - touchOffsetX}px`; ghostImageElement.style.top = `${touch.clientY - touchOffsetY}px`; ghostImageElement.style.display = 'none'; const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY); ghostImageElement.style.display = ''; if (changeGivenBox === elementUnderTouch || changeGivenBox.contains(elementUnderTouch)) { changeGivenBox.classList.add('drag-over'); } else { changeGivenBox.classList.remove('drag-over'); } } }
+        function handleTouchEnd(e) { if (!draggedItem) { isTouchDragging = false; return; } if (isTouchDragging) { if (ghostImageElement) ghostImageElement.style.display = 'none'; const endTargetElement = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY); if (ghostImageElement) ghostImageElement.style.display = ''; const finalTargetBox = endTargetElement === changeGivenBox || changeGivenBox.contains(endTargetElement); if (!isDraggingFromTill) { draggedItem.style.visibility = originalItemVisibility; } if (finalTargetBox) { const moneyType = moneyTypes.find(m => m.value == draggedValue); if (moneyType) { const newItem = createMoneyElement(moneyType, true); changeGivenBox.appendChild(newItem); updateTotalDisplay(); } } } if (draggedItem) { draggedItem.classList.remove('dragging-source'); draggedItem.style.visibility = originalItemVisibility; draggedItem.style.opacity = ''; } if (ghostImageElement) { ghostImageElement.remove(); ghostImageElement = null; } changeGivenBox.classList.remove('drag-over'); const touchEndTargetItem = e.target.closest('.money-item'); if (!isTouchDragging && touchEndTargetItem === draggedItem && draggedItem.parentElement === changeGivenBox) { handleItemClick({ currentTarget: draggedItem }); } draggedItem = null; draggedValue = null; isTouchDragging = false; isDraggingFromTill = false; originalItemVisibility = ''; }
+
+        function handleItemClick(e) {
+            const clickedItem = e.currentTarget;
+            if (clickedItem.parentElement === changeGivenBox) { clickedItem.remove(); updateTotalDisplay(); setFeedback(''); }
+        }
+
+        function applyFeedbackStyle(type) {
+            const success = type === 'success';
+            changeGivenBox.classList.add(success ? 'feedback-success' : 'feedback-error');
+            totalContainer.classList.add(success ? 'feedback-success' : 'feedback-error');
+            setTimeout(() => {
+                changeGivenBox.classList.remove('feedback-success', 'feedback-error');
+                totalContainer.classList.remove('feedback-success', 'feedback-error');
+            }, 1000);
+        }
+
+        function calculateOptimalChange(amount) {
+            let remaining = Math.round(amount * 100);
+            let count = 0;
+            for (const money of moneyTypes) {
+                const valueInCents = Math.round(money.value * 100);
+                const numItems = Math.floor(remaining / valueInCents);
+                count += numItems;
+                remaining -= numItems * valueInCents;
+            }
+            return count;
+        }
+
+        function checkChange() {
+            stopTimer();
+            const currentTotal = calculateTotalInBox();
+            if (Math.abs(currentTotal - changeDue) < 0.001) {
+                const optimalCount = calculateOptimalChange(changeDue);
+                const userItemCount = changeGivenBox.children.length;
+                if (optimalCount === userItemCount) {
+                    setFeedback('Perfect Change! You used the fewest items possible!', 'success');
+                } else {
+                    setFeedback('Correct! Perfect change!', 'success');
+                }
+                applyFeedbackStyle('success');
+                checkButton.disabled = true;
+                setTimeout(generateNewTransaction, 2500);
+            } else {
+                applyFeedbackStyle('error');
+                if (currentTotal > changeDue) {
+                    setFeedback(`Too much! You gave ${formatCurrency(currentTotal)}. Try removing some.`, 'error');
+                } else {
+                    setFeedback(`Not enough! You only gave ${formatCurrency(currentTotal)}. Try adding more.`, 'error');
+                }
+            }
+        }
+
+        function setFeedback(message, type = 'info') {
+            feedbackDiv.textContent = message;
+            feedbackDiv.className = 'feedback mt-4 text-center text-lg font-semibold min-h-[1.5em]';
+            if (type === 'success') feedbackDiv.classList.add('text-green-600');
+            if (type === 'error') feedbackDiv.classList.add('text-red-600');
+        }
+
+        function setDifficulty(newDifficulty) {
+            if (difficulty === newDifficulty) return;
+            difficulty = newDifficulty;
+            document.querySelectorAll('.difficulty-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.difficulty === difficulty);
+            });
+            generateNewTransaction();
+        }
+
+        function startTimer() {
+            timeLeft = 30;
+            timerEl.textContent = timeLeft;
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerEl.textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    stopTimer();
+                    setFeedback("Time's up! Here's a new one.", 'error');
+                    applyFeedbackStyle('error');
+                    setTimeout(generateNewTransaction, 2000);
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+
+        function initializeGame() {
+            moneyTill = document.getElementById('moneyTill'); changeGivenBox = document.getElementById('changeGivenBox'); totalCostEl = document.getElementById('totalCost');
+            roundedTotalEl = document.getElementById('roundedTotal'); amountPaidEl = document.getElementById('amountPaid'); changeDueEl = document.getElementById('changeDue');
+            currentTotalEl = document.getElementById('currentTotal'); checkButton = document.getElementById('checkButton'); newTransactionButton = document.getElementById('newTransactionButton');
+            feedbackDiv = document.getElementById('feedback'); clearButton = document.getElementById('clearButton'); totalContainer = document.getElementById('totalContainer');
+            changeDueContainer = document.getElementById('changeDueContainer'); timerContainer = document.getElementById('timerContainer'); timerEl = document.getElementById('timer');
+            
+            if (!moneyTill) { console.error("Initialization failed."); return; }
+
+            populateTill();
+            generateNewTransaction();
+
+            changeGivenBox.addEventListener('dragover', handleDragOver); changeGivenBox.addEventListener('dragleave', handleDragLeave); changeGivenBox.addEventListener('drop', handleDrop);
+            checkButton.addEventListener('click', checkChange);
+            newTransactionButton.addEventListener('click', generateNewTransaction);
+            clearButton.addEventListener('click', resetChangeBox);
+
+            document.querySelectorAll('.difficulty-btn').forEach(btn => btn.addEventListener('click', () => setDifficulty(btn.dataset.difficulty)));
+            document.addEventListener('touchmove', handleTouchMove, { passive: false }); document.addEventListener('touchend', handleTouchEnd);
+            console.log("Cashier Change Game Initialized");
+        }
+
+        document.addEventListener('DOMContentLoaded', initializeGame);
+    </script>
+</body>
+</html>
+
