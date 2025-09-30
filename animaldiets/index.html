@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sorting Game – Animal Diets</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ----------  CORE LAYOUT  ---------- */
+    :root {
+      --bg: #79A8A9; /* Background color - a muted teal */
+      --panel: #F0EFEB; /* Panel color - a light, warm grey */
+      --btn: #E88D67; /* Button color - a warm coral */
+      --btn-hover: #D96C46; /* Button hover color - darker coral */
+      --zone-border: #8C6D62; /* Dashed border for zones - earthy brown */
+      --zone-bg-hover: #D4C2AD; /* Zone hover background - light tan */
+      --text-light: #ffffff; /* Light text (e.g., for title) */
+      --text-dark: #3A3F44;  /* Dark text (e.g., for zone labels) */
+      --item-label-color: #4a5568; /* Color for item labels - a medium grey */
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0; font-family:'Poppins',sans-serif; background:var(--bg);
+      display:flex; flex-direction:column; align-items:center; padding:20px;
+      overscroll-behavior: none; /* Prevent scroll bounce on touch devices */
+    }
+    h1{font-size:2.5rem;color:var(--text-light);margin:5px 0; text-align: center;}
+    p{color:var(--text-light);margin:0 0 20px; text-align: center;}
+
+    .game-container{
+      background:var(--panel); width:100%; max-width:900px; /* Adjusted for 3 columns */
+      padding:20px; border-radius:10px;
+      position: relative; /* For absolute positioning of dragged items */
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+
+    /* ----------  DRAG ITEMS  ---------- */
+    #items-container{
+        display:flex;flex-wrap:wrap;gap:15px;justify-content:center;margin-bottom:20px;
+        padding: 10px; background-color: rgba(255,255,255,0.6); border-radius: 8px;
+        min-height: 120px; /* Ensure space for items */
+    }
+    .item{
+      width:90px;
+      min-height:100px;
+      background:#fff;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      border-radius:8px;box-shadow:0 2px 5px rgba(0,0,0,0.1);cursor:grab;
+      touch-action: none; /* Essential for touch drag */
+      user-select: none; /* Prevent text selection */
+      position: relative;
+      transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out;
+      padding: 5px;
+    }
+    .item img {
+      pointer-events: none; /* Image should not capture pointer events */
+      max-width: 50px;
+      max-height: 50px;
+      user-select: none;
+      margin-bottom: 5px;
+    }
+    .item-label {
+      pointer-events: none; /* Label should not capture pointer events */
+      font-size: 0.7rem;
+      color: var(--item-label-color);
+      text-align: center;
+      line-height: 1.2;
+      user-select: none;
+      max-width: 100%;
+    }
+
+    /* Styling for item being dragged (touch) */
+    .item.dragging {
+      opacity: 0.7;
+      cursor: grabbing;
+      position: absolute; /* Take out of normal flow */
+      z-index: 1000; /* Appear above other elements */
+      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+      transform: scale(1.1); /* Slightly enlarge */
+      transition: none; /* No transition during active drag */
+    }
+    /* Styling for original item during native mouse drag */
+    .item.native-dragging {
+        opacity: 0.3; /* Make original item faint */
+    }
+
+
+    /* ----------  DROP ZONES  ---------- */
+    .zones-container{
+        display:grid;
+        /* Adjust to fit 3 columns, allowing them to wrap on smaller screens */
+        grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+        gap:20px;margin-bottom:20px;
+    }
+    .zone-wrapper {
+        display: flex;
+        flex-direction: column;
+    }
+    .zone-label{font-weight:bold;margin-bottom:8px;color:var(--text-dark); text-align: center; font-size: 1.1rem;}
+    .drop-zone{
+      width:100%;min-height:200px; /* Ample space for dropped items */
+      background:#fff;border:3px dashed var(--zone-border);border-radius:8px;
+      padding:15px;display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start;
+      transition:background .3s, border-style .3s;
+    }
+    /* Highlight for drop zone when item is dragged over */
+    .drop-zone.over{background:var(--zone-bg-hover); border-style: solid;}
+
+    /* ----------  CONTROLS  ---------- */
+    .controls{text-align:center;}
+    .controls button{
+      background:var(--btn);color:var(--text-light);border:none;padding:12px 25px;border-radius:10px;cursor:pointer;
+      margin:10px 5px;font-size:1.2rem;font-family:'Poppins',sans-serif;transition:background .3s, transform 0.1s;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    }
+    .controls button:hover{background:var(--btn-hover); transform: translateY(-2px);}
+    .controls button:active{transform: translateY(0px);}
+
+    /* Area for feedback messages */
+    #message-area {
+        text-align: center;
+        margin-top: 15px;
+        font-size: 1.1rem;
+        min-height: 2em; /* Reserve space for messages */
+        color: var(--text-dark);
+    }
+  </style>
+</head>
+<body>
+  <h1>Animal Diets</h1>
+  <p>Drag and drop each animal into the correct diet category.</p>
+
+  <div class="game-container">
+    <div id="items-container"></div>
+
+    <div class="zones-container">
+      <div class="zone-wrapper">
+        <div class="zone-label">Herbivore</div>
+        <div id="herbivore" class="drop-zone" aria-label="Herbivore items drop-zone"></div>
+      </div>
+      <div class="zone-wrapper">
+        <div class="zone-label">Omnivore</div>
+        <div id="omnivore" class="drop-zone" aria-label="Omnivore items drop-zone"></div>
+      </div>
+      <div class="zone-wrapper">
+        <div class="zone-label">Carnivore</div>
+        <div id="carnivore" class="drop-zone" aria-label="Carnivore items drop-zone"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="check-btn" type="button">Check Answers</button>
+      <button id="reset-btn" type="button">Reset</button>
+    </div>
+    <div id="message-area"></div>
+  </div>
+
+  <script>
+  /**
+   * Sorting Game – Animal Diets
+   * Categories: Herbivore, Omnivore, Carnivore
+   * Uses OpenMoji icons with text labels.
+   */
+  document.addEventListener('DOMContentLoaded', () => {
+    // Helper function to get OpenMoji SVG URLs
+    const om = code => `https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${code}.svg`;
+
+    // Define the animal icons, their names (alt text), and their diet categories
+    const ICONS_DATA = {
+      // Herbivores
+      deer:     { src: om('1F98C'), alt: 'Deer', category: 'herbivore' },
+      rabbit:   { src: om('1F407'), alt: 'Rabbit', category: 'herbivore' },
+      elephant: { src: om('1F418'), alt: 'Elephant', category: 'herbivore' },
+      koala:    { src: om('1F428'), alt: 'Koala', category: 'herbivore' },
+      horse:    { src: om('1F40E'), alt: 'Horse', category: 'herbivore' },
+      // Omnivores
+      bear:     { src: om('1F43B'), alt: 'Bear', category: 'omnivore' },
+      pig:      { src: om('1F416'), alt: 'Pig', category: 'omnivore' },
+      chicken:  { src: om('1F414'), alt: 'Chicken', category: 'omnivore' },
+      monkey:   { src: om('1F412'), alt: 'Monkey', category: 'omnivore' },
+      raccoon:  { src: om('1F99D'), alt: 'Raccoon', category: 'omnivore' },
+      // Carnivores
+      lion:     { src: om('1F981'), alt: 'Lion', category: 'carnivore' },
+      tiger:    { src: om('1F405'), alt: 'Tiger', category: 'carnivore' },
+      wolf:     { src: om('1F43A'), alt: 'Wolf', category: 'carnivore' },
+      fox:      { src: om('1F98A'), alt: 'Fox', category: 'carnivore' },
+      crocodile:{ src: om('1F40A'), alt: 'Crocodile', category: 'carnivore' },
+    };
+
+    // Convert ICONS_DATA to the ITEMS array structure used by the game
+    const ITEMS = Object.keys(ICONS_DATA).map((key, index) => ({
+        id: `item-${key}-${index}`, // Unique ID for each item
+        // HTML content for the item, including the image and its label
+        htmlContent: `<img src="${ICONS_DATA[key].src}" alt="${ICONS_DATA[key].alt}" title="${ICONS_DATA[key].alt}"><span class="item-label">${ICONS_DATA[key].alt}</span>`,
+        category: ICONS_DATA[key].category // The correct category for this item
+    }));
+
+    const itemsContainer = document.getElementById('items-container');
+    const dropZones = document.querySelectorAll('.drop-zone');
+    const gameContainer = document.querySelector('.game-container'); // Used for touch drag positioning
+    const messageArea = document.getElementById('message-area');
+
+    // --- State variables for drag-and-drop ---
+    let pointerDraggedItem = null; // The item currently being dragged
+    let offsetX = 0, offsetY = 0;  // Offset of pointer from item's top-left corner
+    let currentOverZone = null;    // The drop zone the item is currently hovering over
+    let isTouchDragging = false;   // Flag to distinguish touch drags from mouse drags
+
+    // --- Initialization function to set up or reset the game ---
+    function initializeGame() {
+        itemsContainer.innerHTML = ''; // Clear items from the starting container
+        dropZones.forEach(zone => { // Clear items from each drop zone
+            zone.innerHTML = '';
+            zone.classList.remove('over'); // Remove hover highlight
+            zone.style.border = ''; // Reset validation borders
+        });
+        messageArea.textContent = ''; // Clear any feedback messages
+        messageArea.style.color = 'var(--text-dark)'; // Reset message color
+
+        // Shuffle items for variety each time the game starts
+        const shuffledItems = [...ITEMS].sort(() => Math.random() - 0.5);
+
+        // Create and add each item to the items container
+        shuffledItems.forEach(itemData => {
+            const card = document.createElement('div');
+            card.className = 'item';
+            card.draggable = true; // Enable native HTML drag-and-drop
+            card.id = itemData.id;
+            card.dataset.category = itemData.category; // Store category in a data attribute
+            card.innerHTML = itemData.htmlContent; // Set image and label
+            card.style.border = ''; // Ensure no leftover validation border
+
+            // Add event listeners for drag operations
+            card.addEventListener('dragstart', handleDragStartMouse); // Native mouse drag
+            card.addEventListener('dragend', handleDragEndMouse);     // Native mouse drag
+            card.addEventListener('pointerdown', handlePointerDown);   // Unified pointer (touch, mouse, pen)
+            itemsContainer.appendChild(card);
+        });
+
+        // Reset drag state variables
+        pointerDraggedItem = null;
+        isTouchDragging = false;
+        currentOverZone = null;
+    }
+
+    // --- Native Mouse Drag-and-Drop Handlers ---
+    function handleDragStartMouse(e) {
+      // Only for mouse drags; touch is handled by pointer events
+      if (e.pointerType !== 'touch') {
+          e.dataTransfer.setData('text/plain', e.currentTarget.id); // Set item ID for transfer
+          e.dataTransfer.effectAllowed = 'move'; // Indicate a move operation
+          // Briefly hide original item after browser creates drag image
+          setTimeout(() => {
+              if (e.target) e.target.classList.add('native-dragging');
+          }, 0);
+          isTouchDragging = false;
+      } else {
+           e.preventDefault(); // Prevent native drag for touch
+      }
+    }
+
+    function handleDragEndMouse(e) {
+        // Cleanup after a mouse drag
+        if (e.pointerType !== 'touch') {
+            if (e.target) e.target.classList.remove('native-dragging');
+            dropZones.forEach(zone => zone.classList.remove('over')); // Clear all zone highlights
+        }
+        // Reset global drag state
+        isTouchDragging = false;
+        pointerDraggedItem = null;
+        currentOverZone = null;
+        if (document.body.style.userSelect === 'none') { // Restore text selection if disabled
+            document.body.style.userSelect = '';
+        }
+    }
+
+    // Add listeners to drop zones for native mouse drag
+    dropZones.forEach(zone => {
+      zone.addEventListener('dragover', handleDragOverMouse);
+      zone.addEventListener('drop', handleDropMouse);
+    });
+
+    function handleDragOverMouse(e) {
+        e.preventDefault(); // Allow drop
+        e.dataTransfer.dropEffect = 'move';
+        // 'over' class for highlighting is handled by pointermove for consistency
+    }
+
+    function handleDropMouse(e) {
+      e.preventDefault(); // Prevent default drop action (e.g., opening link)
+      if (e.pointerType !== 'touch') { // Only handle native mouse drops
+        const id = e.dataTransfer.getData('text/plain');
+        const droppedElement = document.getElementById(id);
+
+        if (droppedElement) {
+            droppedElement.classList.remove('native-dragging');
+            // Append to new zone if not already there
+            if (e.currentTarget && !e.currentTarget.contains(droppedElement)) {
+                 e.currentTarget.appendChild(droppedElement);
+            }
+        }
+        if (e.currentTarget) e.currentTarget.classList.remove('over'); // Remove highlight from target zone
+        currentOverZone = null;
+      }
+    }
+
+     // --- Pointer Event Handlers (for Touch, Pen, and Mouse hover consistency) ---
+    function handlePointerDown(e) {
+        // Start of a drag operation (touch, mouse, or pen)
+        if (e.button !== 0 || pointerDraggedItem) return; // Only main button, no concurrent drags
+
+        pointerDraggedItem = e.currentTarget; // The item being interacted with
+        isTouchDragging = e.pointerType === 'touch';
+
+        // Clear previous validation styling and messages
+        pointerDraggedItem.style.border = '';
+        messageArea.textContent = '';
+        messageArea.style.color = 'var(--text-dark)';
+
+
+        if (isTouchDragging) {
+            e.preventDefault(); // Prevent default touch actions (scroll, etc.)
+            // Capture pointer events to this item for the duration of the drag
+            if (pointerDraggedItem && typeof pointerDraggedItem.setPointerCapture === 'function') {
+                try { pointerDraggedItem.setPointerCapture(e.pointerId); } catch (err) { console.warn("Touch Pointer capture failed:", err); }
+            }
+
+            const rect = pointerDraggedItem.getBoundingClientRect();
+            offsetX = e.clientX - rect.left; // Calculate pointer offset within the item
+            offsetY = e.clientY - rect.top;
+
+            pointerDraggedItem.classList.add('dragging'); // Apply dragging style
+        } else { // Mouse (also uses pointer events for hover detection)
+            if (pointerDraggedItem && typeof pointerDraggedItem.setPointerCapture === 'function') {
+                 try { pointerDraggedItem.setPointerCapture(e.pointerId); } catch (err) { console.warn("Mouse Pointer capture failed for hover:", err); }
+            }
+        }
+
+        // Add global listeners for pointer movement and release
+        document.addEventListener('pointermove', handlePointerMove);
+        document.addEventListener('pointerup', handlePointerUp);
+        document.addEventListener('pointercancel', handlePointerUp); // Treat cancel as up
+        document.body.style.userSelect = 'none'; // Disable text selection during drag
+    }
+
+    function handlePointerMove(e) {
+        // When pointer moves during a drag
+        if (!pointerDraggedItem || (pointerDraggedItem && typeof pointerDraggedItem.hasPointerCapture !== 'function') || !pointerDraggedItem.hasPointerCapture(e.pointerId)) return;
+
+
+        if (isTouchDragging) {
+            e.preventDefault(); // Prevent scrolling
+            // Manually position the item for touch drag
+            const gameRect = gameContainer.getBoundingClientRect();
+            let newX = e.clientX - gameRect.left - offsetX;
+            let newY = e.clientY - gameRect.top - offsetY;
+            pointerDraggedItem.style.left = `${newX}px`;
+            pointerDraggedItem.style.top = `${newY}px`;
+        }
+
+        // Drop Zone Highlighting: Determine element under pointer
+        const originalVisibility = isTouchDragging ? pointerDraggedItem.style.visibility : '';
+        if (isTouchDragging) pointerDraggedItem.style.visibility = 'hidden'; // Hide for elementFromPoint
+
+        let elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY);
+
+        if (isTouchDragging) pointerDraggedItem.style.visibility = originalVisibility; // Restore
+
+        let dropTarget = elementUnderPointer ? elementUnderPointer.closest('.drop-zone') : null;
+
+        // Update 'over' class on drop zones
+        if (currentOverZone && currentOverZone !== dropTarget) {
+            currentOverZone.classList.remove('over');
+        }
+        if (dropTarget) {
+            dropTarget.classList.add('over');
+            currentOverZone = dropTarget;
+        } else {
+            currentOverZone = null;
+        }
+    }
+
+    function handlePointerUp(e) {
+        // End of a drag operation
+        if (!pointerDraggedItem || (pointerDraggedItem && typeof pointerDraggedItem.hasPointerCapture !== 'function') || !pointerDraggedItem.hasPointerCapture(e.pointerId)) {
+            // Cleanup listeners if drag was not properly initiated or capture lost
+            document.removeEventListener('pointermove', handlePointerMove);
+            document.removeEventListener('pointerup', handlePointerUp);
+            document.removeEventListener('pointercancel', handlePointerUp);
+            if (document.body.style.userSelect === 'none') { document.body.style.userSelect = ''; }
+            return;
+        }
+
+        // Remove global listeners
+        document.removeEventListener('pointermove', handlePointerMove);
+        document.removeEventListener('pointerup', handlePointerUp);
+        document.removeEventListener('pointercancel', handlePointerUp);
+        if (document.body.style.userSelect === 'none') { document.body.style.userSelect = ''; }
+
+
+        if (isTouchDragging) {
+            // Finalize touch drag
+            pointerDraggedItem.classList.remove('dragging');
+            pointerDraggedItem.style.left = ''; // Reset inline positioning
+            pointerDraggedItem.style.top = '';
+            pointerDraggedItem.style.visibility = '';
+
+            if (currentOverZone) { // If dropped on a zone
+                if (!currentOverZone.contains(pointerDraggedItem)) { // Avoid re-appending if already child
+                    currentOverZone.appendChild(pointerDraggedItem);
+                }
+                currentOverZone.classList.remove('over');
+            } else { // If not on a zone, return to items container
+                itemsContainer.appendChild(pointerDraggedItem);
+            }
+        } else { // Mouse drag
+            // Native 'drop' event handles placement for mouse. This cleans up hover styles.
+            pointerDraggedItem.classList.remove('native-dragging');
+            if (currentOverZone) {
+                currentOverZone.classList.remove('over');
+            }
+        }
+
+        // Release pointer capture and reset state
+        if (pointerDraggedItem && typeof pointerDraggedItem.releasePointerCapture === 'function') {
+            try { pointerDraggedItem.releasePointerCapture(e.pointerId); } catch(err) { console.warn("Pointer release failed:", err); }
+        }
+
+        pointerDraggedItem = null;
+        isTouchDragging = false;
+        currentOverZone = null;
+        offsetX = 0;
+        offsetY = 0;
+    }
+
+    // --- Control Button Listeners ---
+    document.getElementById('check-btn').addEventListener('click', () => {
+        let allCorrect = true;
+        let totalItemsChecked = 0; // Items placed in any of the three diet zones
+        let totalItemsInGame = ITEMS.length;
+        messageArea.textContent = ''; // Clear previous messages
+
+        // Define the categories to check
+        const dietCategories = ['herbivore', 'omnivore', 'carnivore'];
+
+        dietCategories.forEach(zoneId => {
+            const zone = document.getElementById(zoneId);
+            if (!zone) return; // Should not happen if HTML is correct
+
+            Array.from(zone.children).forEach(item => {
+                if (item.classList.contains('item')) {
+                    totalItemsChecked++;
+                    const isCorrect = item.dataset.category === zoneId;
+                    item.style.border = isCorrect ? '3px solid #22c55e' : '3px solid #ef4444'; // Green/Red border
+                    if (!isCorrect) allCorrect = false;
+                }
+            });
+        });
+
+        let unsortedItemsCount = 0;
+        // Check for items remaining in the initial items container (unsorted)
+        Array.from(itemsContainer.children).forEach(item => {
+            if (item.classList.contains('item')) {
+                item.style.border = '3px solid #f97316'; // Orange border for unsorted
+                allCorrect = false;
+                unsortedItemsCount++;
+            }
+        });
+
+        // Provide feedback message
+        if (unsortedItemsCount > 0) {
+            messageArea.textContent = `Please sort all ${unsortedItemsCount} remaining animal(s).`;
+            messageArea.style.color = '#f97316'; // Orange text
+        } else if (totalItemsChecked === 0 && totalItemsInGame > 0) {
+            messageArea.textContent = "Drag the animals to their diet categories.";
+            messageArea.style.color = 'var(--text-dark)';
+        } else if (allCorrect && totalItemsChecked === totalItemsInGame) {
+            messageArea.textContent = "Fantastic! All animals are sorted correctly!";
+            messageArea.style.color = '#22c55e'; // Green text
+        } else if (!allCorrect) {
+            messageArea.textContent = "Not quite right. Check the animals' diets and try again!";
+            messageArea.style.color = '#ef4444'; // Red text
+        } else {
+            // Default message if no items are sorted yet but also none are unsorted (e.g. if ITEMS is empty)
+            messageArea.textContent = "Sort the animals to check their diets.";
+            messageArea.style.color = 'var(--text-dark)';
+        }
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', () => {
+        initializeGame(); // Reset the game to its initial state
+    });
+
+    // --- Initial Game Setup ---
+    initializeGame(); // Set up the game when the page loads
+  });
+  </script>
+</body>
+</html>
