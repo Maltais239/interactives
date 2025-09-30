@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Living Systems Vocabulary Matching Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Montserrat', sans-serif;
+            background: linear-gradient(135deg, #f0fff4, #e0f2f7);
+            display: flex;
+            justify-content: center;
+            align-items: center; /* Center game area vertically for full page view */
+            min-height: 100vh; /* Ensure body takes full viewport height */
+            padding: 15px; /* Reduced padding around the game area */
+        }
+        .game-area {
+            background: #fff;
+            padding: 20px; /* Reduced padding */
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 960px; /* Max width of the game container */
+            margin: 0 auto; /* Center the game area if viewport is wider */
+        }
+        h1 {
+            color: #388e3c;
+            margin-bottom: 15px; /* Reduced margin */
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            text-align: center;
+            font-size: 1.8em; /* Slightly smaller h1 for conciseness */
+        }
+        .progress-bar {
+            width: 100%;
+            background: #e8f5e9;
+            border-radius: 10px; /* Slightly smaller radius */
+            overflow: hidden;
+            height: 20px; /* Reduced height */
+            margin-bottom: 15px; /* Reduced margin */
+        }
+        .progress-fill {
+            height: 100%;
+            width: 0;
+            background: #81c784;
+            transition: width .3s;
+        }
+        .game-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr; /* Term column narrower than definition column */
+            gap: 16px; /* Reduced gap */
+            margin-top: 15px; /* Reduced margin */
+        }
+        @media (max-width: 700px) { /* Adjust breakpoint for better stacking on smaller screens */
+            .game-container {
+                grid-template-columns: 1fr; /* Stack columns on smaller screens */
+            }
+        }
+        .column {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch; /* Make cards take full width of column */
+        }
+        .column h2 {
+            width: 100%;
+            text-align: center;
+            margin: 0 0 8px; /* Reduced bottom margin */
+            font-size: 1.3em; /* Slightly smaller column titles */
+        }
+        .cards {
+            display: flex;
+            flex-direction: column;
+            gap: 8px; /* Reduced gap */
+            width: 100%;
+            min-height: 150px; /* Reduced min-height */
+        }
+        .card { /* Style for draggable terms */
+            background: #e8f5e9;
+            border: 2px solid #a5d6a7;
+            border-radius: 10px; /* Slightly smaller radius */
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05); /* Slightly reduced shadow */
+            padding: 8px 12px; /* Reduced padding */
+            width: 100%;
+            text-align: center;
+            cursor: grab;
+            transition: transform .2s, background .3s, box-shadow .2s;
+            user-select: none;
+            line-height: 1.3; /* Slightly reduced line height */
+            font-size: 0.9rem; /* Slightly smaller font */
+        }
+        .card:active {
+            cursor: grabbing;
+            transform: scale(0.98);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Slightly reduced shadow */
+        }
+        .card.hide { visibility: hidden; }
+        .definition { /* Style for drop target definitions */
+            background: #e0f7fa;
+            border: 2px dashed #4dd0e1; /* Dashed border for drop zones */
+            border-radius: 10px; /* Slightly smaller radius */
+            padding: 8px; /* Significantly reduced padding */
+            width: 100%;
+            transition: background .2s, border-color .2s, border-style .2s;
+            line-height: 1.4; /* Adjusted line height */
+            font-size: 0.85rem; /* Slightly smaller font */
+            display: flex; /* For centering text if needed */
+            align-items: center;
+            justify-content: center;
+            min-height: 50px; /* Reduced min-height */
+        }
+        .definition.over {
+            border-color: #388e3c;
+            border-style: solid; /* Solid border on hover */
+            background: #dcfce7; /* Light green background on hover */
+        }
+        .correct {
+            background: #dcedc8 !important;
+            border: 2px solid #689f38 !important; /* Solid correct border */
+            color: #33691e;
+            cursor: default !important; /* No grab cursor for correct items */
+        }
+         .definition.correct { /* Specific style for definition slots once correct */
+            cursor: default !important;
+            padding: 8px; /* Ensure padding remains consistent when correct */
+        }
+        .shake {
+            animation: shake .5s;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px); } /* Reduced shake */
+            40%, 80% { transform: translateX(6px); }  /* Reduced shake */
+        }
+        #message {
+            font-size: 1.2rem; /* Slightly smaller message */
+            margin-top: 15px;
+            margin-bottom: 15px;
+            color: #43a047;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            display: none;
+            text-align: center;
+        }
+        .controls {
+            text-align: center;
+            margin-top: 20px; /* Reduced margin */
+        }
+        button#resetBtn { /* More specific selector for reset button */
+            background: #81c784;
+            color: #fff;
+            border: none;
+            padding: 10px 24px; /* Reduced padding */
+            border-radius: 10px; /* Slightly smaller radius */
+            cursor: pointer;
+            font-size: 0.95rem; /* Slightly smaller font */
+            font-weight: 500; /* Medium font weight */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: transform .2s, background .3s;
+        }
+        button#resetBtn:hover {
+            transform: scale(1.05);
+            background: #66bb6a;
+        }
+        /* Canvas for confetti - full screen, behind everything, non-interactive */
+        #confettiCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Allows clicks to go through to elements behind it */
+            z-index: 9999; /* Ensure it's on top of other elements if needed, or behind if preferred */
+        }
+    </style>
+</head>
+<body>
+    <div class="game-area">
+        <h1>Living Systems Vocabulary Matching Game</h1>
+        <div class="progress-bar" aria-label="Progress"><div class="progress-fill"></div></div>
+        <div id="message">You did it! 🎉</div>
+        <div class="game-container">
+            <div class="column">
+                <h2 style="color:#388e3c;">Terms</h2>
+                <div id="terms" class="cards"></div>
+            </div>
+            <div class="column">
+                <h2 style="color:#17a2b8;">Definitions</h2>
+                <div id="definitions" class="cards"></div>
+            </div>
+        </div>
+        <div class="controls"><button id="resetBtn">Reset &amp; Shuffle</button></div>
+    </div>
+
+    <audio id="successSound" preload="auto">
+        <source src="https://cdn.freesound.org/previews/522/522193_10299972-lq.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+    <canvas id="confettiCanvas"></canvas>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const vocabList = [
+            { term: 'Food Chain', def: 'A series of organisms each dependent on the next as a source of food.' },
+            { term: 'Carnivores', def: 'Animals that eat only other animals.' },
+            { term: 'Herbivores', def: 'Animals that eat only plants.' },
+            { term: 'Omnivores', def: 'Animals that eat both plants and animals.' },
+            { term: 'Sensory Stimuli', def: 'Things in the environment that cause plants and animals to respond, such as water, food, temperature, and light.' },
+            { term: 'Habitat', def: 'The natural home or environment of an animal, plant, or other organism.' },
+            { term: 'Population', def: 'A group of individuals of the same species living in a particular area.' },
+            { term: 'Predator', def: 'An animal that hunts and eats other animals.' },
+            { term: 'Prey', def: 'An animal that is hunted and eaten by other animals.' },
+            { term: 'Symbiosis', def: 'A close relationship between two species where at least one benefits.' },
+            { term: 'Photosynthesis', def: 'The process by which green plants use sunlight to make their own food from carbon dioxide and water.' },
+            { term: 'Ecosystem', def: 'A community of interacting organisms and their physical environment.' },
+            { term: 'Biodiversity', def: 'The variety of life in a particular habitat or ecosystem.' },
+            { term: 'Pollination', def: 'The transfer of pollen from the male part of a plant to the female part, allowing plants to reproduce.' },
+            { term: 'Decomposers', def: 'Organisms that break down dead or decaying organisms.' }
+        ];
+
+        let matches = 0;
+        const total = vocabList.length;
+        const termsContainer = document.getElementById('terms');
+        const defsContainer  = document.getElementById('definitions');
+        const progressFill   = document.querySelector('.progress-fill');
+        const messageEl      = document.getElementById('message');
+        const resetBtn       = document.getElementById('resetBtn');
+        const successSound   = document.getElementById('successSound');
+        const confettiCanvas = document.getElementById('confettiCanvas');
+        const confettiInstance = (typeof confetti !== 'undefined' && confettiCanvas)
+            ? confetti.create(confettiCanvas, { resize: true, useWorker: true })
+            : null;
+        let draggedElement = null;
+
+        function shuffle(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function initGame() {
+            matches = 0;
+            progressFill.style.width = '0%';
+            termsContainer.innerHTML = '';
+            defsContainer.innerHTML  = '';
+            messageEl.style.display = 'none';
+
+            const terms = shuffle([...vocabList]);
+            const defs  = shuffle([...vocabList]); // Shuffle definitions independently
+
+            terms.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card term';
+                card.draggable = true;
+                card.textContent = item.term;
+                card.dataset.term = item.term; // Store the actual term for matching
+                card.addEventListener('dragstart', dragStart);
+                card.addEventListener('dragend', dragEnd);
+                termsContainer.appendChild(card);
+            });
+
+            defs.forEach(item => {
+                const slot = document.createElement('div');
+                slot.className = 'definition';
+                slot.textContent = item.def;
+                slot.dataset.defForTerm = item.term; // Store which term this definition belongs to
+                slot.addEventListener('dragover', dragOver);
+                slot.addEventListener('dragleave', dragLeave);
+                slot.addEventListener('drop', drop);
+                defsContainer.appendChild(slot);
+            });
+        }
+
+        function dragStart(e) {
+            draggedElement = e.target;
+            e.dataTransfer.setData('text/plain', draggedElement.dataset.term);
+            setTimeout(() => {
+                if (draggedElement) draggedElement.classList.add('hide');
+            }, 0);
+        }
+
+        function dragEnd() {
+            if (draggedElement) {
+                draggedElement.classList.remove('hide');
+                draggedElement = null;
+            }
+        }
+
+        function dragOver(e) {
+            e.preventDefault();
+            if (e.currentTarget.classList.contains('definition') && !e.currentTarget.classList.contains('correct')) {
+                e.currentTarget.classList.add('over');
+            }
+        }
+
+        function dragLeave(e) {
+            if (e.currentTarget.classList.contains('definition')) {
+                e.currentTarget.classList.remove('over');
+            }
+        }
+
+        function drop(e) {
+            e.preventDefault();
+            const slot = e.currentTarget;
+            if (!slot.classList.contains('definition') || slot.classList.contains('correct')) return;
+
+            slot.classList.remove('over');
+            const termDragged = e.dataTransfer.getData('text/plain');
+
+            if (!draggedElement) return;
+
+            if (termDragged === slot.dataset.defForTerm) { // Correct match
+                slot.classList.add('correct');
+                draggedElement.classList.add('correct');
+                draggedElement.draggable = false;
+                // Keep the original definition text, just mark as correct.
+                // The term card is removed.
+                // slot.textContent = `${draggedElement.textContent}: ${slot.textContent}`; // Original line if you want to combine
+                draggedElement.remove(); // Remove the dragged term card
+                matches++;
+                try {
+                    successSound.currentTime = 0; // Rewind to start
+                    successSound.play();
+                } catch(err) { console.error("Error playing sound:", err); }
+
+                progressFill.style.width = `${(matches/total)*100}%`;
+                if (matches === total) win();
+            } else { // Incorrect match
+                draggedElement.classList.add('shake');
+                setTimeout(() => {
+                    if (draggedElement) draggedElement.classList.remove('shake');
+                }, 500);
+            }
+            draggedElement.classList.remove('hide'); // Always ensure it's visible after drop attempt
+            draggedElement = null;
+        }
+
+        function win() {
+            messageEl.style.display = 'block';
+            if (confettiInstance) {
+                confettiInstance({
+                    particleCount: 150,
+                    spread: 90,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+
+        resetBtn.addEventListener('click', initGame);
+        initGame(); // Initialize game on load
+    });
+    </script>
+</body>
+</html>
