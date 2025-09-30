@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sorting Game – Earth's Surface Changes</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ----------  CORE LAYOUT  ---------- */
+    :root {
+      --bg: #6F83A1; /* Background color - a calm blue-grey */
+      --panel: #F4E4C6; /* Panel color - a sandy beige */
+      --btn: #f472b6; /* Button color - pink */
+      --btn-hover: #ec4899; /* Button hover color - darker pink */
+      --zone-border: #a16207; /* Dashed border for zones - earthy brown */
+      --zone-bg-hover: #fde68a; /* Zone hover background - light yellow */
+      --text-light: #ffffff; /* Light text (e.g., for title) */
+      --text-dark: #374151;  /* Dark text (e.g., for zone labels) */
+      --item-label-color: #4b5563; /* Color for item labels */
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0; font-family:'Poppins',sans-serif; background:var(--bg);
+      display:flex; flex-direction:column; align-items:center; padding:20px;
+      overscroll-behavior: none;
+    }
+    h1{font-size:2.5rem;color:var(--text-light);margin:5px 0; text-align: center;}
+    p{color:var(--text-light);margin:0 0 20px; text-align: center;}
+
+    .game-container{
+      background:var(--panel); width:100%; max-width:800px; padding:20px; border-radius:10px;
+      position: relative;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+
+    /* ----------  DRAG ITEMS  ---------- */
+    #items-container{
+        display:flex;flex-wrap:wrap;gap:15px;justify-content:center;margin-bottom:20px;
+        padding: 10px; background-color: rgba(255,255,255,0.6); border-radius: 8px;
+        min-height: 120px; /* Increased min-height for items with labels */
+    }
+    .item{
+      width:90px; /* Slightly wider to accommodate text */
+      min-height:100px; /* Ensure enough height for icon and text */
+      background:#fff;display:flex;flex-direction:column; /* Stack icon and text */
+      align-items:center;justify-content:center; /* Center content */
+      border-radius:8px;box-shadow:0 2px 5px rgba(0,0,0,0.1);cursor:grab;
+      touch-action: none;
+      user-select: none;
+      position: relative;
+      transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out;
+      padding: 5px; /* Add some padding */
+    }
+    .item img {
+      pointer-events: none;
+      max-width: 50px; /* Adjust icon size if needed */
+      max-height: 50px;
+      user-select: none;
+      margin-bottom: 5px; /* Space between icon and label */
+    }
+    .item-label {
+      pointer-events: none; /* Prevent label from interfering with drag */
+      font-size: 0.7rem; /* Smaller font for labels */
+      color: var(--item-label-color);
+      text-align: center;
+      line-height: 1.2; /* Adjust line height for multi-word labels */
+      user-select: none;
+      max-width: 100%; /* Ensure label doesn't overflow item width */
+    }
+
+    .item.dragging {
+      opacity: 0.7;
+      cursor: grabbing;
+      position: absolute;
+      z-index: 1000;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+      transform: scale(1.1);
+      transition: none;
+    }
+    .item.native-dragging {
+        opacity: 0.3;
+    }
+
+
+    /* ----------  DROP ZONES  ---------- */
+    .zones-container{
+        display:grid;grid-template-columns:repeat(auto-fit, minmax(250px, 1fr));
+        gap:20px;margin-bottom:20px;
+    }
+    .zone-wrapper {
+        display: flex;
+        flex-direction: column;
+    }
+    .zone-label{font-weight:bold;margin-bottom:8px;color:var(--text-dark); text-align: center; font-size: 1.1rem;}
+    .drop-zone{
+      width:100%;min-height:200px;
+      background:#fff;border:3px dashed var(--zone-border);border-radius:8px;
+      padding:15px;display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start;
+      transition:background .3s, border-style .3s;
+    }
+    .drop-zone.over{background:var(--zone-bg-hover); border-style: solid;}
+
+    /* ----------  CONTROLS  ---------- */
+    .controls{text-align:center;}
+    .controls button{
+      background:var(--btn);color:var(--text-light);border:none;padding:12px 25px;border-radius:10px;cursor:pointer;
+      margin:10px 5px;font-size:1.2rem;font-family:'Poppins',sans-serif;transition:background .3s, transform 0.1s;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    }
+    .controls button:hover{background:var(--btn-hover); transform: translateY(-2px);}
+    .controls button:active{transform: translateY(0px);}
+
+    #message-area {
+        text-align: center;
+        margin-top: 15px;
+        font-size: 1.1rem;
+        min-height: 2em;
+        color: var(--text-dark);
+    }
+  </style>
+</head>
+<body>
+  <h1>Changes to the Earth's Surface</h1>
+  <p>Drag and drop each icon into the correct category.</p>
+
+  <div class="game-container">
+    <div id="items-container"></div>
+
+    <div class="zones-container">
+      <div class="zone-wrapper">
+        <div class="zone-label">Fast Change</div>
+        <div id="fast" class="drop-zone" aria-label="Fast Change items drop-zone"></div>
+      </div>
+      <div class="zone-wrapper">
+        <div class="zone-label">Slow Change</div>
+        <div id="slow" class="drop-zone" aria-label="Slow Change items drop-zone"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="check-btn" type="button">Check Answers</button>
+      <button id="reset-btn" type="button">Reset</button>
+    </div>
+    <div id="message-area"></div>
+  </div>
+
+  <script>
+  /**
+   * Sorting Game – Earth's Surface Changes
+   * Categories: Fast Change, Slow Change
+   * Uses OpenMoji icons with text labels.
+   */
+  document.addEventListener('DOMContentLoaded', () => {
+    const om = code => `https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${code}.svg`;
+
+    const ICONS_DATA = {
+      // Fast Changes
+      tornado:    { src: om('1F32A'), alt: 'Tornado', category: 'fast' },
+      volcano:    { src: om('1F30B'), alt: 'Volcano', category: 'fast' },
+      flood:      { src: om('1F30A'), alt: 'Flood', category: 'fast' }, // Simplified alt
+      landslide:  { src: om('1FAA8'), alt: 'Landslide', category: 'fast' }, // Simplified alt
+      earthquake: { src: om('1F3DA'), alt: 'Earthquake', category: 'fast' }, // Simplified alt
+      wildfire:   { src: om('1F525'), alt: 'Wildfire', category: 'fast' },
+      hurricane:  { src: om('1F300'), alt: 'Hurricane', category: 'fast' }, // Simplified alt
+      // Slow Changes
+      wind_weathering: { src: om('1F32C'), alt: 'Wind Weathering', category: 'slow' },
+      mountain_building: { src: om('1F3D4'), alt: 'Mountain Building', category: 'slow' },
+      glacier:    { src: om('1F9CA'), alt: 'Glacier', category: 'slow' }, // Simplified alt
+      canyon_erosion: { src: om('1F3DE'), alt: 'Canyon Erosion', category: 'slow' },
+      desertification: { src: om('1F3DC'), alt: 'Desertification', category: 'slow' },
+      plate_tectonics: { src: om('1F30F'), alt: 'Plate Tectonics', category: 'slow' },
+      soil_formation: { src: om('1F331'), alt: 'Soil Formation', category: 'slow' }
+    };
+
+    // Convert ICONS_DATA to the ITEMS array structure used by the game
+    const ITEMS = Object.keys(ICONS_DATA).map((key, index) => ({
+        id: `item-${key}-${index}`,
+        // Generate HTML content with image and label
+        htmlContent: `<img src="${ICONS_DATA[key].src}" alt="${ICONS_DATA[key].alt}" title="${ICONS_DATA[key].alt}"><span class="item-label">${ICONS_DATA[key].alt}</span>`,
+        category: ICONS_DATA[key].category,
+        altText: ICONS_DATA[key].alt // Store alt text separately if needed, though it's in htmlContent
+    }));
+
+    const itemsContainer = document.getElementById('items-container');
+    const dropZones = document.querySelectorAll('.drop-zone');
+    const gameContainer = document.querySelector('.game-container');
+    const messageArea = document.getElementById('message-area');
+
+    let pointerDraggedItem = null;
+    let offsetX = 0, offsetY = 0;
+    let currentOverZone = null;
+    let isTouchDragging = false;
+
+    function initializeGame() {
+        itemsContainer.innerHTML = '';
+        dropZones.forEach(zone => {
+            zone.innerHTML = '';
+            zone.classList.remove('over');
+            zone.style.border = '';
+        });
+        messageArea.textContent = '';
+        messageArea.style.color = 'var(--text-dark)';
+
+        const shuffledItems = [...ITEMS].sort(() => Math.random() - 0.5);
+
+        shuffledItems.forEach(itemData => {
+            const card = document.createElement('div');
+            card.className = 'item';
+            card.draggable = true;
+            card.id = itemData.id;
+            card.dataset.category = itemData.category;
+            // itemData.htmlContent now includes the image and the label span
+            card.innerHTML = itemData.htmlContent;
+            card.style.border = '';
+
+            card.addEventListener('dragstart', handleDragStartMouse);
+            card.addEventListener('dragend', handleDragEndMouse);
+            card.addEventListener('pointerdown', handlePointerDown);
+            itemsContainer.appendChild(card);
+        });
+
+        pointerDraggedItem = null;
+        isTouchDragging = false;
+        currentOverZone = null;
+    }
+
+    function handleDragStartMouse(e) {
+      if (e.pointerType !== 'touch') {
+          e.dataTransfer.setData('text/plain', e.currentTarget.id);
+          e.dataTransfer.effectAllowed = 'move';
+          setTimeout(() => {
+              // Check if e.target still exists, it might have been removed from DOM
+              if (e.target) e.target.classList.add('native-dragging');
+          }, 0);
+          isTouchDragging = false;
+      } else {
+           e.preventDefault();
+      }
+    }
+
+    function handleDragEndMouse(e) {
+        if (e.pointerType !== 'touch') {
+            // Check if e.target still exists
+            if (e.target) e.target.classList.remove('native-dragging');
+            dropZones.forEach(zone => zone.classList.remove('over'));
+        }
+        isTouchDragging = false;
+        pointerDraggedItem = null;
+        currentOverZone = null;
+        if (document.body.style.userSelect === 'none') {
+            document.body.style.userSelect = '';
+        }
+    }
+
+    dropZones.forEach(zone => {
+      zone.addEventListener('dragover', handleDragOverMouse);
+      zone.addEventListener('drop', handleDropMouse);
+    });
+
+    function handleDragOverMouse(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleDropMouse(e) {
+      e.preventDefault();
+      if (e.pointerType !== 'touch') {
+        const id = e.dataTransfer.getData('text/plain');
+        const droppedElement = document.getElementById(id);
+
+        if (droppedElement) {
+            droppedElement.classList.remove('native-dragging');
+            if (!e.currentTarget.contains(droppedElement)) {
+                 e.currentTarget.appendChild(droppedElement);
+            }
+        }
+        // Check if e.currentTarget still exists
+        if (e.currentTarget) e.currentTarget.classList.remove('over');
+        currentOverZone = null;
+      }
+    }
+
+    function handlePointerDown(e) {
+        if (e.button !== 0 || pointerDraggedItem) return;
+
+        pointerDraggedItem = e.currentTarget;
+        isTouchDragging = e.pointerType === 'touch';
+
+        pointerDraggedItem.style.border = '';
+        messageArea.textContent = '';
+        messageArea.style.color = 'var(--text-dark)';
+
+
+        if (isTouchDragging) {
+            e.preventDefault();
+            // Check if pointerDraggedItem exists and has setPointerCapture method
+            if (pointerDraggedItem && typeof pointerDraggedItem.setPointerCapture === 'function') {
+                try {
+                    pointerDraggedItem.setPointerCapture(e.pointerId);
+                } catch (err) {
+                    console.warn("Error setting pointer capture:", err);
+                    // Fallback or error handling if necessary
+                }
+            }
+
+
+            const rect = pointerDraggedItem.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+
+            pointerDraggedItem.classList.add('dragging');
+        } else {
+            if (pointerDraggedItem && typeof pointerDraggedItem.setPointerCapture === 'function') {
+                try {
+                    pointerDraggedItem.setPointerCapture(e.pointerId);
+                } catch (err) {
+                    console.warn("Mouse pointer capture failed for hover handling.", err);
+                }
+            }
+        }
+
+        document.addEventListener('pointermove', handlePointerMove);
+        document.addEventListener('pointerup', handlePointerUp);
+        document.addEventListener('pointercancel', handlePointerUp);
+        document.body.style.userSelect = 'none';
+    }
+
+    function handlePointerMove(e) {
+        if (!pointerDraggedItem || (pointerDraggedItem && typeof pointerDraggedItem.hasPointerCapture !== 'function') || !pointerDraggedItem.hasPointerCapture(e.pointerId)) return;
+
+
+        if (isTouchDragging) {
+            e.preventDefault();
+            const gameRect = gameContainer.getBoundingClientRect();
+            let newX = e.clientX - gameRect.left - offsetX;
+            let newY = e.clientY - gameRect.top - offsetY;
+            pointerDraggedItem.style.left = `${newX}px`;
+            pointerDraggedItem.style.top = `${newY}px`;
+        }
+
+        const originalVisibility = isTouchDragging ? pointerDraggedItem.style.visibility : '';
+        if (isTouchDragging) pointerDraggedItem.style.visibility = 'hidden';
+
+        let elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY);
+
+        if (isTouchDragging) pointerDraggedItem.style.visibility = originalVisibility;
+
+        let dropTarget = elementUnderPointer ? elementUnderPointer.closest('.drop-zone') : null;
+
+        if (currentOverZone && currentOverZone !== dropTarget) {
+            currentOverZone.classList.remove('over');
+        }
+        if (dropTarget) {
+            dropTarget.classList.add('over');
+            currentOverZone = dropTarget;
+        } else {
+            currentOverZone = null;
+        }
+    }
+
+    function handlePointerUp(e) {
+        if (!pointerDraggedItem || (pointerDraggedItem && typeof pointerDraggedItem.hasPointerCapture !== 'function') || !pointerDraggedItem.hasPointerCapture(e.pointerId)) {
+            document.removeEventListener('pointermove', handlePointerMove);
+            document.removeEventListener('pointerup', handlePointerUp);
+            document.removeEventListener('pointercancel', handlePointerUp);
+            if (document.body.style.userSelect === 'none') {
+                document.body.style.userSelect = '';
+            }
+            return;
+        }
+
+        document.removeEventListener('pointermove', handlePointerMove);
+        document.removeEventListener('pointerup', handlePointerUp);
+        document.removeEventListener('pointercancel', handlePointerUp);
+        if (document.body.style.userSelect === 'none') {
+            document.body.style.userSelect = '';
+        }
+
+
+        if (isTouchDragging) {
+            pointerDraggedItem.classList.remove('dragging');
+            pointerDraggedItem.style.left = '';
+            pointerDraggedItem.style.top = '';
+            pointerDraggedItem.style.visibility = '';
+
+            if (currentOverZone) {
+                if (!currentOverZone.contains(pointerDraggedItem)) {
+                    currentOverZone.appendChild(pointerDraggedItem);
+                }
+                currentOverZone.classList.remove('over');
+            } else {
+                itemsContainer.appendChild(pointerDraggedItem);
+            }
+        } else {
+            pointerDraggedItem.classList.remove('native-dragging');
+            if (currentOverZone) {
+                currentOverZone.classList.remove('over');
+            }
+        }
+
+        if (pointerDraggedItem && typeof pointerDraggedItem.releasePointerCapture === 'function') {
+            try {
+                pointerDraggedItem.releasePointerCapture(e.pointerId);
+            } catch(err) {
+                console.warn("Error releasing pointer capture:", err);
+            }
+        }
+
+
+        pointerDraggedItem = null;
+        isTouchDragging = false;
+        currentOverZone = null;
+        offsetX = 0;
+        offsetY = 0;
+    }
+
+    document.getElementById('check-btn').addEventListener('click', () => {
+        let allCorrect = true;
+        let totalItemsChecked = 0;
+        let totalItemsInGame = ITEMS.length;
+        messageArea.textContent = '';
+
+        ['fast', 'slow'].forEach(zoneId => {
+            const zone = document.getElementById(zoneId);
+            Array.from(zone.children).forEach(item => {
+                if (item.classList.contains('item')) {
+                    totalItemsChecked++;
+                    const isCorrect = item.dataset.category === zoneId;
+                    item.style.border = isCorrect ? '3px solid #22c55e' : '3px solid #ef4444';
+                    if (!isCorrect) allCorrect = false;
+                }
+            });
+        });
+
+        let unsortedItemsCount = 0;
+        Array.from(itemsContainer.children).forEach(item => {
+            if (item.classList.contains('item')) {
+                item.style.border = '3px solid #f97316';
+                allCorrect = false;
+                unsortedItemsCount++;
+            }
+        });
+
+        if (unsortedItemsCount > 0) {
+            messageArea.textContent = `Please sort all ${unsortedItemsCount} remaining item(s).`;
+            messageArea.style.color = '#f97316';
+        } else if (totalItemsChecked === 0 && totalItemsInGame > 0) {
+            messageArea.textContent = "Drag the items to the 'Fast Change' or 'Slow Change' boxes.";
+            messageArea.style.color = 'var(--text-dark)';
+        } else if (allCorrect && totalItemsChecked === totalItemsInGame) {
+            messageArea.textContent = "Congratulations! Everything is sorted correctly!";
+            messageArea.style.color = '#22c55e';
+        } else if (!allCorrect) {
+            messageArea.textContent = "Some items are in the wrong place or unsorted. Please try again!";
+            messageArea.style.color = '#ef4444';
+        } else {
+            messageArea.textContent = "Sort the items to check your answers.";
+            messageArea.style.color = 'var(--text-dark)';
+        }
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', () => {
+        initializeGame();
+    });
+
+    initializeGame();
+  });
+  </script>
+</body>
+</html>
