@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <title>Water Cycle Activity</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f9ff; /* Light sky blue background */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+            overscroll-behavior-y: contain;
+        }
+        .activity-container {
+            background-color: #ffffff;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 950px;
+            border: 3px solid #a5f3fc; /* Cyan border */
+        }
+        .title {
+            color: #0891b2; /* Cyan-dark */
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+        .instructions {
+            text-align: center;
+            color: #475569; /* Slate */
+            margin-bottom: 20px;
+            font-size: 1rem;
+        }
+
+        .main-area {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        @media (min-width: 768px) { /* Side-by-side layout on medium screens and up */
+            .main-area {
+                flex-direction: row;
+                align-items: flex-start;
+            }
+        }
+
+        /* Left Column (Palette + Definition) */
+        .left-column {
+             order: 2; /* Below image on small screens */
+             display: flex;
+             flex-direction: column;
+             gap: 15px; /* Space between palette and definition */
+        }
+         @media (min-width: 768px) {
+             .left-column {
+                 order: 1; /* Left side on larger screens */
+                 width: 220px; /* Slightly wider for more terms */
+                 flex-shrink: 0;
+             }
+         }
+
+
+        /* Terms Palette */
+        .terms-palette {
+            background-color: #ecfeff; /* Lighter cyan */
+            border: 2px dashed #67e8f9; /* Cyan dashed border */
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column; /* Stack title and terms */
+            align-items: center;
+            gap: 10px;
+            width: 100%; /* Full width within left column */
+        }
+
+        .palette-title {
+            font-weight: 600;
+            color: #0e7490; /* Darker cyan */
+            margin-bottom: 5px;
+        }
+        .term-item {
+            background-color: #ffffff;
+            border: 1px solid #99f6e4; /* Teal border */
+            border-radius: 8px;
+            padding: 8px 12px; /* Adjusted padding for potentially longer text */
+            font-size: 0.9rem; /* Slightly smaller for more terms */
+            font-weight: 500;
+            color: #115e59; /* Dark teal */
+            cursor: grab; /* Default cursor grab */
+            transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            width: 95%; /* Take most of palette width */
+            text-align: center;
+            touch-action: none; /* Important for preventing default touch actions like scrolling */
+            user-select: none; /* Prevent text selection during drag */
+        }
+         /* Make items in palette also clickable */
+         .terms-palette .term-item {
+            cursor: pointer;
+         }
+        .term-item:active { /* Mouse active state */
+            cursor: grabbing;
+        }
+        .term-item.dragging { /* Visual feedback for the original item being dragged */
+            opacity: 0.4; /* Make original item more transparent */
+        }
+        /* Style for term when dropped */
+        .drop-zone .term-item {
+            cursor: pointer; /* Still allow clicking dropped item (to return) */
+            width: auto;
+            box-shadow: none;
+            border-color: #14b8a6;
+            background-color: #ccfbf1;
+            white-space: nowrap;
+            font-size: 0.85rem; /* Slightly smaller in drop zone */
+            padding: 4px 8px;
+            opacity: 1; /* Ensure dropped item is fully opaque */
+            transform: scale(1); /* Ensure dropped item is normal size */
+        }
+        /* Ghost image style for touch drag */
+        .ghost-image {
+            position: absolute;
+            pointer-events: none; /* Ghost should not interfere with touch events */
+            opacity: 0.7;
+            transform: scale(0.9); /* Slightly smaller */
+            z-index: 1000; /* Ensure it's on top */
+            background-color: #ffffff;
+            border: 1px solid #99f6e4;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #115e59;
+            width: auto; /* Let content define width */
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+
+        /* Definition Display Area */
+        #definitionDisplay {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 80px; /* Give it some initial height */
+            font-size: 0.9rem;
+            line-height: 1.4;
+            color: #475569;
+            text-align: left;
+            width: 100%; /* Full width within left column */
+            font-style: italic;
+        }
+
+
+        /* Image and Drop Zones Area */
+        .image-area {
+            position: relative;
+            width: 100%;
+            max-width: 700px;
+            margin: 0 auto;
+            order: 1; /* Above palette on small screens */
+            flex-grow: 1;
+        }
+        @media (min-width: 768px) {
+             .image-area {
+                 order: 2; /* Right side on larger screens */
+             }
+        }
+
+        .background-image {
+            display: block;
+            width: 100%;
+            height: auto;
+            border-radius: 10px;
+            border: 1px solid #ccc;
+        }
+
+        /* Drop Zones */
+        .drop-zone {
+            position: absolute;
+            border: 2px dashed #0ea5e9;
+            background-color: rgba(224, 242, 254, 0.7);
+            border-radius: 8px;
+            min-width: 100px; /* Adjusted minimum size */
+            min-height: 35px; /* Adjusted minimum size */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+            padding: 2px;
+        }
+        .drop-zone.drag-over { /* Used for both mouse and touch */
+            background-color: rgba(186, 230, 253, 0.9);
+            border-color: #0284c7;
+        }
+
+        /* Drop Zone Positions */
+        #zone-evaporation { top: 55%; left: 58%; }
+        #zone-condensation { top: 33%; left: 60%; }
+        #zone-precipitation { top: 50%; left: 15%; }
+        #zone-runoff { top: 65%; left: 20%; }
+        #zone-transpiration { top: 75%; left: 15%; }
+        #zone-transportation { top: 33%; left: 30%; }
+
+
+        /* Controls */
+        .controls {
+            text-align: center;
+            margin-top: 25px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .control-button {
+            padding: 10px 25px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            box-shadow: 0 3px 5px rgba(0,0,0,0.1);
+            color: white;
+        }
+        .check-button { background-color: #16a34a; }
+        .check-button:hover:not(:disabled) { background-color: #15803d; }
+        .reset-button { background-color: #f97316; }
+        .reset-button:hover { background-color: #ea580c; }
+        .control-button:active { transform: translateY(1px); }
+        .check-button:disabled { background-color: #9ca3af; opacity: 0.7; cursor: not-allowed; }
+
+        /* Feedback Area (for check results) */
+        .feedback {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            min-height: 1.5em; /* Smaller height now */
+            color: #4b5563;
+        }
+        .feedback.success { color: #15803d; font-weight: 600; }
+        .feedback.error { color: #dc2626; font-weight: 600; }
+
+
+    </style>
+</head>
+<body>
+    <div class="activity-container">
+        <h1 class="title">The Water Cycle</h1>
+        <p class="instructions">Drag each term to its correct location. Click a term in the palette to see its definition.</p>
+
+        <div class="main-area">
+            <div class="left-column">
+                <div class="terms-palette">
+                    <h3 class="palette-title">Water Cycle Terms</h3>
+                    <div id="term-evaporation" class="term-item" draggable="true" data-term="evaporation">Evaporation</div>
+                    <div id="term-condensation" class="term-item" draggable="true" data-term="condensation">Condensation</div>
+                    <div id="term-precipitation" class="term-item" draggable="true" data-term="precipitation">Precipitation</div>
+                    <div id="term-runoff" class="term-item" draggable="true" data-term="runoff">Runoff</div>
+                    <div id="term-transpiration" class="term-item" draggable="true" data-term="transpiration">Transpiration</div>
+                    <div id="term-transportation" class="term-item" draggable="true" data-term="transportation">Transportation</div>
+                </div>
+                <div id="definitionDisplay">Click a term above to see its definition.</div>
+            </div>
+
+            <div class="image-area">
+                <img src="https://raw.githubusercontent.com/Maltais239/Images/main/Water%20Cycle.png" alt="Water Cycle Diagram" class="background-image">
+                <div id="zone-evaporation" class="drop-zone" data-target="evaporation"></div>
+                <div id="zone-condensation" class="drop-zone" data-target="condensation"></div>
+                <div id="zone-precipitation" class="drop-zone" data-target="precipitation"></div>
+                <div id="zone-runoff" class="drop-zone" data-target="runoff"></div>
+                <div id="zone-transpiration" class="drop-zone" data-target="transpiration"></div>
+                <div id="zone-transportation" class="drop-zone" data-target="transportation"></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="checkButton" class="control-button check-button" disabled>Check Answers</button>
+            <button id="resetButton" class="control-button reset-button">Reset</button>
+        </div>
+        <div id="feedback" class="feedback"></div>
+
+    </div>
+
+    <script>
+        // --- Definitions ---
+        const definitions = {
+            evaporation: "Evaporation: The process where liquid water turns into water vapor (a gas) and rises into the air, usually due to heat from the sun.",
+            condensation: "Condensation: The process where water vapor in the air cools down and changes back into liquid water, forming clouds.",
+            precipitation: "Precipitation: Water falling back to Earth from clouds in the form of rain, snow, sleet, or hail.",
+            runoff: "Runoff: Water that flows over the land surface after precipitation, rather than seeping into the ground.",
+            transportation: "Transportation: The movement of water (in clouds or as vapor) through the atmosphere by wind.",
+            transpiration: "Transpiration: The process where plants release water vapor into the air from their leaves."
+        };
+
+        // --- DOM References ---
+        let termItems, dropZones, termsPalette, checkButton, resetButton, feedbackDiv, definitionDisplayDiv;
+
+        // --- State ---
+        let draggedItem = null; // For both mouse and touch (the original element)
+        let ghostImage = null; // For the touch drag visual clone
+        let droppedItemsState = {};
+        let isDraggingTouch = false;
+        let touchOffsetX = 0;
+        let touchOffsetY = 0;
+        // let originalPointerEvents = ''; // No longer needed with visibility approach
+
+        // --- Drag and Drop Event Handlers (Mouse) ---
+        function handleDragStart(e) {
+            definitionDisplayDiv.textContent = 'Click a term above to see its definition.';
+            draggedItem = e.target;
+            e.dataTransfer.setData('text/plain', draggedItem.dataset.term);
+            setTimeout(() => {
+                if (draggedItem) draggedItem.classList.add('dragging');
+            }, 0);
+        }
+
+        function handleDragEnd(e) {
+            setTimeout(() => {
+                if (draggedItem && draggedItem.classList && draggedItem.classList.contains('dragging')) {
+                    draggedItem.classList.remove('dragging');
+                }
+                dropZones.forEach(zone => zone.classList.remove('drag-over'));
+                draggedItem = null;
+            }, 0);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            const targetZone = e.target.closest('.drop-zone');
+            if (targetZone && !targetZone.querySelector('.term-item')) {
+                targetZone.classList.add('drag-over');
+                e.dataTransfer.dropEffect = 'move';
+            } else {
+                e.dataTransfer.dropEffect = 'none';
+            }
+        }
+
+        function handleDragLeave(e) {
+            const targetZone = e.target.closest('.drop-zone');
+            if (targetZone && !targetZone.contains(e.relatedTarget)) {
+                 targetZone.classList.remove('drag-over');
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const targetZone = e.target.closest('.drop-zone');
+            if (!targetZone || !draggedItem || targetZone.querySelector('.term-item')) {
+                if (draggedItem && draggedItem.classList) {
+                    draggedItem.classList.remove('dragging');
+                }
+                draggedItem = null;
+                return;
+            }
+            performDrop(targetZone, draggedItem.dataset.term, draggedItem);
+        }
+
+        // --- Touch Event Handlers ---
+        let touchStartX = 0;
+        let touchStartY = 0;
+        const touchMoveThreshold = 10;
+
+        function handleTouchStart(e) {
+            isDraggingTouch = false;
+            const targetItem = e.target.closest('.term-item');
+            if (!targetItem || !targetItem.draggable) return;
+
+            draggedItem = targetItem;
+            const touch = e.touches[0];
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+
+            const rect = draggedItem.getBoundingClientRect();
+            touchOffsetX = touch.clientX - rect.left;
+            touchOffsetY = touch.clientY - rect.top;
+
+            definitionDisplayDiv.textContent = 'Click a term above to see its definition.';
+        }
+
+        function handleTouchMove(e) {
+            if (!draggedItem) return;
+
+            const touch = e.touches[0];
+            const touchX = touch.clientX;
+            const touchY = touch.clientY;
+            let originalVisibility = ''; // Store original visibility
+
+            if (!isDraggingTouch) {
+                const deltaX = Math.abs(touchX - touchStartX);
+                const deltaY = Math.abs(touchY - touchStartY);
+                if (deltaX > touchMoveThreshold || deltaY > touchMoveThreshold) {
+                    isDraggingTouch = true;
+                    draggedItem.classList.add('dragging'); // Style original item
+
+                    ghostImage = draggedItem.cloneNode(true);
+                    ghostImage.classList.remove('dragging');
+                    ghostImage.classList.add('ghost-image');
+                    document.body.appendChild(ghostImage);
+                    ghostImage.style.left = `${touchX - touchOffsetX}px`;
+                    ghostImage.style.top = `${touchY - touchOffsetY}px`;
+                }
+            }
+
+            if (isDraggingTouch) {
+                e.preventDefault();
+                if (ghostImage) {
+                    ghostImage.style.left = `${touchX - touchOffsetX}px`;
+                    ghostImage.style.top = `${touchY - touchOffsetY}px`;
+                }
+
+                // Temporarily hide original item and ghost for accurate elementFromPoint
+                if (draggedItem) {
+                    originalVisibility = draggedItem.style.visibility;
+                    draggedItem.style.visibility = 'hidden';
+                }
+                if (ghostImage) ghostImage.style.display = 'none'; // Also hide ghost for this check
+
+                const elementUnderTouch = document.elementFromPoint(touchX, touchY);
+
+                // Restore visibility
+                if (draggedItem) draggedItem.style.visibility = originalVisibility;
+                if (ghostImage) ghostImage.style.display = '';
+
+
+                dropZones.forEach(zone => {
+                    if (zone === elementUnderTouch || zone.contains(elementUnderTouch)) {
+                        if (!zone.querySelector('.term-item')) {
+                            zone.classList.add('drag-over');
+                        }
+                    } else {
+                        zone.classList.remove('drag-over');
+                    }
+                });
+            }
+        }
+
+        function handleTouchEnd(e) {
+            if (!draggedItem) return;
+
+            let originalVisibility = '';
+            if (draggedItem) { // Ensure draggedItem exists before accessing style
+                originalVisibility = draggedItem.style.visibility; // Store before potential modification
+            }
+
+
+            if (isDraggingTouch) {
+                // Temporarily hide original item and ghost for accurate elementFromPoint
+                if (draggedItem) draggedItem.style.visibility = 'hidden';
+                if (ghostImage) ghostImage.style.display = 'none';
+
+                const endTargetElement = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+
+                // Restore visibility immediately after check
+                if (draggedItem) draggedItem.style.visibility = originalVisibility;
+                if (ghostImage) ghostImage.style.display = '';
+
+
+                const targetDropZone = endTargetElement ? endTargetElement.closest('.drop-zone') : null;
+
+                if (targetDropZone && !targetDropZone.querySelector('.term-item')) {
+                    performDrop(targetDropZone, draggedItem.dataset.term, draggedItem);
+                }
+            }
+
+            // Cleanup
+            if (draggedItem) {
+                draggedItem.classList.remove('dragging');
+                draggedItem.style.visibility = originalVisibility; // Ensure final restore
+            }
+            if (ghostImage) {
+                ghostImage.remove();
+                ghostImage = null;
+            }
+            dropZones.forEach(zone => zone.classList.remove('drag-over'));
+            draggedItem = null;
+            isDraggingTouch = false;
+        }
+
+
+        // --- Common Drop Logic (for both mouse and touch) ---
+        function performDrop(targetZone, termId, itemElement) {
+            const zoneId = targetZone.id;
+            const originalParent = itemElement.parentElement;
+
+            targetZone.appendChild(itemElement); // itemElement is the original draggedItem
+
+            droppedItemsState[zoneId] = termId;
+
+            if (originalParent && originalParent.classList.contains('drop-zone') && originalParent !== targetZone) {
+                delete droppedItemsState[originalParent.id];
+            }
+
+            updateCheckButtonState();
+            setFeedback('');
+        }
+
+
+        // --- Click Handler (for definitions and returning items) ---
+        function handleContainerClick(e) {
+            if (isDraggingTouch) return;
+
+            const clickedItem = e.target.closest('.term-item');
+
+            if (!clickedItem) {
+                 if (!draggedItem) {
+                     definitionDisplayDiv.textContent = 'Click a term above to see its definition.';
+                 }
+                 return;
+            }
+
+            if (clickedItem.parentElement === termsPalette) {
+                const termId = clickedItem.dataset.term;
+                const definition = definitions[termId];
+                definitionDisplayDiv.textContent = definition || 'Definition not found.';
+                setFeedback('');
+            }
+            else if (clickedItem.parentElement.classList.contains('drop-zone')) {
+                const parentZone = clickedItem.parentElement;
+                const zoneId = parentZone.id;
+
+                termsPalette.appendChild(clickedItem);
+                clickedItem.style.borderColor = '';
+                clickedItem.style.backgroundColor = '';
+
+                delete droppedItemsState[zoneId];
+
+                updateCheckButtonState();
+                setFeedback('');
+                definitionDisplayDiv.textContent = 'Click a term above to see its definition.';
+            }
+        }
+
+        // --- Game Logic Functions ---
+        function updateCheckButtonState() {
+            const droppedCount = Object.keys(droppedItemsState).length;
+            checkButton.disabled = droppedCount === 0;
+        }
+
+        function setFeedback(message, type = 'info') {
+            feedbackDiv.textContent = message;
+            feedbackDiv.className = 'feedback';
+            switch (type) {
+                case 'success': feedbackDiv.classList.add('success'); break;
+                case 'error': feedbackDiv.classList.add('error'); break;
+            }
+        }
+
+        function checkAnswers() {
+            let correctCount = 0;
+            const totalExpectedTerms = 6;
+
+            dropZones.forEach(zone => {
+                const zoneId = zone.id;
+                const expectedTerm = zone.dataset.target;
+                const droppedTermId = droppedItemsState[zoneId];
+                const termItemElement = zone.querySelector('.term-item');
+
+                if (termItemElement) {
+                    termItemElement.style.borderColor = '';
+                    termItemElement.style.backgroundColor = '';
+                }
+
+                if (droppedTermId && droppedTermId === expectedTerm) {
+                    correctCount++;
+                    if (termItemElement) {
+                        termItemElement.style.borderColor = '#16a34a';
+                        termItemElement.style.backgroundColor = '#dcfce7';
+                    }
+                } else if (droppedTermId) {
+                     if (termItemElement) {
+                        termItemElement.style.borderColor = '#dc2626';
+                        termItemElement.style.backgroundColor = '#fee2e2';
+                    }
+                }
+            });
+
+            const allPlaced = Object.keys(droppedItemsState).length === dropZones.length;
+            definitionDisplayDiv.textContent = 'Click a term above to see its definition.';
+
+            if (correctCount === dropZones.length && allPlaced) {
+                setFeedback('Correct! Well done!', 'success');
+                checkButton.disabled = true;
+            } else if (!allPlaced) {
+                 setFeedback('Please place all terms before checking.', 'error');
+            } else {
+                setFeedback('Some terms are incorrect. Try again!', 'error');
+            }
+        }
+
+        function resetActivity() {
+            droppedItemsState = {};
+
+            dropZones.forEach(zone => {
+                const item = zone.querySelector('.term-item');
+                if (item) {
+                    termsPalette.appendChild(item);
+                    item.style.borderColor = '';
+                    item.style.backgroundColor = '';
+                }
+            });
+
+            setFeedback('');
+            definitionDisplayDiv.textContent = 'Click a term above to see its definition.';
+            checkButton.disabled = true;
+        }
+
+        // --- Initial Setup ---
+        function initializeActivity() {
+            termItems = document.querySelectorAll('.term-item');
+            dropZones = document.querySelectorAll('.drop-zone');
+            termsPalette = document.querySelector('.terms-palette');
+            checkButton = document.getElementById('checkButton');
+            resetButton = document.getElementById('resetButton');
+            feedbackDiv = document.getElementById('feedback');
+            definitionDisplayDiv = document.getElementById('definitionDisplay');
+
+            termItems.forEach(item => {
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragend', handleDragEnd);
+                item.addEventListener('touchstart', handleTouchStart, { passive: false });
+            });
+
+            document.addEventListener('touchmove', handleTouchMove, { passive: false });
+            document.addEventListener('touchend', handleTouchEnd);
+
+
+            dropZones.forEach(zone => {
+                zone.addEventListener('dragover', handleDragOver);
+                zone.addEventListener('dragleave', handleDragLeave);
+                zone.addEventListener('drop', handleDrop);
+            });
+
+            document.querySelector('.activity-container').addEventListener('click', handleContainerClick);
+
+            checkButton.addEventListener('click', checkAnswers);
+            resetButton.addEventListener('click', resetActivity);
+
+            console.log("Water Cycle Activity Initialized");
+        }
+
+        document.addEventListener('DOMContentLoaded', initializeActivity);
+
+    </script>
+</body>
+</html>
