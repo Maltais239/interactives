@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <title>Interactive Creature Care v4.7: Bear Images</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f9ff; /* Very light blue background */
+            display: flex;
+            flex-direction: column; /* Ensure header and instructions stack above main layout */
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px; /* Reduced body padding */
+            box-sizing: border-box;
+        }
+        .header-bar {
+            background-color: #075985; /* Dark Blue from title */
+            color: #ffffff;
+            padding: 0.5rem 0;
+            width: 100%;
+            max-width: 900px; /* Max width for header to align with game area */
+            text-align: center;
+            margin-bottom: 10px; /* Reduced margin */
+            border-radius: 12px; /* More rounded */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header-bar h1 {
+            font-size: 1.8rem; /* Slightly larger title */
+            margin:0;
+            font-weight: 700;
+        }
+        p.instructions {
+            color: #374151; /* Gray-700 */
+            margin: 0 auto 15px; /* Adjusted margin */
+            text-align: center;
+            font-size: 0.9rem; /* Slightly larger instructions */
+            max-width: 900px;
+        }
+
+        /* New main layout container for two columns */
+        .main-layout-container {
+            display: flex;
+            flex-direction: column; /* Default: stack game and tips */
+            gap: 20px; /* Gap between game container and tips */
+            width: 100%;
+            max-width: 900px; /* Adjust as needed for wider layout */
+        }
+
+        /* On medium screens and up, use a row layout */
+        @media (min-width: 768px) { /* md breakpoint in Tailwind */
+            .main-layout-container {
+                flex-direction: row;
+            }
+        }
+
+        .game-container {
+            background-color: #ffffff;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            border: 5px solid #7dd3fc; /* Light blue border */
+            flex-grow: 1; /* Game container takes available space */
+            /* max-width remains effectively controlled by main-layout-container's max-width */
+        }
+        .title { /* Title within the game container, if any, or remove if header-bar is sufficient */
+            color: #075985; 
+            margin-bottom: 20px;
+            font-size: 2.0rem;
+            font-weight: 700;
+        }
+        .creature-display {
+            background-color: #e0f2fe; 
+            border-radius: 15px;
+            padding: 15px; 
+            margin-bottom: 25px;
+            min-height: 200px; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .creature-image-element {
+            max-width: 100%;
+            max-height: 180px; 
+            object-fit: contain; 
+            transition: transform 0.5s ease-in-out, width 0.5s ease-in-out, height 0.5s ease-in-out, filter 0.3s ease, opacity 0.3s ease;
+            line-height: 1;
+        }
+
+        .creature-display[data-stage="0"] .creature-image-element { width: 80px; height: 80px; transform: translateY(10px); }
+        .creature-display[data-stage="1"] .creature-image-element { width: 100px; height: 100px; transform: translateY(5px); }
+        .creature-display[data-stage="2"] .creature-image-element { width: 130px; height: 130px; transform: translateY(0px); }
+        .creature-display[data-stage="3"] .creature-image-element { width: 160px; height: 160px; transform: translateY(-5px); }
+        .creature-display[data-stage="4"] .creature-image-element { width: 180px; height: 180px; transform: translateY(-10px); filter: drop-shadow(0 0 8px #fde047); }
+
+        .creature-display[data-stage="unhappy"] {
+            font-size: 7rem; 
+            filter: grayscale(80%) drop-shadow(0 0 5px #ff0000);
+            opacity: 0.7;
+            transform: rotate(-5deg) scale(0.95);
+            line-height: 1; 
+        }
+        .creature-display[data-stage="unhappy"] .creature-image-element {
+            display: none !important; 
+        }
+        .creature-display.stressed .creature-image-element,
+        .creature-display.stressed[data-stage="unhappy"] {
+            /* animation: shake 0.5s infinite; */
+        }
+
+        .status-bars {
+            display: flex;
+            justify-content: space-around;
+            gap: 10px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+        .status-bar-container {
+            width: calc(33.33% - 8px);
+            min-width: 100px;
+            margin-bottom: 10px;
+        }
+        .status-bar-container.half-width {
+            width: calc(50% - 10px);
+        }
+        .status-label {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 4px;
+            font-size: 0.85rem;
+            white-space: nowrap;
+        }
+        .progress-bar-bg {
+            background-color: #e5e7eb;
+            border-radius: 9999px;
+            height: 18px;
+            overflow: hidden;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 9999px;
+            transition: width 0.3s ease-in-out, background-color 0.3s ease;
+            text-align: center;
+            color: white;
+            font-size: 0.7rem;
+            line-height: 18px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .hydration-bar { background-color: #3b82f6; }
+        .warmth-bar { background-color: #f59e0b; }
+        .fullness-bar { background-color: #84cc16; }
+        .discomfort-bar { background-color: #f43f5e; }
+        .happiness-bar { background-color: #22c55e; }
+
+        .controls-area {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .action-button {
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 1.0rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease;
+            box-shadow: 0 3px 5px rgba(0, 0, 0, 0.1);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .action-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background-color: #9ca3af;
+        }
+        .hydrate-button { background-color: #3b82f6; }
+        .hydrate-button:hover:not(:disabled) { background-color: #2563eb; }
+        .warmth-button { background-color: #f59e0b; }
+        .warmth-button:hover:not(:disabled) { background-color: #d97706; }
+        .feed-button { background-color: #84cc16; }
+        .feed-button:hover:not(:disabled) { background-color: #65a30d; }
+        .reset-button { background-color: #ef4444; }
+        .reset-button:hover:not(:disabled) { background-color: #dc2626; }
+        .action-button:active:not(:disabled) {
+            transform: translateY(1px);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .reset-button-container {
+            margin-top: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .feedback-message {
+            margin-bottom: 15px;
+            font-size: 1.0rem;
+            font-weight: 600;
+            min-height: 1.4em;
+            color: #4b5563;
+            transition: color 0.3s ease;
+        }
+
+        /* Tips section specific styling */
+        .tips-container {
+            background-color: #ffffff; /* Match game container bg */
+            border-radius: 20px; /* Match game container radius */
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); /* Match game container shadow */
+            border: 5px solid #bae6fd; /* Lighter blue border for tips */
+            width: 100%; /* Full width on small screens */
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            .tips-container {
+                width: 300px; /* Fixed width for side panel */
+                flex-shrink: 0; /* Prevent shrinking */
+                max-height: calc(100vh - 120px); /* Example max height, adjust as needed */
+                overflow-y: auto; /* Allow scrolling if content is too long */
+            }
+        }
+
+        .tips-section { /* Inner content of tips */
+            background-color: #e0f2fe;
+            border-radius: 10px;
+            border: 1px solid #7dd3fc;
+            text-align: left;
+            font-size: 0.85rem;
+            color: #0c4a6e;
+            padding: 15px; /* Add padding to inner tips section */
+            height: 100%; /* Make it fill the tips-container */
+        }
+        .tips-section h3 {
+            font-weight: 700;
+            font-size: 1.1rem; /* Slightly larger tips title */
+            margin-bottom: 10px; /* More space below title */
+            text-align: center;
+            color: #075985;
+        }
+        .tips-section ul { list-style: disc; margin-left: 20px; }
+        .tips-section li { margin-bottom: 6px; /* Slightly more space between tips */ }
+    </style>
+</head>
+<body>
+    <header class="header-bar">
+        <h1>Bear Cub Care</h1>
+    </header>
+    <p class="instructions">Nurture your bear cub by managing its needs. Help it grow!</p>
+
+    <div class="main-layout-container">
+        <div class="game-container">
+            <div id="creatureDisplay" class="creature-display">
+                </div>
+
+            <div class="status-bars">
+                <div class="status-bar-container">
+                    <div class="status-label">💧 Hydration</div>
+                    <div class="progress-bar-bg">
+                        <div id="hydrationBar" class="progress-bar-fill hydration-bar" style="width: 50%;">50%</div>
+                    </div>
+                </div>
+                <div class="status-bar-container">
+                    <div class="status-label">☀️ Warmth</div>
+                    <div class="progress-bar-bg">
+                        <div id="warmthBar" class="progress-bar-fill warmth-bar" style="width: 50%;">50%</div>
+                    </div>
+                </div>
+                <div class="status-bar-container">
+                    <div class="status-label">🍖 Fullness</div>
+                    <div class="progress-bar-bg">
+                        <div id="fullnessBar" class="progress-bar-fill fullness-bar" style="width: 60%;">60%</div>
+                    </div>
+                </div>
+                <div class="status-bar-container half-width">
+                    <div class="status-label">😟 Discomfort</div>
+                    <div class="progress-bar-bg">
+                        <div id="discomfortBar" class="progress-bar-fill discomfort-bar" style="width: 0%;">0%</div>
+                    </div>
+                </div>
+                 <div class="status-bar-container half-width">
+                    <div class="status-label">😊 Happiness/Growth</div>
+                    <div class="progress-bar-bg">
+                        <div id="happinessBar" class="progress-bar-fill happiness-bar" style="width: 0%;">0%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls-area">
+                <button id="hydrateButton" class="action-button hydrate-button">
+                     <span>💧</span> Give Water
+                </button>
+                <button id="warmthButton" class="action-button warmth-button">
+                     <span>☀️</span> Provide Warmth
+                </button>
+                <button id="feedButton" class="action-button feed-button">
+                     <span>🍖</span> Feed Bear
+                </button>
+            </div>
+            <div id="feedbackMessage" class="feedback-message">Care for your new bear cub!</div>
+
+            <div class="reset-button-container">
+                 <button id="resetButton" class="action-button reset-button">
+                     <span>🔄</span> New Bear Cub
+                </button>
+            </div>
+        </div>
+
+        <div class="tips-container">
+            <div class="tips-section">
+                 <h3>Care Tips</h3>
+                 <ul>
+                     <li>Keep 💧 Hydration, ☀️ Warmth, and 🍖 Fullness (30-90%) in the ideal range.</li>
+                     <li>Too much water/warmth/food (>90%) contributes to 😟 Discomfort!</li>
+                     <li>Low hydration/warmth/fullness (<10%) also increases discomfort over time.</li>
+                     <li>High discomfort (>75%) stops 😊 Happiness gain. Max discomfort (100%) is very bad!</li>
+                     <li>All needs decrease automatically - keep an eye on them!</li>
+                 </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Sound Synthesis Setup (Tone.js) ---
+        const synth = new Tone.Synth().toDestination();
+        const noiseSynth = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0 } }).toDestination();
+        const pluckSynth = new Tone.PluckSynth().toDestination();
+        pluckSynth.volume.value = -10;
+        synth.volume.value = -8;
+        noiseSynth.volume.value = -18;
+
+        function playSound(type) {
+            Tone.start(); 
+            try {
+                switch (type) {
+                    case 'hydrate': pluckSynth.triggerAttackRelease('D5', '16n', Tone.now()); pluckSynth.triggerAttackRelease('F#5', '16n', Tone.now() + 0.05); break;
+                    case 'warmth': synth.triggerAttackRelease('B5', '16n', Tone.now()); break;
+                    case 'feed': synth.triggerAttackRelease('C4', '8n', Tone.now()); synth.triggerAttackRelease('G4', '8n', Tone.now() + 0.1); break;
+                    case 'happy_event': synth.triggerAttackRelease('E4', '8n', Tone.now()); synth.triggerAttackRelease('B4', '8n', Tone.now() + 0.15); synth.triggerAttackRelease('E5', '8n', Tone.now() + 0.3); break;
+                    case 'warning': synth.triggerAttackRelease('A3', '8n', Tone.now()); break;
+                    case 'discomfort': noiseSynth.triggerAttackRelease(Tone.now()); break;
+                    case 'unhappy': synth.triggerAttackRelease('D4', '4n', Tone.now()); synth.triggerAttackRelease('B3', '4n', Tone.now() + 0.2); synth.triggerAttackRelease('G3', '4n', Tone.now() + 0.4); break;
+                    case 'reset': pluckSynth.triggerAttackRelease('A4', '8n', Tone.now()); break;
+                }
+            } catch (error) {
+                // console.error("Tone.js error:", error);
+            }
+        }
+
+        // --- Game State Variables ---
+        let hydrationLevel = 50;
+        let warmthLevel = 50;
+        let fullnessLevel = 60;
+        let discomfortLevel = 0;
+        let happinessPoints = 0;
+        let creatureStage = 0;
+        let isUnhappy = false;
+        let gameLoopInterval = null;
+
+        // --- Game Constants ---
+        const MAX_LEVEL = 100;
+        const MIN_LEVEL = 0;
+        const HYDRATION_DECREASE_RATE = 2;
+        const WARMTH_DECREASE_RATE = 2;
+        const FULLNESS_DECREASE_RATE = 3;
+        const DISCOMFORT_INCREASE_LOW_RESOURCE = 3;
+        const DISCOMFORT_FROM_OVERHYDRATE = 8; 
+        const DISCOMFORT_FROM_OVERFEED = 8;    
+        const DISCOMFORT_FROM_OVERWARM = 12;   
+        const DISCOMFORT_DECREASE_RATE = 2;
+        const HAPPINESS_PER_TICK = 1;
+        const POINTS_PER_STAGE = [25, 50, 75, 100]; 
+        const IDEAL_HYDRATION_LOW = 30;
+        const IDEAL_HYDRATION_HIGH = 90;
+        const IDEAL_WARMTH_LOW = 30;
+        const IDEAL_WARMTH_HIGH = 90;
+        const IDEAL_FULLNESS_LOW = 30;
+        const IDEAL_FULLNESS_HIGH = 90;
+        const CRITICAL_THRESHOLD = 10;
+        const HIGH_DISCOMFORT_THRESHOLD = 75;
+        const HYDRATION_PER_CLICK = 20;
+        const WARMTH_PER_CLICK = 20;
+        const FULLNESS_PER_CLICK = 30;
+        const GAME_TICK_MS = 1000;
+
+        // URLs for bear images and ghost emoji for unhappy state
+        const CREATURE_STAGE_IMAGES = [
+            'https://raw.githubusercontent.com/Maltais239/Images/main/bear%20(2).png', // Stage 0: Cub
+            'https://raw.githubusercontent.com/Maltais239/Images/main/bear%20(1).png', // Stage 1: Young Bear
+            'https://raw.githubusercontent.com/Maltais239/Images/main/bear%20(3).png', // Stage 2: Young Adult Bear
+            'https://raw.githubusercontent.com/Maltais239/Images/main/bear%20(4).png', // Stage 3: BIG OLD ADULT BEAR
+            'https://raw.githubusercontent.com/Maltais239/Images/main/bear%20(4).png', // Stage 4: Max Growth (same as adult, CSS adds glow)
+            '👻'  // Unhappy state: Ghost Emoji
+        ];
+
+        // --- DOM References ---
+        const creatureDisplayEl = document.getElementById('creatureDisplay'); 
+        // creatureImageElement is now created/managed within updateCreatureImage
+
+        const hydrationBarEl = document.getElementById('hydrationBar');
+        const warmthBarEl = document.getElementById('warmthBar');
+        const fullnessBarEl = document.getElementById('fullnessBar');
+        const discomfortBarEl = document.getElementById('discomfortBar');
+        const happinessBarEl = document.getElementById('happinessBar');
+        const feedbackMessageEl = document.getElementById('feedbackMessage');
+        const hydrateButton = document.getElementById('hydrateButton');
+        const warmthButton = document.getElementById('warmthButton');
+        const feedButton = document.getElementById('feedButton');
+        const resetButton = document.getElementById('resetButton');
+
+        // --- UI Update Functions ---
+        function updateCreatureImage() {
+            const stageIndex = isUnhappy ? CREATURE_STAGE_IMAGES.length - 1 : creatureStage;
+            const stageRepresentation = CREATURE_STAGE_IMAGES[stageIndex];
+
+            creatureDisplayEl.setAttribute('data-stage', isUnhappy ? 'unhappy' : creatureStage.toString());
+            creatureDisplayEl.innerHTML = ''; // Clear previous content (image or emoji)
+
+            if (typeof stageRepresentation === 'string' && stageRepresentation.startsWith('http')) { 
+                // It's an image URL
+                let localCreatureImageElement = document.createElement('img'); 
+                localCreatureImageElement.alt = "Bear Creature";
+                localCreatureImageElement.classList.add('creature-image-element');
+                localCreatureImageElement.src = stageRepresentation; 
+                
+                localCreatureImageElement.onload = function() {
+                    // Image loaded successfully
+                }
+                localCreatureImageElement.onerror = function() {
+                    creatureDisplayEl.textContent = '⚠️ Image Load Error'; 
+                    if (localCreatureImageElement) localCreatureImageElement.style.display = 'none';
+                }
+                creatureDisplayEl.appendChild(localCreatureImageElement);
+
+            } else { 
+                // It's an emoji (e.g., ghost)
+                creatureDisplayEl.textContent = stageRepresentation; 
+            }
+            creatureDisplayEl.classList.toggle('stressed', discomfortLevel > HIGH_DISCOMFORT_THRESHOLD && !isUnhappy);
+        }
+
+
+        function updateUI() {
+            hydrationBarEl.style.width = `${hydrationLevel}%`;
+            hydrationBarEl.textContent = `${hydrationLevel}%`;
+            warmthBarEl.style.width = `${warmthLevel}%`;
+            warmthBarEl.textContent = `${warmthLevel}%`;
+            fullnessBarEl.style.width = `${fullnessLevel}%`;
+            fullnessBarEl.textContent = `${fullnessLevel}%`;
+            discomfortBarEl.style.width = `${discomfortLevel}%`;
+            discomfortBarEl.textContent = `${discomfortLevel}%`;
+
+            const currentStageMaxPoints = POINTS_PER_STAGE[creatureStage] || POINTS_PER_STAGE[POINTS_PER_STAGE.length -1];
+            const happinessPercentage = creatureStage < POINTS_PER_STAGE.length
+                ? Math.min(100, Math.round((happinessPoints / currentStageMaxPoints) * 100))
+                : 100; 
+            happinessBarEl.style.width = `${happinessPercentage}%`;
+            happinessBarEl.textContent = `${happinessPercentage}%`;
+
+            updateCreatureImage(); 
+
+            hydrateButton.disabled = isUnhappy;
+            warmthButton.disabled = isUnhappy;
+            feedButton.disabled = isUnhappy;
+            resetButton.disabled = false;
+        }
+
+        function setFeedback(message, type = 'info') {
+            feedbackMessageEl.textContent = message;
+            switch (type) {
+                case 'success': feedbackMessageEl.style.color = '#16a34a'; break;
+                case 'error': feedbackMessageEl.style.color = '#dc2626'; break;
+                case 'warning': feedbackMessageEl.style.color = '#f97316'; break;
+                case 'discomfort': feedbackMessageEl.style.color = '#ef4444'; break;
+                case 'info': default: feedbackMessageEl.style.color = '#374151'; break;
+            }
+        }
+
+        // --- Game Logic Functions ---
+        function giveHydration() {
+            if (isUnhappy) return;
+            if (hydrationLevel >= IDEAL_HYDRATION_HIGH) {
+                discomfortLevel = Math.min(MAX_LEVEL, discomfortLevel + DISCOMFORT_FROM_OVERHYDRATE);
+                setFeedback('Too much water! The bear is uncomfortable!', 'discomfort');
+                playSound('discomfort');
+            } else {
+                hydrationLevel = Math.min(MAX_LEVEL, hydrationLevel + HYDRATION_PER_CLICK);
+                setFeedback('Bear hydrated!', 'info');
+                playSound('hydrate');
+            }
+            updateUI();
+            checkUnhappyState();
+        }
+
+        function provideWarmth() {
+            if (isUnhappy) return;
+            if (warmthLevel >= IDEAL_WARMTH_HIGH) {
+                discomfortLevel = Math.min(MAX_LEVEL, discomfortLevel + DISCOMFORT_FROM_OVERWARM);
+                setFeedback('Too much warmth! The bear is uncomfortable!', 'discomfort');
+                playSound('discomfort');
+            } else {
+                warmthLevel = Math.min(MAX_LEVEL, warmthLevel + WARMTH_PER_CLICK);
+                setFeedback('Bear feels warmer!', 'info');
+                playSound('warmth');
+            }
+            updateUI();
+            checkUnhappyState();
+        }
+
+        function feedCreature() {
+            if (isUnhappy) return;
+            if (fullnessLevel >= IDEAL_FULLNESS_HIGH) {
+                discomfortLevel = Math.min(MAX_LEVEL, discomfortLevel + DISCOMFORT_FROM_OVERFEED);
+                setFeedback('Too much food! The bear is uncomfortable!', 'discomfort');
+                playSound('discomfort');
+            } else {
+                fullnessLevel = Math.min(MAX_LEVEL, fullnessLevel + FULLNESS_PER_CLICK);
+                setFeedback('Bear fed!', 'info');
+                playSound('feed');
+            }
+            updateUI();
+            checkUnhappyState();
+        }
+
+
+        function checkDevelopment() {
+            if (isUnhappy || creatureStage >= POINTS_PER_STAGE.length) return;
+
+            const isHydrationOk = hydrationLevel >= IDEAL_HYDRATION_LOW && hydrationLevel < IDEAL_HYDRATION_HIGH;
+            const isWarmthOk = warmthLevel >= IDEAL_WARMTH_LOW && warmthLevel < IDEAL_WARMTH_HIGH;
+            const isFullnessOk = fullnessLevel >= IDEAL_FULLNESS_LOW && fullnessLevel < IDEAL_FULLNESS_HIGH;
+            const isHighlyDiscomforted = discomfortLevel > HIGH_DISCOMFORT_THRESHOLD;
+            const isCriticallyLow = hydrationLevel < CRITICAL_THRESHOLD || warmthLevel < CRITICAL_THRESHOLD || fullnessLevel < CRITICAL_THRESHOLD;
+
+            let feedbackMsg = "";
+            let feedbackType = "info";
+            let developedThisTick = false;
+            let discomfortIncreasedThisTick = false;
+
+            // Discomfort Handling
+            if (isCriticallyLow) {
+                discomfortLevel = Math.min(MAX_LEVEL, discomfortLevel + DISCOMFORT_INCREASE_LOW_RESOURCE);
+                let criticalReason = "Needs are critical";
+                if(hydrationLevel < CRITICAL_THRESHOLD) criticalReason = "Very thirsty";
+                else if(warmthLevel < CRITICAL_THRESHOLD) criticalReason = "Very cold";
+                else if(fullnessLevel < CRITICAL_THRESHOLD) criticalReason = "Very hungry";
+                feedbackMsg = `${criticalReason}, bear is uncomfortable! `;
+                feedbackType = "warning";
+                playSound('warning');
+                discomfortIncreasedThisTick = true;
+            }
+            if (!discomfortIncreasedThisTick && isHydrationOk && isWarmthOk && isFullnessOk && discomfortLevel > MIN_LEVEL) {
+                discomfortLevel = Math.max(MIN_LEVEL, discomfortLevel - DISCOMFORT_DECREASE_RATE);
+            }
+
+             // Happiness/Development Handling
+            if (isHydrationOk && isWarmthOk && isFullnessOk) {
+                if (isHighlyDiscomforted) {
+                    if (feedbackType !== 'warning' && feedbackType !== 'discomfort') {
+                        feedbackMsg = "Bear is too uncomfortable to be happy!";
+                        feedbackType = "discomfort";
+                    } else {
+                         feedbackMsg += "Bear is too uncomfortable to be happy!";
+                    }
+                    if (!discomfortIncreasedThisTick) playSound('discomfort');
+                } else {
+                    happinessPoints += HAPPINESS_PER_TICK;
+                    developedThisTick = true;
+                    if (feedbackType === 'info' && !feedbackMsg) { 
+                        feedbackMsg = "Bear seems content!";
+                    }
+                }
+            } else if (!isCriticallyLow && !feedbackMsg) { 
+                 feedbackMsg = "Bear needs something...";
+                 feedbackType = "info";
+            }
+
+            // Check for stage up
+            if (developedThisTick) {
+                const pointsNeeded = POINTS_PER_STAGE[creatureStage];
+                if (happinessPoints >= pointsNeeded) {
+                    creatureStage++;
+                    happinessPoints = 0; 
+                    feedbackMsg = `Bear grew to the next stage!`;
+                    feedbackType = 'success';
+                    playSound('happy_event');
+                    if (creatureStage >= POINTS_PER_STAGE.length) { 
+                        creatureStage = POINTS_PER_STAGE.length; 
+                        feedbackMsg = `Congratulations! Your bear is fully grown!`;
+                    }
+                }
+            }
+            if (feedbackMsg) { setFeedback(feedbackMsg, feedbackType); }
+        }
+
+        function checkUnhappyState() {
+             if (isUnhappy) return true; 
+
+             const hydrationCritical = hydrationLevel <= MIN_LEVEL;
+             const warmthCritical = warmthLevel <= MIN_LEVEL;
+             const fullnessCritical = fullnessLevel <= MIN_LEVEL;
+             const discomfortMax = discomfortLevel >= MAX_LEVEL;
+
+             if (hydrationCritical || warmthCritical || fullnessCritical || discomfortMax) {
+                 isUnhappy = true; 
+                 let reason = "became very unhappy"; 
+
+                 if (discomfortMax) {
+                     reason = "became too uncomfortable";
+                 } else if (hydrationCritical) {
+                     reason = "is too thirsty";
+                 } else if (warmthCritical) {
+                     reason = "is too cold";
+                 } else if (fullnessCritical) {
+                     reason = "is too hungry";
+                 }
+                 
+                 setFeedback(`Oh no! The bear ${reason}. Try again?`, 'error');
+                 playSound('unhappy');
+                 clearInterval(gameLoopInterval); 
+                 gameLoopInterval = null;
+                 updateUI(); 
+                 return true; 
+             }
+             return false; 
+        }
+
+        function gameTick() {
+            if (isUnhappy) return;
+            hydrationLevel = Math.max(MIN_LEVEL, hydrationLevel - HYDRATION_DECREASE_RATE);
+            warmthLevel = Math.max(MIN_LEVEL, warmthLevel - WARMTH_DECREASE_RATE);
+            fullnessLevel = Math.max(MIN_LEVEL, fullnessLevel - FULLNESS_DECREASE_RATE);
+            checkDevelopment();
+            if (checkUnhappyState()) return; 
+            updateUI();
+        }
+
+        function resetGame() {
+             playSound('reset');
+             if (gameLoopInterval) clearInterval(gameLoopInterval);
+             hydrationLevel = 50;
+             warmthLevel = 50;
+             fullnessLevel = 60;
+             discomfortLevel = 0;
+             happinessPoints = 0;
+             creatureStage = 0;
+             isUnhappy = false;
+             setFeedback('New bear cub! Care for it well.', 'info');
+             updateUI(); 
+             startGameLoop();
+        }
+
+         function startGameLoop() {
+            if (gameLoopInterval) clearInterval(gameLoopInterval);
+            if (!isUnhappy) {
+                 gameLoopInterval = setInterval(gameTick, GAME_TICK_MS);
+            }
+         }
+
+        // --- Initial Setup ---
+        function initializeGame() {
+            hydrateButton.addEventListener('click', giveHydration);
+            warmthButton.addEventListener('click', provideWarmth);
+            feedButton.addEventListener('click', feedCreature);
+            resetButton.addEventListener('click', resetGame);
+            
+            updateUI(); 
+            startGameLoop();
+        }
+        window.onload = initializeGame;
+    </script>
+</body>
+</html>
