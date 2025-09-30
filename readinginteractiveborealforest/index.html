@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boreal Forest Comprehension</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0fdf4; /* Light green background */
+            color: #1f2937; /* Dark gray text */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 700px;
+            text-align: left;
+        }
+        h1 {
+            color: #15803d; /* Dark green for heading */
+            margin-bottom: 15px;
+            font-size: 1.8rem;
+            text-align: center;
+        }
+        h2 {
+            color: #166534; /* Medium green for subheading */
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            text-align: center;
+            font-weight: normal;
+        }
+        .paragraph-text p {
+            margin-bottom: 1.5em; /* Space between paragraphs */
+            line-height: 1.7; /* Increased line height for better readability of clickable chunks */
+        }
+        .text-chunk { /* General class for all text parts */
+            display: inline; /* Keep text flowing normally */
+        }
+        .clickable-chunk {
+            cursor: pointer;
+            transition: background-color 0.3s ease, color 0.3s ease, padding 0.3s ease;
+            padding: 2px 3px; /* Slight padding for better click feel */
+            border-radius: 4px; /* Rounded corners for clickable chunks */
+            margin: 0 1px; /* Tiny margin between chunks */
+        }
+        .clickable-chunk:hover {
+            background-color: #dcfce7; /* Lighter green on hover */
+        }
+        .clickable-chunk.selected-key {
+            background-color: #86efac; /* Green for correct key sentence */
+            color: #14532d;
+            font-weight: 600;
+            box-shadow: 0 0 5px rgba(20, 83, 45, 0.3);
+        }
+        .clickable-chunk.selected-other {
+            background-color: #cffafe; /* Light blue for other selected sentence */
+            color: #0e7490;
+        }
+        .feedback {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+        }
+        .feedback.good {
+            background-color: #dcfce7;
+            color: #16a34a;
+        }
+        .reset-button {
+            display: block;
+            margin: 25px auto 0;
+            background-color: #15803d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s ease;
+        }
+        .reset-button:hover {
+            background-color: #166534;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Alberta's Amazing Forest Friends!</h1>
+        <h2>Click on the words or phrases you think are the most important parts of the story.</h2>
+
+        <div id="textContent" class="paragraph-text">
+            </div>
+
+        <div id="feedbackArea" class="feedback" role="status">
+            Found <span id="foundCount">0</span> of <span id="totalKeyCount">0</span> key pieces of information.
+        </div>
+
+        <button id="resetButton" class="reset-button">Start Over</button>
+    </div>
+
+    <script>
+        // The text is now structured into chunks.
+        // Each chunk is an object: { text: "string", isClickable: boolean, isKey: boolean (only if isClickable is true) }
+        const structuredText = [
+            // Paragraph 1
+            [
+                { text: "Here in Alberta, we have a giant, wonderful forest called the ", isClickable: false },
+                { text: "boreal forest", isClickable: true, isKey: true },
+                { text: "! It’s a special home with ", isClickable: false },
+                { text: "tall trees", isClickable: true, isKey: false }, // Example: clickable but not "key"
+                { text: " and ", isClickable: false },
+                { text: "many animals", isClickable: true, isKey: true },
+                { text: ". In this forest, ", isClickable: false },
+                { text: "gentle deer", isClickable: true, isKey: true },
+                { text: " love to munch on ", isClickable: false },
+                { text: "sweet berries", isClickable: true, isKey: true },
+                { text: " and ", isClickable: false },
+                { text: "tasty leaves", isClickable: true, isKey: true },
+                { text: ". These ", isClickable: false },
+                { text: "plants get their energy from the sun", isClickable: true, isKey: true },
+                { text: ". Sometimes, a ", isClickable: false },
+                { text: "clever wolf", isClickable: true, isKey: true },
+                { text: " might ", isClickable: false },
+                { text: "hunt a deer", isClickable: true, isKey: true },
+                { text: " for its meal. This is how ", isClickable: false },
+                { text: "energy moves from the plants to the deer, and then to the wolf", isClickable: true, isKey: true },
+                { text: ", ", isClickable: false },
+                { text: "like a chain!", isClickable: true, isKey: true },
+            ],
+            // Paragraph 2
+            [
+                { text: "When the forest animals and plants finish their time, tiny helpers like worms and little bugs, called ", isClickable: false },
+                { text: "decomposers", isClickable: true, isKey: true },
+                { text: ", ", isClickable: false },
+                { text: "gently turn them back into the earth", isClickable: true, isKey: true },
+                { text: ". This ", isClickable: false },
+                { text: "makes the soil super healthy", isClickable: true, isKey: true },
+                { text: ", like vitamins for the ground! From this good soil, ", isClickable: false },
+                { text: "new plants and trees can grow strong", isClickable: true, isKey: true },
+                { text: ", ", isClickable: false },
+                { text: "keeping Alberta's boreal forest full of life", isClickable: true, isKey: true },
+                { text: ". We learn about these cool nature cycles from scientists and people who study our Alberta parks!", isClickable: false }
+            ]
+        ];
+
+        // Automatically derive keyInformationText from structuredText
+        const keyInformationText = [];
+        structuredText.forEach(paragraph => {
+            paragraph.forEach(chunk => {
+                if (chunk.isKey) {
+                    keyInformationText.push(chunk.text);
+                }
+            });
+        });
+
+
+        const textContentDiv = document.getElementById('textContent');
+        const foundCountSpan = document.getElementById('foundCount');
+        const totalKeyCountSpan = document.getElementById('totalKeyCount');
+        const feedbackArea = document.getElementById('feedbackArea');
+        const resetButton = document.getElementById('resetButton');
+
+        let foundKeyInfoCount = 0;
+
+        function initializeActivity() {
+            textContentDiv.innerHTML = ''; // Clear previous content
+            foundKeyInfoCount = 0;
+            totalKeyCountSpan.textContent = keyInformationText.length;
+
+            structuredText.forEach(paragraphChunks => {
+                const pElement = document.createElement('p');
+                paragraphChunks.forEach(chunk => {
+                    const span = document.createElement('span');
+                    span.textContent = chunk.text;
+                    span.classList.add('text-chunk'); // General class for all parts
+
+                    if (chunk.isClickable) {
+                        span.classList.add('clickable-chunk');
+                        span.dataset.text = chunk.text; // Store original text for comparison
+                        span.setAttribute('role', 'button');
+                        span.setAttribute('tabindex', '0'); // Make it focusable
+
+                        if (chunk.isKey) {
+                            span.dataset.isKey = "true";
+                        }
+
+                        span.addEventListener('click', handleChunkClick);
+                        span.addEventListener('keydown', (event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                                handleChunkClick(event);
+                            }
+                        });
+                    }
+                    pElement.appendChild(span);
+                    // Add a space after each chunk for better visual separation if they are inline
+                    // but only if it's not the end of a natural sentence from the original text.
+                    // The current structure adds spaces within the text chunks themselves where needed.
+                });
+                textContentDiv.appendChild(pElement);
+            });
+            updateFeedback();
+        }
+
+        function handleChunkClick(event) {
+            const clickedSpan = event.currentTarget;
+            const isKey = clickedSpan.dataset.isKey === "true";
+
+            // Toggle selection
+            if (clickedSpan.classList.contains('selected-key') || clickedSpan.classList.contains('selected-other')) {
+                // Deselecting
+                if (clickedSpan.classList.contains('selected-key')) {
+                    foundKeyInfoCount--;
+                }
+                clickedSpan.classList.remove('selected-key', 'selected-other');
+            } else {
+                // Selecting
+                if (isKey) {
+                    clickedSpan.classList.add('selected-key');
+                    foundKeyInfoCount++;
+                } else {
+                    clickedSpan.classList.add('selected-other');
+                }
+            }
+            updateFeedback();
+        }
+
+        function updateFeedback() {
+            foundCountSpan.textContent = foundKeyInfoCount;
+            if (foundKeyInfoCount === keyInformationText.length) {
+                feedbackArea.textContent = "Great job! You found all the key pieces of information!";
+                feedbackArea.classList.add('good');
+            } else {
+                // Ensure the spans exist before trying to set their textContent
+                const currentFoundSpan = document.getElementById('foundCount');
+                const currentTotalSpan = document.getElementById('totalKeyCount');
+                if (currentFoundSpan && currentTotalSpan) {
+                     feedbackArea.innerHTML = `Found <span id="foundCount">${foundKeyInfoCount}</span> of <span id="totalKeyCount">${keyInformationText.length}</span> key pieces of information.`;
+                } else { // Fallback if spans are not yet in the feedbackArea's innerHTML
+                     feedbackArea.textContent = `Found ${foundKeyInfoCount} of ${keyInformationText.length} key pieces of information.`;
+                }
+                feedbackArea.classList.remove('good');
+            }
+        }
+
+        resetButton.addEventListener('click', initializeActivity);
+
+        // Initial setup
+        document.addEventListener('DOMContentLoaded', initializeActivity);
+    </script>
+</body>
+</html>
