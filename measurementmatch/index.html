@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Measurement Tool Match-Up!</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ----------  CORE LAYOUT & SUPER CONCISE STYLING  ---------- */
+    :root {
+      --bg-page: #6B5B95; --bg-panel: #F8F7FC; --btn-accent: #886AEA;
+      --btn-accent-hover: #6B5B95; --text-on-dark-bg: #FFFFFF;
+      --text-on-light-bg: #333333; --border-light-gray: #D1D5DB;
+      --zone-border-dashed: #A0A0A0; --zone-over-bg: #EAE6F3;
+      --correct-border: #22c55e; --incorrect-border: #ef4444;
+      --unplaced-border: #f97316; --message-correct-bg: #d4edda;
+      --message-correct-text: #155724; --message-incorrect-bg: #f8d7da;
+      --message-incorrect-text: #721c24; --message-progress-bg: #EAE6F3; 
+      --message-progress-text: #523A78; 
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0; font-family:'Poppins',sans-serif; background:var(--bg-page);
+      display:flex; flex-direction:column; align-items:center; 
+      justify-content: center; 
+      padding:5px; /* Super reduced padding */
+      min-height: 100vh; color: var(--text-on-dark-bg); 
+      overscroll-behavior: none; 
+    }
+    .header-bar { 
+        text-align: center;
+        margin-bottom: 5px; /* Super reduced margin */
+    }
+    .header-bar h1{
+        font-size:1.6rem; /* Further reduced font size */
+        margin:0; font-weight: 700;
+        color: var(--text-on-dark-bg);
+    }
+    p.instructions{
+      color:var(--text-on-dark-bg); margin:0 auto 5px; /* Super reduced margin */
+      text-align: center; font-size: 0.7rem; /* Further reduced font size */
+      max-width: 100%;
+    }
+
+    .game-container{
+      background:var(--bg-panel); width:100%;
+      max-width:680px; 
+      padding:8px; /* Super reduced padding */
+      border-radius:6px; 
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+      display: flex;
+      flex-direction: column;
+      gap: 6px; /* Super reduced gap */
+      position: relative; 
+      color: var(--text-on-light-bg); 
+    }
+
+    #items-pool-container { 
+        padding: 4px; /* Super reduced padding */
+        background-color: #EDEDED; 
+        border-radius: 4px; 
+        border: 1px solid var(--border-light-gray);
+        text-align: center;
+    }
+    #items-pool-container h2 { 
+        margin-top: 0;
+        margin-bottom: 4px; /* Super reduced margin */
+        font-size: 0.8rem; /* Further reduced font size */
+        color: var(--text-on-light-bg);
+        font-weight: 600;
+    }
+    #items-pool{ 
+      display:flex;flex-wrap:wrap;gap:4px; /* Super reduced gap */
+      justify-content:center; min-height: 55px; /* Further reduced min-height */
+    }
+    .draggable-item{ 
+      width: 70px; /* Further reduced width */
+      height: 50px; /* Further reduced height */
+      padding: 2px; /* Super reduced padding */
+      background:var(--text-on-dark-bg); 
+      color: var(--text-on-light-bg);
+      display:flex; align-items:center; justify-content:center;
+      border-radius:4px; /* Further reduced radius */
+      box-shadow:0 1px 2px rgba(0,0,0,0.07);cursor:grab;
+      touch-action: none; user-select: none; position: relative;
+      transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out, border 0.2s ease-out;
+      border: 2px solid transparent; 
+      text-align: center;
+      font-size: 0.75rem; /* Adjusted for smaller box, emojis still visible */
+      font-weight: 600;
+      line-height: 1.1; 
+      word-break: break-word; 
+      overflow-wrap: break-word; 
+    }
+    .draggable-item.correct { border: 2px solid var(--correct-border) !important; } /* Thinner border */
+    .draggable-item.incorrect { border: 2px solid var(--incorrect-border) !important; } /* Thinner border */
+    .draggable-item.unplaced { border: 2px solid var(--unplaced-border) !important; } /* Thinner border */
+
+    .draggable-item.dragging { 
+      opacity: 0.7; cursor: grabbing; position: absolute;
+      z-index: 1000; box-shadow: 0 5px 10px rgba(0,0,0,0.15); 
+      transform: scale(1.05); /* Slightly less scale */
+      transform-origin: 0 0; 
+      transition: none; 
+      border: 2px solid var(--btn-accent); 
+    }
+    .draggable-item.native-dragging { opacity: 0.3; } 
+
+    #tool-definitions-container { 
+      display: grid;
+      /* Adjusted minmax to allow more items per row. 70px (drop-zone) + 4px (gap) + ~70px (text) + 4px (padding) = ~150px */
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); 
+      gap: 5px; /* Slightly reduced gap */
+    }
+    .tool-definition-wrapper{ 
+      background-color: #F0F0F0; 
+      border: 1px solid var(--border-light-gray);
+      border-radius: 4px; 
+      padding: 4px; /* Super reduced padding */
+      display: flex;
+      flex-direction: row; 
+      align-items: center; 
+      gap: 4px; /* Super reduced gap */
+      min-height: 60px; /* Further reduced min-height */
+    }
+    .tool-text{ 
+      font-size:0.65rem; /* Further reduced font size for more horizontal fit */
+      color:var(--text-on-light-bg);
+      text-align: left; 
+      font-weight: 600;
+      flex-grow: 1; 
+      word-break: break-word;
+      overflow-wrap: break-word;
+      line-height: 1.2; 
+    }
+    .drop-zone{ 
+      width:70px; height:50px; /* Match draggable-item dimensions */
+      border:2px dashed var(--zone-border-dashed); 
+      border-radius:4px; 
+      display:flex; align-items:center; justify-content:center;
+      transition:background .3s, border-style .3s;
+      background-color: var(--text-on-dark-bg); 
+      flex-shrink: 0; 
+    }
+    .drop-zone.over{ 
+      border-style: solid;
+      border-color: var(--btn-accent); 
+      background-color: var(--zone-over-bg); 
+    }
+    .drop-zone .draggable-item { 
+        box-shadow: none;
+        border-width: 2px; 
+        width: 100%;
+        height: 100%;
+        font-size: 0.7rem; /* Adjusted for dropped item */
+    }
+
+    /* ----------  CONTROLS & MESSAGES  ---------- */
+    .controls{
+      text-align:center; margin-top: 6px; /* Super reduced margin */
+    }
+    .controls button{
+      background:var(--btn-accent);color:var(--text-on-dark-bg);border:none;
+      padding:6px 14px; /* Super reduced padding */
+      border-radius:4px; 
+      cursor:pointer;
+      margin:2px; /* Super reduced margin */
+      font-size:0.8rem; /* Further reduced font size */
+      font-weight:bold; 
+      font-family:'Poppins',sans-serif;transition:background .3s, transform 0.1s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .controls button:hover{background:var(--btn-accent-hover); transform: translateY(-1px);}
+    .controls button:active{transform: scale(0.98); background: var(--btn-accent-hover);}
+
+    #message-area {
+        text-align: center; font-size: 0.75rem; /* Further reduced font size */
+        font-weight: bold;
+        margin-top: 6px; /* Super reduced margin */
+        min-height: 1.4em; padding: 4px; /* Super reduced padding */
+        border-radius: 3px;
+        color: var(--text-on-light-bg); 
+    }
+    .message-correct { background-color: var(--message-correct-bg); color: var(--message-correct-text); border: 1px solid var(--correct-border);}
+    .message-incorrect { background-color: var(--message-incorrect-bg); color: var(--message-incorrect-text); border: 1px solid var(--incorrect-border);}
+    .message-progress { background-color: var(--message-progress-bg); color: var(--message-progress-text); border: 1px solid var(--btn-accent);}
+
+     /* Responsive adjustments */
+    @media (max-width: 670px) { /* Adjusted breakpoint for when 4-across might not fit well */
+        #tool-definitions-container { 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Fallback to wider for 2/3 across */
+        }
+    }
+    @media (max-width: 480px) { /* Adjusted from 550px for more granular control */
+        .header-bar h1 { font-size: 1.4rem; }
+        .game-container { padding: 6px;}
+        #tool-definitions-container { 
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); /* Allow 2 across on smaller tablets */
+        } 
+        .tool-definition-wrapper { min-height: 58px; } 
+        .draggable-item { width: 65px; height: 48px; font-size: 0.7rem; } 
+        .drop-zone { width: 65px; height: 48px;} 
+    }
+    @media (max-width: 400px) { 
+        .header-bar h1 { font-size: 1.2rem; }
+        p.instructions { font-size: 0.65rem; }
+        #tool-definitions-container { grid-template-columns: 1fr; } /* Stack to 1 column */
+        .draggable-item { width: 60px; height: 45px; font-size: 0.65rem; } 
+        .drop-zone { width: 60px; height: 45px;} 
+        .tool-definition-wrapper { min-height: 55px; padding: 3px; gap: 3px;} 
+        .tool-text { font-size: 0.65rem; } 
+        .controls button { padding: 5px 10px; font-size: 0.7rem;}
+    }
+
+  </style>
+</head>
+<body>
+  <header class="header-bar"> <h1>Measurement Tool Match-Up! 📏⚖️🌡️</h1>
+  </header>
+  <p class="instructions">Drag each item to the tool you would use to measure it.</p>
+
+  <div class="game-container">
+    <div id="items-pool-container"> 
+        <h2>Available Items to Measure</h2>
+        <div id="items-pool"> 
+            </div>
+    </div>
+
+    <div id="tool-definitions-container">
+        </div>
+
+    <div id="message-area"></div>
+
+    <div class="controls">
+      <button id="check-btn" type="button">Check Answers</button>
+      <button id="reset-btn" type="button">Reset Game</button>
+    </div>
+  </div>
+
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Define items and their matching measurement tools - ADDED NEW ITEMS
+    const MEASUREMENT_DATA = [
+      { key: 'room_length', itemDisplay: 'Room Length 🛋️', toolDefinition: 'Measuring Tape 📏' },
+      { key: 'flour_cake', itemDisplay: 'Flour (Cake) 🎂', toolDefinition: 'Scale/Cups ⚖️' }, 
+      { key: 'milk_recipe', itemDisplay: 'Milk (Recipe) 🥛', toolDefinition: 'Jug/Cup' }, 
+      { key: 'body_temp', itemDisplay: 'Body Temp 🤒', toolDefinition: 'Thermometer 🌡️' },
+      { key: 'race_time', itemDisplay: 'Race Time 🏃⏱️', toolDefinition: 'Stopwatch' }, 
+      { key: 'suitcase_weight', itemDisplay: 'Suitcase 🧳', toolDefinition: 'Luggage Scale' }, 
+      { key: 'wood_angle', itemDisplay: 'Wood Angle 📐', toolDefinition: 'Protractor' }, 
+      { key: 'sugar_tea', itemDisplay: 'Sugar (Tea) ☕️', toolDefinition: 'Teaspoon 🥄' },
+      { key: 'car_speed', itemDisplay: 'Car Speed 🚗', toolDefinition: 'Speedometer  speedometer' }, // New
+      { key: 'rainfall', itemDisplay: 'Rainfall 🌧️', toolDefinition: 'Rain Gauge 💧' } // New
+    ];
+
+    const itemsPool = document.getElementById('items-pool');
+    const toolDefinitionsContainer = document.getElementById('tool-definitions-container');
+    const gameContainer = document.querySelector('.game-container');
+    const messageArea = document.getElementById('message-area');
+
+    let pointerDraggedItem = null;
+    let offsetX = 0, offsetY = 0;
+    let currentOverZone = null;
+    let isTouchDragging = false; 
+
+    function initializeGame() {
+        itemsPool.innerHTML = ''; 
+        toolDefinitionsContainer.innerHTML = '';
+        messageArea.textContent = '';
+        messageArea.className = ''; 
+        clearValidationStylesGlobally();
+
+
+        const shuffledItems = [...MEASUREMENT_DATA].sort(() => Math.random() - 0.5);
+        shuffledItems.forEach(data => {
+            const itemEl = document.createElement('div');
+            itemEl.className = 'draggable-item'; 
+            itemEl.draggable = true; 
+            itemEl.id = `item-${data.key}`; 
+            itemEl.dataset.itemKey = data.key; 
+            itemEl.textContent = data.itemDisplay; 
+
+            itemEl.addEventListener('dragstart', handleDragStartMouse);
+            itemEl.addEventListener('dragend', handleDragEndMouse);
+            itemEl.addEventListener('pointerdown', handlePointerDown); 
+            itemsPool.appendChild(itemEl);
+        });
+
+        const shuffledTools = [...MEASUREMENT_DATA].sort(() => Math.random() - 0.5);
+        shuffledTools.forEach(data => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'tool-definition-wrapper';
+
+            const dropZoneEl = document.createElement('div');
+            dropZoneEl.className = 'drop-zone';
+            dropZoneEl.id = `zone-${data.key}`;
+            dropZoneEl.dataset.toolKey = data.key; 
+
+            const textEl = document.createElement('div');
+            textEl.className = 'tool-text';
+            textEl.textContent = data.toolDefinition; 
+
+            dropZoneEl.addEventListener('dragover', handleDragOverMouse);
+            dropZoneEl.addEventListener('dragleave', handleDragLeaveMouse);
+            dropZoneEl.addEventListener('drop', handleDropMouse);
+            
+            wrapper.appendChild(dropZoneEl); 
+            wrapper.appendChild(textEl);    
+            toolDefinitionsContainer.appendChild(wrapper);
+        });
+        
+        pointerDraggedItem = null;
+        isTouchDragging = false;
+        currentOverZone = null;
+    }
+    
+    function clearValidationStyles(item) {
+        if(item) {
+            item.classList.remove('correct', 'incorrect', 'unplaced');
+            item.style.borderColor = 'transparent'; 
+        }
+    }
+
+    function clearValidationStylesGlobally() {
+        document.querySelectorAll('.draggable-item').forEach(item => {
+            clearValidationStyles(item);
+        });
+    }
+
+
+    function handleDragStartMouse(e) {
+      if (e.pointerType !== 'touch' && !isTouchDragging) { 
+          e.dataTransfer.setData('text/plain', e.currentTarget.id);
+          e.dataTransfer.effectAllowed = 'move';
+          setTimeout(() => { e.target.classList.add('native-dragging'); }, 0);
+          clearValidationStyles(e.target);
+      } else {
+          e.preventDefault(); 
+      }
+    }
+
+    function handleDragEndMouse(e) {
+        if (e.pointerType !== 'touch' && !isTouchDragging) {
+            if(e.target) e.target.classList.remove('native-dragging');
+            document.querySelectorAll('.drop-zone.over').forEach(z => z.classList.remove('over'));
+        }
+         if (e.target) e.target.style.borderColor = 'transparent'; 
+    }
+
+    function handleDragOverMouse(e) {
+        e.preventDefault(); 
+        e.dataTransfer.dropEffect = 'move';
+        const targetZone = e.currentTarget.classList.contains('drop-zone') ? e.currentTarget : null;
+        if (targetZone && targetZone !== currentOverZone) {
+            if(currentOverZone) currentOverZone.classList.remove('over');
+            if (targetZone.children.length === 0) { 
+                 targetZone.classList.add('over');
+            }
+            currentOverZone = targetZone;
+        } else if (targetZone && targetZone.children.length > 0 && pointerDraggedItem && !targetZone.contains(pointerDraggedItem)) { 
+            targetZone.classList.remove('over');
+        }
+    }
+     function handleDragLeaveMouse(e) { 
+        const targetZone = e.currentTarget.classList.contains('drop-zone') ? e.currentTarget : null;
+        if (targetZone) {
+            targetZone.classList.remove('over');
+            if (currentOverZone === targetZone) {
+                currentOverZone = null;
+            }
+        }
+    }
+
+
+    function handleDropMouse(e) {
+      e.preventDefault();
+      if (e.pointerType !== 'touch' && !isTouchDragging) { 
+        const id = e.dataTransfer.getData('text/plain');
+        const droppedElement = document.getElementById(id);
+        const targetZone = e.currentTarget.classList.contains('drop-zone') ? e.currentTarget : null;
+
+        if (droppedElement && targetZone) {
+            droppedElement.classList.remove('native-dragging');
+            clearValidationStyles(droppedElement);
+            if (targetZone.children.length === 0) { 
+                 targetZone.appendChild(droppedElement);
+            } else { 
+                const existingItem = targetZone.children[0];
+                itemsPool.appendChild(existingItem); 
+                clearValidationStyles(existingItem);
+                targetZone.appendChild(droppedElement); 
+            }
+        }
+        if(targetZone) targetZone.classList.remove('over');
+        currentOverZone = null; 
+      }
+    }
+
+    function handlePointerDown(e) {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        if (pointerDraggedItem) return; 
+
+        pointerDraggedItem = e.currentTarget;
+        isTouchDragging = e.pointerType === 'touch'; 
+        
+        clearValidationStyles(pointerDraggedItem); 
+        messageArea.textContent = ''; messageArea.className = '';
+
+        try {
+            pointerDraggedItem.setPointerCapture(e.pointerId);
+        } catch (err) {
+            console.warn("Pointer capture failed.", err);
+            pointerDraggedItem = null; 
+            return;
+        }
+        
+        const rect = pointerDraggedItem.getBoundingClientRect();
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+
+        pointerDraggedItem.classList.add('dragging'); 
+
+        const gameRect = gameContainer.getBoundingClientRect();
+        pointerDraggedItem.style.left = `${(rect.left - gameRect.left)}px`;
+        pointerDraggedItem.style.top = `${(rect.top - gameRect.top)}px`;
+
+        document.addEventListener('pointermove', handlePointerMove);
+        document.addEventListener('pointerup', handlePointerUp);
+        document.addEventListener('pointercancel', handlePointerUp); 
+        document.body.style.userSelect = 'none'; 
+    }
+
+    function handlePointerMove(e) {
+        if (!pointerDraggedItem || !pointerDraggedItem.hasPointerCapture(e.pointerId)) return;
+        e.preventDefault(); 
+
+        const gameRect = gameContainer.getBoundingClientRect();
+        const scaleFactor = 1.05; // Matches .dragging transform
+
+        let newX = (e.clientX - gameRect.left) - (offsetX * scaleFactor) ;
+        let newY = (e.clientY - gameRect.top) - (offsetY * scaleFactor) ;
+
+        pointerDraggedItem.style.left = `${newX}px`;
+        pointerDraggedItem.style.top = `${newY}px`;
+
+        const originalVisibility = pointerDraggedItem.style.visibility;
+        pointerDraggedItem.style.visibility = 'hidden';
+        let elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY);
+        pointerDraggedItem.style.visibility = originalVisibility;
+
+        let dropTarget = elementUnderPointer ? elementUnderPointer.closest('.drop-zone') : null;
+
+        if (currentOverZone && currentOverZone !== dropTarget) {
+            currentOverZone.classList.remove('over'); 
+        }
+
+        if (dropTarget && dropTarget.children.length === 0) { 
+            dropTarget.classList.add('over');
+            currentOverZone = dropTarget;
+        } else {
+            if(dropTarget && dropTarget.children.length > 0 && dropTarget.contains(pointerDraggedItem)){
+                 currentOverZone = dropTarget; 
+            } else if (dropTarget && dropTarget.children.length > 0 && !dropTarget.contains(pointerDraggedItem)) {
+                 currentOverZone = null; 
+                 if (dropTarget.classList.contains('over')) dropTarget.classList.remove('over');
+            } else {
+                 currentOverZone = null; 
+            }
+        }
+    }
+
+    function handlePointerUp(e) {
+        if (!pointerDraggedItem || (e.pointerId && !pointerDraggedItem.hasPointerCapture(e.pointerId))) {
+            document.removeEventListener('pointermove', handlePointerMove);
+            document.removeEventListener('pointerup', handlePointerUp);
+            document.removeEventListener('pointercancel', handlePointerUp);
+            document.body.style.userSelect = '';
+            if (pointerDraggedItem) { 
+                pointerDraggedItem.classList.remove('dragging');
+                pointerDraggedItem.style.left = '';
+                pointerDraggedItem.style.top = '';
+                pointerDraggedItem.style.visibility = '';
+                pointerDraggedItem.style.borderColor = 'transparent'; 
+                 if (!itemsPool.contains(pointerDraggedItem) && (!pointerDraggedItem.parentElement || !pointerDraggedItem.parentElement.classList.contains('drop-zone'))) {
+                    itemsPool.appendChild(pointerDraggedItem); 
+                }
+            }
+            pointerDraggedItem = null;
+            isTouchDragging = false;
+            if(currentOverZone) currentOverZone.classList.remove('over');
+            currentOverZone = null;
+            return;
+        }
+
+        document.removeEventListener('pointermove', handlePointerMove);
+        document.removeEventListener('pointerup', handlePointerUp);
+        document.removeEventListener('pointercancel', handlePointerUp);
+        document.body.style.userSelect = ''; 
+
+        pointerDraggedItem.classList.remove('dragging');
+        pointerDraggedItem.style.left = '';
+        pointerDraggedItem.style.top = '';
+        pointerDraggedItem.style.visibility = '';
+
+
+        if (currentOverZone && currentOverZone.children.length === 0) { 
+            if (!currentOverZone.contains(pointerDraggedItem)) { 
+                if (pointerDraggedItem.parentElement && pointerDraggedItem.parentElement.classList.contains('drop-zone')) {
+                    const oldZone = pointerDraggedItem.parentElement;
+                    oldZone.removeChild(pointerDraggedItem); 
+                } else if (pointerDraggedItem.parentElement === itemsPool) {
+                    itemsPool.removeChild(pointerDraggedItem); 
+                }
+                currentOverZone.appendChild(pointerDraggedItem);
+            }
+            currentOverZone.classList.remove('over');
+        } else if (currentOverZone && currentOverZone.children.length > 0 && !currentOverZone.contains(pointerDraggedItem)) {
+            const existingItem = currentOverZone.children[0];
+            const sourceContainer = pointerDraggedItem.parentElement;
+
+            currentOverZone.removeChild(existingItem); 
+            
+            if (sourceContainer && sourceContainer.classList.contains('drop-zone')) { 
+                sourceContainer.appendChild(existingItem);
+            } else { 
+                itemsPool.appendChild(existingItem);
+            }
+            clearValidationStyles(existingItem);
+
+            if (sourceContainer === itemsPool && pointerDraggedItem.parentElement === itemsPool) { 
+                 itemsPool.removeChild(pointerDraggedItem);
+            } else if (sourceContainer && sourceContainer.classList.contains('drop-zone') && pointerDraggedItem.parentElement === sourceContainer){
+            }
+             currentOverZone.appendChild(pointerDraggedItem); 
+            currentOverZone.classList.remove('over');
+
+        } else if (currentOverZone && currentOverZone.contains(pointerDraggedItem)) {
+             currentOverZone.classList.remove('over');
+        }
+        else { 
+            if (!itemsPool.contains(pointerDraggedItem)) {
+                if (pointerDraggedItem.parentElement && pointerDraggedItem.parentElement.classList.contains('drop-zone')) {
+                    pointerDraggedItem.parentElement.removeChild(pointerDraggedItem);
+                }
+                itemsPool.appendChild(pointerDraggedItem);
+            }
+            if(currentOverZone) currentOverZone.classList.remove('over'); 
+        }
+        
+        if (pointerDraggedItem) { 
+             pointerDraggedItem.style.borderColor = 'transparent'; 
+            if (e.pointerId) { 
+                try {
+                    pointerDraggedItem.releasePointerCapture(e.pointerId);
+                } catch(err) { /* console.warn("Failed to release pointer capture.", err); */ }
+            }
+        }
+
+
+        pointerDraggedItem = null;
+        isTouchDragging = false;
+        currentOverZone = null;
+        offsetX = 0; offsetY = 0;
+    }
+
+
+    document.getElementById('check-btn').addEventListener('click', () => {
+        let allCorrect = true;
+        let itemsInWrongZone = false;
+        let itemsStillInPool = itemsPool.children.length > 0; 
+
+        clearValidationStylesGlobally();
+
+
+        document.querySelectorAll('.drop-zone').forEach(zone => {
+            const placedItem = zone.querySelector('.draggable-item'); 
+            if (placedItem) {
+                const itemKey = placedItem.dataset.itemKey; 
+                const toolKey = zone.dataset.toolKey; 
+                const isCorrect = itemKey === toolKey;
+                
+                placedItem.classList.add(isCorrect ? 'correct' : 'incorrect');
+                placedItem.style.borderColor = ''; 
+
+                if (!isCorrect) {
+                    allCorrect = false;
+                    itemsInWrongZone = true;
+                }
+            } else { 
+                allCorrect = false; 
+            }
+        });
+
+        Array.from(itemsPool.children).forEach(item => {
+            if (item.classList.contains('draggable-item')) {
+                item.classList.add('unplaced');
+                item.style.borderColor = ''; 
+                allCorrect = false; 
+            }
+        });
+
+        if (allCorrect && !itemsStillInPool) { 
+            messageArea.textContent = "🎉 Fantastic! All items matched correctly! 🎉";
+            messageArea.className = 'message-correct';
+        } else if (itemsStillInPool) {
+            messageArea.textContent = "Keep going! Some items are still waiting to be measured. 🤔";
+            messageArea.className = 'message-progress';
+        } else if (itemsInWrongZone) { 
+            messageArea.textContent = "Almost! Some tools are mismatched. Check highlighted items. 🧐";
+            messageArea.className = 'message-incorrect';
+        } else { 
+            messageArea.textContent = "Some tools are still empty or items are mismatched. Try again! 💪";
+            messageArea.className = 'message-progress';
+        }
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', () => {
+        initializeGame(); 
+    });
+    
+    initializeGame();
+  });
+  </script>
+</body>
+</html>
