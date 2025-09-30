@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Magnetic or Not? Sorting</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-page: #f0f2f5;
+      --bg-panel: #ffffff;
+      --text-dark: #333;
+      --text-light: #fff;
+      --accent-color: #007bff;
+      --accent-dark: #0056b3;
+      --magnetic-zone-bg: #e6f7ff;
+      --magnetic-zone-border: #91d5ff;
+      --nonmagnetic-zone-bg: #fffbe6;
+      --nonmagnetic-zone-border: #ffe58f;
+      --correct-border: #52c41a;
+      --incorrect-border: #f5222d;
+      --unplaced-border: #faad14;
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0; font-family:'Poppins',sans-serif; background:var(--bg-page);
+      display:flex; flex-direction:column; align-items:center; padding:5px;
+      min-height: 100vh; color: var(--text-dark);
+      overscroll-behavior: none; /* Prevent pull-to-refresh/scroll bounce during drag */
+    }
+    .header-bar {
+      background-color: var(--accent-color);
+      color: var(--text-light);
+      padding: 6px 0;
+      width: 100%;
+      text-align: center;
+      margin-bottom: 8px;
+      border-radius: 5px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .header-bar h1{font-size:1.5rem; margin:0; font-weight: 600;}
+    p.instructions{
+      color:var(--text-dark); margin:0 auto 8px;
+      text-align: center; font-size: 0.75rem;
+      max-width: 100%;
+    }
+
+    .game-container{
+      background:var(--bg-panel); width:100%;
+      max-width:460px; /* Narrow container */
+      padding:10px;
+      border-radius:8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative; /* Crucial for absolute positioning of dragged items within it */
+    }
+
+    #items-pool-container {
+        padding: 8px;
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        border: 1px solid #e8e8e8;
+        text-align: center;
+    }
+    #items-pool-container h2 {
+        margin-top: 0;
+        margin-bottom: 8px;
+        font-size: 0.9rem;
+        color: var(--text-dark);
+        font-weight: 600;
+    }
+    #items-pool{
+      display:flex;flex-wrap:wrap;gap:6px;
+      justify-content:center; min-height: 50px;
+    }
+    .item{
+      width:55px; height:65px;
+      background:#fff;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      border-radius:4px; box-shadow:0 1px 1px rgba(0,0,0,0.1);cursor:grab;
+      touch-action: none; /* Essential for preventing default touch behaviors like scrolling */
+      user-select: none;
+      position: relative; /* Initial position in flow */
+      transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out;
+      border: 2px solid transparent; padding: 2px;
+      text-align: center;
+    }
+    .item img {
+      pointer-events: none; max-width: 60%; max-height: 60%;
+      user-select: none; object-fit: contain; margin-bottom: 2px;
+    }
+    .item-label {
+        font-size: 0.6rem; color: var(--text-dark);
+        pointer-events: none; user-select: none;
+        line-height: 1.1; max-width:100%; overflow-wrap: break-word;
+    }
+    /* This class is applied during touch drag for JS-based positioning and scaling */
+    .item.dragging {
+      opacity: 0.7;
+      cursor: grabbing;
+      position: absolute; /* Take out of flow, positioned relative to game-container */
+      z-index: 1000;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      transform: scale(1.1); /* Visual scaling effect */
+      transform-origin: 0 0; /* CRITICAL: Scale from top-left for consistent offset math */
+      transition: none; /* No transition during active drag for immediate feedback */
+    }
+    /* This class is for native mouse drag to slightly fade the original */
+    .item.native-dragging { opacity: 0.3; }
+
+    .zones-container {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .zone-wrapper{
+      display: flex; flex-direction: column;
+      background-color: #f9f9f9;
+      border-radius: 5px;
+      border: 1px solid #e8e8e8;
+    }
+    .zone-label{
+      font-weight:600; margin-bottom:5px; color:var(--text-dark); text-align:center;
+      padding: 5px; border-radius: 4px 4px 0 0;
+      font-size: 0.85rem;
+    }
+    #magnetic-label { background-color: var(--magnetic-zone-border); }
+    #nonmagnetic-label { background-color: var(--nonmagnetic-zone-border); }
+
+    .drop-zone{
+      width:100%; min-height:100px;
+      border:2px dashed #ccc; border-radius:0 0 4px 4px; border-top: none;
+      padding:6px;display:flex;flex-wrap:wrap;gap:5px;
+      align-content:flex-start; justify-content: center;
+      transition:background .3s, border-style .3s;
+    }
+    #magnetic.drop-zone { background-color: var(--magnetic-zone-bg); border-color: var(--magnetic-zone-border); }
+    #nonmagnetic.drop-zone { background-color: var(--nonmagnetic-zone-bg); border-color: var(--nonmagnetic-zone-border); }
+
+    .drop-zone.over{ border-style: solid; filter: brightness(0.95); }
+    .drop-zone .item { cursor: default; }
+
+    .controls{
+      text-align:center;
+      margin-top: 5px;
+    }
+    .controls button{
+      background:var(--accent-color);color:var(--text-light);border:none;
+      padding:6px 15px; border-radius:4px; cursor:pointer;
+      margin:4px 3px; font-size:0.8rem; font-weight:600;
+      font-family:'Poppins',sans-serif;transition:background .3s, transform 0.1s;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.15);
+    }
+    .controls button:hover{background:var(--accent-dark); transform: translateY(-1px);}
+    .controls button:active{transform: translateY(0px); background: #004085;}
+
+    #message-area {
+        text-align: center; font-size: 0.8rem; font-weight: bold;
+        margin-top: 8px;
+        min-height: 1.2em; padding: 5px;
+        border-radius: 4px;
+    }
+    .message-correct { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;}
+    .message-incorrect { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;}
+    .message-progress { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba;}
+  </style>
+</head>
+<body>
+  <header class="header-bar">
+    <h1>Magnetic or Not?</h1>
+  </header>
+  <p class="instructions">Drag items to the 'Magnetic' or 'Non-Magnetic' box.</p>
+
+  <div class="game-container">
+    <div id="items-pool-container">
+        <h2>Sortable Items</h2>
+        <div id="items-pool"></div>
+    </div>
+
+    <div class="zones-container">
+      <div class="zone-wrapper">
+        <div id="magnetic-label" class="zone-label">Magnetic</div>
+        <div id="magnetic" class="drop-zone" data-category="magnetic"></div>
+      </div>
+      <div class="zone-wrapper">
+        <div id="nonmagnetic-label" class="zone-label">Non-Magnetic</div>
+        <div id="nonmagnetic" class="drop-zone" data-category="nonmagnetic"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="check-btn" type="button">Check Answers</button>
+      <button id="reset-btn" type="button">Reset Game</button>
+    </div>
+
+    <div id="message-area"></div>
+
+  </div>
+
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const om = code => `https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${code}.svg`;
+
+    const ITEMS_DATA = [
+      // Magnetic (8)
+      {key:'ironNail', category:'magnetic', label:'Iron Nail', imageSrc: om('1F529')},
+      {key:'paperClip', category:'magnetic', label:'Paper Clip', imageSrc: om('1F4CE')},
+      {key:'steelKey', category:'magnetic', label:'Steel Key', imageSrc: om('1F511')},
+      {key:'scissors', category:'magnetic', label:'Scissors', imageSrc: om('2702')},
+      {key:'steelSpoon', category:'magnetic', label:'Steel Spoon', imageSrc: om('1F944')},
+      {key:'magnet', category:'magnetic', label:'Magnet', imageSrc: om('1F9F2')},
+      {key:'safetyPin', category:'magnetic', label:'Safety Pin', imageSrc: om('1F9F7')},
+      {key:'fridgeMagnet', category:'magnetic', label:'Fridge Magnet', imageSrc: om('1F9F2')},
+      // Non-Magnetic (9)
+      {key:'woodBlock', category:'nonmagnetic', label:'Wood Block', imageSrc: om('1FAB5')},
+      {key:'plasticBrick', category:'nonmagnetic', label:'Plastic Brick', imageSrc: om('1F9F1')},
+      {key:'rubberBall', category:'nonmagnetic', label:'Rubber Ball', imageSrc: om('26BD')},
+      {key:'glassMarble', category:'nonmagnetic', label:'Glass Marble', imageSrc: om('1F3B1')},
+      {key:'aluminumCan', category:'nonmagnetic', label:'Aluminum Can', imageSrc: om('1F96B')},
+      {key:'copperWire', category:'nonmagnetic', label:'Copper Wire', imageSrc: om('1F50C')},
+      {key:'cottonBall', category:'nonmagnetic', label:'Cotton Ball', imageSrc: om('1F4A8')},
+      {key:'chalk', category:'nonmagnetic', label:'Chalk', imageSrc: om('1F58D')},
+      {key:'feather', category:'nonmagnetic', label:'Feather', imageSrc: om('1FAB6')}
+    ];
+
+    const itemsPoolContainer = document.getElementById('items-pool');
+    const dropZones = document.querySelectorAll('.drop-zone');
+    const gameContainer = document.querySelector('.game-container'); // Used for coordinate calculations
+    const messageArea = document.getElementById('message-area');
+
+    let pointerDraggedItem = null;
+    let offsetX = 0, offsetY = 0;
+    let currentOverZone = null;
+    let isTouchDragging = false;
+
+    function initializeGame() {
+        itemsPoolContainer.innerHTML = '';
+        dropZones.forEach(zone => {
+            zone.innerHTML = '';
+            zone.classList.remove('over');
+        });
+        messageArea.textContent = '';
+        messageArea.className = '';
+
+        ITEMS_DATA.sort(() => Math.random() - 0.5).forEach((itemData, idx) => {
+            const card = document.createElement('div');
+            card.className = 'item';
+            card.draggable = true;
+            card.id = `item-${idx}`;
+            card.dataset.itemKey = itemData.key;
+            card.dataset.category = itemData.category;
+
+            const img = document.createElement('img');
+            img.src = itemData.imageSrc;
+            img.alt = itemData.label;
+
+            const label = document.createElement('span');
+            label.className = 'item-label';
+            label.textContent = itemData.label;
+
+            card.appendChild(img);
+            card.appendChild(label);
+
+            card.addEventListener('dragstart', handleDragStartMouse);
+            card.addEventListener('dragend', handleDragEndMouse);
+            card.addEventListener('pointerdown', handlePointerDown);
+            itemsPoolContainer.appendChild(card);
+        });
+        pointerDraggedItem = null; isTouchDragging = false; currentOverZone = null;
+    }
+
+    function handleDragStartMouse(e) {
+      if (e.pointerType !== 'touch') {
+          e.dataTransfer.setData('text/plain', e.currentTarget.id);
+          e.dataTransfer.effectAllowed = 'move';
+          setTimeout(() => { e.target.classList.add('native-dragging'); }, 0);
+          isTouchDragging = false;
+      } else { e.preventDefault(); }
+    }
+
+    function handleDragEndMouse(e) {
+        if (e.pointerType !== 'touch') {
+            e.target.classList.remove('native-dragging');
+            dropZones.forEach(zone => zone.classList.remove('over'));
+        }
+        isTouchDragging = false; pointerDraggedItem = null; currentOverZone = null;
+    }
+
+    dropZones.forEach(zone => {
+      zone.addEventListener('dragover', handleDragOverMouse);
+      zone.addEventListener('drop', handleDropMouse);
+    });
+
+    function handleDragOverMouse(e) {
+        e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleDropMouse(e) {
+      e.preventDefault();
+      if (e.pointerType !== 'touch') {
+        const id = e.dataTransfer.getData('text/plain');
+        const droppedElement = document.getElementById(id);
+        const targetZone = e.currentTarget.classList.contains('drop-zone') ? e.currentTarget : null;
+
+        if (droppedElement && targetZone) {
+            droppedElement.classList.remove('native-dragging');
+            targetZone.appendChild(droppedElement);
+        }
+        if(targetZone) targetZone.classList.remove('over');
+        currentOverZone = null;
+      }
+    }
+
+    function handlePointerDown(e) {
+        if (e.button !== 0 || pointerDraggedItem) return;
+        pointerDraggedItem = e.currentTarget;
+        isTouchDragging = e.pointerType === 'touch';
+        pointerDraggedItem.style.border = '2px solid transparent';
+        messageArea.textContent = ''; messageArea.className = '';
+
+        if (isTouchDragging) {
+            e.preventDefault();
+            pointerDraggedItem.setPointerCapture(e.pointerId);
+            // Get item's current position relative to viewport
+            const rect = pointerDraggedItem.getBoundingClientRect();
+            // Calculate offset from item's top-left to the touch point
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+            // Add dragging class (applies position:absolute, transform:scale, transform-origin)
+            pointerDraggedItem.classList.add('dragging');
+        } else { // Mouse
+            try { pointerDraggedItem.setPointerCapture(e.pointerId); }
+            catch (err) { console.warn("Pointer capture failed for mouse.", err); }
+        }
+        document.addEventListener('pointermove', handlePointerMove);
+        document.addEventListener('pointerup', handlePointerUp);
+        document.addEventListener('pointercancel', handlePointerUp);
+        document.body.style.userSelect = 'none';
+    }
+
+    function handlePointerMove(e) {
+        if (!pointerDraggedItem || !pointerDraggedItem.hasPointerCapture(e.pointerId)) return;
+
+        if (isTouchDragging) {
+            e.preventDefault();
+            // Get the game container's position relative to viewport
+            const gameRect = gameContainer.getBoundingClientRect();
+            const scaleFactor = 1.1; // This MUST match the CSS transform: scale(1.1)
+
+            // Calculate the new top-left for the absolutely positioned, scaled item.
+            // The goal is to keep the original touch point (offset by offsetX, offsetY within the unscaled item)
+            // under the current pointer position (e.clientX, e.clientY).
+            // 1. Current pointer position relative to game container: (e.clientX - gameRect.left)
+            // 2. Subtract the scaled offset of the touch point within the item: (offsetX * scaleFactor)
+            let newX = (e.clientX - gameRect.left) - (offsetX * scaleFactor);
+            let newY = (e.clientY - gameRect.top) - (offsetY * scaleFactor);
+
+            pointerDraggedItem.style.left = `${newX}px`;
+            pointerDraggedItem.style.top = `${newY}px`;
+        }
+
+        // Drop zone highlighting logic (works for both touch and mouse)
+        const originalVisibility = isTouchDragging ? pointerDraggedItem.style.visibility : '';
+        if (isTouchDragging) pointerDraggedItem.style.visibility = 'hidden'; // Temporarily hide for elementFromPoint
+        let elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY);
+        if (isTouchDragging) pointerDraggedItem.style.visibility = originalVisibility; // Restore
+
+        let dropTarget = elementUnderPointer ? elementUnderPointer.closest('.drop-zone') : null;
+
+        if (currentOverZone && currentOverZone !== dropTarget) {
+            currentOverZone.classList.remove('over');
+        }
+        if (dropTarget) {
+            dropTarget.classList.add('over'); currentOverZone = dropTarget;
+        } else { currentOverZone = null; }
+    }
+
+    function handlePointerUp(e) {
+        if (!pointerDraggedItem || !pointerDraggedItem.hasPointerCapture(e.pointerId)) {
+            document.removeEventListener('pointermove', handlePointerMove);
+            document.removeEventListener('pointerup', handlePointerUp);
+            document.removeEventListener('pointercancel', handlePointerUp);
+            document.body.style.userSelect = ''; return;
+        }
+
+        document.removeEventListener('pointermove', handlePointerMove);
+        document.removeEventListener('pointerup', handlePointerUp);
+        document.removeEventListener('pointercancel', handlePointerUp);
+        document.body.style.userSelect = '';
+
+        if (isTouchDragging) {
+            pointerDraggedItem.classList.remove('dragging'); // Removes absolute, scale, origin
+            // Reset styles applied for dragging
+            pointerDraggedItem.style.left = '';
+            pointerDraggedItem.style.top = '';
+            pointerDraggedItem.style.visibility = '';
+
+            if (currentOverZone) {
+                currentOverZone.appendChild(pointerDraggedItem); // Append to drop zone
+                currentOverZone.classList.remove('over');
+            } else { itemsPoolContainer.appendChild(pointerDraggedItem); } // Or return to pool
+        } else { // Mouse
+            pointerDraggedItem.classList.remove('native-dragging');
+            if (currentOverZone) { currentOverZone.classList.remove('over'); }
+        }
+
+        try { pointerDraggedItem.releasePointerCapture(e.pointerId); } catch(err) {}
+        pointerDraggedItem = null; isTouchDragging = false;
+        currentOverZone = null; offsetX = 0; offsetY = 0;
+    }
+
+    document.getElementById('check-btn').addEventListener('click', () => {
+        let allCorrect = true;
+        let itemsInWrongZone = false;
+
+        document.querySelectorAll('.item').forEach(item => item.style.borderColor = 'transparent');
+        messageArea.textContent = ''; messageArea.className = '';
+
+        dropZones.forEach(zone => {
+            const zoneCategory = zone.dataset.category;
+            Array.from(zone.children).forEach(item => {
+                if (item.classList.contains('item')) {
+                    const itemCategory = item.dataset.category;
+                    const isCorrect = itemCategory === zoneCategory;
+                    item.style.borderColor = isCorrect ? 'var(--correct-border)' : 'var(--incorrect-border)';
+                    if (!isCorrect) {
+                        allCorrect = false;
+                        itemsInWrongZone = true;
+                    }
+                }
+            });
+        });
+
+        let itemsStillInPool = false;
+        Array.from(itemsPoolContainer.children).forEach(item => {
+            if (item.classList.contains('item')) {
+                item.style.borderColor = 'var(--unplaced-border)';
+                allCorrect = false; itemsStillInPool = true;
+            }
+        });
+
+        if (allCorrect && !itemsStillInPool) {
+            messageArea.textContent = "Great job! All items sorted correctly!";
+            messageArea.className = 'message-correct';
+        } else if (itemsStillInPool) {
+            messageArea.textContent = "Keep sorting! Some items are still in the pool.";
+            messageArea.className = 'message-progress';
+        } else if (itemsInWrongZone) {
+            messageArea.textContent = "Almost! Check items with red borders.";
+            messageArea.className = 'message-incorrect';
+        } else {
+            messageArea.textContent = "Double check your sorting!";
+            messageArea.className = 'message-progress';
+        }
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', () => {
+        initializeGame();
+    });
+
+    initializeGame();
+  });
+  </script>
+</body>
+</html>
