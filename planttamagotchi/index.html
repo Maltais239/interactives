@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <title>Interactive Plant Grower v7</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0fdf4; /* Very light green background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .game-container {
+            background-color: #ffffff;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 700px; /* Wider for more controls */
+            width: 100%;
+            border: 5px solid #86efac; /* Light green border */
+        }
+        .title {
+            color: #15803d; /* Dark Green */
+            margin-bottom: 20px;
+            font-size: 2.0rem;
+            font-weight: 700;
+        }
+        .plant-display {
+            background-color: #dcfce7; /* Lighter green */
+            border-radius: 15px;
+            padding: 25px 15px;
+            margin-bottom: 25px;
+            min-height: 180px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .plant-image {
+            font-size: 5rem; /* Base size */
+            transition: transform 0.5s ease-in-out, font-size 0.5s ease-in-out, filter 0.3s ease, opacity 0.3s ease;
+            line-height: 1;
+        }
+        /* Specific sizes/styles for different stages */
+        .plant-image[data-stage="0"] { font-size: 2.5rem; transform: translateY(25px); } /* Seed */
+        .plant-image[data-stage="1"] { font-size: 3.5rem; transform: translateY(15px); } /* Sprout */
+        .plant-image[data-stage="2"] { font-size: 5rem; transform: translateY(0px); } /* Small Plant */
+        .plant-image[data-stage="3"] { font-size: 6.5rem; transform: translateY(-8px); } /* Medium Plant */
+        .plant-image[data-stage="4"] { font-size: 8rem; transform: translateY(-15px); } /* Large Plant */
+        .plant-image[data-stage="dead"] { font-size: 5rem; filter: grayscale(100%); opacity: 0.6; transform: rotate(15deg); } /* Dead Plant */
+        .plant-image.stressed {
+             /* Optional: Add visual stress indicator */
+        }
+
+        .status-bars {
+            display: flex;
+            justify-content: space-around; /* Distribute space */
+            gap: 10px; /* Reduced gap */
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+        .status-bar-container {
+             /* Adjust width to fit 3 bars comfortably, allowing wrap */
+            width: calc(33.33% - 10px); /* Approx 1/3 width minus gap */
+            min-width: 120px; /* Minimum width before wrapping */
+            margin-bottom: 10px;
+        }
+        .status-bar-container.full-width {
+             width: 100%; /* Growth bar takes full width */
+             min-width: 250px; /* Ensure growth bar is wide enough */
+        }
+        .status-label {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 4px;
+            font-size: 0.9rem;
+            white-space: nowrap; /* Prevent label wrapping */
+        }
+        .progress-bar-bg {
+            background-color: #e5e7eb;
+            border-radius: 9999px;
+            height: 18px;
+            overflow: hidden;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 9999px;
+            transition: width 0.3s ease-in-out, background-color 0.3s ease;
+            text-align: center;
+            color: white;
+            font-size: 0.7rem;
+            line-height: 18px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .water-bar { background-color: #3b82f6; } /* Blue */
+        .sun-bar { background-color: #f59e0b; } /* Amber */
+        .stress-bar { background-color: #f43f5e; } /* Red */
+        .temp-bar { background-color: #a855f7; } /* Purple */
+        .growth-bar { background-color: #22c55e; } /* Green */
+
+        /* Controls Area */
+        .controls-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            width: 100%; /* Take full width within controls area */
+        }
+        /* General Action Button Styling (Water, Sun, Reset) */
+        .action-button {
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 1.0rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease;
+            box-shadow: 0 3px 5px rgba(0, 0, 0, 0.1);
+            display: inline-flex; /* Use inline-flex for button itself */
+            align-items: center;
+            gap: 6px;
+        }
+        .action-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background-color: #9ca3af;
+        }
+        .water-button { background-color: #3b82f6; }
+        .water-button:hover:not(:disabled) { background-color: #2563eb; }
+        .sun-button { background-color: #f59e0b; }
+        .sun-button:hover:not(:disabled) { background-color: #d97706; }
+        .reset-button { background-color: #ef4444; }
+        .reset-button:hover:not(:disabled) { background-color: #dc2626; }
+
+        .action-button:active:not(:disabled) {
+            transform: translateY(1px);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Temperature Slider Styling */
+        .temperature-control {
+            width: 80%; /* Control width of the slider area */
+            max-width: 400px;
+            text-align: center;
+        }
+        .temperature-control label {
+            display: block;
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+        .temperature-control input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: #a855f7; /* Match bar color */
+        }
+
+        /* Container for the moved Reset button */
+        .reset-button-container {
+            margin-top: 10px; /* Space above reset button */
+            margin-bottom: 20px; /* Space below reset button */
+            text-align: center;
+        }
+
+
+        .feedback-message {
+            margin-bottom: 15px;
+            font-size: 1.0rem;
+            font-weight: 600;
+            min-height: 1.4em;
+            color: #4b5563;
+            transition: color 0.3s ease;
+        }
+
+        .tips-section {
+            padding: 15px;
+            background-color: #ecfdf5; /* Very light green */
+            border-radius: 10px;
+            border: 1px solid #a7f3d0; /* Light green border */
+            text-align: left;
+            font-size: 0.85rem;
+            color: #065f46; /* Darker green text */
+            margin-top: 0;
+        }
+        .tips-section h3 {
+            font-weight: 700;
+            font-size: 1.0rem;
+            margin-bottom: 8px;
+            text-align: center;
+            color: #047857;
+        }
+        .tips-section ul {
+            list-style: disc;
+            margin-left: 20px;
+        }
+         .tips-section li {
+            margin-bottom: 5px;
+         }
+
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="title">Plant Grower</h1>
+
+        <div class="plant-display">
+            <span id="plantImage" class="plant-image" data-stage="0">🌰</span>
+        </div>
+
+        <div class="status-bars">
+            <div class="status-bar-container">
+                <div class="status-label">💧 Water Level</div>
+                <div class="progress-bar-bg">
+                    <div id="waterBar" class="progress-bar-fill water-bar" style="width: 50%;">50%</div>
+                </div>
+            </div>
+            <div class="status-bar-container">
+                <div class="status-label">☀️ Sunlight Level</div>
+                <div class="progress-bar-bg">
+                    <div id="sunBar" class="progress-bar-fill sun-bar" style="width: 50%;">50%</div>
+                </div>
+            </div>
+             <div class="status-bar-container">
+                <div class="status-label">🌡️ Temperature</div>
+                <div class="progress-bar-bg">
+                    <div id="tempBar" class="progress-bar-fill temp-bar" style="width: 50%;">20°C</div>
+                </div>
+            </div>
+            <div class="status-bar-container">
+                <div class="status-label">😟 Stress Level</div>
+                <div class="progress-bar-bg">
+                    <div id="stressBar" class="progress-bar-fill stress-bar" style="width: 0%;">0%</div>
+                </div>
+            </div>
+             <div class="status-bar-container full-width">
+                <div class="status-label">🌱 Growth Progress</div>
+                <div class="progress-bar-bg">
+                    <div id="growthBar" class="progress-bar-fill growth-bar" style="width: 0%;">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls-area">
+            <div class="action-buttons">
+                <button id="waterButton" class="action-button water-button">
+                     <span>💧</span> Water
+                </button>
+                <button id="sunButton" class="action-button sun-button">
+                     <span>☀️</span> Sunlight
+                </button>
+                 </div>
+
+            <div class="temperature-control">
+                 <label for="tempSlider">Set Temperature (<span id="tempValueDisplay">20</span>°C)</label>
+                 <input type="range" id="tempSlider" name="tempSlider" min="0" max="40" value="20">
+            </div>
+        </div>
+        <div id="feedbackMessage" class="feedback-message">Care for your plant!</div>
+
+        <div class="reset-button-container">
+             <button id="resetButton" class="action-button reset-button">
+                 <span>🔄</span> Reset Plant
+            </button>
+        </div>
+
+        <div class="tips-section">
+             <h3>Quick Tips</h3>
+             <ul>
+                 <li>Keep 💧 Water (30-90%) and ☀️ Sun (30-90%) in the ideal range.</li>
+                 <li>Keep 🌡️ Temperature ideally between 15°C and 30°C.</li>
+                 <li>Too much water/sun (>90%) or extreme temperatures cause 😟 Stress!</li>
+                 <li>Low water/sun (<10%) also increases stress over time.</li>
+                 <li>High stress (>75%) stops 🌱 Growth. Max stress (100%) is fatal!</li>
+                 <li>Water/Sun levels decrease automatically - keep an eye on them!</li>
+             </ul>
+        </div>
+        </div>
+
+    <script>
+        // --- Sound Synthesis Setup (Tone.js) ---
+        const synth = new Tone.Synth().toDestination();
+        const noiseSynth = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0 } }).toDestination();
+        const pluckSynth = new Tone.PluckSynth().toDestination();
+        pluckSynth.volume.value = -10;
+        synth.volume.value = -8;
+        noiseSynth.volume.value = -15;
+
+        function playSound(type) {
+            Tone.start();
+            try {
+                switch (type) {
+                    case 'water': pluckSynth.triggerAttackRelease('C5', '16n', Tone.now()); pluckSynth.triggerAttackRelease('E5', '16n', Tone.now() + 0.05); break;
+                    case 'sun': synth.triggerAttackRelease('A5', '16n', Tone.now()); break;
+                    case 'grow': synth.triggerAttackRelease('C4', '8n', Tone.now()); synth.triggerAttackRelease('G4', '8n', Tone.now() + 0.15); synth.triggerAttackRelease('C5', '8n', Tone.now() + 0.3); break;
+                    case 'warning': synth.triggerAttackRelease('G3', '8n', Tone.now()); break;
+                    case 'stress': noiseSynth.triggerAttackRelease(Tone.now()); break;
+                    case 'dead': synth.triggerAttackRelease('C4', '4n', Tone.now()); synth.triggerAttackRelease('A3', '4n', Tone.now() + 0.2); synth.triggerAttackRelease('F3', '4n', Tone.now() + 0.4); break;
+                    case 'reset': pluckSynth.triggerAttackRelease('G4', '8n', Tone.now()); break;
+                }
+            } catch (error) {
+                console.error("Tone.js error:", error);
+            }
+        }
+
+        // --- Game State Variables ---
+        let waterLevel = 50;
+        let sunLevel = 50;
+        let temperatureLevel = 20;
+        let stressLevel = 0;
+        let growthPoints = 0;
+        let plantStage = 0;
+        let isDead = false;
+        let gameLoopInterval = null;
+
+        // --- Game Constants ---
+        const MAX_LEVEL = 100;
+        const MIN_LEVEL = 0;
+        const WATER_DECREASE_RATE = 2;
+        const SUN_DECREASE_RATE = 2;
+        const STRESS_INCREASE_LOW_RESOURCE = 2;
+        const STRESS_INCREASE_OVERCLICK = 15;
+        const STRESS_INCREASE_BAD_TEMP = 1;
+        const STRESS_DECREASE_RATE = 2;
+        const GROWTH_PER_TICK = 1;
+        const POINTS_PER_STAGE = [25, 40, 55, 70];
+        const IDEAL_WATER_LOW = 30;
+        const IDEAL_WATER_HIGH = 90;
+        const IDEAL_SUN_LOW = 30;
+        const IDEAL_SUN_HIGH = 90;
+        const IDEAL_TEMP_LOW = 15;
+        const IDEAL_TEMP_HIGH = 30;
+        const CRITICAL_THRESHOLD = 10;
+        const HIGH_STRESS_THRESHOLD = 75;
+        const WATER_PER_CLICK = 20;
+        const SUN_PER_CLICK = 20;
+        const GAME_TICK_MS = 1000;
+
+        const PLANT_STAGES_EMOJI = ['🌰', '🌱', '🌿', '🌳', '🌲', '💀'];
+
+        // --- DOM References ---
+        const plantImageEl = document.getElementById('plantImage');
+        const waterBarEl = document.getElementById('waterBar');
+        const sunBarEl = document.getElementById('sunBar');
+        const tempBarEl = document.getElementById('tempBar');
+        const stressBarEl = document.getElementById('stressBar');
+        const growthBarEl = document.getElementById('growthBar');
+        const feedbackMessageEl = document.getElementById('feedbackMessage');
+        const waterButton = document.getElementById('waterButton');
+        const sunButton = document.getElementById('sunButton');
+        const resetButton = document.getElementById('resetButton'); // Still need reference
+        const tempSlider = document.getElementById('tempSlider');
+        const tempValueDisplay = document.getElementById('tempValueDisplay');
+
+        // --- UI Update Functions ---
+        function updateUI() {
+            // Update progress bars
+            waterBarEl.style.width = `${waterLevel}%`;
+            waterBarEl.textContent = `${waterLevel}%`;
+            sunBarEl.style.width = `${sunLevel}%`;
+            sunBarEl.textContent = `${sunLevel}%`;
+            stressBarEl.style.width = `${stressLevel}%`;
+            stressBarEl.textContent = `${stressLevel}%`;
+
+            // Update temperature bar
+            const tempPercentage = (temperatureLevel / 40) * 100;
+            tempBarEl.style.width = `${tempPercentage}%`;
+            tempBarEl.textContent = `${temperatureLevel}°C`;
+
+            // Update growth bar
+            const currentStageMaxPoints = POINTS_PER_STAGE[plantStage] || 1;
+            const growthPercentage = plantStage < POINTS_PER_STAGE.length
+                ? Math.min(100, Math.round((growthPoints / currentStageMaxPoints) * 100))
+                : 100;
+            growthBarEl.style.width = `${growthPercentage}%`;
+            growthBarEl.textContent = `${growthPercentage}%`;
+
+            // Update plant image
+            const stageIndex = isDead ? PLANT_STAGES_EMOJI.length - 1 : plantStage;
+            plantImageEl.textContent = PLANT_STAGES_EMOJI[stageIndex];
+            plantImageEl.setAttribute('data-stage', isDead ? 'dead' : plantStage.toString());
+
+            // Update stressed class
+            plantImageEl.classList.toggle('stressed', stressLevel > HIGH_STRESS_THRESHOLD && !isDead);
+
+            // Update button/slider states
+            waterButton.disabled = isDead;
+            sunButton.disabled = isDead;
+            resetButton.disabled = false; // Reset button should always be enabled? Or disable when game ends? Currently enabled.
+            tempSlider.disabled = isDead;
+        }
+
+        function setFeedback(message, type = 'info') {
+            feedbackMessageEl.textContent = message;
+            switch (type) {
+                case 'success': feedbackMessageEl.style.color = '#16a34a'; break;
+                case 'error': feedbackMessageEl.style.color = '#dc2626'; break;
+                case 'warning': feedbackMessageEl.style.color = '#f97316'; break;
+                case 'stress': feedbackMessageEl.style.color = '#f43f5e'; break;
+                case 'info': default: feedbackMessageEl.style.color = '#4b5563'; break;
+            }
+        }
+
+        // --- Event Handlers ---
+        function handleTempChange(event) {
+            if (isDead) return;
+            temperatureLevel = parseInt(event.target.value, 10);
+            tempValueDisplay.textContent = temperatureLevel;
+            updateUI();
+        }
+
+        // --- Game Logic Functions ---
+        function waterPlant() {
+            if (isDead) return;
+            if (waterLevel >= IDEAL_WATER_HIGH) {
+                stressLevel = Math.min(MAX_LEVEL, stressLevel + STRESS_INCREASE_OVERCLICK);
+                setFeedback('Too much water! The plant is stressed!', 'stress');
+                playSound('stress');
+            } else {
+                waterLevel = Math.min(MAX_LEVEL, waterLevel + WATER_PER_CLICK);
+                setFeedback('Plant watered!', 'info');
+                playSound('water');
+            }
+            updateUI();
+            checkDeath();
+        }
+
+        function giveSunlight() {
+            if (isDead) return;
+            if (sunLevel >= IDEAL_SUN_HIGH) {
+                stressLevel = Math.min(MAX_LEVEL, stressLevel + STRESS_INCREASE_OVERCLICK);
+                setFeedback('Too much sun! The plant is stressed!', 'stress');
+                playSound('stress');
+            } else {
+                sunLevel = Math.min(MAX_LEVEL, sunLevel + SUN_PER_CLICK);
+                setFeedback('Plant received sunlight!', 'info');
+                playSound('sun');
+            }
+            updateUI();
+            checkDeath();
+        }
+
+        function checkGrowth() {
+            if (isDead || plantStage >= POINTS_PER_STAGE.length) return;
+
+            const isWaterOk = waterLevel >= IDEAL_WATER_LOW && waterLevel < IDEAL_WATER_HIGH;
+            const isSunOk = sunLevel >= IDEAL_SUN_LOW && sunLevel < IDEAL_SUN_HIGH;
+            const isTempOk = temperatureLevel >= IDEAL_TEMP_LOW && temperatureLevel <= IDEAL_TEMP_HIGH;
+            const isStressed = stressLevel > HIGH_STRESS_THRESHOLD;
+            const isCriticallyLow = waterLevel < CRITICAL_THRESHOLD || sunLevel < CRITICAL_THRESHOLD;
+
+            let feedbackMsg = "";
+            let feedbackType = "info";
+            let grewThisTick = false;
+            let stressIncreasedThisTick = false;
+
+            // Stress Handling
+            if (isCriticallyLow) {
+                stressLevel = Math.min(MAX_LEVEL, stressLevel + STRESS_INCREASE_LOW_RESOURCE);
+                feedbackMsg = "Conditions are poor, plant is getting stressed! ";
+                feedbackType = "warning";
+                playSound('warning');
+                stressIncreasedThisTick = true;
+            }
+            if (!isTempOk) {
+                stressLevel = Math.min(MAX_LEVEL, stressLevel + STRESS_INCREASE_BAD_TEMP);
+                let tempMsg = temperatureLevel < IDEAL_TEMP_LOW ? "It's too cold!" : "It's too hot!";
+                feedbackMsg += tempMsg + " ";
+                feedbackType = feedbackType === "warning" ? "warning" : "stress";
+                if (!stressIncreasedThisTick) playSound('stress');
+                stressIncreasedThisTick = true;
+            }
+            if (!stressIncreasedThisTick && isWaterOk && isSunOk && isTempOk && stressLevel > MIN_LEVEL) {
+                stressLevel = Math.max(MIN_LEVEL, stressLevel - STRESS_DECREASE_RATE);
+            }
+
+             // Growth Handling
+            if (isWaterOk && isSunOk && isTempOk) {
+                if (isStressed) {
+                    if (feedbackType !== 'warning' && feedbackType !== 'stress') {
+                        feedbackMsg = "Plant is too stressed to grow!";
+                        feedbackType = "stress";
+                    } else {
+                         feedbackMsg += "Plant is too stressed to grow!";
+                    }
+                    if (!stressIncreasedThisTick) playSound('stress');
+                } else {
+                    growthPoints += GROWTH_PER_TICK;
+                    grewThisTick = true;
+                    if (feedbackType === 'info') {
+                        feedbackMsg = "Plant is growing well!";
+                    }
+                }
+            } else if (!isCriticallyLow && !feedbackMsg) {
+                 feedbackMsg = "Plant needs something...";
+                 feedbackType = "info";
+            }
+
+            // Check for stage up
+            if (grewThisTick) {
+                const pointsNeeded = POINTS_PER_STAGE[plantStage];
+                if (growthPoints >= pointsNeeded) {
+                    plantStage++;
+                    growthPoints = 0;
+                    feedbackMsg = `Plant grew to the next stage! (${PLANT_STAGES_EMOJI[plantStage]})`;
+                    feedbackType = 'success';
+                    playSound('grow');
+                    if (plantStage >= POINTS_PER_STAGE.length) {
+                        feedbackMsg = `Congratulations! Your plant is fully grown! (${PLANT_STAGES_EMOJI[plantStage]})`;
+                    }
+                }
+            }
+
+            if (feedbackMsg) {
+                 setFeedback(feedbackMsg, feedbackType);
+            }
+        }
+
+        function checkDeath() {
+             if (isDead) return true;
+             if (waterLevel <= MIN_LEVEL || sunLevel <= MIN_LEVEL || stressLevel >= MAX_LEVEL) {
+                 isDead = true;
+                 let deathReason = "withered away";
+                 if (stressLevel >= MAX_LEVEL) deathReason = "died from stress";
+                 else if (waterLevel <= MIN_LEVEL) deathReason = "dried out";
+                 else if (sunLevel <= MIN_LEVEL) deathReason = "lacked sunlight";
+
+                 setFeedback(`Oh no! The plant ${deathReason}. Try again?`, 'error');
+                 playSound('dead');
+                 clearInterval(gameLoopInterval);
+                 gameLoopInterval = null;
+                 updateUI();
+                 return true;
+             }
+             return false;
+        }
+
+        function gameTick() {
+            if (isDead) return;
+            waterLevel = Math.max(MIN_LEVEL, waterLevel - WATER_DECREASE_RATE);
+            sunLevel = Math.max(MIN_LEVEL, sunLevel - SUN_DECREASE_RATE);
+            checkGrowth();
+            if (checkDeath()) return;
+            updateUI();
+        }
+
+        function resetGame() {
+             playSound('reset');
+             if (gameLoopInterval) clearInterval(gameLoopInterval);
+             waterLevel = 50;
+             sunLevel = 50;
+             temperatureLevel = 20;
+             stressLevel = 0;
+             growthPoints = 0;
+             plantStage = 0;
+             isDead = false;
+             tempSlider.value = temperatureLevel;
+             tempValueDisplay.textContent = temperatureLevel;
+             setFeedback('New plant started! Care for it well.', 'info');
+             updateUI();
+             startGameLoop();
+        }
+
+         function startGameLoop() {
+            if (gameLoopInterval) clearInterval(gameLoopInterval);
+            if (!isDead) {
+                 gameLoopInterval = setInterval(gameTick, GAME_TICK_MS);
+            }
+         }
+
+        // --- Initial Setup ---
+        function initializeGame() {
+            // Add event listeners
+            waterButton.addEventListener('click', waterPlant);
+            sunButton.addEventListener('click', giveSunlight);
+            resetButton.addEventListener('click', resetGame); // Reset listener remains
+            tempSlider.addEventListener('input', handleTempChange);
+
+            // Initial UI setup
+            tempValueDisplay.textContent = temperatureLevel;
+            updateUI();
+
+            // Start the game loop
+            startGameLoop();
+        }
+
+        // --- Start Game on Load ---
+        window.onload = initializeGame;
+
+    </script>
+</body>
+</html>
