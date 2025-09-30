@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Circular Food Chain Challenge - Alberta Focus</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #6F83A1; --panel: #F4E4C6; --btn: #f472b6; --btn-hover: #ec4899;
+      --zone-border: #a16207; --zone-bg-hover: #fde68a; --text-light: #ffffff;
+      --text-dark: #374151; --item-label-color: #4b5563; --correct-border: #22c55e;
+      --incorrect-border: #ef4444; --unsorted-border: #f97316;
+      --arrow-color: #4A5568;
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0; font-family:'Poppins',sans-serif; background:var(--bg);
+      display:flex; flex-direction:column; align-items:center; padding:20px;
+      overscroll-behavior: none;
+    }
+    h1{font-size:2.2rem;color:var(--text-light);margin:5px 0; text-align: center;}
+    p.instructions{color:var(--text-light);margin:0 0 20px; text-align: center; font-size:0.9rem;}
+
+    .game-container{
+      background:var(--panel); width:100%; max-width:1000px;
+      padding:20px; border-radius:10px; position: relative;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+
+    #items-container{
+        display:flex;flex-wrap:wrap;gap:10px; justify-content:center;margin-bottom:25px;
+        padding: 10px; background-color: rgba(255,255,255,0.6); border-radius: 8px;
+        min-height: 140px; border: 1px solid rgba(0,0,0,0.1);
+    }
+    .item{
+      width:85px; min-height:95px; background:#fff;display:flex;flex-direction:column;
+      align-items:center; justify-content:center; border-radius:8px;
+      box-shadow:0 2px 4px rgba(0,0,0,0.1);cursor:grab; touch-action: none;
+      user-select: none; position: relative;
+      transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out, border-color 0.3s ease-out;
+      padding: 5px; border: 3px solid transparent;
+    }
+    .item.in-slot {
+        cursor: pointer;
+    }
+    .item img {
+      pointer-events: none; max-width: 45px; max-height: 35px; object-fit: contain;
+      user-select: none; margin-bottom: 5px; display: block;
+    }
+    .item-label {
+      pointer-events: none; font-size: 0.65rem; color: var(--item-label-color);
+      text-align: center; line-height: 1.1; user-select: none; max-width: 100%;
+    }
+    .item-label small { font-size: 0.6rem; color: var(--incorrect-border); display: block; font-style: italic; }
+    .item.dragging { opacity: 0.7; cursor: grabbing; position: absolute; z-index: 1000; box-shadow: 0 10px 20px rgba(0,0,0,0.2); transform: scale(1.1); transition: none; }
+    .item.native-dragging { opacity: 0.3; }
+
+    .food-chain-area {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 30px;
+        min-height: 480px;
+        position: relative;
+    }
+    .sun-indicator {
+        position: absolute;
+        top: 0px;
+        left: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        z-index: 5;
+    }
+    .sun-indicator img {
+        width: 60px;
+        height: 60px;
+    }
+
+    .food-chain-circle-container {
+        position: relative;
+        width: 450px;
+        height: 450px;
+    }
+    .chain-slot-wrapper {
+        position: absolute;
+        width: 160px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .chain-slot-wrapper .zone-label {
+        font-weight:bold; margin-bottom:5px; color:var(--text-dark); font-size: 0.85rem;
+        background-color: rgba(255,255,255,0.7); padding: 3px 6px; border-radius: 4px;
+    }
+    .chain-slot-wrapper .drop-zone {
+        width:110px; min-height:80px;
+        background:rgba(255,255,255,0.8);border:3px dashed var(--zone-border);border-radius:8px;
+        padding:8px; display:flex;flex-wrap:wrap;gap:5px;
+        align-items:center; justify-content: center;
+        transition:background .3s, border-style .3s;
+    }
+    .drop-zone.over{background:var(--zone-bg-hover); border-style: solid;}
+
+    #slot-producer-wrapper   { top: 90%;  left: 50%; transform: translate(-50%, -50%); }
+    #slot-herbivore-wrapper  { top: 50%;  left: 90%; transform: translate(-50%, -50%); }
+    #slot-carnivore-wrapper  { top: 10%;  left: 50%; transform: translate(-50%, -50%); }
+    #slot-decomposer-wrapper { top: 50%;  left: 10%; transform: translate(-50%, -50%); }
+
+    .arrow {
+        position: absolute; font-size: 2.8rem; color: var(--arrow-color); font-weight: bold;
+        width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;
+        z-index: 1;
+    }
+    #arrow-producer-herbivore   { top: 70%; left: 75%; transform: translate(-50%, -50%) rotate(-45deg); }
+    #arrow-herbivore-carnivore  { top: 25%; left: 75%; transform: translate(-50%, -50%) rotate(45deg);  }
+    #arrow-carnivore-decomposer { top: 25%; left: 25%; transform: translate(-50%, -50%) rotate(135deg); }
+    #arrow-decomposer-producer  { top: 70%; left: 25%; transform: translate(-50%, -50%) rotate(-135deg);}
+
+
+    .controls{text-align:center;}
+    .controls button{
+      background:var(--btn);color:var(--text-light);border:none;padding:10px 20px;
+      border-radius:8px;cursor:pointer; margin:10px 5px;font-size:1.1rem;
+      font-family:'Poppins',sans-serif;transition:background .3s, transform 0.1s;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    }
+    .controls button:hover{background:var(--btn-hover); transform: translateY(-2px);}
+    #message-area { text-align: center; margin-top: 20px; font-size: 1.1rem; min-height: 2em; color: var(--text-dark); font-weight: 600; }
+    #message-area.success { color: var(--correct-border); }
+    #message-area.error { color: var(--incorrect-border); }
+  </style>
+</head>
+<body>
+  <h1>Circular Food Chain!</h1>
+  <p class="instructions">Drag items from the pool to create a valid food chain in the circle below.<br>The sun (top-left) provides energy to the Producer!</p>
+
+  <div class="game-container">
+    <div id="items-container"></div>
+
+    <div class="food-chain-area">
+      <div class="sun-indicator">
+        <img src="https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F31E.svg" alt="Sun">
+      </div>
+      <div class="food-chain-circle-container">
+        <div id="slot-producer-wrapper" class="chain-slot-wrapper">
+          <div class="zone-label">Producer (Makes Food)</div>
+          <div id="slot-producer" class="drop-zone" data-expected-category="producer"></div>
+        </div>
+        <div id="slot-herbivore-wrapper" class="chain-slot-wrapper">
+          <div class="zone-label">Herbivore (Eats Producer)</div>
+          <div id="slot-herbivore" class="drop-zone" data-expected-category="herbivore"></div>
+        </div>
+        <div id="slot-carnivore-wrapper" class="chain-slot-wrapper">
+          <div class="zone-label">Carnivore (Eats Herbivore)</div>
+          <div id="slot-carnivore" class="drop-zone" data-expected-category="carnivore"></div>
+        </div>
+        <div id="slot-decomposer-wrapper" class="chain-slot-wrapper">
+          <div class="zone-label">Decomposer (Breaks Down)</div>
+          <div id="slot-decomposer" class="drop-zone" data-expected-category="decomposer"></div>
+        </div>
+
+        <div id="arrow-producer-herbivore" class="arrow">&rarr;</div>
+        <div id="arrow-herbivore-carnivore" class="arrow">&rarr;</div>
+        <div id="arrow-carnivore-decomposer" class="arrow">&rarr;</div>
+        <div id="arrow-decomposer-producer" class="arrow">&rarr;</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="check-btn" type="button">Check Food Chain</button>
+      <button id="reset-btn" type="button">Reset Game</button>
+    </div>
+    <div id="message-area"></div>
+  </div>
+
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const OPENMOJI_BASE_URL = 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/';
+
+    const ICONS_DATA = [
+      // Producers (4)
+      { id: 'grass', name: 'Grass', imgSrc: 'https://github.com/Maltais239/Images/blob/main/logo%20(1).png?raw=true', category: 'producer' },
+      { id: 'wild_rose', name: 'Wild Rose (Berries)', imgSrc: `${OPENMOJI_BASE_URL}1F339.svg`, category: 'producer' }, // Rose for berries
+      { id: 'sunflower', name: 'Sunflower', imgSrc: `${OPENMOJI_BASE_URL}1F33B.svg`, category: 'producer' },
+      { id: 'aspen_tree', name: 'Aspen Tree', imgSrc: `${OPENMOJI_BASE_URL}1F333.svg`, category: 'producer' }, // Deciduous tree for Aspen
+      // Herbivores (4)
+      { id: 'deer', name: 'Deer', imgSrc: 'https://github.com/Maltais239/Images/blob/main/deer.png?raw=true', category: 'herbivore' },
+      { id: 'rabbit', name: 'Rabbit', imgSrc: 'https://github.com/Maltais239/Images/blob/main/rabbit.png?raw=true', category: 'herbivore' },
+      { id: 'mouse', name: 'Mouse', imgSrc: `${OPENMOJI_BASE_URL}1F42D.svg`, category: 'herbivore' },
+      { id: 'beaver', name: 'Beaver', imgSrc: `${OPENMOJI_BASE_URL}1F9AB.svg`, category: 'herbivore' },
+      // Carnivores (4)
+      { id: 'wolf', name: 'Wolf', imgSrc: 'https://github.com/Maltais239/Images/blob/main/wolf.png?raw=true', category: 'carnivore' },
+      { id: 'fox', name: 'Fox', imgSrc: `${OPENMOJI_BASE_URL}1F98A.svg`, category: 'carnivore' },
+      { id: 'owl', name: 'Owl', imgSrc: `${OPENMOJI_BASE_URL}1F989.svg`, category: 'carnivore' },
+      { id: 'coyote', name: 'Coyote', imgSrc: `${OPENMOJI_BASE_URL}1F43A.svg`, category: 'carnivore' }, // Wolf icon for Coyote
+      // Decomposers (4)
+      { id: 'worm', name: 'Worm (Bug)', imgSrc: `${OPENMOJI_BASE_URL}1F41B.svg`, category: 'decomposer' },
+      { id: 'mushroom', name: 'Mushroom', imgSrc: `${OPENMOJI_BASE_URL}1F344.svg`, category: 'decomposer' },
+      { id: 'beetle', name: 'Beetle', imgSrc: `${OPENMOJI_BASE_URL}1F41E.svg`, category: 'decomposer' },
+      { id: 'microbe', name: 'Microbe', imgSrc: `${OPENMOJI_BASE_URL}1F9A0.svg`, category: 'decomposer' },
+      // Additional Distractor Icons
+      { id: 'pine_tree', name: 'Pine Tree', imgSrc: `${OPENMOJI_BASE_URL}1F332.svg`, category: 'distractor' },
+      { id: 'fallen_leaf', name: 'Fallen Leaf', imgSrc: `${OPENMOJI_BASE_URL}1F342.svg`, category: 'distractor' },
+      { id: 'mountain', name: 'Mountain', imgSrc: `${OPENMOJI_BASE_URL}26F0.svg`, category: 'distractor' },
+      { id: 'water_wave', name: 'Water Wave', imgSrc: `${OPENMOJI_BASE_URL}1F30A.svg`, category: 'distractor'}
+    ];
+
+    const itemsContainer = document.getElementById('items-container');
+    const chainSlots = document.querySelectorAll('.food-chain-circle-container .drop-zone');
+    const gameContainer = document.querySelector('.game-container');
+    const messageArea = document.getElementById('message-area');
+    const checkBtn = document.getElementById('check-btn');
+    const resetBtn = document.getElementById('reset-btn');
+
+    let pointerDraggedItem = null;
+    let offsetX = 0, offsetY = 0;
+    let currentOverZone = null;
+    let isTouchDragging = false;
+
+    window.handleImageError = function(imgElement, itemName) {
+        imgElement.style.display = 'none'; const parent = imgElement.parentElement;
+        let label = parent.querySelector('.item-label');
+        if (label) { if (!label.innerHTML.includes('⚠️')) { label.innerHTML = `⚠️ <span style="text-decoration: line-through;">${itemName}</span><br><small>(Image Error)</small>`;}}
+        imgElement.onerror = null;
+    }
+
+    function initializeGame() {
+        itemsContainer.innerHTML = '';
+        chainSlots.forEach(zone => { zone.innerHTML = ''; zone.classList.remove('over'); });
+        messageArea.textContent = ''; messageArea.className = '';
+        document.querySelectorAll('.item').forEach(item => item.style.borderColor = 'transparent');
+
+        const shuffledIcons = [...ICONS_DATA].sort(() => Math.random() - 0.5);
+
+        shuffledIcons.forEach(iconData => {
+            const item = document.createElement('div');
+            item.className = 'item'; item.draggable = true;
+            item.id = `item-${iconData.id}`;
+            item.dataset.id = iconData.id;
+            item.dataset.category = iconData.category;
+            item.style.cursor = 'grab';
+
+            item.innerHTML = `<img src="${iconData.imgSrc}" alt="${iconData.name}" style="display: block;" onerror="handleImageError(this, '${iconData.name}')"> <span class="item-label">${iconData.name}</span>`;
+            item.style.borderColor = 'transparent';
+
+            item.addEventListener('dragstart', handleDragStartMouse);
+            item.addEventListener('dragend', handleDragEndMouse);
+            item.addEventListener('pointerdown', handlePointerDown);
+            itemsContainer.appendChild(item);
+        });
+        pointerDraggedItem = null; isTouchDragging = false; currentOverZone = null;
+    }
+
+    function returnItemToPool(event) {
+        const item = event.currentTarget;
+        itemsContainer.appendChild(item);
+        item.draggable = true;
+        item.style.cursor = 'grab';
+        item.classList.remove('in-slot');
+        item.style.borderColor = 'transparent';
+        item.removeEventListener('click', returnItemToPool);
+        item.addEventListener('pointerdown', handlePointerDown);
+    }
+
+    function handleDragStartMouse(e) { if (e.pointerType !== 'touch') { e.dataTransfer.setData('text/plain', e.currentTarget.id); e.dataTransfer.effectAllowed = 'move'; setTimeout(() => { if(e.target && typeof e.target.classList !== 'undefined') e.target.classList.add('native-dragging'); }, 0); isTouchDragging = false; } else { e.preventDefault(); } }
+    function handleDragEndMouse(e) { if (e.pointerType !== 'touch') { if(e.target && typeof e.target.classList !== 'undefined') e.target.classList.remove('native-dragging'); chainSlots.forEach(zone => zone.classList.remove('over')); } isTouchDragging = false; pointerDraggedItem = null; currentOverZone = null; if (document.body.style.userSelect === 'none') document.body.style.userSelect = ''; }
+    chainSlots.forEach(zone => { zone.addEventListener('dragover', handleDragOverMouse); zone.addEventListener('drop', handleDropMouse); });
+    function handleDragOverMouse(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move';}
+    function handleDropMouse(e) {
+      e.preventDefault();
+      if (e.pointerType !== 'touch') {
+        const id = e.dataTransfer.getData('text/plain');
+        const droppedElement = document.getElementById(id);
+        if (droppedElement && e.currentTarget.classList.contains('drop-zone')) {
+            droppedElement.classList.remove('native-dragging');
+            if (!e.currentTarget.contains(droppedElement) && e.currentTarget.children.length === 0) {
+                e.currentTarget.appendChild(droppedElement);
+                droppedElement.draggable = false;
+                droppedElement.style.cursor = 'pointer';
+                droppedElement.classList.add('in-slot');
+                droppedElement.removeEventListener('pointerdown', handlePointerDown);
+                droppedElement.addEventListener('click', returnItemToPool);
+            } else if (!e.currentTarget.contains(droppedElement) && e.currentTarget.children.length > 0) {
+                itemsContainer.appendChild(droppedElement);
+            }
+        }
+        if(e.currentTarget) e.currentTarget.classList.remove('over');
+        currentOverZone = null;
+      }
+    }
+    function handlePointerDown(e) {
+        const item = e.currentTarget;
+        if (e.button !== 0 || pointerDraggedItem || item.classList.contains('in-slot')) return;
+        pointerDraggedItem = item;
+        isTouchDragging = e.pointerType === 'touch';
+        pointerDraggedItem.style.borderColor = 'transparent';
+        messageArea.textContent = ''; messageArea.className = '';
+        if (isTouchDragging) {
+            e.preventDefault();
+            if (pointerDraggedItem && typeof pointerDraggedItem.setPointerCapture === 'function') {
+                try { pointerDraggedItem.setPointerCapture(e.pointerId); } catch (err) {console.warn("Pointer capture failed:", err)}
+            }
+            const rect = pointerDraggedItem.getBoundingClientRect();
+            offsetX = e.clientX - rect.left; offsetY = e.clientY - rect.top;
+            pointerDraggedItem.classList.add('dragging');
+        } else {
+            if (pointerDraggedItem && typeof pointerDraggedItem.setPointerCapture === 'function') {
+                try { pointerDraggedItem.setPointerCapture(e.pointerId); } catch (err) {console.warn("Pointer capture failed for mouse:", err)}
+            }
+        }
+        document.addEventListener('pointermove', handlePointerMove);
+        document.addEventListener('pointerup', handlePointerUp);
+        document.addEventListener('pointercancel', handlePointerUp);
+        document.body.style.userSelect = 'none';
+    }
+    function handlePointerMove(e) {
+        if (!pointerDraggedItem || (pointerDraggedItem && typeof pointerDraggedItem.hasPointerCapture !== 'function') || !pointerDraggedItem.hasPointerCapture(e.pointerId)) return;
+        if (isTouchDragging) { e.preventDefault(); const gameRect = gameContainer.getBoundingClientRect(); let newX = e.clientX - gameRect.left - offsetX; let newY = e.clientY - gameRect.top - offsetY; pointerDraggedItem.style.left = `${newX}px`; pointerDraggedItem.style.top = `${newY}px`;}
+        const originalVisibility = isTouchDragging ? pointerDraggedItem.style.visibility : ''; if (isTouchDragging) pointerDraggedItem.style.visibility = 'hidden'; let elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY); if (isTouchDragging) pointerDraggedItem.style.visibility = originalVisibility;
+        let dropTarget = elementUnderPointer ? elementUnderPointer.closest('.drop-zone') : null;
+        if (currentOverZone && currentOverZone !== dropTarget) currentOverZone.classList.remove('over');
+        if (dropTarget && dropTarget.children.length === 0) {
+            dropTarget.classList.add('over'); currentOverZone = dropTarget;
+        } else {
+            if(dropTarget) dropTarget.classList.remove('over');
+            currentOverZone = null;
+        }
+    }
+    function handlePointerUp(e) {
+        if (!pointerDraggedItem || (pointerDraggedItem && typeof pointerDraggedItem.hasPointerCapture !== 'function') || !pointerDraggedItem.hasPointerCapture(e.pointerId)) {
+            document.removeEventListener('pointermove', handlePointerMove); document.removeEventListener('pointerup', handlePointerUp); document.removeEventListener('pointercancel', handlePointerUp);
+            if (document.body.style.userSelect === 'none') document.body.style.userSelect = ''; return;
+        }
+        document.removeEventListener('pointermove', handlePointerMove); document.removeEventListener('pointerup', handlePointerUp); document.removeEventListener('pointercancel', handlePointerUp);
+        if (document.body.style.userSelect === 'none') document.body.style.userSelect = '';
+        const droppedSuccessfullyInEmptySlot = currentOverZone && currentOverZone.children.length === 0;
+        if (isTouchDragging) {
+            pointerDraggedItem.classList.remove('dragging');
+            pointerDraggedItem.style.left = ''; pointerDraggedItem.style.top = ''; pointerDraggedItem.style.visibility = '';
+            if (currentOverZone && droppedSuccessfullyInEmptySlot) {
+                if (!currentOverZone.contains(pointerDraggedItem)) currentOverZone.appendChild(pointerDraggedItem);
+                pointerDraggedItem.draggable = false; pointerDraggedItem.style.cursor = 'pointer';
+                pointerDraggedItem.classList.add('in-slot');
+                pointerDraggedItem.removeEventListener('pointerdown', handlePointerDown);
+                pointerDraggedItem.addEventListener('click', returnItemToPool);
+            } else { itemsContainer.appendChild(pointerDraggedItem); }
+            if(currentOverZone) currentOverZone.classList.remove('over');
+        } else {
+            if(pointerDraggedItem && typeof pointerDraggedItem.classList !== 'undefined') pointerDraggedItem.classList.remove('native-dragging');
+            if (currentOverZone) currentOverZone.classList.remove('over');
+        }
+        if (pointerDraggedItem && typeof pointerDraggedItem.releasePointerCapture === 'function') { try { pointerDraggedItem.releasePointerCapture(e.pointerId); } catch(err) {console.warn("Pointer release failed:", err)}}
+        pointerDraggedItem = null; isTouchDragging = false; currentOverZone = null; offsetX = 0; offsetY = 0;
+    }
+
+    checkBtn.addEventListener('click', () => {
+        let allSlotsCorrectlyFilled = true;
+        let slotsFilledCount = 0;
+        document.querySelectorAll('.item').forEach(item => item.style.borderColor = 'transparent');
+
+        chainSlots.forEach(slot => {
+            const expectedCategory = slot.dataset.expectedCategory;
+            if (slot.children.length === 1 && slot.children[0].classList.contains('item')) {
+                slotsFilledCount++;
+                const itemInSlot = slot.children[0];
+                const actualCategory = itemInSlot.dataset.category;
+                if (actualCategory === expectedCategory) { itemInSlot.style.borderColor = 'var(--correct-border)'; }
+                else { itemInSlot.style.borderColor = 'var(--incorrect-border)'; allSlotsCorrectlyFilled = false; }
+            } else { allSlotsCorrectlyFilled = false; }
+        });
+
+        if (slotsFilledCount < chainSlots.length) { messageArea.textContent = `Please complete the food chain by filling all ${chainSlots.length} slots.`; messageArea.className = 'error';
+        } else if (!allSlotsCorrectlyFilled) { messageArea.textContent = "Some items are in the wrong category for this food chain. Try again!"; messageArea.className = 'error';
+        } else { messageArea.textContent = "Excellent! This is a valid food chain!"; messageArea.className = 'success'; }
+    });
+
+    resetBtn.addEventListener('click', initializeGame);
+    initializeGame();
+  });
+  </script>
+</body>
+</html>
