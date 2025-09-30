@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hazard Symbol Matching Game</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ----------  CORE LAYOUT  ---------- */
+    :root {
+      --bg-page: #e9ecef;
+      --bg-panel: #ffffff;
+      --text-dark: #212529;
+      --text-light: #f8f9fa;
+      --accent-color: #ffc107;
+      --accent-dark: #e0a800;
+      --correct-border: #28a745;
+      --incorrect-border: #dc3545;
+      --unplaced-border: #fd7e14;
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0; font-family:'Poppins',sans-serif; background:var(--bg-page);
+      display:flex; flex-direction:column; align-items:center; padding:3px; /* MINIMAL padding */
+      min-height: 100vh; color: var(--text-dark);
+      overscroll-behavior: none;
+    }
+    .header-bar {
+      background-color: var(--accent-color);
+      color: var(--text-dark);
+      padding: 5px 0; /* REDUCED padding */
+      width: 100%;
+      text-align: center;
+      margin-bottom: 5px; /* REDUCED margin */
+      border-radius: 4px; /* REDUCED border-radius */
+      box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+    }
+    .header-bar h1{font-size:1.5rem; margin:0; font-weight: 700;} /* REDUCED font-size */
+    p.instructions{
+      color:var(--text-dark); margin:0 auto 5px; /* REDUCED margin */
+      text-align: center; font-size: 0.75rem; /* REDUCED font-size */
+      max-width: 100%;
+    }
+
+    .game-container{
+      background:var(--bg-panel); width:100%;
+      max-width:460px; /* FURTHER REDUCED max-width */
+      padding:8px; /* REDUCED padding */
+      border-radius:6px; /* REDUCED border-radius */
+      box-shadow: 0 1px 6px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 8px; /* REDUCED gap */
+      position: relative; /* For absolute positioning of dragged item */
+    }
+
+    #symbols-pool-container {
+        padding: 6px; /* REDUCED padding */
+        background-color: #f8f9fa;
+        border-radius: 4px; /* REDUCED border-radius */
+        border: 1px solid #dee2e6;
+        text-align: center;
+    }
+    #symbols-pool-container h2 {
+        margin-top: 0;
+        margin-bottom: 6px; /* REDUCED margin */
+        font-size: 0.9rem; /* REDUCED font-size */
+        color: var(--text-dark);
+    }
+    #symbols-pool{
+      display:flex;flex-wrap:wrap;gap:6px; /* REDUCED gap */
+      justify-content:center; min-height: 50px; /* REDUCED min-height */
+    }
+    .symbol-item{
+      width:50px; height:50px; /* REDUCED size */
+      background:#fff;
+      display:flex; align-items:center; justify-content:center;
+      border-radius:4px; /* REDUCED border-radius */
+      box-shadow:0 1px 1px rgba(0,0,0,0.1);cursor:grab;
+      touch-action: none; user-select: none; position: relative;
+      transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out;
+      border: 2px solid transparent;
+      padding: 2px; /* REDUCED padding */
+    }
+    .symbol-item img {
+      pointer-events: none; max-width: 75%; max-height: 75%; /* Adjusted for smaller item */
+      user-select: none;
+      object-fit: contain;
+    }
+    .symbol-item.dragging {
+      opacity: 0.7; cursor: grabbing; position: absolute;
+      z-index: 1000; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      transform: scale(1.1);
+      transform-origin: 0 0; /* ADDED: Crucial for correct touch drag with scale */
+      transition: none;
+    }
+    .symbol-item.native-dragging { opacity: 0.3; }
+
+    #definitions-container {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px; /* REDUCED gap */
+    }
+    .definition-wrapper{
+      background-color: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 4px; /* REDUCED border-radius */
+      padding: 6px; /* REDUCED padding */
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 6px; /* REDUCED gap */
+    }
+    .definition-text{
+      font-size:0.7rem; /* REDUCED font-size */
+      color:var(--text-dark);
+      margin-bottom: 0;
+      text-align: left;
+      font-weight: 600;
+      flex-grow: 1;
+      min-height: auto;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      line-height: 1.3; /* Adjust line height for small text */
+    }
+    .definition-drop-zone{
+      width:45px; height:45px; /* REDUCED size */
+      border:2px dashed #adb5bd; border-radius:4px; /* REDUCED border-radius */
+      display:flex; align-items:center; justify-content:center;
+      transition:background .3s, border-style .3s;
+      background-color: #fff;
+      flex-shrink: 0;
+    }
+    .definition-drop-zone.over{
+      border-style: solid;
+      border-color: var(--accent-color);
+      background-color: #fff9e6;
+    }
+    .definition-drop-zone .symbol-item {
+        box-shadow: none;
+        border-width: 2px;
+        width: 100%;
+        height: 100%;
+    }
+     .definition-drop-zone .symbol-item img {
+        max-width: 80%;
+        max-height: 80%;
+    }
+
+
+    /* ----------  CONTROLS & MESSAGES  ---------- */
+    .controls{
+      text-align:center;
+    }
+    .controls button{
+      background:var(--accent-color);color:var(--text-dark);border:none;
+      padding:6px 15px; /* REDUCED padding */
+      border-radius:4px; /* REDUCED border-radius */
+      cursor:pointer;
+      margin:4px 3px; /* REDUCED margin */
+      font-size:0.8rem; /* REDUCED font-size */
+      font-weight:600;
+      font-family:'Poppins',sans-serif;transition:background .3s, transform 0.1s;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.15);
+    }
+    .controls button:hover{background:var(--accent-dark); transform: translateY(-1px);}
+    .controls button:active{transform: translateY(0px); background: #cca300;}
+
+    #message-area {
+        text-align: center; font-size: 0.8rem; /* REDUCED font-size */
+        font-weight: bold;
+        margin-top: 8px; /* REDUCED margin */
+        min-height: 1.2em; padding: 5px; /* REDUCED padding */
+        border-radius: 4px; /* REDUCED border-radius */
+    }
+    .message-correct { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;}
+    .message-incorrect { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;}
+    .message-progress { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba;}
+  </style>
+</head>
+<body>
+  <header class="header-bar">
+    <h1>Hazard Symbol Match</h1>
+  </header>
+  <p class="instructions">Drag each symbol to its correct definition.</p>
+
+  <div class="game-container">
+    <div id="symbols-pool-container">
+        <h2>Available Symbols</h2>
+        <div id="symbols-pool">
+            </div>
+    </div>
+
+    <div id="definitions-container">
+        </div>
+
+    <div id="message-area"></div>
+
+    <div class="controls">
+      <button id="check-btn" type="button">Check Answers</button>
+      <button id="reset-btn" type="button">Reset Game</button>
+    </div>
+  </div>
+
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Helper function to get OpenMoji SVG URLs
+    const om = code => `https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${code}.svg`;
+
+    // Define symbols and their matching definitions
+    const HAZARD_DATA = [
+      {
+        key: 'explosive',
+        imageSrc: 'https://raw.githubusercontent.com/Maltais239/Images/main/hazard-symbol-danger4.jpg',
+        definition: 'Explosive: May explode if heated, struck, or near fire.'
+      },
+      {
+        key: 'flammable',
+        imageSrc: 'https://raw.githubusercontent.com/Maltais239/Images/main/flame.png',
+        definition: 'Flammable: Catches fire easily.'
+      },
+      {
+        key: 'toxic', // "Poisonous" from user, maps to "toxic" key
+        imageSrc: 'https://raw.githubusercontent.com/Maltais239/Images/main/hazard-symbol-danger1.jpg',
+        definition: 'Toxic: Can cause serious illness or death if swallowed or inhaled.'
+      },
+      {
+        key: 'corrosive',
+        imageSrc: 'https://raw.githubusercontent.com/Maltais239/Images/main/hazard-symbol-danger2.jpg',
+        definition: 'Corrosive: Burns skin, eyes, or eats away at materials.'
+      },
+      {
+        key: 'harmful',
+        imageSrc: om('26A0'), // Warning sign (often used for irritant/harmful)
+        definition: 'Harmful/Irritant: May cause irritation or less serious health effects.'
+      },
+      {
+        key: 'environmental',
+        imageSrc: 'https://raw.githubusercontent.com/Maltais239/Images/main/WHMIS_Pictograms_Environment.webp',
+        definition: 'Environmental Hazard: Harmful to aquatic life or the environment.'
+      }
+    ];
+
+    const symbolsPool = document.getElementById('symbols-pool');
+    const definitionsContainer = document.getElementById('definitions-container');
+    const gameContainer = document.querySelector('.game-container');
+    const messageArea = document.getElementById('message-area');
+
+    let pointerDraggedItem = null;
+    let offsetX = 0, offsetY = 0;
+    let currentOverZone = null;
+    let isTouchDragging = false;
+
+    function initializeGame() {
+        symbolsPool.innerHTML = '';
+        definitionsContainer.innerHTML = '';
+        messageArea.textContent = '';
+        messageArea.className = '';
+
+        const shuffledSymbols = [...HAZARD_DATA].sort(() => Math.random() - 0.5);
+        shuffledSymbols.forEach((data, idx) => {
+            const symbolEl = document.createElement('div');
+            symbolEl.className = 'symbol-item';
+            symbolEl.draggable = true;
+            symbolEl.id = `symbol-${data.key}`;
+            symbolEl.dataset.symbolKey = data.key;
+            symbolEl.innerHTML = `<img src="${data.imageSrc}" alt="${data.key} symbol">`;
+
+            symbolEl.addEventListener('dragstart', handleDragStartMouse);
+            symbolEl.addEventListener('dragend', handleDragEndMouse);
+            symbolEl.addEventListener('pointerdown', handlePointerDown);
+            symbolsPool.appendChild(symbolEl);
+        });
+
+        const shuffledDefinitions = [...HAZARD_DATA].sort(() => Math.random() - 0.5);
+        shuffledDefinitions.forEach(data => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'definition-wrapper';
+            const dropZoneEl = document.createElement('div');
+            dropZoneEl.className = 'definition-drop-zone';
+            dropZoneEl.id = `zone-${data.key}`;
+            dropZoneEl.dataset.definitionKey = data.key;
+
+            const textEl = document.createElement('div');
+            textEl.className = 'definition-text';
+            textEl.textContent = data.definition;
+
+            dropZoneEl.addEventListener('dragover', handleDragOverMouse);
+            dropZoneEl.addEventListener('drop', handleDropMouse);
+
+            wrapper.appendChild(dropZoneEl);
+            wrapper.appendChild(textEl);
+            definitionsContainer.appendChild(wrapper);
+        });
+
+        pointerDraggedItem = null;
+        isTouchDragging = false;
+        currentOverZone = null;
+    }
+
+    // --- Mouse Drag & Drop Handlers ---
+    function handleDragStartMouse(e) {
+      if (e.pointerType !== 'touch') {
+          e.dataTransfer.setData('text/plain', e.currentTarget.id);
+          e.dataTransfer.effectAllowed = 'move';
+          setTimeout(() => { e.target.classList.add('native-dragging'); }, 0);
+          isTouchDragging = false;
+      } else { e.preventDefault(); }
+    }
+
+    function handleDragEndMouse(e) {
+        if (e.pointerType !== 'touch') {
+            e.target.classList.remove('native-dragging');
+            document.querySelectorAll('.definition-drop-zone.over').forEach(z => z.classList.remove('over'));
+        }
+        isTouchDragging = false; pointerDraggedItem = null; currentOverZone = null;
+    }
+
+    function handleDragOverMouse(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleDropMouse(e) {
+      e.preventDefault();
+      if (e.pointerType !== 'touch') {
+        const id = e.dataTransfer.getData('text/plain');
+        const droppedElement = document.getElementById(id);
+        const targetZone = e.currentTarget.classList.contains('definition-drop-zone') ? e.currentTarget : null;
+
+        if (droppedElement && targetZone) {
+            droppedElement.classList.remove('native-dragging');
+            if (targetZone.children.length === 0) {
+                 targetZone.appendChild(droppedElement);
+            } else {
+                symbolsPool.appendChild(droppedElement);
+            }
+        }
+        if(targetZone) targetZone.classList.remove('over');
+        currentOverZone = null;
+      }
+    }
+
+    // --- Pointer Event Handlers ---
+    function handlePointerDown(e) {
+        if (e.button !== 0 || pointerDraggedItem) return;
+        pointerDraggedItem = e.currentTarget;
+        isTouchDragging = e.pointerType === 'touch';
+        pointerDraggedItem.style.border = '2px solid transparent';
+        messageArea.textContent = ''; messageArea.className = '';
+
+        if (isTouchDragging) {
+            e.preventDefault();
+            pointerDraggedItem.setPointerCapture(e.pointerId);
+            const rect = pointerDraggedItem.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+            pointerDraggedItem.classList.add('dragging'); // Applies scale and absolute positioning
+        } else {
+            try { pointerDraggedItem.setPointerCapture(e.pointerId); }
+            catch (err) { console.warn("Pointer capture failed for mouse.", err); }
+        }
+        document.addEventListener('pointermove', handlePointerMove);
+        document.addEventListener('pointerup', handlePointerUp);
+        document.addEventListener('pointercancel', handlePointerUp);
+        document.body.style.userSelect = 'none';
+    }
+
+    function handlePointerMove(e) {
+        if (!pointerDraggedItem || !pointerDraggedItem.hasPointerCapture(e.pointerId)) return;
+
+        if (isTouchDragging) {
+            e.preventDefault();
+            const gameRect = gameContainer.getBoundingClientRect();
+            const scaleFactor = 1.1; // Must match CSS transform: scale() in .symbol-item.dragging
+            // Adjust position based on initial offset and scale factor
+            let newX = (e.clientX - gameRect.left) - (offsetX * scaleFactor);
+            let newY = (e.clientY - gameRect.top) - (offsetY * scaleFactor);
+
+            pointerDraggedItem.style.left = `${newX}px`;
+            pointerDraggedItem.style.top = `${newY}px`;
+        }
+
+        const originalVisibility = isTouchDragging ? pointerDraggedItem.style.visibility : '';
+        if (isTouchDragging) pointerDraggedItem.style.visibility = 'hidden';
+        let elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY);
+        if (isTouchDragging) pointerDraggedItem.style.visibility = originalVisibility;
+
+        let dropTarget = elementUnderPointer ? elementUnderPointer.closest('.definition-drop-zone') : null;
+
+        if (currentOverZone && currentOverZone !== dropTarget) {
+            currentOverZone.classList.remove('over');
+        }
+        if (dropTarget && dropTarget.children.length === 0) { // Only allow drop if zone is empty
+            dropTarget.classList.add('over');
+            currentOverZone = dropTarget;
+        } else {
+            if (dropTarget && dropTarget.children.length > 0) { // Zone is full
+                currentOverZone = null;
+                if (dropTarget.classList.contains('over')) dropTarget.classList.remove('over');
+            } else { // Not over any valid zone
+                 currentOverZone = null;
+            }
+        }
+    }
+
+    function handlePointerUp(e) {
+        if (!pointerDraggedItem || !pointerDraggedItem.hasPointerCapture(e.pointerId)) {
+            document.removeEventListener('pointermove', handlePointerMove);
+            document.removeEventListener('pointerup', handlePointerUp);
+            document.removeEventListener('pointercancel', handlePointerUp);
+            document.body.style.userSelect = '';
+            return;
+        }
+
+        document.removeEventListener('pointermove', handlePointerMove);
+        document.removeEventListener('pointerup', handlePointerUp);
+        document.removeEventListener('pointercancel', handlePointerUp);
+        document.body.style.userSelect = '';
+
+        if (isTouchDragging) {
+            pointerDraggedItem.classList.remove('dragging');
+            pointerDraggedItem.style.left = '';
+            pointerDraggedItem.style.top = '';
+            pointerDraggedItem.style.visibility = '';
+
+            if (currentOverZone && currentOverZone.children.length === 0) {
+                if (!currentOverZone.contains(pointerDraggedItem)) {
+                    currentOverZone.appendChild(pointerDraggedItem);
+                }
+                currentOverZone.classList.remove('over');
+            } else {
+                symbolsPool.appendChild(pointerDraggedItem);
+                if(currentOverZone) currentOverZone.classList.remove('over'); // Remove hover from full zone
+            }
+        } else {
+            pointerDraggedItem.classList.remove('native-dragging');
+            if (currentOverZone) {
+                currentOverZone.classList.remove('over');
+            }
+        }
+
+        try { pointerDraggedItem.releasePointerCapture(e.pointerId); } catch(err) {}
+        pointerDraggedItem = null;
+        isTouchDragging = false;
+        currentOverZone = null;
+        offsetX = 0; offsetY = 0;
+    }
+
+    // --- Game Logic Buttons ---
+    document.getElementById('check-btn').addEventListener('click', () => {
+        let allCorrect = true;
+        let itemsInWrongZone = false;
+        let itemsStillInPool = symbolsPool.children.length > 0;
+
+        document.querySelectorAll('.definition-drop-zone .symbol-item').forEach(item => {
+            item.style.borderColor = 'transparent';
+        });
+        Array.from(symbolsPool.children).forEach(item => {
+             if (item.classList.contains('symbol-item')) {
+                item.style.borderColor = 'transparent';
+             }
+        });
+
+        document.querySelectorAll('.definition-drop-zone').forEach(zone => {
+            const placedSymbol = zone.querySelector('.symbol-item');
+            if (placedSymbol) {
+                const symbolKey = placedSymbol.dataset.symbolKey;
+                const definitionKey = zone.dataset.definitionKey;
+                const isCorrect = symbolKey === definitionKey;
+                placedSymbol.style.borderColor = isCorrect ? 'var(--correct-border)' : 'var(--incorrect-border)';
+                if (!isCorrect) {
+                    allCorrect = false;
+                    itemsInWrongZone = true;
+                }
+            } else {
+                allCorrect = false;
+            }
+        });
+
+        Array.from(symbolsPool.children).forEach(item => {
+            if (item.classList.contains('symbol-item')) {
+                item.style.borderColor = 'var(--unplaced-border)';
+                allCorrect = false;
+            }
+        });
+
+        if (allCorrect && !itemsStillInPool) {
+            messageArea.textContent = "Excellent! All symbols matched correctly!";
+            messageArea.className = 'message-correct';
+        } else if (itemsStillInPool) {
+            messageArea.textContent = "Keep going! Some symbols are still in the pool.";
+            messageArea.className = 'message-progress';
+        } else if (itemsInWrongZone) {
+            messageArea.textContent = "Almost! Some symbols are in the wrong places. Check red borders.";
+            messageArea.className = 'message-incorrect';
+        } else {
+            messageArea.textContent = "Some definitions are still empty. Try to match all symbols!";
+            messageArea.className = 'message-progress';
+        }
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', () => {
+        initializeGame();
+    });
+
+    initializeGame();
+  });
+  </script>
+</body>
+</html>
