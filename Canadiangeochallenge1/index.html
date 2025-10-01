@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canadian Geography Challenge</title>
+
+    <!-- Leaflet CSS and JS for the interactive map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- Tailwind CSS for styling the page layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Poppins:wght@700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow-y: auto;
+        }
+        h1, h2 {
+            font-family: 'Poppins', sans-serif;
+        }
+        #map {
+            height: 650px;
+            width: 100%;
+            border-radius: 0.75rem; /* rounded-xl */
+            border: 1px solid #e2e8f0; /* slate-200 */
+            z-index: 10;
+        }
+        .leaflet-container {
+            background-color: #f1f5f9; /* bg-slate-100 */
+        }
+        .quest-panel {
+            min-height: 650px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        #info-panel-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 0.5rem;
+            background-color: #e2e8f0; /* slate-200 */
+        }
+        .feedback {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+        }
+        .feedback-correct {
+            background-color: #dcfce7; /* green-100 */
+            color: #166534; /* green-800 */
+        }
+        .feedback-incorrect {
+            background-color: #fee2e2; /* red-100 */
+            color: #991b1b; /* red-800 */
+        }
+        /* Custom styles for Leaflet Circle Markers */
+        .community-marker { stroke: #0891b2; fill: #67e8f9; }
+        .city-marker { stroke: #6d28d9; fill: #c4b5fd; }
+        .region-marker { stroke: #db2777; fill: #f9a8d4; }
+    </style>
+</head>
+<body class="bg-slate-100 text-gray-800">
+
+    <div class="w-full">
+        <header class="text-center py-8 px-4 md:px-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-900 tracking-tight">Canadian Geography Challenge</h1>
+            <p class="text-lg text-gray-600 mt-2">Explore the places and regions of Canada.</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-4 gap-8 px-4 md:px-8">
+            <!-- Map Container -->
+            <div class="lg:col-span-3 bg-white p-4 rounded-xl shadow-lg">
+                <div id="map"></div>
+            </div>
+
+            <!-- Quest Panel -->
+            <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg quest-panel">
+                <div id="quest-panel-content" class="flex-grow">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">Your Mission</h2>
+                    <div id="instructions" class="text-gray-700 space-y-4">
+                        <h3 class="text-lg font-medium text-gray-800">What city or town is your school in?</h3>
+                        <select id="community-select" class="w-full p-2 border border-gray-300 rounded-md">
+                            <option value="Beaumont">Beaumont</option>
+                            <option value="Calmar">Calmar</option>
+                            <option value="Devon">Devon</option>
+                            <option value="Leduc">Leduc</option>
+                            <option value="New Sarepta">New Sarepta</option>
+                            <option value="Thorsby">Thorsby</option>
+                            <option value="Warburg">Warburg</option>
+                        </select>
+                        <button id="start-game-button" class="mt-4 w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">Find My Community!</button>
+                    </div>
+                    <div id="info-panel-details" class="mt-4 hidden">
+                         <img id="info-panel-image" src="" alt="Image of the selected location" onerror="this.onerror=null;this.src='https://placehold.co/600x400/e0e0e0/757575?text=Image+Not+Found';">
+                         <p id="info-panel-story" class="text-gray-700 mt-4"></p>
+                         <p id="info-panel-attribution" class="text-xs text-gray-500 mt-2"></p>
+                    </div>
+                </div>
+                 <div id="feedback-container"></div>
+            </div>
+        </main>
+        
+        <footer class="text-center py-8 px-4 md:px-8 text-gray-500 text-sm">
+            <p>Made with Leaflet.js and Tailwind CSS.</p>
+        </footer>
+    </div>
+
+    <script>
+        // --- DATA ---
+        const mapData = [
+            // Black Gold Communities
+            { name: "Beaumont", coords: [53.35, -113.41], type: 'community', story: "A city in the Edmonton Metropolitan Region." },
+            { name: "Calmar", coords: [53.26, -113.81], type: 'community', story: "A town west of Leduc." },
+            { name: "Devon", coords: [53.36, -113.73], type: 'community', story: "A town on the North Saskatchewan River." },
+            { name: "Leduc", coords: [53.26, -113.55], type: 'community', story: "A city south of Edmonton, near the international airport." },
+            { name: "New Sarepta", coords: [53.28, -113.11], type: 'community', story: "A hamlet east of Leduc." },
+            { name: "Thorsby", coords: [53.22, -114.05], type: 'community', story: "A village southwest of Leduc." },
+            { name: "Warburg", coords: [53.18, -114.30], type: 'community', story: "A village in Leduc County." },
+            
+            // Major Cities
+            { name: "Edmonton", coords: [53.54, -113.49], type: 'city', story: "Edmonton is the capital city of Alberta, located on the North Saskatchewan River. It is a cultural, governmental and educational centre.", image: "https://upload.wikimedia.org/wikipedia/commons/4/4c/Edmonton_Skyline_from_106_Street_Lookout_2019.jpg", attribution: "Kurt Bauschardt, CC BY-SA 2.0, via Wikimedia Commons" },
+            { name: "Calgary", coords: [51.04, -114.07], type: 'city', story: "Calgary is a major city in Alberta, situated at the confluence of the Bow and Elbow rivers. It is a leader in Canada's oil and gas industry.", image: "https://upload.wikimedia.org/wikipedia/commons/b/bb/Downtown_Calgary_2020-4.jpg", attribution: "Luminou, CC BY-SA 4.0, via Wikimedia Commons" },
+            { name: "Vancouver", coords: [49.28, -123.12], type: 'city', story: "Forestry is a key industry in British Columbia. Vancouver is a major port city that ships forest products around the world.", image: "https://upload.wikimedia.org/wikipedia/commons/4/49/Vancouver_night_2.jpg", attribution: "Mttb, CC BY-SA 3.0, via Wikimedia Commons" },
+            { name: "Yellowknife", coords: [62.45, -114.37], type: 'city', story: "Yellowknife is the capital of the Northwest Territories. It's a northern city located in the Canadian Shield, known for its history of gold mining.", image: "https://upload.wikimedia.org/wikipedia/commons/3/3f/Yellowknife_201809.jpg", attribution: "Denise Chan, CC BY-SA 2.0, via Wikimedia Commons" },
+            { name: "Montreal", coords: [45.50, -73.56], type: 'city', story: "Montreal is a large, historic city in Quebec, located on an island in the St. Lawrence River.", image: "https://upload.wikimedia.org/wikipedia/commons/f/f8/Downtown_seen_from_Mont-Royal.jpg", attribution: "Taxiarchos228, CC BY-SA 3.0, via Wikimedia Commons"},
+            { name: "Halifax", coords: [44.64, -63.57], type: 'city', story: "Halifax, in the Appalachian region, has a large natural harbour. Its economy has long been tied to the Atlantic fishery.", image: "https://upload.wikimedia.org/wikipedia/commons/7/74/Halifax_Harbour_Sunset_Skyline%2C_Nova_Scotia_%2824237034620%29.jpg", attribution: "Tony Webster, CC BY 2.0, via Wikimedia Commons"},
+
+            // Physical Regions
+            { name: "Prairies", coords: [50.44, -104.61], type: 'region', story: "The Interior Plains, or Prairies, have rich soil and flat land, making it ideal for agriculture. Alberta's oil and gas resources are also found here.", image: "https://upload.wikimedia.org/wikipedia/commons/7/74/Rural_Alberta%2C_Canada_%28cropped%29.jpg", attribution: "Adil., CC BY 2.0, via Wikimedia Commons" },
+            { name: "Canadian Shield", coords: [56, -95], type: 'region', story: "A huge area of ancient, exposed rock, the Canadian Shield is not good for farming but is rich in natural resources like minerals (mining).", image: "https://upload.wikimedia.org/wikipedia/commons/c/c5/Parc_national_des_Grands-Jardins_Charlevoix_Quebec_Canada.jpg", attribution: "Berneri, CC BY-SA 4.0, via Wikimedia Commons" },
+            { name: "Arctic", coords: [69.11, -95.05], type: 'region', story: "Canada's northernmost region is characterized by tundra and ice. It's a vast and sparsely populated area with a unique environment.", image: "https://upload.wikimedia.org/wikipedia/commons/8/8f/Repulse_Bay.jpg", attribution: "Ansgar Walk, CC BY-SA 2.5, via Wikimedia Commons"},
+            { name: "Great Lakes", coords: [45, -82], type: 'region', story: "This region has fertile lowlands and access to the Great Lakes waterway. It is the most densely populated region in Canada.", image: "https://upload.wikimedia.org/wikipedia/commons/9/9f/Toronto_-_ON_-_Toronto_Island_Park.jpg", attribution: "Iankiki, CC BY-SA 4.0, via Wikimedia Commons"},
+            { name: "Appalachian Mountains", coords: [47.56, -58.71], type: 'region', story: "An older, eroded mountain range in Eastern Canada with rolling hills, forests, and deep coastal harbours used for fishing.", image: "https://upload.wikimedia.org/wikipedia/commons/4/42/Blue_Ridge_Parkway_Sunset_%2843691100%29.jpeg", attribution: "Great Smoky Mountains National Park, Public domain, via Wikimedia Commons" },
+        ];
+        
+        // --- GAME QUESTS ---
+        const quests = [
+            { instruction: "Great! Now that you've found your home base, let's find a neighbour. Click on the city of <strong>Leduc</strong>.", target: "Leduc" },
+            { instruction: "Well done. The town of <strong>Thorsby</strong> is SOUTH-WEST of Leduc. Find and click on <strong>Thorsby</strong>.", target: "Thorsby" },
+            { instruction: "Excellent! The hamlet of <strong>New Sarepta</strong> is EAST of Leduc. Click on <strong>New Sarepta</strong>.", target: "New Sarepta" },
+            { instruction: "Let's find Alberta's capital city. Click on <strong>Edmonton</strong>.", target: "Edmonton" },
+            { instruction: "Now find Alberta's other major city to the south. Click on <strong>Calgary</strong>.", target: "Calgary" },
+            { instruction: "You know Alberta well! Now let's explore natural resources. Forestry is vital to BC's economy. Find the major WEST coast city of <strong>Vancouver</strong>.", target: "Vancouver" },
+            { instruction: "Perfect. Most of Alberta is in the <strong>Prairies</strong> physical region, known for agriculture and oil. Click its marker.", target: "Prairies" },
+            { instruction: "Fantastic. Now let's go far NORTH. Find the city of <strong>Yellowknife</strong>, located in the mineral-rich Canadian Shield.", target: "Yellowknife"},
+            { instruction: "Awesome! Let's head to the EAST coast. The fishery is a major industry there. Find the port city of <strong>Halifax</strong>.", target: "Halifax"},
+            { instruction: "You're a natural! Now find the large physical region in eastern Canada made of old, rolling mountains: the <strong>Appalachian Mountains</strong>.", target: "Appalachian Mountains" },
+            { instruction: "Time to find one of Canada's most historic cities, far EAST of us in the <strong>Great Lakes</strong> region. Find <strong>Montreal</strong>.", target: "Montreal"},
+            { instruction: "Final challenge: You've seen many places. Now click on the marker for the vast <strong>Arctic</strong> region.", target: "Arctic" },
+        ];
+        let activeQuests = [];
+        let currentQuestIndex = 0;
+        let gameStarted = false;
+
+        // --- MAP INITIALIZATION ---
+        const map = L.map('map').setView([58, -98], 4);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>', subdomains: 'abcd', maxZoom: 20 }).addTo(map);
+
+        // --- DOM ELEMENTS ---
+        const instructionsPanel = document.getElementById('instructions');
+        const feedbackContainer = document.getElementById('feedback-container');
+        const startGameButton = document.getElementById('start-game-button');
+        const communitySelect = document.getElementById('community-select');
+        const infoDetails = document.getElementById('info-panel-details');
+        const infoImage = document.getElementById('info-panel-image');
+        const infoStory = document.getElementById('info-panel-story');
+        const infoAttribution = document.getElementById('info-panel-attribution');
+        
+        // --- GAME LOGIC ---
+        function startGame() {
+            gameStarted = true;
+            const selectedCommunityName = communitySelect.value;
+            
+            // Filter out the quest that matches the starting community
+            activeQuests = quests.filter(quest => quest.target !== selectedCommunityName);
+
+            const selectedCommunity = mapData.find(item => item.name === selectedCommunityName);
+            if (selectedCommunity) {
+                map.flyTo(selectedCommunity.coords, 11, { animate: true, duration: 1.5 });
+                instructions.innerHTML = `<p class="font-semibold">Excellent! The map has zoomed to <strong>${selectedCommunity.name}</strong>. Get ready for your first challenge!</p>`;
+                setTimeout(displayQuest, 2500); 
+            }
+        }
+
+        function displayQuest() {
+            infoDetails.classList.add('hidden'); // Hide the info panel for the next question
+            if (currentQuestIndex < activeQuests.length) {
+                const quest = activeQuests[currentQuestIndex];
+                instructionsPanel.innerHTML = `<p>${quest.instruction}</p>`;
+            } else {
+                instructionsPanel.innerHTML = `<h3 class="font-bold text-xl text-green-700">Congratulations!</h3><p>You have completed the Canadian Geography Challenge! You successfully located communities, used directions, and identified Canada's major physical regions and resources.</p>`;
+            }
+            feedbackContainer.innerHTML = '';
+        }
+        
+        function updateInfoPanel(item) {
+            infoStory.textContent = item.story || '';
+            if (item.image) {
+                infoImage.src = item.image;
+                infoImage.alt = `Image of ${item.name}`;
+                infoAttribution.innerHTML = `Image: ${item.attribution || 'Source unavailable'}`;
+                infoDetails.classList.remove('hidden');
+            } else {
+                infoDetails.classList.add('hidden');
+            }
+        }
+
+        function handleMarkerClick(item) {
+            if (!gameStarted || currentQuestIndex >= activeQuests.length) return;
+
+            const quest = activeQuests[currentQuestIndex];
+            if (item.name === quest.target) {
+                feedbackContainer.innerHTML = `<div class="feedback feedback-correct">Correct! That's ${item.name}.</div>`;
+                updateInfoPanel(item); // Show image and story
+                currentQuestIndex++;
+                setTimeout(displayQuest, 4000); // Give them time to read the info
+            } else {
+                feedbackContainer.innerHTML = `<div class="feedback feedback-incorrect">Not quite! That's ${item.name}. Try again.</div>`;
+                infoDetails.classList.add('hidden');
+            }
+        }
+        
+        // --- DRAW MARKERS ---
+        mapData.forEach(item => {
+            let markerOptions = { radius: 8, fillOpacity: 0.8, weight: 1 };
+            if (item.type === 'community') { markerOptions.className = 'community-marker'; } 
+            else if (item.type === 'city') { markerOptions.className = 'city-marker'; markerOptions.radius = 10; } 
+            else if (item.type === 'region') { markerOptions.className = 'region-marker'; markerOptions.radius = 12; }
+            const marker = L.circleMarker(item.coords, markerOptions).addTo(map);
+            marker.bindPopup(`<strong class="text-base text-gray-800">${item.name}</strong>`);
+            marker.on('click', () => handleMarkerClick(item));
+        });
+        
+        // --- EVENT LISTENERS ---
+        startGameButton.addEventListener('click', startGame);
+
+    </script>
+</body>
+</html>
