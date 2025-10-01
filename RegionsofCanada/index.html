@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Map of Canada's Physiographic Regions</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; display: flex; font-family: 'Poppins', sans-serif; background-color: #f0f4f8; color: #334155; }
+    #map { flex: 1; height: 100%; border-right: 1px solid #ddd; }
+    #info-panel { width: 380px; max-width: 40%; padding: 2rem; background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%); border-left: 5px solid #047857; overflow-y: auto; box-shadow: -5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+    #info-panel h2 { margin-top: 0; color: #064e3b; font-size: 1.75rem; font-weight: 700; border-bottom: 2px solid #6ee7b7; padding-bottom: 0.5rem; margin-bottom: 1rem; }
+    #general-info { background-color: #e6fef7; border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; border: 1px solid #a7f3d0; }
+    #general-info h3 { margin-top: 0; margin-bottom: 0.75rem; color: #047857; font-size: 1.1rem; font-weight: 600; }
+    #general-info ul { list-style-type: '⛰️'; padding-left: 1.2rem; margin: 0; color: #475569; font-size: 0.9rem; }
+    #general-info li { padding-left: 0.6rem; margin-bottom: 0.5rem; line-height: 1.5; }
+    #info-content { border-top: 1px solid #ddd; padding-top: 1.5rem; }
+    #info-content h3 { margin-top: 0; margin-bottom: 1rem; color: #059669; font-size: 1.5rem; font-weight: 600; }
+    #info-content p { font-size: 0.95rem; line-height: 1.6; margin: 0.5rem 0 1rem 0; color: #334155; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="info-panel">
+    <h2>Canada's Physiographic Regions</h2>
+    <div id="general-info"></div>
+    <div id="info-content"><p>Click a region on the map to learn more about it.</p></div>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    // Initialize map
+    const map = L.map('map', { zoomControl: true }).setView([62, -96], 4);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      subdomains: 'abcd', maxZoom: 19
+    }).addTo(map);
+
+    const infoContent = document.getElementById('info-content');
+    const generalInfoDiv = document.getElementById('general-info');
+
+    // Region descriptions
+    const regionData = {
+      'Cordillera': `The Western Cordillera stretches along British Columbia and the Yukon, featuring the Rocky Mountains, Coast Mountains, and interior plateaus. Deep U-shaped valleys formed by ancient glaciers are lined with forests of spruce and fir. In high alpine zones, wildflowers bloom in summer and wildlife such as mountain goats, bears, and eagles thrive. Rivers like the Fraser carve through steep canyons, while volcanoes such as Mount Meager remain active reminders of the region’s fiery origins.`,
+      'Interior Plains': `Covering Alberta, Saskatchewan, and southern Manitoba, the Interior Plains are vast expanses of rolling grasslands and fertile farmlands. Thick layers of soil formed from ancient seabeds support wheat, canola, and sunflowers. The Saskatchewan and Missouri river valleys, with their meandering channels and floodplains, host cottonwood forests and wetland marshes that attract birds like sandhill cranes and ducks. Badlands in the south display eroded buttes and hoodoos from soft sandstone.`,
+      'Canadian Shield': `The Canadian Shield underlies half of Canada, including Ontario, Quebec, and parts of the territories. Composed of ancient Precambrian rocks, it is etched with thousands of lakes and boreal forests of pine, spruce, and birch. This “rocky core” contains rich mineral deposits such as nickel, copper, and gold. Glacial deposits created eskers and drumlins across the terrain, while features like the Canadian Shield’s highlands reach up to 1,200 m above sea level, offering vistas over lake-filled basins.`,
+      'Hudson Bay Lowlands': `This marshy region around Hudson Bay covers parts of Ontario and Manitoba. Permafrost lies just beneath sphagnum moss and peatlands that store vast amounts of carbon. Rivers draining into Hudson Bay form large deltas, supporting polar bears, seals, and migratory birds. Gravel beach ridges mark ancient shorelines from the Champlain Sea, and the terrain shifts from mire to lichen-dotted coastal flats at the bay’s edge.`,
+      'Great Lakes-St. Lawrence Lowlands': `From Lake Huron through Lake Ontario to the St. Lawrence River, this densely populated lowland features fertile glacial till plains under cities like Toronto, Montreal, and Ottawa. The Niagara Escarpment forms dramatic cliffs, waterfalls at Niagara Falls, and tablelands used for vineyards. Seasonal wetlands and Carolinian forests host turtles, salamanders, and rare orchids. Rolling drumlins and kames reveal the sculpting power of retreating glaciers.`,
+      'Appalachian Region': `Eastern Canada’s Appalachian belt extends from Quebec to Newfoundland. Ancient metamorphic rocks create ridges and valleys, with summits like Mont Jacques-Cartier rising above 1,200 m. Coastal areas feature fjords and rugged shorelines, while interior uplands support mixed hardwood forests of maple, oak, and birch. Soil from weathered sandstone and shale yields pockets of agriculture, and glacial striations remind us of the last ice sheet’s passage.`,
+      'Arctic and Subarctic': `North of the treeline, tundra and taiga landscapes stretch across Nunavut, Northwest Territories, and northern Quebec. Continuous permafrost shapes patterned ground and pingos—ice-cored mounds that dot the plains. Ice caps and glaciers blanket islands like Baffin and Ellesmere, feeding cold meltwater streams. Caribou herds migrate vast distances, and polar bears hunt on shifting sea ice along coastal areas.`
+    };
+
+    // General facts list
+    const generalFactsSingle = [
+      'Canada’s seven regions formed through tectonic plate collisions and glaciations over billions of years.',
+      'Glaciers sculpted U-shaped valleys, left behind drumlins and eskers, and deposited fertile soils.',
+      'Physiographic regions define soil types, vegetation zones, and habitat for Canada’s wildlife.'
+    ];
+
+    // Display general facts
+    function showGeneralInfo() {
+      generalInfoDiv.innerHTML = `<h3>About Regions</h3><ul>${generalFactsSingle.map(f=>`<li>${f}</li>`).join('')}</ul>`;
+    }
+
+    showGeneralInfo();
+
+    // Utility to extract region name
+    function getRegionName(props) {
+      return props.ENNAME || props.NAME || props.PHYSIO_NAME || Object.values(props).find(v => typeof v === 'string') || 'Unknown';
+    }
+
+    // Color palette
+    const colors = ['#8c715a','#f5dd90','#a690a4','#6495ed','#90ee90','#d2b48c','#b0c4de'];
+    function getColor(name) { return colors[Object.keys(regionData).indexOf(name)] || '#aaa'; }
+
+    // Style features
+    function style(feature) {
+      return { fillColor: getColor(getRegionName(feature.properties)), weight: 1.5, color: '#fff', fillOpacity: 0.8 };
+    }
+
+    // Interaction handlers
+    function highlight(e) { e.target.setStyle({ weight: 3, color: '#333', fillOpacity: 1 }); }
+    function reset(e) { geojson.resetStyle(e.target); }
+    function clickFeature(e) {
+      const props = e.target.feature.properties;
+      const name = getRegionName(props);
+      infoContent.innerHTML = `<h3>${name}</h3><p>${regionData[name] || 'No data available.'}</p>`;
+      const bounds = e.target.getBounds();
+      map.panTo(bounds.getCenter(), { animate: true });
+    }
+
+    // Apply to each feature
+    function onEach(feature, layer) {
+      layer.on({ mouseover: highlight, mouseout: reset, click: clickFeature });
+    }
+
+    // Load GeoJSON
+    let geojson;
+    fetch('https://services.arcgis.com/As5CFN3ThbQpy8Ph/arcgis/rest/services/1Physiographic_Regions/FeatureServer/0/query?f=geojson&where=1=1&outFields=*')
+      .then(res=>res.json())
+      .then(data=>{ geojson = L.geoJson(data, { filter: f=>Object.keys(regionData).includes(getRegionName(f.properties)), style, onEachFeature: onEach }).addTo(map); })
+      .catch(()=>{ infoContent.innerHTML = '<p>Error loading regions.</p>'; });
+  </script>
+</body>
+</html>
