@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Morpheme Match-Up</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #89CFF0; /* Baby Blue */
+            overflow: hidden;
+            touch-action: none;
+        }
+        .game-title {
+            font-family: 'Fredoka One', cursive;
+            color: white;
+            text-shadow: 2px 2px 0px #008CBA, 4px 4px 0px rgba(0,0,0,0.1);
+        }
+        .game-area {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            margin: auto;
+            aspect-ratio: 16 / 9;
+            background: linear-gradient(to bottom, #73C2FB, #A0D6F9);
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1), inset 0 2px 4px rgba(255,255,255,0.5);
+            overflow: hidden;
+            border: 4px solid #fff;
+        }
+        /* Background bubbles */
+        .bg-bubble {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            animation: float 20s infinite ease-in-out;
+        }
+        @keyframes float {
+            0% { transform: translateY(0) translateX(0); }
+            50% { transform: translateY(-30px) translateX(20px); }
+            100% { transform: translateY(0) translateX(0); }
+        }
+        .morpheme {
+            position: absolute;
+            border-radius: 50px;
+            color: white;
+            font-weight: 700;
+            font-size: 1.1rem;
+            cursor: grab;
+            user-select: none;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1), inset 0 2px 3px rgba(255,255,255,0.5);
+            border: 2px solid white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        .morpheme:active { cursor: grabbing; }
+        .morpheme.dragging { transform: scale(1.1); box-shadow: 0 8px 15px rgba(0,0,0,0.2); z-index: 20; }
+        .root {
+            background: linear-gradient(145deg, #4dabf7, #3b82f6);
+            font-size: 1.5rem;
+            width: 120px; height: 120px;
+            border-radius: 50%;
+            cursor: default;
+        }
+        .prefix { background: linear-gradient(145deg, #f8c03f, #f59e0b); }
+        .suffix { background: linear-gradient(145deg, #34d399, #10b981); }
+
+        .modal-overlay {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(5px);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 100; padding: 20px; text-align: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .modal-overlay.show { opacity: 1; pointer-events: auto; }
+        .start-button {
+            font-family: 'Fredoka One', cursive; background-color: #EF4444;
+            color: white; padding: 1rem 3rem; border-radius: 50px; font-size: 2rem;
+            border: 4px solid white; box-shadow: 0 5px 0 #B91C1C, 0 8px 15px rgba(0,0,0,0.2);
+            transition: all 0.1s ease-in-out; cursor: pointer;
+        }
+        .start-button:hover { transform: translateY(-2px); box-shadow: 0 7px 0 #B91C1C, 0 10px 20px rgba(0,0,0,0.25); }
+        .start-button:active { transform: translateY(2px); box-shadow: 0 3px 0 #B91C1C, 0 5px 10px rgba(0,0,0,0.2); }
+        
+        .timer-bar-bg { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 70%; height: 15px; background: rgba(0,0,0,0.2); border-radius: 10px; }
+        .timer-bar { height: 100%; border-radius: 10px; background-color: #34D399; transition: width 0.1s linear; }
+        
+        .score { font-family: 'Fredoka One', cursive; font-size: 2rem; color: white; text-shadow: 2px 2px 3px rgba(0,0,0,0.2); }
+        
+        .found-words-container { background: rgba(0, 0, 0, 0.1); }
+        .found-word-tag { background: #fff; color: #3B82F6; font-weight: 700; padding: 4px 10px; border-radius: 20px; font-size: 0.9rem; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        
+        .word-popup {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.5);
+            font-family: 'Fredoka One', cursive; font-size: 5rem;
+            opacity: 0; transition: all 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            z-index: 200; pointer-events: none;
+        }
+        .word-popup.show { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(0); opacity: 0; }
+        }
+        .pop-effect { animation: pop 0.4s ease-out forwards; }
+
+        @keyframes shake {
+            10%, 90% { transform: translate(-1px, 0); } 20%, 80% { transform: translate(2px, 0); }
+            30%, 50%, 70% { transform: translate(-4px, 0); } 40%, 60% { transform: translate(4px, 0); }
+        }
+    </style>
+</head>
+<body class="p-4 flex flex-col items-center justify-center min-h-screen">
+
+    <h1 class="game-title text-5xl md:text-6xl mb-4 text-center">Morpheme Match-Up</h1>
+
+    <div id="gameArea" class="game-area">
+        <div id="background-bubbles"></div>
+        <div id="morphemeContainer"></div>
+        <div id="wordPopup" class="word-popup"></div>
+        
+        <div class="absolute top-4 left-4">
+            <p class="score" id="score">Score: 0</p>
+        </div>
+
+        <div class="absolute bottom-4 left-4 right-4 flex flex-col items-center">
+            <div id="foundWordsContainer" class="found-words-container w-full max-w-2xl min-h-[50px] rounded-lg p-2 flex flex-wrap gap-2 justify-center items-center mb-2"></div>
+            <div class="timer-bar-bg"><div id="timerBar" class="timer-bar"></div></div>
+        </div>
+
+        <div id="startScreen" class="modal-overlay show">
+            <div class="bg-white p-8 rounded-xl shadow-lg text-center">
+                <h2 class="text-3xl font-bold text-gray-800 mb-2">Ready to Play?</h2>
+                <p class="text-gray-600 mb-6 max-w-md">Drag the prefixes and suffixes onto the root word to build as many words as you can before the time runs out!</p>
+                <button id="startButton" class="start-button">START</button>
+            </div>
+        </div>
+        <div id="endScreen" class="modal-overlay">
+            <div class="bg-white p-8 rounded-xl shadow-lg text-center">
+                <h2 id="endTitle" class="text-4xl font-bold text-gray-800 mb-2">Time's Up!</h2>
+                <p id="endScore" class="text-gray-700 text-2xl mb-6">Final Score: 0</p>
+                <button id="playAgainButton" class="start-button">Play Again</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const gameArea = document.getElementById('gameArea');
+        const startScreen = document.getElementById('startScreen');
+        const endScreen = document.getElementById('endScreen');
+        const startButton = document.getElementById('startButton');
+        const playAgainButton = document.getElementById('playAgainButton');
+        const morphemeContainer = document.getElementById('morphemeContainer');
+        const timerBar = document.getElementById('timerBar');
+        const scoreDisplay = document.getElementById('score');
+        const wordPopup = document.getElementById('wordPopup');
+        const foundWordsContainer = document.getElementById('foundWordsContainer');
+        const endTitle = document.getElementById('endTitle');
+        const endScore = document.getElementById('endScore');
+
+        let rootElement = null;
+        let score = 0;
+        let timerId;
+        const GAME_DURATION = 30000;
+        let foundWords = [];
+
+        const wordSets = [
+            { root: 'port', affixes: ['im', 'ex', 're', 'sup', 'trans', 'er', 'able'], decoys: ['un', 'dis', 'ly', 'ive'], validCombos: ['import', 'export', 'report', 'support', 'transport', 'porter', 'portable'] },
+            { root: 'act', affixes: ['re', 'en', 'inter', 'or', 'ion', 'ive'], decoys: ['dis', 'pre', 'ment'], validCombos: ['react', 'enact', 'interact', 'actor', 'action', 'active'] },
+            { root: 'help', affixes: ['un', 'er', 'ful', 'less'], decoys: ['dis', 're', 'ist', 'ive'], validCombos: ['unhelp', 'helper', 'helpful', 'helpless'] },
+            { root: 'struct', affixes: ['con', 'de', 'in', 're', 'ion', 'ure'], decoys: ['pre', 'un', 'er'], validCombos: ['construct', 'destruct', 'instruct', 'restructure', 'instruction', 'structure'] },
+            { root: 'ject', affixes: ['pro', 're', 'in', 'e', 'ion'], decoys: ['sub', 'un', 'or'], validCombos: ['project', 'reject', 'inject', 'eject', 'rejection', 'injection'] },
+            { root: 'form', affixes: ['con', 'de', 're', 'in', 'al', 'ation'], decoys: ['pre', 'un', 'ive'], validCombos: ['conform', 'deform', 'reform', 'inform', 'formal', 'formation', 'information'] },
+            { root: 'spect', affixes: ['in', 're', 'pro', 'or', 'ive'], decoys: ['de', 'un', 'ion'], validCombos: ['inspect', 'respect', 'prospect', 'inspector', 'respective'] },
+            { root: 'vis', affixes: ['re', 'in', 'pro', 'ible', 'ion'], decoys: ['un', 'de', 'ly', 'ment'], validCombos: ['revise', 'invisible', 'provision', 'vision'] },
+            { root: 'cred', affixes: ['in', 'dis', 'ible', 'it'], decoys: ['re', 'un', 'ly', 'ion'], validCombos: ['credit', 'discredit', 'incredible'] },
+            { root: 'mit', affixes: ['trans', 'sub', 'ad', 'per', 'sion'], decoys: ['pro', 're', 'ent', 'able'], validCombos: ['transmit', 'submit', 'admit', 'permit', 'permission', 'submission'] },
+            { root: 'graph', affixes: ['auto', 'tele', 'photo', 'bio', 'y'], decoys: ['sub', 'inter', 'er'], validCombos: ['autograph', 'telegraph', 'photograph', 'biography'] }
+        ];
+        let currentWordSet;
+        
+        let draggedEl = null, offsetX, offsetY;
+
+        function handleDragStart(e, el) {
+            e.preventDefault();
+            draggedEl = el;
+            draggedEl.classList.add('dragging');
+            const touch = e.type === 'touchstart' ? e.touches[0] : e;
+            const rect = draggedEl.getBoundingClientRect();
+            offsetX = touch.clientX - rect.left;
+            offsetY = touch.clientY - rect.top;
+        }
+
+        function handleDrag(e) {
+            if (!draggedEl) return;
+            e.preventDefault();
+            const touch = e.type === 'touchmove' ? e.touches[0] : e;
+            const gameRect = gameArea.getBoundingClientRect();
+            let x = touch.clientX - gameRect.left - offsetX;
+            let y = touch.clientY - gameRect.top - offsetY;
+            draggedEl.style.left = `${x}px`;
+            draggedEl.style.top = `${y}px`;
+        }
+
+        function handleDragEnd(e) {
+            if (!draggedEl) return;
+            const rootRect = rootElement.getBoundingClientRect();
+            const draggedRect = draggedEl.getBoundingClientRect();
+            if (draggedRect.left < rootRect.right && draggedRect.right > rootRect.left &&
+                draggedRect.top < rootRect.bottom && draggedRect.bottom > rootRect.top) {
+                checkConnection(draggedEl);
+            }
+            draggedEl.classList.remove('dragging');
+            draggedEl = null;
+        }
+
+        function createMorphemeElement(text, type, isDecoy) {
+            const el = document.createElement('div');
+            el.textContent = text;
+            el.dataset.text = text;
+            el.dataset.type = type;
+            el.dataset.isDecoy = isDecoy;
+            el.className = `morpheme ${type}`;
+            el.style.width = `${text.length * 12 + 40}px`;
+            el.style.height = `50px`;
+
+            if (type === 'root') {
+                rootElement = el;
+            } else {
+                el.addEventListener('mousedown', (e) => handleDragStart(e, el));
+                el.addEventListener('touchstart', (e) => handleDragStart(e, el), { passive: false });
+            }
+            morphemeContainer.appendChild(el);
+            return el;
+        }
+
+        function checkConnection(affixEl) {
+            if (affixEl.dataset.isDecoy === 'true') {
+                score -= 15;
+                updateScore();
+                showFeedback("-15", "#ef4444");
+                affixEl.classList.add('shake');
+                setTimeout(() => affixEl.remove(), 500);
+                return;
+            }
+
+            const affix = affixEl.dataset.text;
+            const root = rootElement.dataset.text;
+            const word = affixEl.dataset.type === 'prefix' ? affix + root : root + affix;
+
+            if (currentWordSet.validCombos.includes(word) && !foundWords.includes(word)) {
+                score += 25;
+                foundWords.push(word);
+                updateScore();
+                showFeedback(word, "#3b82f6");
+                addWordToCollector(word);
+                affixEl.classList.add('pop-effect');
+                setTimeout(() => affixEl.remove(), 400);
+                if (foundWords.length === currentWordSet.affixes.length) {
+                    endGame(true);
+                }
+            } else {
+                affixEl.classList.add('shake');
+                setTimeout(() => affixEl.classList.remove('shake'), 500);
+            }
+        }
+        
+        function showFeedback(text, color) {
+            wordPopup.textContent = text;
+            wordPopup.style.color = color;
+            wordPopup.style.textShadow = `2px 2px 0px #fff, 4px 4px 0px rgba(0,0,0,0.1)`;
+            wordPopup.classList.add('show');
+            setTimeout(() => wordPopup.classList.remove('show'), 1500);
+        }
+
+        function addWordToCollector(word) {
+            const tag = document.createElement('div');
+            tag.className = 'found-word-tag';
+            tag.textContent = word;
+            foundWordsContainer.appendChild(tag);
+        }
+
+        function updateScore() {
+            scoreDisplay.textContent = `Score: ${score}`;
+        }
+
+        function startGame() {
+            score = 0; foundWords = [];
+            updateScore();
+            startScreen.classList.add('show');
+            endScreen.classList.remove('show');
+            morphemeContainer.innerHTML = '';
+            foundWordsContainer.innerHTML = '';
+        }
+
+        function setupGameLevel() {
+            startScreen.classList.remove('show');
+            currentWordSet = wordSets[Math.floor(Math.random() * wordSets.length)];
+            const allMorphemes = [
+                ...currentWordSet.affixes.map(affix => ({ text: affix, isDecoy: false })),
+                ...currentWordSet.decoys.map(decoy => ({ text: decoy, isDecoy: true })),
+            ];
+            allMorphemes.sort(() => Math.random() - 0.5);
+
+            const gameRect = gameArea.getBoundingClientRect();
+            const rootEl = createMorphemeElement(currentWordSet.root, 'root', false);
+            rootEl.style.left = `${gameRect.width / 2 - 60}px`;
+            rootEl.style.top = `${gameRect.height / 2 - 60}px`;
+
+            allMorphemes.forEach(morpheme => {
+                let x, y, tooClose;
+                do {
+                    x = Math.random() * (gameRect.width - 100);
+                    y = Math.random() * (gameRect.height - 70);
+                    const rootRect = { x: gameRect.width / 2, y: gameRect.height / 2, w: 150, h: 150 };
+                    tooClose = Math.abs(x - rootRect.x + 50) < rootRect.w && Math.abs(y - rootRect.y + 35) < rootRect.h;
+                } while (tooClose);
+                
+                const affixEl = createMorphemeElement(morpheme.text, 'affix', morpheme.isDecoy);
+                affixEl.style.left = `${x}px`;
+                affixEl.style.top = `${y}px`;
+            });
+
+            morphemeContainer.querySelectorAll('.affix').forEach(el => {
+                 if (el.dataset.isDecoy === 'true') {
+                    if (Math.random() > 0.5) el.classList.add('prefix');
+                    else el.classList.add('suffix');
+                    return;
+                 }
+                 const affix = el.dataset.text;
+                 const root = rootElement.dataset.text;
+                 const isPrefix = currentWordSet.validCombos.some(c => c === `${affix}${root}`);
+                 if(isPrefix) {
+                    el.classList.add('prefix');
+                    el.dataset.type = 'prefix';
+                 } else {
+                    el.classList.add('suffix');
+                    el.dataset.type = 'suffix';
+                 }
+            });
+
+            startTimer();
+        }
+
+        function startTimer() {
+            clearInterval(timerId);
+            let timeLeft = GAME_DURATION;
+            timerId = setInterval(() => {
+                timeLeft -= 100;
+                const widthPercent = (timeLeft / GAME_DURATION) * 100;
+                timerBar.style.width = `${widthPercent}%`;
+                if (widthPercent < 25) timerBar.style.backgroundColor = '#ef4444';
+                else if (widthPercent < 60) timerBar.style.backgroundColor = '#f59e0b';
+                else timerBar.style.backgroundColor = '#34d399';
+                if (timeLeft <= 0) endGame(false);
+            }, 100);
+        }
+
+        function endGame(allFound) {
+            clearInterval(timerId);
+            endTitle.textContent = allFound ? "You got them all!" : "Time's Up!";
+            endScore.textContent = `Final Score: ${score}`;
+            endScreen.classList.add('show');
+        }
+
+        // --- Background Bubbles ---
+        const bgBubbles = document.getElementById('background-bubbles');
+        for (let i = 0; i < 15; i++) {
+            const bubble = document.createElement('div');
+            const size = Math.random() * 80 + 20;
+            bubble.className = 'bg-bubble';
+            bubble.style.width = `${size}px`;
+            bubble.style.height = `${size}px`;
+            bubble.style.left = `${Math.random() * 100}%`;
+            bubble.style.top = `${Math.random() * 100}%`;
+            bubble.style.animationDelay = `${Math.random() * 20}s`;
+            bgBubbles.appendChild(bubble);
+        }
+
+        document.addEventListener('mousemove', handleDrag);
+        document.addEventListener('touchmove', handleDrag, { passive: false });
+        document.addEventListener('mouseup', handleDragEnd);
+        document.addEventListener('touchend', handleDragEnd);
+        startButton.addEventListener('click', setupGameLevel);
+        playAgainButton.addEventListener('click', startGame);
+
+        startGame();
+    </script>
+</body>
+</html>
