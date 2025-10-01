@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sorting Game - Renewable vs. Non-Renewable Energy</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet" />
+    <style>
+        /* ---------- CORE LAYOUT ---------- */
+        :root {
+            --bg: #0B4F6C; /* Deep Teal/Blue */
+            --panel: #F8F7FC;
+            --btn: #20A4F3; /* Bright Blue */
+            --btn-hover: #1178C2; /* Darker Blue */
+            --text-light: #FFFFFF;
+            --text-dark: #333333;
+            --border-color: #D1D5DB;
+            --zone-border: #A0A0A0;
+            --zone-over-bg: #E0F7FA; /* Light Cyan */
+            --correct-border: #22c55e;
+            --incorrect-border: #ef4444;
+            --unplaced-border: #f97316;
+        }
+        *{box-sizing:border-box;}
+        body{
+            margin:0;
+            font-family:'Poppins', sans-serif;
+            background:var(--bg);
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 15px; /* Reduced */
+            overscroll-behavior: none;
+        }
+        h1{
+            font-size: 2.2rem; /* Reduced */
+            color: var(--text-light);
+            margin: 5px 0; /* Reduced */
+            text-align: center;
+        }
+        p{
+            color: var(--text-light);
+            margin: 0 0 15px 0; /* Reduced */
+            text-align: center;
+            font-size: 0.9rem; /* Slightly Reduced */
+        }
+
+        .game-container{
+            background: var(--panel);
+            width: 100%;
+            max-width: 750px; /* Reduced */
+            padding: 25px; /* Reduced */
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        /* ---------- DRAG ITEMS ---------- */
+        #items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px; /* Reduced */
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 25px; /* Reduced */
+            min-height: 180px; /* Adjusted for 10 items in 2 rows */
+            padding: 10px; /* Reduced */
+            border-bottom: 1px solid var(--border-color);
+        }
+        .item{
+            width: 80px; /* Reduced */
+            height: 80px; /* Reduced */
+            background: var(--text-light);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            cursor: grab;
+            touch-action: none;
+            user-select: none;
+            position: relative;
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out, border 0.2s ease-out;
+            text-align: center;
+            font-size: 0.75rem; /* Reduced */
+            color: var(--text-dark);
+            padding: 2px;
+        }
+        .item img {
+            pointer-events: none;
+            max-width: 40%; /* Reduced */
+            max-height: 40%; /* Reduced */
+            user-select: none;
+            margin-bottom: 3px; /* Reduced */
+        }
+        .item.dragging {
+            opacity: 0.7;
+            cursor: grabbing;
+            position: absolute;
+            z-index: 1000;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            transform: scale(1.1);
+            transition: none;
+            border: 1px solid var(--btn);
+        }
+        .item.native-dragging { opacity: 0.3; }
+        .item.correct { border: 3px solid var(--correct-border); }
+        .item.incorrect { border: 3px solid var(--incorrect-border); }
+        .item.unplaced { border: 3px solid var(--unplaced-border); }
+
+
+        /* ---------- DROP ZONES ---------- */
+        .zones{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px; /* Reduced */
+            margin-bottom: 25px; /* Reduced */
+        }
+        .zone-label{
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: var(--text-dark);
+            text-align: center;
+            font-size: 1rem; /* Reduced */
+        }
+        .drop-zone{
+            width: 100%;
+            min-height: 180px; /* Reduced */
+            background: var(--text-light);
+            border: 2px dashed var(--zone-border);
+            border-radius: 8px;
+            padding: 10px; /* Reduced */
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px; /* Reduced */
+            align-content: flex-start;
+            transition: background .3s, border-style .3s;
+        }
+        .drop-zone.over{
+            background: var(--zone-over-bg);
+            border-style: solid;
+        }
+
+        /* ---------- CONTROLS ---------- */
+        .controls{
+            text-align:center;
+        }
+        .controls button{
+            background: var(--btn);
+            color: var(--text-light);
+            border: none;
+            padding: 10px 20px; /* Reduced */
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px 8px; /* Reduced */
+            font-size: 1rem; /* Reduced */
+            font-family: 'Poppins', sans-serif;
+            font-weight: bold;
+            transition: background .3s, transform 0.1s ease-out;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .controls button:hover{ background: var(--btn-hover); }
+        .controls button:active { transform: scale(0.98); }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            h1 { font-size: 1.6rem; } /* Reduced */
+            p { font-size: 0.8rem; }
+            .item { width: 70px; height: 70px; font-size: 0.65rem; } /* Reduced */
+            .item img { max-width: 35%; max-height: 35%; } /* Reduced */
+            #items { min-height: 150px; gap: 8px;} /* Reduced */
+            .zones { grid-template-columns: 1fr; }
+            .drop-zone { min-height: 130px; } /* Reduced */
+            .game-container { padding: 15px; } /* Reduced */
+            .controls button { padding: 8px 15px; font-size: 0.9rem;} /* Reduced */
+        }
+
+    </style>
+</head>
+<body>
+    <h1>Renewable vs. Non-Renewable Energy</h1>
+    <p>Drag and drop the energy sources into the correct category.</p>
+
+    <div class="game-container">
+        <div id="items">
+            </div>
+
+        <div class="zones">
+            <div class="zone">
+                <div class="zone-label">Renewable</div>
+                <div id="renewable" class="drop-zone" aria-label="Renewable energy sources drop-zone"></div>
+            </div>
+            <div class="zone">
+                <div class="zone-label">Non-Renewable</div>
+                <div id="nonrenewable" class="drop-zone" aria-label="Non-renewable energy sources drop-zone"></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="check-btn" type="button">Check Answers</button>
+            <button id="reset-btn" type="button">Reset</button>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const om = code => `https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${code}.svg`;
+
+        const ICONS = {
+            // Renewable
+            solar:      `<img src="${om('1F506')}" alt="sun"><span>Solar</span>`,
+            wind:       `<img src="${om('1F32C')}" alt="wind"><span>Wind</span>`,
+            biomass:    `<img src="${om('1F33F')}" alt="plant"><span>Biomass</span>`,
+            geothermal: `<img src="${om('1F30B')}" alt="volcano"><span>Geothermal</span>`,
+            tidal:      `<img src="${om('1F30A')}" alt="wave"><span>Tidal</span>`,
+            hydro:      `<img src="${om('1F4A7')}" alt="water"><span>Water/Hydro</span>`,
+
+            // Non-Renewable
+            nuclear:    `<img src="${om('269B')}" alt="atom"><span>Nuclear</span>`,
+            fossil:     `<img src="${om('1F6E2')}" alt="oil"><span>Fossil Fuels</span>`,
+            naturalgas: `<img src="${om('1F525')}" alt="fire"><span>Natural Gas</span>`, // NEW
+            coal:       `<img src="${om('1FAA8')}" alt="rock"><span>Coal</span>`,        // NEW
+        };
+
+        const ITEMS = [
+            { key: 'solar',      category: 'renewable' },
+            { key: 'wind',       category: 'renewable' },
+            { key: 'biomass',    category: 'renewable' },
+            { key: 'geothermal', category: 'renewable' },
+            { key: 'tidal',      category: 'renewable' },
+            { key: 'hydro',      category: 'renewable' },
+
+            { key: 'nuclear',    category: 'nonrenewable' },
+            { key: 'fossil',     category: 'nonrenewable' },
+            { key: 'naturalgas', category: 'nonrenewable' }, // NEW
+            { key: 'coal',       category: 'nonrenewable' }, // NEW
+        ];
+
+        const itemsContainer = document.getElementById('items');
+        const dropZones = document.querySelectorAll('.drop-zone');
+        const gameContainer = document.querySelector('.game-container');
+        let pointerDraggedItem = null;
+        let offsetX = 0, offsetY = 0;
+        let currentOverZone = null;
+        let isTouchDragging = false;
+
+        function initializeGame() {
+            itemsContainer.innerHTML = '';
+            dropZones.forEach(zone => zone.innerHTML = '');
+            ITEMS.sort(() => Math.random() - 0.5).forEach((itemData, idx) => {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'item';
+                itemElement.draggable = true;
+                itemElement.id = `item-${itemData.key}-${idx}`;
+                itemElement.dataset.category = itemData.category;
+                itemElement.dataset.key = itemData.key;
+                itemElement.innerHTML = ICONS[itemData.key];
+                itemElement.addEventListener('dragstart', handleDragStartMouse);
+                itemElement.addEventListener('dragend', handleDragEndMouse);
+                itemElement.addEventListener('pointerdown', handlePointerDown);
+                itemsContainer.appendChild(itemElement);
+            });
+            clearValidationStyles();
+            pointerDraggedItem = null;
+        }
+
+        function clearValidationStyles() {
+            document.querySelectorAll('.item').forEach(item => {
+                item.classList.remove('correct', 'incorrect', 'unplaced');
+            });
+            const existingFeedback = document.querySelector('.feedback-msg');
+            if (existingFeedback) existingFeedback.remove();
+        }
+
+        function handleDragStartMouse(e) {
+            if (e.pointerType !== 'touch') {
+                e.dataTransfer.setData('text/plain', e.currentTarget.id);
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => e.target.classList.add('native-dragging'), 0);
+                isTouchDragging = false;
+                clearValidationStyles();
+            } else { e.preventDefault(); }
+        }
+
+        function handleDragEndMouse(e) {
+            e.target?.classList.remove('native-dragging');
+            dropZones.forEach(zone => zone.classList.remove('over'));
+            isTouchDragging = false; pointerDraggedItem = null;
+        }
+
+        dropZones.forEach(zone => {
+            zone.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; zone.classList.add('over'); });
+            zone.addEventListener('dragleave', e => zone.classList.remove('over'));
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('over');
+                if (e.pointerType !== 'touch') {
+                    const id = e.dataTransfer.getData('text/plain');
+                    const droppedElement = document.getElementById(id);
+                    if (droppedElement && !zone.contains(droppedElement)) {
+                        droppedElement.classList.remove('correct', 'incorrect', 'unplaced');
+                        zone.appendChild(droppedElement);
+                        droppedElement.classList.remove('native-dragging');
+                    }
+                }
+            });
+        });
+
+        function handlePointerDown(e) {
+            if (e.button !== 0 || pointerDraggedItem) return;
+            pointerDraggedItem = e.currentTarget;
+            isTouchDragging = e.pointerType === 'touch' || e.pointerType === 'pen';
+            clearValidationStyles();
+
+            if (isTouchDragging) {
+                e.preventDefault();
+                pointerDraggedItem.setPointerCapture(e.pointerId);
+                const rect = pointerDraggedItem.getBoundingClientRect();
+                offsetX = e.clientX - rect.left;
+                offsetY = e.clientY - rect.top;
+                pointerDraggedItem.classList.add('dragging');
+                document.body.style.cursor = 'grabbing';
+            } else {
+                 try { pointerDraggedItem.setPointerCapture(e.pointerId); } catch (err) {}
+            }
+            document.addEventListener('pointermove', handlePointerMove);
+            document.addEventListener('pointerup', handlePointerUp);
+            document.addEventListener('pointercancel', handlePointerUp);
+            document.body.style.userSelect = 'none';
+        }
+
+        function handlePointerMove(e) {
+            if (!pointerDraggedItem || !pointerDraggedItem.hasPointerCapture(e.pointerId)) {
+                if (!pointerDraggedItem?.hasPointerCapture(e.pointerId)) { handlePointerUp(e); }
+                return;
+            }
+            if (isTouchDragging) {
+                e.preventDefault();
+                const gameRect = gameContainer.getBoundingClientRect();
+                pointerDraggedItem.style.left = `${e.clientX - gameRect.left - offsetX}px`;
+                pointerDraggedItem.style.top = `${e.clientY - gameRect.top - offsetY}px`;
+            }
+
+            pointerDraggedItem.style.visibility = 'hidden';
+            let elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY);
+            pointerDraggedItem.style.visibility = '';
+
+            let dropTarget = elementUnderPointer ? elementUnderPointer.closest('.drop-zone') : null;
+
+            if (currentOverZone !== dropTarget) {
+                currentOverZone?.classList.remove('over');
+                dropTarget?.classList.add('over');
+                currentOverZone = dropTarget;
+            }
+        }
+
+        function handlePointerUp(e) {
+             if (!pointerDraggedItem || !pointerDraggedItem.hasPointerCapture(e.pointerId)) {
+                 document.removeEventListener('pointermove', handlePointerMove);
+                 document.removeEventListener('pointerup', handlePointerUp);
+                 document.removeEventListener('pointercancel', handlePointerUp);
+                 document.body.style.userSelect = '';
+                 document.body.style.cursor = '';
+                 return;
+             }
+            if (isTouchDragging) {
+                pointerDraggedItem.classList.remove('dragging');
+                pointerDraggedItem.style.left = ''; pointerDraggedItem.style.top = '';
+                if (currentOverZone && !currentOverZone.contains(pointerDraggedItem)) {
+                    currentOverZone.appendChild(pointerDraggedItem);
+                } else if (!currentOverZone) {
+                    itemsContainer.appendChild(pointerDraggedItem);
+                }
+            }
+
+            currentOverZone?.classList.remove('over');
+            try { pointerDraggedItem.releasePointerCapture(e.pointerId); } catch (err) {}
+            document.removeEventListener('pointermove', handlePointerMove);
+            document.removeEventListener('pointerup', handlePointerUp);
+            document.removeEventListener('pointercancel', handlePointerUp);
+            document.body.style.userSelect = '';
+            document.body.style.cursor = '';
+            pointerDraggedItem = null; isTouchDragging = false; currentOverZone = null;
+        }
+
+        document.getElementById('check-btn').addEventListener('click', () => {
+            clearValidationStyles();
+            let allCorrectInZones = true;
+            let unplacedCount = 0;
+
+            ['renewable', 'nonrenewable'].forEach(zoneId => {
+                Array.from(document.getElementById(zoneId).children).forEach(item => {
+                    if (item.classList.contains('item')) {
+                        const isCorrect = item.dataset.category === zoneId;
+                        item.classList.add(isCorrect ? 'correct' : 'incorrect');
+                        if (!isCorrect) allCorrectInZones = false;
+                    }
+                });
+            });
+
+            Array.from(itemsContainer.children).forEach(item => {
+                if (item.classList.contains('item')) {
+                    item.classList.add('unplaced');
+                    unplacedCount++;
+                }
+            });
+
+            const allItemsPlaced = unplacedCount === 0;
+            let message = "";
+            let color = "";
+
+            if (allItemsPlaced && allCorrectInZones) {
+                message = "Great job! All sorted correctly!";
+                color = 'var(--correct-border)';
+            } else if (!allItemsPlaced) {
+                message = `Keep going! ${unplacedCount} item(s) still need to be placed.`;
+                color = 'var(--unplaced-border)';
+            } else {
+                message = "Almost there! Some items are in the wrong category.";
+                color = 'var(--incorrect-border)';
+            }
+
+            let feedbackMsg = document.createElement('p');
+            feedbackMsg.textContent = message;
+            feedbackMsg.className = 'feedback-msg'; // Added for easier removal
+            feedbackMsg.style.color = color;
+            feedbackMsg.style.textAlign = 'center';
+            feedbackMsg.style.marginTop = '10px';
+            feedbackMsg.style.fontWeight = 'bold';
+            document.querySelector('.controls').insertAdjacentElement('afterend', feedbackMsg);
+            setTimeout(() => feedbackMsg.remove(), 4000);
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', initializeGame);
+        initializeGame();
+    });
+    </script>
+</body>
+</html>
