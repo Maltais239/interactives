@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sorting Game - Internal vs. External Forces</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg: #3498DB; /* Engineering Blue */
+            --panel: #ECF0F1; /* Light Grey */
+            --btn: #2ECC71; /* Emerald Green */
+            --btn-hover: #27AE60; /* Darker Emerald */
+            --text-light: #FFFFFF;
+            --text-dark: #2C3E50; /* Midnight Blue */
+            --border-color: #BDC3C7; /* Silver */
+            --zone-border: #95A5A6; /* Greyish Blue */
+            --zone-over-bg: #D6EAF8; /* Lighter Blue */
+            --correct-border: #22c55e; /* Green */
+            --incorrect-border: #ef4444; /* Red */
+            --unplaced-border: #f97316; /* Orange */
+        }
+        *{box-sizing:border-box;}
+        body{
+            margin:0;
+            font-family:'Poppins', sans-serif;
+            background:var(--bg);
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 15px;
+            overscroll-behavior: none;
+        }
+        h1{
+            font-size: 2.2rem;
+            color: var(--text-light);
+            margin: 5px 0;
+            text-align: center;
+        }
+        p{
+            color: var(--text-light);
+            margin: 0 0 15px 0;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .game-container{
+            background: var(--panel);
+            width: 100%;
+            max-width: 800px;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        #items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 25px;
+            min-height: 170px; /* Adjusted for 2 rows of 8 items (80px height + 10px gap) */
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .item{
+            width: 80px;
+            height: 80px;
+            background: var(--text-light);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            cursor: grab;
+            touch-action: none;
+            user-select: none;
+            position: relative;
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out, border 0.2s ease-out;
+            text-align: center;
+            font-size: 0.65rem; /* Slightly smaller for potentially longer text */
+            color: var(--text-dark);
+            padding: 4px;
+            line-height: 1.1; /* Adjusted line height */
+        }
+        .item img {
+            pointer-events: none;
+            max-width: 45%;
+            max-height: 45%;
+            user-select: none;
+            margin-bottom: 3px;
+        }
+        .item.dragging {
+            opacity: 0.7;
+            cursor: grabbing;
+            position: absolute;
+            z-index: 1000;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            transform: scale(1.1);
+            transition: none;
+            border: 1px solid var(--btn);
+        }
+        .item.native-dragging { opacity: 0.3; }
+        .item.correct { border: 3px solid var(--correct-border); }
+        .item.incorrect { border: 3px solid var(--incorrect-border); }
+        .item.unplaced { border: 3px solid var(--unplaced-border); }
+
+
+        .zones{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .zone-label{
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: var(--text-dark);
+            text-align: center;
+            font-size: 1rem;
+        }
+        .drop-zone{
+            width: 100%;
+            min-height: 200px;
+            background: var(--text-light);
+            border: 2px dashed var(--zone-border);
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-content: flex-start;
+            transition: background .3s, border-style .3s;
+        }
+        .drop-zone.over{
+            background: var(--zone-over-bg);
+            border-style: solid;
+        }
+
+        .controls{ text-align:center; }
+        .controls button{
+            background: var(--btn);
+            color: var(--text-dark); /* Changed to dark for better contrast on green */
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px 8px;
+            font-size: 1rem;
+            font-family: 'Poppins', sans-serif;
+            font-weight: bold;
+            transition: background .3s, transform 0.1s ease-out;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .controls button:hover{ background: var(--btn-hover); color:var(--text-light); }
+        .controls button:active { transform: scale(0.98); }
+
+        .feedback-msg {
+            text-align: center;
+            margin-top: 15px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 1.8rem; }
+            p { font-size: 0.8rem; }
+            .item { width: 70px; height: 70px; font-size: 0.6rem; }
+            .item img { max-width: 40%; max-height: 40%; }
+            #items { min-height: 150px; gap: 6px;}
+            .zones { grid-template-columns: 1fr; }
+            .drop-zone { min-height: 150px; }
+            .game-container { padding: 15px; max-width: 100%; }
+            .controls button { padding: 8px 15px; font-size: 0.9rem;}
+        }
+
+    </style>
+</head>
+<body>
+    <h1>Internal vs. External Forces</h1>
+    <p>Drag and drop the examples into the correct force category.</p>
+
+    <div class="game-container">
+        <div id="items">
+            <!-- Items will be generated by JavaScript -->
+        </div>
+
+        <div class="zones">
+            <div class="zone">
+                <div class="zone-label">External Forces</div>
+                <div id="external" class="drop-zone" aria-label="External forces drop-zone"></div>
+            </div>
+            <div class="zone">
+                <div class="zone-label">Internal Forces</div>
+                <div id="internal" class="drop-zone" aria-label="Internal forces drop-zone"></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="check-btn" type="button">Check Answers</button>
+            <button id="reset-btn" type="button">Reset</button>
+        </div>
+        <!-- Feedback message area -->
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const om = code => `https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${code}.svg`;
+
+        // Icon and Text definitions for each item
+        const ICONS = {
+            // External Forces
+            person_pushing:           `<img src="${om('1F69A')}" alt="truck"><span>Person Pushing Cart (Applied)</span>`,
+            object_hitting:           `<img src="${om('26BD')}" alt="ball"><span>Bat Hitting Ball (Applied)</span>`,
+            sliding_friction:         `<img src="${om('1F4D6')}" alt="book"><span>Book Sliding on Table (Friction)</span>`,
+            air_drag:                 `<img src="${om('1F32A')}" alt="wind"><span>Wind Against Flag (Friction)</span>`,
+            stretched_band_pulls:     `<img src="${om('1F380')}" alt="ribbon"><span>Stretched Band Exerts Pull (Elastic)</span>`,
+            compressed_spring_pushes: `<img src="${om('1F529')}" alt="spring part"><span>Compressed Spring Exerts Push (Spring)</span>`,
+            gravity_acts_down:        `<img src="${om('1F34E')}" alt="apple"><span>Gravity on Falling Apple</span>`,
+            magnet_attracts_metal:    `<img src="${om('1F9F2')}" alt="magnet"><span>Magnet Attracting Nail</span>`,
+
+            // Internal Forces
+            rope_pulled_tight:        `<img src="${om('1FAA2')}" alt="knot"><span>Rope in Tug-of-War (Tension)</span>`,
+            pillar_supports_roof:     `<img src="${om('1F3DB')}" alt="building"><span>Pillar Supporting Roof (Compression)</span>`,
+            scissors_cutting_paper:   `<img src="${om('2702')}" alt="scissors"><span>Scissors Cutting Paper (Shear)</span>`,
+            twisting_a_lid:           `<img src="${om('1FAD6')}" alt="jar"><span>Twisting a Jar Lid (Torsion)</span>`,
+            squeezing_a_sponge:       `<img src="${om('1F9FD')}" alt="sponge"><span>Squeezing a Sponge (Compression)</span>`,
+            spring_material_stretching: `<img src="${om('1FA9B')}" alt="hook"><span>Stretching a Spring (Internal Tension)</span>`,
+            bending_a_beam:           `<img src="${om('1F528')}" alt="hammer"><span>Bending a Metal Bar (Internal Shear/Comp.)</span>`,
+            wringing_a_towel:         `<img src="${om('1F9F9')}" alt="towel"><span>Wringing a Wet Towel (Torsion/Shear)</span>`
+        };
+
+        // Item data: key (for ICONS), and correct category
+        const ITEMS = [
+            // External Items
+            { key: 'person_pushing',           category: 'external' },
+            { key: 'object_hitting',           category: 'external' },
+            { key: 'sliding_friction',         category: 'external' },
+            { key: 'air_drag',                 category: 'external' },
+            { key: 'stretched_band_pulls',     category: 'external' },
+            { key: 'compressed_spring_pushes', category: 'external' },
+            { key: 'gravity_acts_down',        category: 'external' },
+            { key: 'magnet_attracts_metal',    category: 'external' },
+
+            // Internal Items
+            { key: 'rope_pulled_tight',        category: 'internal' },
+            { key: 'pillar_supports_roof',     category: 'internal' },
+            { key: 'scissors_cutting_paper',   category: 'internal' },
+            { key: 'twisting_a_lid',           category: 'internal' },
+            { key: 'squeezing_a_sponge',       category: 'internal' },
+            { key: 'spring_material_stretching', category: 'internal' },
+            { key: 'bending_a_beam',           category: 'internal' },
+            { key: 'wringing_a_towel',         category: 'internal' }
+        ];
+
+        const itemsContainer = document.getElementById('items');
+        const dropZones = document.querySelectorAll('.drop-zone');
+        const gameContainer = document.querySelector('.game-container');
+        let pointerDraggedItem = null;
+        let offsetX = 0, offsetY = 0;
+        let currentOverZone = null;
+        let isTouchDragging = false;
+
+        // Initializes or resets the game
+        function initializeGame() {
+            itemsContainer.innerHTML = ''; // Clear existing items
+            dropZones.forEach(zone => {
+                zone.innerHTML = ''; // Clear items from drop zones
+                zone.classList.remove('over');
+            });
+
+            // Shuffle and create item elements
+            ITEMS.sort(() => Math.random() - 0.5).forEach((itemData, idx) => {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'item';
+                itemElement.draggable = true;
+                itemElement.id = `item-${itemData.key}-${idx}`; // Unique ID for each item instance
+                itemElement.dataset.category = itemData.category; // Store correct category
+                itemElement.dataset.key = itemData.key; // Store item key
+                itemElement.innerHTML = ICONS[itemData.key]; // Set content from ICONS
+
+                // Add event listeners for drag and drop
+                itemElement.addEventListener('dragstart', handleDragStartMouse);
+                itemElement.addEventListener('dragend', handleDragEndMouse);
+                itemElement.addEventListener('pointerdown', handlePointerDown);
+
+                itemElement.classList.remove('correct', 'incorrect', 'unplaced');
+                itemsContainer.appendChild(itemElement);
+            });
+            clearValidationStyles(); // Clear any previous validation (correct/incorrect borders)
+            pointerDraggedItem = null; // Reset dragged item
+        }
+
+        // Clears validation styles and feedback messages
+        function clearValidationStyles() {
+            document.querySelectorAll('.item').forEach(item => {
+                item.classList.remove('correct', 'incorrect', 'unplaced');
+            });
+            const existingFeedback = document.querySelector('.feedback-msg');
+            if (existingFeedback) existingFeedback.remove();
+        }
+
+       // Handles the start of a drag operation (mouse)
+       function handleDragStartMouse(e) {
+            // Only proceed if not a touch event (pointerdown handles touch)
+            if (e.pointerType !== 'touch') {
+                e.dataTransfer.setData('text/plain', e.currentTarget.id);
+                e.dataTransfer.effectAllowed = 'move';
+                // Add class to style the original item while dragging (ghosting)
+                setTimeout(() => { e.target.classList.add('native-dragging'); }, 0);
+                isTouchDragging = false; // Ensure touch dragging flag is off
+                clearValidationStyles(); // Clear previous validation states
+            } else { e.preventDefault(); } // Prevent default for touch to avoid conflicts
+        }
+
+        // Handles the end of a drag operation (mouse)
+        function handleDragEndMouse(e) {
+            e.target?.classList.remove('native-dragging'); // Remove ghosting style
+            dropZones.forEach(zone => zone.classList.remove('over')); // Remove 'over' style from zones
+            isTouchDragging = false; pointerDraggedItem = null; // Reset dragging state
+        }
+
+        // Add dragover, dragleave, drop listeners to drop zones for mouse-based D&D
+        dropZones.forEach(zone => {
+            zone.addEventListener('dragover', e => { 
+                e.preventDefault(); // Necessary to allow dropping
+                e.dataTransfer.dropEffect = 'move'; 
+                zone.classList.add('over'); // Style zone when item is dragged over
+            });
+            zone.addEventListener('dragleave', e => zone.classList.remove('over')); // Remove style
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('over');
+                if (e.pointerType !== 'touch') { // Ensure it's not a touch drop (handled by pointerup)
+                    const id = e.dataTransfer.getData('text/plain');
+                    const droppedElement = document.getElementById(id);
+                    if (droppedElement && !zone.contains(droppedElement)) { // Check if element exists and not already in zone
+                        droppedElement.classList.remove('correct', 'incorrect', 'unplaced');
+                        zone.appendChild(droppedElement); // Move item to the zone
+                        droppedElement.classList.remove('native-dragging');
+                    }
+                }
+            });
+        });
+
+        // Handles pointer down (mouse, touch, pen) to initiate dragging
+        function handlePointerDown(e) {
+            if (e.button !== 0 || pointerDraggedItem) return; // Only left-click/primary touch, and no item already being dragged
+            pointerDraggedItem = e.currentTarget; // The item being pressed
+            isTouchDragging = e.pointerType === 'touch' || e.pointerType === 'pen';
+            clearValidationStyles(); // Clear prior feedback
+
+            try { pointerDraggedItem.setPointerCapture(e.pointerId); } catch (err) { /* Ignore if not supported */ }
+
+            if (isTouchDragging) { // Special handling for touch dragging (manual positioning)
+                e.preventDefault(); // Prevent scrolling, etc.
+                const rect = pointerDraggedItem.getBoundingClientRect();
+                offsetX = e.clientX - rect.left;
+                offsetY = e.clientY - rect.top;
+                pointerDraggedItem.classList.add('dragging'); // Style for actively dragged item
+                // Position item relative to game container for touch
+                const gameRect = gameContainer.getBoundingClientRect();
+                pointerDraggedItem.style.left = `${e.clientX - gameRect.left - offsetX}px`;
+                pointerDraggedItem.style.top = `${e.clientY - gameRect.top - offsetY}px`;
+            }
+            // Add global listeners for move and up events
+            document.addEventListener('pointermove', handlePointerMove);
+            document.addEventListener('pointerup', handlePointerUp);
+            document.addEventListener('pointercancel', handlePointerUp); // Treat cancel as up
+            document.body.style.userSelect = 'none'; // Prevent text selection during drag
+        }
+
+        // Handles pointer movement during dragging
+        function handlePointerMove(e) {
+            if (!pointerDraggedItem || !pointerDraggedItem.hasPointerCapture(e.pointerId)) {
+                 // If pointer capture is lost unexpectedly, clean up
+                if (!pointerDraggedItem?.hasPointerCapture(e.pointerId)) { handlePointerUp(e); }
+                return;
+            }
+            e.preventDefault(); // Prevent default actions like text selection or page scroll
+
+            if (isTouchDragging) { // Update position for touch-dragged item
+                const gameRect = gameContainer.getBoundingClientRect();
+                pointerDraggedItem.style.left = `${e.clientX - gameRect.left - offsetX}px`;
+                pointerDraggedItem.style.top = `${e.clientY - gameRect.top - offsetY}px`;
+            }
+
+            // Hide the dragged item temporarily to find element underneath
+            pointerDraggedItem.style.visibility = 'hidden'; 
+            let elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY);
+            pointerDraggedItem.style.visibility = ''; // Make it visible again
+
+            let dropTarget = elementUnderPointer ? elementUnderPointer.closest('.drop-zone') : null;
+
+            // Update 'over' styling on drop zones
+            if (currentOverZone !== dropTarget) {
+                currentOverZone?.classList.remove('over');
+                dropTarget?.classList.add('over');
+                currentOverZone = dropTarget;
+            }
+        }
+
+        // Handles pointer up (mouse, touch, pen) to end dragging
+        function handlePointerUp(e) {
+             if (!pointerDraggedItem || !pointerDraggedItem.hasPointerCapture(e.pointerId)) {
+                 // Clean up listeners if pointer capture was already lost or not set
+                 document.removeEventListener('pointermove', handlePointerMove);
+                 document.removeEventListener('pointerup', handlePointerUp);
+                 document.removeEventListener('pointercancel', handlePointerUp);
+                 document.body.style.userSelect = '';
+                 return;
+             }
+
+            if (isTouchDragging) { // Finalize placement for touch-dragged item
+                pointerDraggedItem.classList.remove('dragging');
+                pointerDraggedItem.style.left = ''; pointerDraggedItem.style.top = ''; // Reset manual positioning
+                if (currentOverZone && !currentOverZone.contains(pointerDraggedItem)) {
+                    currentOverZone.appendChild(pointerDraggedItem); // Place in target zone
+                } else if (!currentOverZone) { // If not over a zone, return to items container
+                    itemsContainer.appendChild(pointerDraggedItem);
+                }
+            }
+            // Note: Mouse drop is handled by the 'drop' event on the zone itself.
+            // This 'pointerup' primarily finalizes touch and cleans up.
+
+            currentOverZone?.classList.remove('over'); // Clear 'over' style
+            try { pointerDraggedItem.releasePointerCapture(e.pointerId); } catch (err) { /* Ignore */ }
+            
+            // Remove global listeners
+            document.removeEventListener('pointermove', handlePointerMove);
+            document.removeEventListener('pointerup', handlePointerUp);
+            document.removeEventListener('pointercancel', handlePointerUp);
+            document.body.style.userSelect = ''; // Re-enable text selection
+
+            pointerDraggedItem = null; isTouchDragging = false; currentOverZone = null; // Reset dragging state
+        }
+
+
+        // Event listener for the "Check Answers" button
+        document.getElementById('check-btn').addEventListener('click', () => {
+            clearValidationStyles(); // Clear previous feedback
+            let allCorrectInZones = true;
+            let unplacedCount = 0;
+
+            // Check items in each drop zone ('external', 'internal')
+            ['external', 'internal'].forEach(zoneId => {
+                const zone = document.getElementById(zoneId);
+                Array.from(zone.children).forEach(item => {
+                    if (item.classList.contains('item')) { // Ensure it's a sortable item
+                        const isCorrect = item.dataset.category === zoneId;
+                        item.classList.add(isCorrect ? 'correct' : 'incorrect');
+                        if (!isCorrect) allCorrectInZones = false;
+                    }
+                });
+            });
+
+            // Check items still in the initial items container (unplaced)
+            Array.from(itemsContainer.children).forEach(item => {
+                if (item.classList.contains('item')) {
+                    item.classList.add('unplaced');
+                    unplacedCount++;
+                }
+            });
+
+            const allItemsPlaced = unplacedCount === 0;
+            let message = "", color = "";
+
+            // Determine feedback message and color
+            if (allItemsPlaced && allCorrectInZones) {
+                message = "Excellent! All forces are sorted correctly!";
+                color = 'var(--correct-border)';
+            } else if (!allItemsPlaced) {
+                message = `Keep trying! ${unplacedCount} example(s) still need to be placed.`;
+                color = 'var(--unplaced-border)';
+            } else {
+                message = "Almost there! Some examples are in the wrong force category.";
+                color = 'var(--incorrect-border)';
+            }
+            
+            // Display feedback message
+            let feedbackMsgEl = document.createElement('p');
+            feedbackMsgEl.textContent = message;
+            feedbackMsgEl.className = 'feedback-msg';
+            feedbackMsgEl.style.color = color;
+            document.querySelector('.controls').insertAdjacentElement('afterend', feedbackMsgEl);
+            
+            // Remove feedback message after a few seconds
+            setTimeout(() => feedbackMsgEl.remove(), 4000);
+        });
+
+        // Event listener for the "Reset" button
+        document.getElementById('reset-btn').addEventListener('click', initializeGame);
+
+        // Initialize the game when the DOM is fully loaded
+        initializeGame();
+    });
+    </script>
+</body>
+</html>
+
