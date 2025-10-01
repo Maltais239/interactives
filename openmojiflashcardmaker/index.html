@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenMoji Flashcards</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        /* --- Print Styles --- */
+        @media print {
+            body { background-color: #ffffff; padding: 0; margin: 0; }
+            #controls { display: none !important; }
+            .page-container {
+                box-shadow: none;
+                width: 100%;
+                height: 100%;
+                padding: 0;
+                margin: 0;
+                border-radius: 0;
+                page-break-after: always;
+            }
+            .page-container:last-child { page-break-after: auto; }
+            .card, .card-back { page-break-inside: avoid; }
+            .card-label { color-adjust: exact; -webkit-print-color-adjust: exact; }
+             @page { size: landscape; margin: 0.5in; }
+        }
+    </style>
+</head>
+<body class="p-8 flex flex-col items-center space-y-8">
+
+    <div id="controls" class="w-full max-w-5xl p-4 bg-white rounded-lg shadow-md">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-lg font-bold text-gray-800">Printing Instructions</h2>
+                <p class="text-sm text-gray-600">1. Click "Save for Printing". 2. Open the downloaded file and print to PDF.</p>
+            </div>
+            <button id="save-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition transform hover:scale-105">
+                Save for Printing
+            </button>
+        </div>
+    </div>
+
+    <!-- Container for dynamically generated pages -->
+    <div id="main-container" class="w-full flex flex-col items-center space-y-8"></div>
+    
+    <script>
+        // Initial vocabulary list.
+        let allCardsData = [
+           { term: 'Map', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F5FA.svg', definition: 'A drawing that shows where places are located.' },
+           { term: 'Globe', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F310.svg', definition: 'A round model of the Earth.' },
+           { term: 'Location', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F4CD.svg', definition: 'Where something is found.' },
+           { term: 'Near', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F50D.svg', definition: 'Close to something.' },
+           { term: 'Far', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F52D.svg', definition: 'A long distance from something.' },
+           { term: 'Directions', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F9ED.svg', definition: 'North, South, East, West are used to describe where something is.' },
+           { term: 'Relative Location', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F587.svg', definition: 'Describing where something is by comparing it to another place.' },
+           { term: 'Physical Region', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F3DE.svg', definition: 'A large area of land with similar physical features.' },
+           { term: 'Canadian Shield', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/26F0.svg', definition: 'A large, rocky area in Canada with many forests and lakes.' },
+           { term: 'Great Lakes', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F30A.svg', definition: 'Large lakes located in central Canada.' },
+           { term: 'Prairies', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F33E.svg', definition: 'Flat land with few trees, found in the middle of Canada.' },
+           { term: 'Arctic', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/2744.svg', definition: 'The cold, northern part of Canada.' },
+           { term: 'Appalachian Mountains', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/26F0.svg', definition: 'A mountain range in eastern Canada.' },
+           { term: 'Landform', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/26F0.svg', definition: 'A natural shape or feature on Earth\'s surface, like mountains or valleys.' },
+           { term: 'Mountain', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/26F0.svg', definition: 'A high area of land.' },
+           { term: 'Valley', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F3DE.svg', definition: 'A low area of land between hills or mountains.' },
+           { term: 'Lake', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F30A.svg', definition: 'A large body of water surrounded by land.' },
+           { term: 'River', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F30A.svg', definition: 'A long, flowing body of water.' },
+           { term: 'Natural Resource', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F333.svg', definition: 'Materials that come from nature and are used by people.' },
+           { term: 'Fish', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F41F.svg', definition: 'Animals that live in water and are used as food.' },
+           { term: 'Forest', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F333.svg', definition: 'A large area filled with trees.' },
+           { term: 'Agricultural Land', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F33E.svg', definition: 'Land used to grow crops and raise animals.' },
+           { term: 'Minerals', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/26CF.svg', definition: 'Valuable materials like gold and iron found in the ground.' },
+           { term: 'Oil and Gas', image: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/26FD.svg', definition: 'Natural resources found in the ground and used for energy.' }
+        ];
+
+        const colors = ['green-500', 'blue-500', 'orange-500', 'red-500', 'purple-500', 'cyan-500', 'yellow-500', 'lime-500', 'pink-500', 'teal-500', 'indigo-500', 'gray-500'];
+
+        function createCardFront(card, index) {
+            const color = colors[index % colors.length];
+            const cardEl = document.createElement('div');
+            cardEl.className = `card h-full bg-white rounded-2xl border-8 border-${color} shadow-lg overflow-hidden flex flex-col relative`;
+            
+            cardEl.innerHTML = `
+                <div class="image-container flex-1 min-h-0 flex items-center justify-center p-4 overflow-hidden">
+                    <img src="${card.image}" alt="${card.term}" class="max-h-full max-w-full object-contain">
+                </div>
+                <div class="card-label text-center text-white flex items-center justify-center px-2 bg-${color}" style="flex-basis: 4.5rem;">
+                    <h2 class="text-xl font-bold">${card.term}</h2>
+                </div>
+            `;
+            return cardEl;
+        }
+
+        function createCardBack(card, index) {
+            const color = colors[index % colors.length];
+            const cardEl = document.createElement('div');
+            cardEl.className = `card-back h-full bg-white rounded-2xl border-8 border-${color} shadow-lg overflow-hidden flex flex-col items-center justify-center p-6`;
+            cardEl.innerHTML = `
+                <h3 class="text-xl font-bold text-gray-800 mb-2">${card.term}</h3>
+                <p class="text-center text-gray-600 text-lg">${card.definition}</p>`;
+            return cardEl;
+        }
+        
+        function populatePage(grid, cards, isBack) {
+            let cardsToRender = [...cards];
+            if (isBack) {
+                 const reordered = [];
+                 for (let i = 0; i < cardsToRender.length; i += 3) {
+                     reordered.push(...cardsToRender.slice(i, i + 3).reverse());
+                 }
+                 cardsToRender = reordered;
+            }
+
+            cardsToRender.forEach((cardData) => {
+                const originalIndex = allCardsData.findIndex(c => c.term === cardData.term);
+                const element = isBack 
+                    ? createCardBack(cardData, originalIndex)
+                    : createCardFront(cardData, originalIndex);
+                grid.appendChild(element);
+            });
+        }
+        
+        function generateAllPages() {
+            const mainContainer = document.getElementById('main-container');
+            mainContainer.innerHTML = '';
+            const cardsPerPage = 6;
+            const numPages = Math.ceil(allCardsData.length / cardsPerPage);
+
+            for (let i = 0; i < numPages; i++) {
+                const pageCards = allCardsData.slice(i * cardsPerPage, (i * cardsPerPage) + cardsPerPage);
+                const frontPageContainer = document.createElement('div');
+                frontPageContainer.className = "page-container w-full max-w-5xl aspect-[11/8.5] bg-white p-8 rounded-lg shadow-lg";
+                const frontGrid = document.createElement('div');
+                frontGrid.className = "grid grid-cols-3 grid-rows-2 gap-6 h-full";
+                frontPageContainer.appendChild(frontGrid);
+                mainContainer.appendChild(frontPageContainer);
+                populatePage(frontGrid, pageCards, false);
+                const backPageContainer = document.createElement('div');
+                backPageContainer.className = "page-container w-full max-w-5xl aspect-[11/8.5] bg-white p-8 rounded-lg shadow-lg";
+                const backGrid = document.createElement('div');
+                backGrid.className = "grid grid-cols-3 grid-rows-2 gap-6 h-full";
+                backPageContainer.appendChild(backGrid);
+                mainContainer.appendChild(backPageContainer);
+                populatePage(backGrid, pageCards, true);
+            }
+        }
+        
+        function saveForPrinting() {
+            const printableHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Printable Flashcards</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Poppins', sans-serif; }
+        @media print {
+            body { background-color: #ffffff; padding: 0; margin: 0; }
+            .page-container {
+                box-shadow: none; width: 100%; height: 100%;
+                padding: 0; margin: 0; border-radius: 0;
+                page-break-after: always;
+            }
+            .page-container:last-child { page-break-after: auto; }
+            .card, .card-back { page-break-inside: avoid; }
+            .card-label { color-adjust: exact; -webkit-print-color-adjust: exact; }
+            @page { size: landscape; margin: 0.5in; }
+        }
+    <\/style>
+</head>
+<body class="p-8 flex flex-col items-center space-y-8">
+    <div id="main-container" class="w-full flex flex-col items-center space-y-8"></div>
+    <script>
+        const allCardsData = ${JSON.stringify(allCardsData)};
+        const colors = ['green-500', 'blue-500', 'orange-500', 'red-500', 'purple-500', 'cyan-500', 'yellow-500', 'lime-500', 'pink-500', 'teal-500', 'indigo-500', 'gray-500'];
+
+        function createCardFront(card, index) {
+            const color = colors[index % colors.length];
+            const cardEl = document.createElement('div');
+            cardEl.className = \`card h-full bg-white rounded-2xl border-8 border-\${color} shadow-lg overflow-hidden flex flex-col relative\`;
+            cardEl.innerHTML = \`
+                <div class="image-container flex-1 min-h-0 flex items-center justify-center p-4 overflow-hidden">
+                    <img src="\${card.image}" alt="\${card.term}" class="max-h-full max-w-full object-contain">
+                </div>
+                <div class="card-label text-center text-white flex items-center justify-center px-2 bg-\${color}" style="flex-basis: 4.5rem;">
+                    <h2 class="text-xl font-bold">\${card.term}</h2>
+                </div>
+            \`;
+            return cardEl;
+        }
+
+        function createCardBack(card, index) {
+            const color = colors[index % colors.length];
+            const cardEl = document.createElement('div');
+            cardEl.className = \`card-back h-full bg-white rounded-2xl border-8 border-\${color} shadow-lg overflow-hidden flex flex-col items-center justify-center p-6\`;
+            cardEl.innerHTML = \`
+                <h3 class="text-xl font-bold text-gray-800 mb-2">\${card.term}</h3>
+                <p class="text-center text-gray-600 text-lg">\${card.definition}</p>\`;
+            return cardEl;
+        }
+        
+        function populatePage(grid, cards, isBack) {
+            let cardsToRender = [...cards];
+            if (isBack) {
+                 const reordered = [];
+                 for (let i = 0; i < cardsToRender.length; i += 3) {
+                     reordered.push(...cardsToRender.slice(i, i + 3).reverse());
+                 }
+                 cardsToRender = reordered;
+            }
+            cardsToRender.forEach((cardData) => {
+                const originalIndex = allCardsData.findIndex(c => c.term === cardData.term);
+                const element = isBack ? createCardBack(cardData, originalIndex) : createCardFront(cardData, originalIndex);
+                grid.appendChild(element);
+            });
+        }
+        
+        function generateAllPages() {
+            const mainContainer = document.getElementById('main-container');
+            mainContainer.innerHTML = '';
+            const cardsPerPage = 6;
+            const numPages = Math.ceil(allCardsData.length / cardsPerPage);
+
+            for (let i = 0; i < numPages; i++) {
+                const pageCards = allCardsData.slice(i * cardsPerPage, (i * cardsPerPage) + cardsPerPage);
+                const frontPageContainer = document.createElement('div');
+                frontPageContainer.className = "page-container w-full max-w-5xl aspect-[11/8.5] bg-white p-8 rounded-lg shadow-lg";
+                const frontGrid = document.createElement('div');
+                frontGrid.className = "grid grid-cols-3 grid-rows-2 gap-6 h-full";
+                frontPageContainer.appendChild(frontGrid);
+                mainContainer.appendChild(frontPageContainer);
+                populatePage(frontGrid, pageCards, false);
+                const backPageContainer = document.createElement('div');
+                backPageContainer.className = "page-container w-full max-w-5xl aspect-[11/8.5] bg-white p-8 rounded-lg shadow-lg";
+                const backGrid = document.createElement('div');
+                backGrid.className = "grid grid-cols-3 grid-rows-2 gap-6 h-full";
+                backPageContainer.appendChild(backGrid);
+                mainContainer.appendChild(backPageContainer);
+                populatePage(backGrid, pageCards, true);
+            }
+        }
+        window.onload = generateAllPages;
+    <\/script>
+</body>
+</html>`;
+            const blob = new Blob([printableHtml.trim()], { type: 'text/html' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'flashcards-for-printing.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        }
+
+        document.getElementById('save-btn').addEventListener('click', saveForPrinting);
+        generateAllPages();
+
+    </script>
+</body>
+</html>
