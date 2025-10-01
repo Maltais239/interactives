@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Map of Alberta's Regions</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; display: flex; font-family: 'Poppins', sans-serif; background-color: #f0f4f8; color: #334155; }
+    #map { flex: 1; height: 100%; border-right: 1px solid #ddd; }
+    #info-panel { width: 380px; max-width: 40%; padding: 2rem; background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%); border-left: 5px solid #ffc107; overflow-y: auto; box-shadow: -5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+    #info-panel h2 { margin-top: 0; color: #854d0e; font-size: 1.75rem; font-weight: 700; border-bottom: 2px solid #fde68a; padding-bottom: 0.5rem; margin-bottom: 1rem; }
+    #info-content { border-top: 1px solid #ddd; padding-top: 1.5rem; }
+    #info-content h3 { margin-top: 0; margin-bottom: 1rem; color: #ca8a04; font-size: 1.5rem; font-weight: 600; }
+    #info-content p { font-size: 0.95rem; line-height: 1.6; margin: 0.5rem 0 1rem 0; color: #334155; }
+    .leaflet-popup-content-wrapper { background-color: #fffbeb; color: #713f12; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+    .leaflet-popup-content { font-weight: bold; }
+    .leaflet-popup-tip { background: #fffbeb; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="info-panel">
+    <h2>Alberta's Natural Regions</h2>
+    <div id="info-content"><p>Click a region on the map to learn more about it.</p></div>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    // Set up the map, centered on Alberta
+    const map = L.map('map', { zoomControl: true }).setView([55, -115], 6);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      subdomains: 'abcd', maxZoom: 19
+    }).addTo(map);
+
+    const infoContent = document.getElementById('info-panel');
+
+    // Descriptions for each of Alberta's six main regions, updated from The Canadian Encyclopedia
+    const regionData = {
+      'Boreal Forest': `The Boreal Forest covers the northern half of the province. It's a land of great rivers and lakes that drain northward to the Arctic Ocean. The forests here are rich with aspen and white birch in the south, and white spruce, larch, and black spruce farther north. Balsam fir and jack pine are also found in the eastern areas.`,
+      'Grassland': `The prairie region of southern Alberta is a gently rolling, dry, and mostly treeless grassland. The grasses here include blue grama and western wheat grass. It is part of the larger Interior Plains physiographic region.`,
+      'Parkland': `The Parkland region is dominant in central Alberta. It varies from the flatlands of ancient lake bottoms to a rolling landscape with numerous lakes and depressions. It is characterized by tall grasses and beautiful aspen trees.`,
+      'Foothills': `Located in Alberta's southwest corner, the Foothills are a series of ridges that rise up to meet the Rocky Mountains. Alpine fir and lodgepole pine grow in the western parts of this region.`,
+      'Rocky Mountains': `Forming part of Canada's great Cordillera region, the Rocky Mountains in Alberta feature stunning landscapes. At lower elevations, you'll find forests of Alpine fir, white spruce, and lodgepole pine. At higher elevations, there are scattered stands of black spruce and alpine larch mixed with lichens and alpine flowers in beautiful meadows.`,
+      'Canadian Shield': `A small portion of Alberta is part of the Canadian Shield, one of Canada's seven major physiographic regions. This area is characterized by ancient, exposed rock and a landscape shaped by glaciers.`
+    };
+    
+    // Function to get the main region name for a sub-region feature
+    function getRegionName(props) {
+      return props.NRNAME || props.NAME || 'Unknown';
+    }
+    
+    // Function to get the specific sub-region name
+    function getSubRegionName(props) {
+        return props.NSRNAME || 'Unknown';
+    }
+
+    const regionColors = {
+        'Boreal Forest': '#228B22', 
+        'Grassland': '#facc15',
+        'Parkland': '#fb923c',
+        'Foothills': '#93c5fd',
+        'Rocky Mountains': '#d8b4fe',
+        'Canadian Shield': '#8FBC8F' 
+    };
+
+    // Color shade utility function (darkens a hex color)
+    const pSBC=(p,c0,c1,l)=>{
+        let r,g,b,P,f,t,h,i=parseInt,m=Math.round,a=typeof(c1)=="string";
+        if(typeof(p)!="number"||p<-1||p>1||typeof(c0)!="string"||(c0[0]!='r'&&c0[0]!='#')||(c1&&!a&&c1.length!=3&&c1.length!=4))return null;
+        if(!this.pSBCr)this.pSBCr=(d)=>{
+            let n=d.length,x={};
+            if(n>9){
+                [r,g,b,a]=d=d.split(","),n=d.length;
+                if(n<3||n>4)return null;
+                x.r=i(r[3]=="a"?r.slice(5):r.slice(4)),x.g=i(g),x.b=i(b),x.a=a?parseFloat(a):-1
+            }else{
+                if(n==8||n==6||n<4)return null;
+                if(n<6)d="#"+d[1]+d[1]+d[2]+d[2]+d[3]+d[3]+(n>4?d[4]+d[4]:"");
+                d=i(d.slice(1),16);
+                if(n==9||n==5)x.r=d>>24&255,x.g=d>>16&255,x.b=d>>8&255,x.a=m((d&255)/0.255)/1000;
+                else x.r=d>>16,x.g=d>>8&255,x.b=d&255,x.a=-1
+            }return x};
+        h=c0.length>9,h=a?c1.length>9?true:c1=="c"?!h:false:h,f=this.pSBCr(c0),P=p<0,t=c1&&c1!="c"?this.pSBCr(c1):P?{r:0,g:0,b:0,a:-1}:{r:255,g:255,b:255,a:-1},p=P?p*-1:p,P=1-p;
+        if(!f||!t)return null;
+        if(l)r=m(P*f.r+p*t.r),g=m(P*f.g+p*t.g),b=m(P*f.b+p*t.b);
+        else r=m((P*f.r**2+p*t.r**2)**0.5),g=m((P*f.g**2+p*t.g**2)**0.5),b=m((P*f.b**2+p*t.b**2)**0.5);
+        a=f.a,t=t.a,f=a>=0||t>=0,a=f?a<0?t:t<0?a:a*P+t*p:0;
+        if(h)return"rgb"+(f?"a(":"(")+r+","+g+","+b+(f?","+m(a*1000)/1000:"")+")";
+        else return"#"+(4294967296+r*16777216+g*65536+b*256+(f?m(a*255):0)).toString(16).slice(1,f?undefined:-2)
+    }
+
+    // More robust function to get the correct color, ignoring case and extra words.
+    function getColor(name, type = 'fill') { 
+        if (!name || typeof name !== 'string') return '#ccc'; // Handle cases where name is not a valid string
+        
+        const lowerCaseName = name.toLowerCase();
+        let baseColor = '#ccc';
+        
+        if (lowerCaseName.includes('boreal')) baseColor = regionColors['Boreal Forest'];
+        else if (lowerCaseName.includes('grassland')) baseColor = regionColors['Grassland'];
+        else if (lowerCaseName.includes('parkland')) baseColor = regionColors['Parkland'];
+        else if (lowerCaseName.includes('foothills')) baseColor = regionColors['Foothills'];
+        else if (lowerCaseName.includes('mountain')) baseColor = regionColors['Rocky Mountains'];
+        else if (lowerCaseName.includes('shield')) baseColor = regionColors['Canadian Shield'];
+        
+        if (type === 'border') {
+            return pSBC(-0.4, baseColor); // Darken the base color by 40% for the border
+        }
+        return baseColor; // Return the base color for the fill
+    }
+
+    function style(feature) {
+      const regionName = getRegionName(feature.properties);
+      return { 
+        fillColor: getColor(regionName, 'fill'), 
+        weight: 2, // Slightly thicker border
+        color: getColor(regionName, 'border'), // Set border color
+        fillOpacity: 0.8 
+      };
+    }
+    
+    const highlightStyle = { weight: 4, color: '#1e3a8a', fillOpacity: 1 };
+    
+    let geojson;
+    
+    function highlightFeature(e) { e.target.setStyle(highlightStyle); }
+    function resetHighlight(e) { geojson.resetStyle(e.target); }
+
+    function clickFeature(e) {
+      L.DomEvent.stopPropagation(e); // Prevent map click event from firing
+      const props = e.target.feature.properties;
+      const rawRegionName = getRegionName(props);
+      const subRegionName = getSubRegionName(props);
+      
+      let mainRegionDisplayName = rawRegionName;
+      const lowerCaseName = rawRegionName.toLowerCase();
+      
+      // FIX: Robustly determine the display name to use as a key for regionData
+      if (lowerCaseName.includes('boreal')) mainRegionDisplayName = 'Boreal Forest';
+      else if (lowerCaseName.includes('grassland')) mainRegionDisplayName = 'Grassland';
+      else if (lowerCaseName.includes('parkland')) mainRegionDisplayName = 'Parkland';
+      else if (lowerCaseName.includes('foothills')) mainRegionDisplayName = 'Foothills';
+      else if (lowerCaseName.includes('mountain')) mainRegionDisplayName = 'Rocky Mountains';
+      else if (lowerCaseName.includes('shield')) mainRegionDisplayName = 'Canadian Shield';
+
+      // Display info for the main region, but specify which sub-region was clicked
+      infoContent.innerHTML = `<h3>${mainRegionDisplayName}</h3><p><b>Sub-Region:</b> ${subRegionName}</p><p>${regionData[mainRegionDisplayName] || 'No data available.'}</p>`;
+      e.target.bringToFront();
+    }
+
+    function onEachFeature(feature, layer) {
+      // The popup now shows the specific sub-region name
+      const subRegionName = getSubRegionName(feature.properties);
+      layer.bindPopup(subRegionName);
+
+      layer.on({ 
+        mouseover: (e) => {
+            highlightFeature(e);
+            layer.openPopup(e.latlng);
+        },
+        mouseout: (e) => {
+            resetHighlight(e);
+            layer.closePopup();
+        },
+        click: clickFeature 
+      });
+    }
+
+    // Using the correct FeatureServer URL
+    const url = 'https://geospatial.alberta.ca/titan/rest/services/biota/natural_subregions_alberta_2005/FeatureServer/0/query?where=1%3D1&outFields=*&f=geojson';
+    
+    fetch(url)
+      .then(res => res.json())
+      .then(data => { 
+        // No merging logic is needed. The data is used directly from the source.
+        geojson = L.geoJson(data, { 
+          style, 
+          onEachFeature 
+        }).addTo(map); 
+      })
+      .catch((err) => { 
+        console.error("Error fetching or processing GeoJSON:", err);
+        infoContent.innerHTML = '<p>Error loading Alberta regions data. Please check the console for details.</p>'; 
+      });
+
+  </script>
+</body>
+</html>
