@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Canada Map Challenge</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body, html { 
+      margin: 0; 
+      padding: 0; 
+      width: 100%; 
+      height: 100%; 
+      display: flex; 
+      font-family: 'Poppins', sans-serif;
+      background-color: #f0f4f8;
+    }
+    #map { 
+      flex: 1; 
+      height: 100%;
+      border-right: 1px solid #ddd;
+    }
+    #info-panel {
+      width: 380px;
+      max-width: 40%;
+      padding: 2rem;
+      background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+      border-left: 5px solid #4f46e5;
+      overflow-y: auto;
+      box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+    }
+    #info-panel h2 { 
+      margin-top: 0; 
+      color: #312e81; 
+      font-size: 1.75rem; 
+      font-weight: 700;
+      border-bottom: 2px solid #c7d2fe;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    #question-box {
+      background-color: #eef2ff;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      border: 1px solid #c7d2fe;
+      min-height: 120px;
+      font-size: 1.1rem;
+      color: #334155;
+      line-height: 1.6;
+      font-weight: 500;
+    }
+
+    #result-box {
+        border-top: 1px solid #ddd;
+        padding-top: 1.5rem;
+    }
+    #result-box h3 { 
+      margin-top: 0;
+      margin-bottom: 1rem; 
+      color: #4f46e5; 
+      font-size: 1.5rem; 
+      font-weight: 600;
+    }
+    #result-box p { 
+      font-size: 1rem; 
+      line-height: 1.6; 
+      margin: 0.5rem 0 1rem 0; 
+      color: #334155;
+    }
+     #result-box p.feedback-correct { color: #166534; font-weight: bold; }
+    #result-box p.feedback-incorrect { color: #991b1b; font-weight: bold; }
+    #result-box p strong { color: #4338ca; }
+    
+    #button-controls {
+        margin-top: 1rem;
+        display: flex;
+        gap: 0.5rem;
+    }
+    .game-btn {
+        flex: 1;
+        padding: 0.75rem;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s, opacity 0.2s;
+    }
+    #next-question-btn { display: none; background-color: #4f46e5; }
+    #next-question-btn:hover { background-color: #4338ca; }
+    #hint-btn { background-color: #f59e0b; }
+    #hint-btn:hover { background-color: #d97706; }
+    #hint-btn:disabled { background-color: #a1a1aa; cursor: not-allowed; }
+    #play-again-btn { display: none; background-color: #16a34a; }
+    #play-again-btn:hover { background-color: #15803d; }
+
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="info-panel">
+    <h2>Canada Map Challenge</h2>
+    <div id="question-box"><!-- Question will be loaded here --></div>
+    <div id="result-box"><p>Read the clue and click the correct province or territory on the map!</p></div>
+    <div id="button-controls">
+        <button id="hint-btn" class="game-btn">Get a Hint!</button>
+        <button id="next-question-btn" class="game-btn">Next Question &rarr;</button>
+        <button id="play-again-btn" class="game-btn">Play Again? ↻</button>
+    </div>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo" crossorigin=""></script>
+  <script>
+    const map = L.map('map').setView([60, -98], 4);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(map);
+
+    // --- DOM Elements ---
+    const questionBox = document.getElementById('question-box');
+    const resultBox = document.getElementById('result-box');
+    const nextQuestionBtn = document.getElementById('next-question-btn');
+    const hintBtn = document.getElementById('hint-btn');
+    const playAgainBtn = document.getElementById('play-again-btn');
+    
+    // --- Game State Variables ---
+    let correctlyGuessedProvinces = [];
+    let currentQuestion = {};
+    let currentHintIndex = 0;
+    let isGameActive = true;
+
+    // --- Data ---
+    const provinceNames = ['British Columbia', 'Alberta', 'Saskatchewan', 'Manitoba', 'Ontario', 'Quebec', 'New Brunswick', 'Nova Scotia', 'Prince Edward Island', 'Newfoundland and Labrador', 'Yukon', 'Northwest Territories', 'Nunavut'];
+
+    const questions = [
+        { hints: ["This province produces over 70% of the world's maple syrup. 🍁", "Its largest city is Montreal.", "Its capital is a historic walled city.", "It is Canada's only predominantly French-speaking province.", "This province's flag features a Fleur-de-lis."], answer: 'Quebec' },
+        { hints: ["This prairie province is known as the 'Polar Bear Capital of the World'.", "Its capital city is Winnipeg.", "It is located in the longitudinal centre of Canada.", "It is home to the Canadian Museum for Human Rights.", "Its name means 'where the spirit lives' in Cree."], answer: 'Manitoba' },
+        { hints: ["This Maritime province has the highest tides on Earth in the Bay of Fundy.", "It's the only officially bilingual province.", "The Appalachian Mountains run through this province.", "It is home to the Confederation Bridge, connecting it to PEI.", "It borders Quebec to the west and Nova Scotia to the east."], answer: 'New Brunswick' },
+        { hints: ["This territory is home to Mount Logan, Canada's highest mountain.", "It's famous for the Klondike Gold Rush of the 1890s.", "It hosts the world's longest annual canoe and kayak race.", "Its capital is Whitehorse.", "It is the westernmost of Canada's three territories."], answer: 'Yukon' },
+        { hints: ["This province contains over 250,000 lakes.", "Its capital is also the most populous city in Canada.", "Canada's capital city, Ottawa, is located here.", "It is home to the CN Tower.", "Its name is thought to come from an Iroquois word meaning 'beautiful water'."], answer: 'Ontario' },
+        { hints: ["This territory is where you can see the Aurora Borealis almost 240 nights a year.", "Its capital is Yellowknife.", "It's known as the 'Diamond Capital of North America'.", "It has more than one official language, including Chipewyan, Cree, and Inuktitut.", "It borders Nunavut to the east and Yukon to the west."], answer: 'Northwest Territories' },
+        { hints: ["Find the province that is home to the world's largest dinosaur model in its badlands.", "Its two largest cities are Calgary and Edmonton.", "It's famous for its oil sands and the Calgary Stampede.", "It is home to Banff, Canada's oldest national park.", "It was named after a daughter of Queen Victoria."], answer: 'Alberta' },
+        { hints: ["This island province's distinct red soil gets its color from high iron oxide content.", "It's the setting for the book 'Anne of Green Gables'.", "It is the smallest province in both land area and population.", "It is known as the 'Birthplace of Confederation'.", "Its capital is Charlottetown."], answer: 'Prince Edward Island' },
+        { hints: ["This Atlantic province's name is Latin for 'New Scotland'.", "It features the famous Cabot Trail, a scenic roadway.", "It is home to Peggy's Cove, a famous fishing village and lighthouse.", "Alexander Graham Bell invented the telephone here.", "It is a peninsula surrounded by the Atlantic Ocean, connected to New Brunswick by a small isthmus."], answer: 'Nova Scotia' },
+        { hints: ["Known for its stunning Pacific coastline and mountain ranges.", "Its largest city is Vancouver.", "Hosted the 2010 Winter Olympics.", "The provincial flower is the Pacific Dogwood.", "Its capital city is Victoria, located on an island."], answer: 'British Columbia' },
+        { hints: ["This prairie province is known as the 'Land of Living Skies'.", "It is the only province whose borders are entirely man-made lines.", "It is a major producer of wheat and potash.", "The Royal Canadian Mounted Police (RCMP) have their main training academy in its capital, Regina.", "Its name comes from the Cree word 'kisiskāciwani-sīpiy', meaning 'swift flowing river'."], answer: 'Saskatchewan' },
+        { hints: ["This is Canada's newest, largest, and northernmost territory.", "It was officially separated from the Northwest Territories in 1999.", "The name means 'our land' in the Inuktitut language.", "The official animal is the Canadian Inuit Dog.", "Its capital is Iqaluit."], answer: 'Nunavut' },
+        { hints: ["This is Canada's most easterly province.", "It has its own unique time zone, 30 minutes ahead of Atlantic Time.", "It's famous for Gros Morne National Park.", "Its capital, St. John's, is one of the oldest cities in North America.", "This province was the last to join Canada, in 1949."], answer: 'Newfoundland and Labrador' }
+    ];
+    let availableQuestions = [];
+
+    const incorrectFeedback = ["Not quite! Give it another go.", "That's not the one. Try again!", "Oops, wrong province! Have another guess.", "Close, but no cigar! Keep looking.", "That's not it. Don't give up!"];
+
+    const provinceData = {
+        'British Columbia': { capital: 'Victoria', population: '5.4 Million' }, 'Alberta': { capital: 'Edmonton', population: '4.5 Million' }, 'Saskatchewan': { capital: 'Regina', population: '1.2 Million' }, 'Manitoba': { capital: 'Winnipeg', population: '1.4 Million' }, 'Ontario': { capital: 'Toronto', population: '15.3 Million' }, 'Quebec': { capital: 'Quebec City', population: '8.7 Million' }, 'New Brunswick': { capital: 'Fredericton', population: '800,000' }, 'Nova Scotia': { capital: 'Halifax', population: '1 Million' }, 'Prince Edward Island': { capital: 'Charlottetown', population: '175,000' }, 'Newfoundland and Labrador': { capital: 'St. John\'s', population: '530,000' }, 'Yukon': { capital: 'Whitehorse', population: '44,000' }, 'Northwest Territories': { capital: 'Yellowknife', population: '45,000' }, 'Nunavut': { capital: 'Iqaluit', population: '40,000' }
+    };
+
+    // --- Game Logic Functions ---
+    function loadNewQuestion() {
+        if (availableQuestions.length === 0) {
+            questionBox.innerHTML = "You've answered all the questions!";
+            resultBox.innerHTML = "<h2>Congratulations!</h2><p>You've completed the Canada Map Challenge!</p>";
+            nextQuestionBtn.style.display = 'none';
+            hintBtn.style.display = 'none';
+            playAgainBtn.style.display = 'block';
+            return;
+        }
+        isGameActive = true;
+        currentHintIndex = 0;
+        const questionIndex = Math.floor(Math.random() * availableQuestions.length);
+        currentQuestion = availableQuestions.splice(questionIndex, 1)[0];
+        questionBox.textContent = currentQuestion.hints[currentHintIndex];
+        resultBox.innerHTML = '<p>Read the clue and click the correct province or territory on the map!</p>';
+        nextQuestionBtn.style.display = 'none';
+        hintBtn.style.display = 'block';
+        playAgainBtn.style.display = 'none';
+        hintBtn.disabled = false;
+    }
+    
+    // NEW: Function to reset the game to its initial state
+    function resetGame() {
+        correctlyGuessedProvinces = [];
+        availableQuestions = [...questions];
+        geojson.resetStyle();
+        loadNewQuestion();
+    }
+
+    function showHint() {
+        if (!isGameActive) return;
+        currentHintIndex++;
+        if (currentHintIndex < currentQuestion.hints.length) {
+            questionBox.textContent = currentQuestion.hints[currentHintIndex];
+        }
+        if (currentHintIndex >= currentQuestion.hints.length - 1) {
+            hintBtn.disabled = true;
+        }
+    }
+
+    function checkAnswer(provinceName) {
+        if (!isGameActive) return;
+        const provinceKey = provinceNames.find(p => provinceName.includes(p)) || provinceName;
+
+        if (provinceKey === currentQuestion.answer) {
+            isGameActive = false;
+            correctlyGuessedProvinces.push(provinceKey);
+            geojson.resetStyle();
+            const data = provinceData[provinceKey];
+            resultBox.innerHTML = `
+                <p class="feedback-correct">Correct! It's ${provinceKey}.</p>
+                <h3>${provinceKey}</h3>
+                <p><strong>Capital:</strong> ${data.capital}</p>
+                <p><strong>Population:</strong> ~${data.population}</p>
+            `;
+            nextQuestionBtn.style.display = 'block';
+            hintBtn.style.display = 'none';
+        } else {
+            const randomFeedback = incorrectFeedback[Math.floor(Math.random() * incorrectFeedback.length)];
+            resultBox.innerHTML = `<p class="feedback-incorrect">${randomFeedback}</p>`;
+        }
+    }
+    
+    nextQuestionBtn.addEventListener('click', loadNewQuestion);
+    hintBtn.addEventListener('click', showHint);
+    playAgainBtn.addEventListener('click', resetGame);
+
+    // --- Map Styling and Interaction ---
+    function getColor(name) {
+      const palette = ['#e57373', '#ffb74d', '#fff176', '#aed581', '#64b5f6', '#ba68c8', '#ff8a65', '#f06292', '#dce775', '#4dd0e1', '#bcaaa4', '#a5d6a7', '#ce93d8'];
+      const provinceKey = provinceNames.find(p => name.includes(p)) || name;
+      const idx = provinceNames.indexOf(provinceKey);
+      return idx >= 0 ? palette[idx % palette.length] : '#bdbdbd';
+    }
+
+    function style(feature) {
+      const provinceName = feature.properties.name;
+      const provinceKey = provinceNames.find(p => provinceName.includes(p)) || provinceName;
+      return { 
+        fillColor: correctlyGuessedProvinces.includes(provinceKey) ? getColor(provinceName) : '#D3D3D3',
+        weight: 2, opacity: 1, color: 'white', fillOpacity: 0.7 
+      };
+    }
+
+    function highlightFeature(e) {
+      if (!isGameActive) return;
+      const layer = e.target;
+      layer.setStyle({ weight: 4, color: '#4f46e5', dashArray: '', fillOpacity: 0.85 });
+      if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) { layer.bringToFront(); }
+    }
+
+    let geojson;
+    function resetHighlight(e) { geojson.resetStyle(e.target); }
+
+    function onEachFeature(feature, layer) {
+      layer.on({ mouseover: highlightFeature, mouseout: resetHighlight, click: () => checkAnswer(feature.properties.name) });
+    }
+    
+    // --- Initial Load ---
+    fetch('https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@master/public/data/canada.geojson')
+      .then(res => res.json())
+      .then(data => { 
+        geojson = L.geoJson(data, { style, onEachFeature }).addTo(map); 
+        resetGame(); // Start the game for the first time
+      })
+      .catch(err => { 
+        console.error('GeoJSON load error:', err); 
+        questionBox.innerHTML = '<p>Error loading map data. Please refresh.</p>'; 
+      });
+  </script>
+</body>
+</html>
