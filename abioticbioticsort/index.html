@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sorting Game - Abiotic vs. Biotic Components</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg: #27AE60; /* Nature Green */
+            --panel: #F9F9F9; /* Off-white */
+            --btn: #3498DB; /* Water Blue */
+            --btn-hover: #2980B9; /* Darker Blue */
+            --text-light: #FFFFFF;
+            --text-dark: #34495E; /* Wet Rock */
+            --border-color: #BDC3C7; /* Silver */
+            --zone-border: #95A5A6; /* Greyish Blue */
+            --zone-over-bg: #E8F6F3; /* Very light green */
+            --correct-border: #22c55e; /* Green */
+            --incorrect-border: #ef4444; /* Red */
+            --unplaced-border: #f97316; /* Orange */
+        }
+        *{box-sizing:border-box;}
+        body{
+            margin:0;
+            font-family:'Poppins', sans-serif;
+            background:var(--bg);
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 15px;
+            overscroll-behavior: none;
+        }
+        h1{
+            font-size: 2.2rem;
+            color: var(--text-light);
+            margin: 5px 0;
+            text-align: center;
+        }
+        p{
+            color: var(--text-light);
+            margin: 0 0 15px 0;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .game-container{
+            background: var(--panel);
+            width: 100%;
+            max-width: 800px;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        #items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 25px;
+            min-height: 170px; /* Adjusted for 2 rows of 8 items (80px height + 10px gap) */
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .item{
+            width: 80px;
+            height: 80px;
+            background: var(--text-light);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            cursor: grab;
+            touch-action: none;
+            user-select: none;
+            position: relative;
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out, border 0.2s ease-out;
+            text-align: center;
+            font-size: 0.65rem;
+            color: var(--text-dark);
+            padding: 4px;
+            line-height: 1.1;
+        }
+        .item img {
+            pointer-events: none;
+            max-width: 45%;
+            max-height: 45%;
+            user-select: none;
+            margin-bottom: 3px;
+        }
+        .item.dragging {
+            opacity: 0.7;
+            cursor: grabbing;
+            position: absolute;
+            z-index: 1000;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            transform: scale(1.1);
+            transition: none;
+            border: 1px solid var(--btn);
+        }
+        .item.native-dragging { opacity: 0.3; }
+        .item.correct { border: 3px solid var(--correct-border); }
+        .item.incorrect { border: 3px solid var(--incorrect-border); }
+        .item.unplaced { border: 3px solid var(--unplaced-border); }
+
+
+        .zones{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .zone-label{
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: var(--text-dark);
+            text-align: center;
+            font-size: 1rem;
+        }
+        .drop-zone{
+            width: 100%;
+            min-height: 200px;
+            background: var(--text-light);
+            border: 2px dashed var(--zone-border);
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-content: flex-start;
+            transition: background .3s, border-style .3s;
+        }
+        .drop-zone.over{
+            background: var(--zone-over-bg);
+            border-style: solid;
+        }
+
+        .controls{ text-align:center; }
+        .controls button{
+            background: var(--btn);
+            color: var(--text-light);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px 8px;
+            font-size: 1rem;
+            font-family: 'Poppins', sans-serif;
+            font-weight: bold;
+            transition: background .3s, transform 0.1s ease-out;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .controls button:hover{ background: var(--btn-hover); }
+        .controls button:active { transform: scale(0.98); }
+
+        .feedback-msg {
+            text-align: center;
+            margin-top: 15px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 1.8rem; }
+            p { font-size: 0.8rem; }
+            .item { width: 70px; height: 70px; font-size: 0.6rem; }
+            .item img { max-width: 40%; max-height: 40%; }
+            #items { min-height: 150px; gap: 6px;}
+            .zones { grid-template-columns: 1fr; }
+            .drop-zone { min-height: 150px; }
+            .game-container { padding: 15px; max-width: 100%; }
+            .controls button { padding: 8px 15px; font-size: 0.9rem;}
+        }
+
+    </style>
+</head>
+<body>
+    <h1>Abiotic vs. Biotic Components</h1>
+    <p>Drag and drop the items into the correct ecosystem category.</p>
+
+    <div class="game-container">
+        <div id="items">
+            <!-- Items will be generated by JavaScript -->
+        </div>
+
+        <div class="zones">
+            <div class="zone">
+                <div class="zone-label">Biotic Components</div>
+                <div id="biotic" class="drop-zone" aria-label="Biotic components drop-zone"></div>
+            </div>
+            <div class="zone">
+                <div class="zone-label">Abiotic Components</div>
+                <div id="abiotic" class="drop-zone" aria-label="Abiotic components drop-zone"></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="check-btn" type="button">Check Answers</button>
+            <button id="reset-btn" type="button">Reset</button>
+        </div>
+        <!-- Feedback message area -->
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const om = code => `https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${code}.svg`;
+
+        // Icon and Text definitions for each item
+        const ICONS = {
+            // Biotic Components
+            tree:           `<img src="${om('1F333')}" alt="tree"><span>Tree (Plant)</span>`,
+            fox:            `<img src="${om('1F98A')}" alt="fox"><span>Fox (Animal)</span>`,
+            mushroom:       `<img src="${om('1F344')}" alt="mushroom"><span>Mushroom (Decomposer)</span>`,
+            fish:           `<img src="${om('1F41F')}" alt="fish"><span>Fish (Animal)</span>`,
+            flower:         `<img src="${om('1F33A')}" alt="hibiscus flower"><span>Flower (Plant)</span>`,
+            bacteria:       `<img src="${om('1F9A0')}" alt="microbe"><span>Bacteria (Microorganism)</span>`,
+            bird:           `<img src="${om('1F426')}" alt="bird"><span>Bird (Animal)</span>`,
+            insect:         `<img src="${om('1F41B')}" alt="insect"><span>Insect (Animal)</span>`,
+
+            // Abiotic Components
+            sunlight:       `<img src="${om('2600')}" alt="sun"><span>Sunlight (Energy)</span>`,
+            water:          `<img src="${om('1F4A7')}" alt="droplet"><span>Water</span>`,
+            soil:           `<img src="${om('1FAA8')}" alt="rock"><span>Soil & Rocks</span>`,
+            air:            `<img src="${om('1F32A')}" alt="wind"><span>Air (Wind/Gases)</span>`,
+            temperature:    `<img src="${om('1F321')}" alt="thermometer"><span>Temperature</span>`,
+            clouds:         `<img src="${om('2601')}" alt="cloud"><span>Clouds</span>`,
+            minerals:       `<img src="${om('1F48E')}" alt="gem stone"><span>Minerals</span>`,
+            ph_level:       `<img src="${om('1F9EA')}" alt="test tube"><span>pH Level</span>`,
+
+        };
+
+        // Item data: key (for ICONS), and correct category
+        const ITEMS = [
+            // Biotic Items
+            { key: 'tree',           category: 'biotic' },
+            { key: 'fox',            category: 'biotic' },
+            { key: 'mushroom',       category: 'biotic' },
+            { key: 'fish',           category: 'biotic' },
+            { key: 'flower',         category: 'biotic' },
+            { key: 'bacteria',       category: 'biotic' },
+            { key: 'bird',           category: 'biotic' },
+            { key: 'insect',         category: 'biotic' },
+
+            // Abiotic Items
+            { key: 'sunlight',       category: 'abiotic' },
+            { key: 'water',          category: 'abiotic' },
+            { key: 'soil',           category: 'abiotic' },
+            { key: 'air',            category: 'abiotic' },
+            { key: 'temperature',    category: 'abiotic' },
+            { key: 'clouds',         category: 'abiotic' },
+            { key: 'minerals',       category: 'abiotic' },
+            { key: 'ph_level',       category: 'abiotic' },
+        ];
+
+        const itemsContainer = document.getElementById('items');
+        const dropZones = document.querySelectorAll('.drop-zone');
+        const gameContainer = document.querySelector('.game-container');
+        let pointerDraggedItem = null;
+        let offsetX = 0, offsetY = 0;
+        let currentOverZone = null;
+        let isTouchDragging = false;
+
+        // Initializes or resets the game
+        function initializeGame() {
+            itemsContainer.innerHTML = '';
+            dropZones.forEach(zone => {
+                zone.innerHTML = '';
+                zone.classList.remove('over');
+            });
+
+            ITEMS.sort(() => Math.random() - 0.5).forEach((itemData, idx) => {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'item';
+                itemElement.draggable = true;
+                itemElement.id = `item-${itemData.key}-${idx}`;
+                itemElement.dataset.category = itemData.category;
+                itemElement.dataset.key = itemData.key;
+                itemElement.innerHTML = ICONS[itemData.key];
+                
+                itemElement.addEventListener('dragstart', handleDragStartMouse);
+                itemElement.addEventListener('dragend', handleDragEndMouse);
+                itemElement.addEventListener('pointerdown', handlePointerDown);
+
+                itemElement.classList.remove('correct', 'incorrect', 'unplaced');
+                itemsContainer.appendChild(itemElement);
+            });
+            clearValidationStyles();
+            pointerDraggedItem = null;
+        }
+
+        function clearValidationStyles() {
+            document.querySelectorAll('.item').forEach(item => {
+                item.classList.remove('correct', 'incorrect', 'unplaced');
+            });
+            const existingFeedback = document.querySelector('.feedback-msg');
+            if (existingFeedback) existingFeedback.remove();
+        }
+
+       function handleDragStartMouse(e) {
+            if (e.pointerType !== 'touch') {
+                e.dataTransfer.setData('text/plain', e.currentTarget.id);
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => { e.target.classList.add('native-dragging'); }, 0);
+                isTouchDragging = false;
+                clearValidationStyles();
+            } else { e.preventDefault(); }
+        }
+
+        function handleDragEndMouse(e) {
+            e.target?.classList.remove('native-dragging');
+            dropZones.forEach(zone => zone.classList.remove('over'));
+            isTouchDragging = false; pointerDraggedItem = null;
+        }
+
+        dropZones.forEach(zone => {
+            zone.addEventListener('dragover', e => { 
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move'; 
+                zone.classList.add('over');
+            });
+            zone.addEventListener('dragleave', e => zone.classList.remove('over'));
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('over');
+                if (e.pointerType !== 'touch') {
+                    const id = e.dataTransfer.getData('text/plain');
+                    const droppedElement = document.getElementById(id);
+                    if (droppedElement && !zone.contains(droppedElement)) {
+                        droppedElement.classList.remove('correct', 'incorrect', 'unplaced');
+                        zone.appendChild(droppedElement);
+                        droppedElement.classList.remove('native-dragging');
+                    }
+                }
+            });
+        });
+
+        function handlePointerDown(e) {
+            if (e.button !== 0 || pointerDraggedItem) return;
+            pointerDraggedItem = e.currentTarget;
+            isTouchDragging = e.pointerType === 'touch' || e.pointerType === 'pen';
+            clearValidationStyles();
+
+            try { pointerDraggedItem.setPointerCapture(e.pointerId); } catch (err) { /* Ignore */ }
+
+            if (isTouchDragging) {
+                e.preventDefault();
+                const rect = pointerDraggedItem.getBoundingClientRect();
+                offsetX = e.clientX - rect.left;
+                offsetY = e.clientY - rect.top;
+                pointerDraggedItem.classList.add('dragging');
+                const gameRect = gameContainer.getBoundingClientRect();
+                pointerDraggedItem.style.left = `${e.clientX - gameRect.left - offsetX}px`;
+                pointerDraggedItem.style.top = `${e.clientY - gameRect.top - offsetY}px`;
+            }
+            document.addEventListener('pointermove', handlePointerMove);
+            document.addEventListener('pointerup', handlePointerUp);
+            document.addEventListener('pointercancel', handlePointerUp);
+            document.body.style.userSelect = 'none';
+        }
+
+        function handlePointerMove(e) {
+            if (!pointerDraggedItem || !pointerDraggedItem.hasPointerCapture(e.pointerId)) {
+                if (!pointerDraggedItem?.hasPointerCapture(e.pointerId)) { handlePointerUp(e); }
+                return;
+            }
+            e.preventDefault();
+
+            if (isTouchDragging) {
+                const gameRect = gameContainer.getBoundingClientRect();
+                pointerDraggedItem.style.left = `${e.clientX - gameRect.left - offsetX}px`;
+                pointerDraggedItem.style.top = `${e.clientY - gameRect.top - offsetY}px`;
+            }
+
+            pointerDraggedItem.style.visibility = 'hidden'; 
+            let elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY);
+            pointerDraggedItem.style.visibility = '';
+
+            let dropTarget = elementUnderPointer ? elementUnderPointer.closest('.drop-zone') : null;
+
+            if (currentOverZone !== dropTarget) {
+                currentOverZone?.classList.remove('over');
+                dropTarget?.classList.add('over');
+                currentOverZone = dropTarget;
+            }
+        }
+
+        function handlePointerUp(e) {
+             if (!pointerDraggedItem || !pointerDraggedItem.hasPointerCapture(e.pointerId)) {
+                 document.removeEventListener('pointermove', handlePointerMove);
+                 document.removeEventListener('pointerup', handlePointerUp);
+                 document.removeEventListener('pointercancel', handlePointerUp);
+                 document.body.style.userSelect = '';
+                 return;
+             }
+            if (isTouchDragging) {
+                pointerDraggedItem.classList.remove('dragging');
+                pointerDraggedItem.style.left = ''; pointerDraggedItem.style.top = '';
+                if (currentOverZone && !currentOverZone.contains(pointerDraggedItem)) {
+                    currentOverZone.appendChild(pointerDraggedItem);
+                } else if (!currentOverZone) {
+                    itemsContainer.appendChild(pointerDraggedItem);
+                }
+            }
+
+            currentOverZone?.classList.remove('over');
+            try { pointerDraggedItem.releasePointerCapture(e.pointerId); } catch (err) { /* Ignore */ }
+            
+            document.removeEventListener('pointermove', handlePointerMove);
+            document.removeEventListener('pointerup', handlePointerUp);
+            document.removeEventListener('pointercancel', handlePointerUp);
+            document.body.style.userSelect = '';
+
+            pointerDraggedItem = null; isTouchDragging = false; currentOverZone = null;
+        }
+
+        document.getElementById('check-btn').addEventListener('click', () => {
+            clearValidationStyles();
+            let allCorrectInZones = true;
+            let unplacedCount = 0;
+
+            ['biotic', 'abiotic'].forEach(zoneId => {
+                const zone = document.getElementById(zoneId);
+                Array.from(zone.children).forEach(item => {
+                    if (item.classList.contains('item')) {
+                        const isCorrect = item.dataset.category === zoneId;
+                        item.classList.add(isCorrect ? 'correct' : 'incorrect');
+                        if (!isCorrect) allCorrectInZones = false;
+                    }
+                });
+            });
+
+            Array.from(itemsContainer.children).forEach(item => {
+                if (item.classList.contains('item')) {
+                    item.classList.add('unplaced');
+                    unplacedCount++;
+                }
+            });
+
+            const allItemsPlaced = unplacedCount === 0;
+            let message = "", color = "";
+
+            if (allItemsPlaced && allCorrectInZones) {
+                message = "Excellent work! All components are sorted correctly!";
+                color = 'var(--correct-border)';
+            } else if (!allItemsPlaced) {
+                message = `Keep going! ${unplacedCount} component(s) still need to be placed.`;
+                color = 'var(--unplaced-border)';
+            } else {
+                message = "Not quite! Some components are in the wrong category.";
+                color = 'var(--incorrect-border)';
+            }
+            
+            let feedbackMsgEl = document.createElement('p');
+            feedbackMsgEl.textContent = message;
+            feedbackMsgEl.className = 'feedback-msg';
+            feedbackMsgEl.style.color = color;
+            document.querySelector('.controls').insertAdjacentElement('afterend', feedbackMsgEl);
+            
+            setTimeout(() => feedbackMsgEl.remove(), 4000);
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', initializeGame);
+        initializeGame();
+    });
+    </script>
+</body>
+</html>
+
