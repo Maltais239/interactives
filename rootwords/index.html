@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rooting For You: A Word Origins Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;700&family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: #FDF8E8; /* Parchment color */
+            background-image: url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23D4CBB6" fill-opacity="0.2"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');
+        }
+        .title-font {
+            font-family: 'Lora', serif;
+        }
+        .card-container {
+            perspective: 1000px;
+        }
+        .card {
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+            cursor: pointer;
+        }
+        .card.is-flipped {
+            transform: rotateY(180deg);
+        }
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 1rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .card-front {
+            background-color: #4A5568; /* Slate 700 */
+            color: white;
+            border: 2px solid #718096;
+        }
+        .card-back {
+            background-color: #FEFCF3; /* Antique White */
+            color: #4A5568;
+            transform: rotateY(180deg);
+            border: 2px solid #A0AEC0;
+        }
+        .morpheme-part {
+            font-family: 'Lora', serif;
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        .morpheme-meaning {
+            font-size: 1.25rem;
+            font-style: italic;
+        }
+        .option-btn {
+            background-color: #fff;
+            border: 2px solid #CBD5E0;
+            transition: all 0.2s ease;
+        }
+        .option-btn:hover:not(:disabled) {
+            background-color: #E2E8F0;
+            border-color: #A0AEC0;
+            transform: translateY(-2px);
+        }
+        .option-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        .correct {
+            background-color: #C6F6D5 !important;
+            border-color: #68D391 !important;
+        }
+        .incorrect {
+            background-color: #FED7D7 !important;
+            border-color: #FC8181 !important;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8 flex items-center justify-center min-h-screen">
+    <div id="gameContainer" class="max-w-3xl w-full bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-gray-200">
+        <header class="text-center mb-6">
+            <h1 class="title-font text-5xl font-bold text-gray-800">Rooting For You!</h1>
+            <p class="text-gray-600 mt-2 text-lg">Uncover the secret meaning of words by investigating their roots.</p>
+        </header>
+
+        <main id="mainContent">
+            <div class="bg-gray-100 p-6 rounded-lg mb-6 text-center shadow-inner">
+                <p class="text-gray-600 mb-2">The mystery word is:</p>
+                <h2 id="mysteryWord" class="title-font text-4xl font-bold text-indigo-800"></h2>
+            </div>
+
+            <p class="text-center text-gray-700 font-semibold mb-4">Click on the clue cards to reveal the meaning of each word part:</p>
+
+            <div id="morphemeCards" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8">
+                <!-- Cards will be injected here -->
+            </div>
+
+            <div id="questionSection" class="hidden">
+                <p class="text-center text-gray-700 font-bold text-xl mb-4">Based on the clues, what does the word mean?</p>
+                <div id="optionsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Options will be injected here -->
+                </div>
+                <div id="feedback" class="text-center font-bold text-2xl mt-4 min-h-[2rem]"></div>
+            </div>
+
+            <div class="mt-8 text-center">
+                <button id="nextWordBtn" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-transform transform hover:scale-105">Next Word</button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const words = [
+            { word: 'geography', parts: { geo: 'Earth', graphy: 'to write' }, options: ['The study of Earth and its features', 'The study of rocks', 'The science of stars', 'The measurement of land'], answer: 0 },
+            { word: 'paleontology', parts: { paleo: 'ancient', onto: 'being/life', logy: 'study of' }, options: ['The study of ancient life through fossils', 'The study of old books', 'The study of volcanoes', 'The study of human history'], answer: 0 },
+            { word: 'triceratops', parts: { tri: 'three', cerat: 'horn', ops: 'face' }, options: ['A three-horned face', 'A large lizard', 'A fast-running bird', 'A plant-eater'], answer: 0 },
+            { word: 'telephone', parts: { tele: 'far off', phone: 'sound' }, options: ['A device for sound from far off', 'A way to see distant things', 'A tool for writing', 'A method of measurement'], answer: 0 },
+            { word: 'aqueduct', parts: { aqua: 'water', duct: 'to lead' }, options: ['A structure that leads water', 'A place to see fish', 'A type of boat', 'A water-powered engine'], answer: 0 },
+            { word: 'photosynthesis', parts: { photo: 'light', syn: 'together', thesis: 'to put' }, options: ['To put together with light', 'The study of photography', 'A description of heat', 'The measurement of brightness'], answer: 0 },
+            { word: 'biology', parts: { bio: 'life', logy: 'study of' }, options: ['The study of life', 'The study of books', 'The science of the sky', 'The study of cells'], answer: 0 },
+            { word: 'chronometer', parts: { chrono: 'time', meter: 'measure' }, options: ['An instrument for measuring time', 'A type of watch', 'A device for measuring distance', 'A calendar'], answer: 0 },
+            { word: 'dinosaur', parts: { deino: 'terrible', saur: 'lizard' }, options: ['Terrible lizard', 'Giant bird', 'Ancient monster', 'Fossilized bone'], answer: 0 },
+            { word: 'autograph', parts: { auto: 'self', graph: 'to write' }, options: ['Something written by oneself', 'A famous person\'s name', 'A type of photograph', 'A printed signature'], answer: 0 },
+            { word: 'thermal', parts: { therm: 'heat' }, options: ['Relating to heat', 'A type of clothing', 'Related to temperature', 'A measurement of energy'], answer: 0 },
+            { word: 'democracy', parts: { demo: 'people', cracy: 'rule' }, options: ['Rule by the people', 'Rule by a king', 'A type of government', 'A system of voting'], answer: 0 },
+            { word: 'astronaut', parts: { astro: 'star', naut: 'sailor' }, options: ['Star sailor', 'Space traveler', 'Pilot of a rocket', 'Sky explorer'], answer: 0 },
+            { word: 'monocle', parts: { mono: 'one', ocul: 'eye' }, options: ['A lens for one eye', 'A type of glasses', 'A magnifying glass', 'A telescope'], answer: 0 },
+            { word: 'biped', parts: { bi: 'two', ped: 'foot' }, options: ['A two-footed animal', 'A type of bicycle', 'Something with two wings', 'A creature that walks upright'], answer: 0 },
+            { word: 'microphone', parts: { micro: 'small', phone: 'sound' }, options: ['Device to amplify small sounds', 'A small telephone', 'A hearing aid', 'A speaker'], answer: 0 },
+            { word: 'telescope', parts: { tele: 'far off', scope: 'to look' }, options: ['An instrument to look at far off objects', 'A type of camera', 'A device for seeing small things', 'A lens for a microscope'], answer: 0 },
+            { word: 'manuscript', parts: { manu: 'hand', script: 'to write' }, options: ['A document written by hand', 'A story for a movie', 'An old book', 'A typed letter'], answer: 0 },
+            { word: 'geology', parts: { geo: 'Earth', logy: 'study of' }, options: ['The study of the Earth\'s structure', 'The study of gems', 'The science of maps', 'The study of geography'], answer: 0 },
+            { word: 'hydrophobia', parts: { hydro: 'water', phobia: 'fear' }, options: ['Fear of water', 'A disease from dogs', 'A love for swimming', 'A type of boat'], answer: 0 }
+        ];
+
+        let currentWordIndex = 0;
+        let revealedCards = 0;
+
+        const mysteryWordEl = document.getElementById('mysteryWord');
+        const morphemeCardsEl = document.getElementById('morphemeCards');
+        const questionSectionEl = document.getElementById('questionSection');
+        const optionsContainerEl = document.getElementById('optionsContainer');
+        const feedbackEl = document.getElementById('feedback');
+        const nextWordBtn = document.getElementById('nextWordBtn');
+
+        function loadWord(index) {
+            const wordData = words[index];
+            mysteryWordEl.textContent = wordData.word;
+            
+            questionSectionEl.classList.add('hidden');
+            feedbackEl.innerHTML = '';
+            nextWordBtn.classList.add('hidden');
+            optionsContainerEl.innerHTML = '';
+            revealedCards = 0;
+            
+            const numParts = Object.keys(wordData.parts).length;
+            if (numParts <= 2) {
+                morphemeCardsEl.className = 'grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8 justify-center';
+            } else {
+                morphemeCardsEl.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8';
+            }
+            morphemeCardsEl.innerHTML = '';
+
+
+            const correctAnswerText = wordData.options[wordData.answer];
+            const shuffledOptions = [...wordData.options].sort(() => Math.random() - 0.5);
+
+            Object.entries(wordData.parts).forEach(([part, meaning]) => {
+                const cardContainer = document.createElement('div');
+                cardContainer.className = 'card-container h-40';
+                
+                const card = document.createElement('div');
+                card.className = 'card w-full h-full';
+                card.addEventListener('click', () => flipCard(card));
+
+                const front = document.createElement('div');
+                front.className = 'card-face card-front';
+                front.innerHTML = `<span class="morpheme-part">${part}</span><span class="text-sm mt-2 font-semibold">Click to reveal</span>`;
+                
+                const back = document.createElement('div');
+                back.className = 'card-face card-back';
+                back.innerHTML = `<span class="morpheme-part">${part}</span><span class="morpheme-meaning">"${meaning}"</span>`;
+
+                card.appendChild(front);
+                card.appendChild(back);
+                cardContainer.appendChild(card);
+                morphemeCardsEl.appendChild(cardContainer);
+            });
+            
+            shuffledOptions.forEach((option) => {
+                const button = document.createElement('button');
+                button.className = 'option-btn p-4 rounded-lg text-gray-700 font-semibold';
+                button.textContent = option;
+                button.onclick = () => checkAnswer(option === correctAnswerText, button);
+                optionsContainerEl.appendChild(button);
+            });
+        }
+        
+        function flipCard(card) {
+            if (card.classList.contains('is-flipped')) return;
+            card.classList.add('is-flipped');
+            revealedCards++;
+            if (revealedCards === Object.keys(words[currentWordIndex].parts).length) {
+                questionSectionEl.classList.remove('hidden');
+            }
+        }
+
+        function checkAnswer(isCorrect, button) {
+            if (isCorrect) {
+                const buttons = optionsContainerEl.querySelectorAll('button');
+                buttons.forEach(btn => btn.disabled = true);
+                
+                feedbackEl.textContent = "Correct!";
+                feedbackEl.style.color = '#38A169';
+                button.classList.add('correct');
+                nextWordBtn.classList.remove('hidden');
+            } else {
+                feedbackEl.textContent = "That's not it, give it another try!";
+                feedbackEl.style.color = '#E53E3E';
+                button.classList.add('incorrect');
+                button.disabled = true;
+            }
+        }
+
+        nextWordBtn.addEventListener('click', () => {
+            currentWordIndex = (currentWordIndex + 1) % words.length;
+            loadWord(currentWordIndex);
+        });
+        
+        loadWord(currentWordIndex);
+    </script>
+</body>
+</html>
