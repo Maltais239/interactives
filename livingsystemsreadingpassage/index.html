@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Annotation Activity - Ecosystems (Highlighting)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f3f4f6; /* gray-100 */
+            color: #1f2937; /* gray-800 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 20px 15px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 1200px;
+        }
+        h1, h2 {
+            text-align: center;
+            font-weight: 700;
+        }
+        h1 { color: #1e40af; margin-bottom: 10px; font-size: 1.8rem; } /* Darker blue for main title */
+        h2 { color: #1d4ed8; margin-bottom: 15px; font-size: 1.1rem; font-weight: 500; } /* Slightly lighter blue for subtitle */
+        
+        .main-content-wrapper { /* New wrapper for source text + summary and annotations column */
+            display: flex;
+            flex-direction: column; /* Stack on small screens */
+            gap: 20px;
+        }
+
+        @media (min-width: 768px) { 
+            .main-content-wrapper {
+                flex-direction: row; /* Side-by-side on medium screens and up */
+            }
+        }
+
+        .left-column { /* Contains source text and summary */
+            flex: 1.8; /* Takes more space */
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* Space between source text and summary */
+        }
+
+        .source-text-column {
+            min-width: 300px; 
+        }
+        .source-text-column h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #374151; 
+            margin-bottom: 10px;
+        }
+        .source-text-content { 
+            line-height: 1.8; 
+            font-size: 0.95rem;
+            color: #374151; 
+            border: 1px solid #e5e7eb; /* Add a light border around text content */
+            padding: 10px;
+            border-radius: 8px;
+            background-color: #f9fafb; /* Light background for text area */
+        }
+         .source-text-content p { 
+            margin-bottom: 0.5em; 
+        }
+        .source-text-content p:last-child {
+            margin-bottom: 0; 
+        }
+        .source-text-content > div {
+             margin-bottom: 0; 
+        }
+
+
+        .annotations-column { 
+            flex: 1; 
+            min-width: 280px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px;
+        }
+
+        .word-span {
+            cursor: pointer;
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+            padding: 1px 2px; 
+            border-radius: 3px;
+            display: inline; 
+        }
+        .phrase-span {
+            display: inline !important; 
+            cursor: pointer;
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+            padding: 2px 3px; 
+            border-radius: 3px;
+        }
+
+        .source-text-content.keywords-mode-active .word-span:not(.highlight-keyword):not(.highlight-idea):hover {
+            background-color: #bee3f8; 
+        }
+        .source-text-content.ideas-mode-active .phrase-span:not(.highlight-keyword):not(.highlight-idea):hover {
+            background-color: #c6f6d5; 
+            box-shadow: 0 0 0 1px #a7f3d0; 
+        }
+
+        .highlight-keyword { 
+            background-color: #bfdbfe !important; 
+        }
+        .highlight-idea { 
+            background-color: #bbf7d0 !important; 
+        }
+
+        .highlight-keyword:hover, .highlight-idea:hover {
+            background-color: #fecaca !important; 
+            text-decoration: line-through;
+            text-decoration-color: #7f1d1d; 
+        }
+
+        .annotation-box {
+            border: 1px solid #d1d5db; 
+            border-radius: 8px; 
+            background-color: #f9fafb; 
+            display: flex; 
+            flex-direction: column;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        #summaryAnnotationBox { 
+            /* width: 100%; */
+        }
+
+        .annotation-header {
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            background-color: #e5e7eb; 
+            border-top-left-radius: 7px; 
+            border-top-right-radius: 7px;
+            padding: 8px 12px; 
+            cursor: pointer; 
+            transition: background-color 0.3s ease;
+        }
+        .annotation-header.active-mode {
+            background-color: #3b82f6; 
+            color: white;
+        }
+        .annotation-header h4 { 
+            font-weight: 600; 
+            color: #374151; 
+            flex-grow: 1; 
+            font-size: 0.9rem;
+        }
+        .annotation-header.active-mode h4 { 
+            color: white; 
+        }
+
+        .annotation-box textarea {
+            width: 100%; 
+            min-height: 120px; 
+            border: none; 
+            padding: 12px; 
+            border-radius: 0 0 7px 7px; 
+            font-size: 0.9rem; 
+            resize: vertical;
+            background-color: #ffffff; 
+            border-top: 1px solid #d1d5db; 
+            color: #1f2937; 
+        }
+        #keyIdeasTextarea { 
+            min-height: 180px; 
+        }
+        .annotation-box textarea::placeholder {
+            color: #9ca3af; 
+        }
+        .clear-btn {
+            background-color: #6b7280; 
+            color: white; 
+            border: none; 
+            padding: 5px 10px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 0.75rem; 
+            line-height: 1;
+            transition: background-color 0.3s ease;
+            margin-left: 8px; 
+        }
+        .clear-btn:hover { 
+            background-color: #4b5563; 
+        }
+
+        .global-action-buttons { 
+            margin-top: 25px; 
+            display: flex; 
+            gap: 12px; 
+            justify-content: center; 
+            flex-wrap: wrap; 
+        }
+        .global-action-buttons button {
+            background-color: #2563eb; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px;
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 0.95rem; 
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .global-action-buttons button:hover { 
+            background-color: #1d4ed8; 
+        }
+        .global-action-buttons button#copyAnnotationsBtn { /* Specific style for copy button */
+            background-color: #059669; /* Green */
+        }
+        .global-action-buttons button#copyAnnotationsBtn:hover {
+             background-color: #047857; /* Darker Green */
+        }
+        #feedbackArea { 
+            margin-top: 20px; 
+            text-align: center; 
+            font-weight: 500; 
+            min-height: 24px; 
+            color: #16a34a; 
+        }
+        #feedbackArea.error {
+            color: #dc2626; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Student Annotation Activity</h1>
+        <h2>The Amazing World of Ecosystems</h2>
+
+        <div class="main-content-wrapper"> 
+            <div class="left-column"> 
+                <div class="source-text-column">
+                    <h3>Source Text <span style="font-weight:400; font-size: 0.85rem;">(Select mode on right, then click to highlight)</span></h3>
+                    <div id="sourceTextContent" class="source-text-content">
+                        </div>
+                </div>
+                <div class="annotation-box" id="summaryAnnotationBox"> 
+                    <div class="annotation-header" style="cursor:default;"> 
+                        <h4>My short summary</h4> 
+                        <button class="clear-btn" data-clear-target="summaryTextarea" title="Clear Summary Text">Clear</button>
+                    </div>
+                    <textarea id="summaryTextarea" aria-label="My short summary" placeholder="Write your short summary here..."></textarea>
+                </div>
+            </div>
+
+            <div class="annotations-column"> 
+                <div class="annotation-box" id="keywordsAnnotationBox">
+                    <div class="annotation-header" id="keywordsHeader">
+                        <h4>Keywords & Vocabulary <span style="color: #3b82f6; font-size: 1.5em; vertical-align: middle;">•</span></h4>
+                        <button class="clear-btn" data-clear-type="keywords" title="Clear Keyword Highlights & Text">Clear</button>
+                    </div>
+                    <textarea id="keywordsTextarea" aria-label="Keywords and Vocabulary" placeholder="Highlighted keywords will appear here..."></textarea>
+                </div>
+
+                <div class="annotation-box" id="keyIdeasAnnotationBox">
+                    <div class="annotation-header" id="keyIdeasHeader">
+                        <h4>Key Ideas <span style="color: #16a34a; font-size: 1.5em; vertical-align: middle;">•</span></h4>
+                        <button class="clear-btn" data-clear-type="ideas" title="Clear Key Idea Highlights & Text">Clear</button>
+                    </div>
+                    <textarea id="keyIdeasTextarea" aria-label="Key Ideas" placeholder="Highlighted key ideas (sentences) will appear here..."></textarea>
+                </div>
+            </div>
+        </div> 
+        <div class="global-action-buttons">
+            <button id="saveAnnotationsBtn">Save Annotations</button>
+            <button id="loadAnnotationsBtn">Load Annotations</button>
+            <button id="copyAnnotationsBtn">Copy Annotations</button>
+        </div>
+        <div id="feedbackArea" role="status" aria-live="polite"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : { 
+                apiKey: "YOUR_API_KEY", 
+                authDomain: "YOUR_AUTH_DOMAIN",
+                projectId: "YOUR_PROJECT_ID",
+                storageBucket: "YOUR_STORAGE_BUCKET",
+                messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+                appId: "YOUR_APP_ID"
+             };
+        
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'student-annotation-ecosystems-default';
+
+        let app;
+        let auth;
+        let db;
+        let userId = null; 
+        let isAuthReady = false; 
+
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (error) {
+            console.error("Firebase initialization error:", error);
+            // Ensure displayFeedback is available or handle error differently if it's not yet defined
+            // For now, just console.error as feedbackArea might not be ready
+            // displayFeedback("Error initializing application.", true); 
+        }
+        
+        let currentMode = 'keywords'; 
+        let sourceWords = []; 
+        let sourcePhrases = []; 
+        
+        let highlightedKeywordIds = new Set(); 
+        let highlightedIdeaIds = new Set();    
+
+        const ecosystemTextParagraphs = [
+            "Welcome to the fascinating world of ecosystems.",
+            "Ecosystems are natural communities.",
+            "In these communities, all living and non-living things interact.",
+            "Think of an ecosystem as a neighborhood.",
+            "This neighborhood can be as huge as an ocean.",
+            "It can also be as small as a garden puddle.",
+            "Here, plants, animals, and microorganisms live together.",
+            "They live with non-living elements.",
+            "These elements include sunlight, water, soil, air, and temperature.",
+            "In every ecosystem, we find living parts.",
+            "These are called biotic components.",
+            "Biotic components include plants that act as producers.",
+            "Animals are consumers.",
+            "Tiny microorganisms act as nature's recyclers.",
+            "They are decomposers.",
+            "We also find abiotic components in ecosystems.",
+            "These are the non-living things.",
+            "Sunlight provides energy.",
+            "Water is essential for survival.",
+            "Soil offers nutrients.",
+            "Air is needed for breathing.",
+            "The overall temperature shapes the environment.",
+            "All these parts are interconnected.",
+            "Animals eat plants.",
+            "Plants need water and sun.",
+            "When organisms die, decomposers return nutrients to the soil.",
+            "It’s a complex and delicate cycle of life."
+        ];
+
+
+        const sourceTextContentDiv = document.getElementById('sourceTextContent');
+        const keywordsHeader = document.getElementById('keywordsHeader');
+        const keyIdeasHeader = document.getElementById('keyIdeasHeader');
+        const keywordsTextarea = document.getElementById('keywordsTextarea');
+        const keyIdeasTextarea = document.getElementById('keyIdeasTextarea');
+        const summaryTextarea = document.getElementById('summaryTextarea');
+        const saveAnnotationsBtn = document.getElementById('saveAnnotationsBtn');
+        const loadAnnotationsBtn = document.getElementById('loadAnnotationsBtn');
+        const copyAnnotationsBtn = document.getElementById('copyAnnotationsBtn');
+        const feedbackArea = document.getElementById('feedbackArea'); // Correctly define feedbackArea
+        const clearButtons = document.querySelectorAll('.clear-btn');
+
+        function displayFeedback(message, isError = false) {
+            if (!feedbackArea) {
+                console.warn("feedbackArea not found. Message:", message);
+                return;
+            }
+            feedbackArea.textContent = message;
+            feedbackArea.className = isError ? 'error' : ''; 
+             setTimeout(() => {
+                if (feedbackArea) { // Check again in case it becomes null
+                    feedbackArea.textContent = '';
+                    feedbackArea.className = '';
+                }
+            }, 5000); 
+        }
+        
+        function splitIntoSentences(paragraphText) {
+            const sentences = paragraphText.match(/[^.!?]+[.!?]+(\s*(?=[A-Z0-9])|$)/g) || [paragraphText];
+            return sentences.map(s => s.trim()).filter(s => s.length > 0);
+        }
+
+
+        function prepareTextData() {
+            sourceWords = [];
+            sourcePhrases = [];
+            let globalWordId = 0;
+            let globalPhraseIdCounter = 0;
+
+            ecosystemTextParagraphs.forEach((paragraphText, pIndex) => {
+                const sentences = splitIntoSentences(paragraphText); 
+                sentences.forEach((sentenceText, sIndex) => {
+                    const phraseId = `phrase_${pIndex}_${sIndex}_${globalPhraseIdCounter++}`;
+                    sourcePhrases.push({
+                        id: phraseId,
+                        text: sentenceText, 
+                        paragraphIndex: pIndex, 
+                        spanElement: null
+                    });
+                });
+
+                const tokens = paragraphText.split(/(\b[\w'-]+\b|[.,;:!?()"'-]|\s+)/g).filter(t => t && t.length > 0);
+                tokens.forEach(token => {
+                    if (token.match(/^\b[\w'-]+\b$/)) { 
+                        sourceWords.push({
+                            id: globalWordId++,
+                            text: token, 
+                            paragraphIndex: pIndex,
+                            spanElement: null,
+                            originalText: token 
+                        });
+                    }
+                });
+            });
+        }
+
+
+        function loadInteractiveText() {
+            if (!sourceTextContentDiv) return;
+            sourceTextContentDiv.innerHTML = ''; 
+            
+            if (currentMode === 'keywords') {
+                sourceWords.forEach(sw => sw.spanElement = null); 
+                const singleWordContainer = document.createElement('div');
+                ecosystemTextParagraphs.forEach((fullParagraphText, pIndex) => {
+                    const displayTokens = fullParagraphText.split(/(\b[\w'-]+\b|[.,;:!?()"'-]|\s+)/g).filter(t => t && t.length > 0);
+                    displayTokens.forEach(token => {
+                        if (token.match(/^\b[\w'-]+\b$/)) { 
+                            const wordObj = sourceWords.find(sw => sw.originalText === token && 
+                                                                 sw.paragraphIndex === pIndex && 
+                                                                 !sw.spanElement);
+                            if (wordObj) {
+                                const span = document.createElement('span');
+                                span.textContent = token; 
+                                span.classList.add('word-span');
+                                span.dataset.wordId = wordObj.id;
+                                wordObj.spanElement = span; 
+                                if (highlightedKeywordIds.has(wordObj.id)) {
+                                    span.classList.add('highlight-keyword');
+                                }
+                                span.addEventListener('click', () => handleWordSpanClick(wordObj.id));
+                                singleWordContainer.appendChild(span);
+                            } else {
+                                singleWordContainer.appendChild(document.createTextNode(token)); 
+                            }
+                        } else { 
+                            singleWordContainer.appendChild(document.createTextNode(token));
+                        }
+                    });
+                    if (pIndex < ecosystemTextParagraphs.length - 1) {
+                         singleWordContainer.appendChild(document.createTextNode(" "));
+                    }
+                });
+                sourceTextContentDiv.appendChild(singleWordContainer);
+
+            } else if (currentMode === 'ideas') {
+                sourcePhrases.forEach(sp => sp.spanElement = null); 
+                const singlePhraseContainer = document.createElement('div'); 
+                sourcePhrases.forEach(phraseObj => {
+                    const span = document.createElement('span');
+                    span.textContent = phraseObj.text + " "; 
+                    span.classList.add('phrase-span');
+                    span.dataset.phraseId = phraseObj.id;
+                    phraseObj.spanElement = span; 
+                    if (highlightedIdeaIds.has(phraseObj.id)) {
+                        span.classList.add('highlight-idea');
+                    }
+                    span.addEventListener('click', () => handlePhraseSpanClick(phraseObj.id));
+                    singlePhraseContainer.appendChild(span); 
+                });
+                sourceTextContentDiv.appendChild(singlePhraseContainer); 
+            }
+            updateAnnotationModeUIStyle(); 
+        }
+        
+        function updateAnnotationModeUIStyle() {
+            if (!sourceTextContentDiv) return;
+            sourceTextContentDiv.classList.toggle('keywords-mode-active', currentMode === 'keywords');
+            sourceTextContentDiv.classList.toggle('ideas-mode-active', currentMode === 'ideas');
+        }
+
+        function switchAnnotationMode(newMode) {
+            if (currentMode === newMode && sourceTextContentDiv.hasChildNodes()) return; 
+            currentMode = newMode;
+            keywordsHeader.classList.toggle('active-mode', currentMode === 'keywords');
+            keyIdeasHeader.classList.toggle('active-mode', currentMode === 'ideas');
+            loadInteractiveText(); 
+        }
+
+        function handleWordSpanClick(wordId) {
+            const wordObj = sourceWords.find(w => w.id === wordId);
+            if (!wordObj || !wordObj.spanElement) return;
+
+            if (highlightedKeywordIds.has(wordId)) {
+                highlightedKeywordIds.delete(wordId);
+                wordObj.spanElement.classList.remove('highlight-keyword');
+            } else {
+                highlightedKeywordIds.add(wordId);
+                wordObj.spanElement.classList.add('highlight-keyword');
+            }
+            updateKeywordsTextarea();
+        }
+
+        function handlePhraseSpanClick(phraseId) {
+            const phraseObj = sourcePhrases.find(p => p.id === phraseId);
+            if (!phraseObj || !phraseObj.spanElement) return;
+
+            if (highlightedIdeaIds.has(phraseId)) {
+                highlightedIdeaIds.delete(phraseId);
+                phraseObj.spanElement.classList.remove('highlight-idea');
+            } else {
+                highlightedIdeaIds.add(phraseId);
+                phraseObj.spanElement.classList.add('highlight-idea');
+            }
+            updateKeyIdeasTextarea();
+        }
+        
+        function updateKeywordsTextarea() {
+            if (!keywordsTextarea) return;
+            const sortedKeywordIds = Array.from(highlightedKeywordIds).sort((a,b) => a - b); 
+            const keywords = sortedKeywordIds
+                                .map(id => sourceWords.find(w => w.id === id)?.text)
+                                .filter(Boolean); 
+            keywordsTextarea.value = keywords.join(', ');
+        }
+
+        function updateKeyIdeasTextarea() {
+            if (!keyIdeasTextarea) return;
+            const sortedPhraseIds = Array.from(highlightedIdeaIds).sort((idA, idB) => {
+                const phraseA = sourcePhrases.find(p => p.id === idA);
+                const phraseB = sourcePhrases.find(p => p.id === idB);
+                if (!phraseA || !phraseB) return 0;
+                const numA = parseInt(phraseA.id.split('_').pop());
+                const numB = parseInt(phraseB.id.split('_').pop());
+                return numA - numB;
+            });
+            const ideas = sortedPhraseIds
+                            .map(id => sourcePhrases.find(p => p.id === id)?.text)
+                            .filter(Boolean);
+            keyIdeasTextarea.value = ideas.join('\n---\n');
+        }
+        
+        function clearAnnotations(type) {
+            if (type === 'keywords') {
+                highlightedKeywordIds.forEach(id => {
+                    const wordObj = sourceWords.find(w => w.id === id);
+                    if (wordObj && wordObj.spanElement) {
+                        wordObj.spanElement.classList.remove('highlight-keyword');
+                    }
+                });
+                highlightedKeywordIds.clear();
+                updateKeywordsTextarea();
+            } else if (type === 'ideas') {
+                 highlightedIdeaIds.forEach(id => {
+                    const phraseObj = sourcePhrases.find(p => p.id === id);
+                    if (phraseObj && phraseObj.spanElement) {
+                        phraseObj.spanElement.classList.remove('highlight-idea');
+                    }
+                });
+                highlightedIdeaIds.clear();
+                updateKeyIdeasTextarea();
+            } else if (type === 'summary' && summaryTextarea) {
+                summaryTextarea.value = '';
+            }
+            displayFeedback(`${type.charAt(0).toUpperCase() + type.slice(1)} cleared.`, false);
+        }
+
+        async function saveAnnotations() {
+            if (!userId || !db) { displayFeedback("Cannot save: Auth/DB issue.", true); return; }
+            if (!appId) { displayFeedback("Cannot save: App ID missing.", true); return; }
+
+            const annotationsData = {
+                keywords: Array.from(highlightedKeywordIds), 
+                ideas: Array.from(highlightedIdeaIds),       
+                summary: summaryTextarea ? summaryTextarea.value : '',
+                lastSaved: serverTimestamp()
+            };
+
+            try {
+                const docRef = doc(db, "artifacts", appId, "users", userId, "activity_data", "annotations");
+                await setDoc(docRef, annotationsData);
+                displayFeedback("Annotations saved successfully!", false);
+            } catch (error) {
+                console.error("Error saving annotations:", error);
+                displayFeedback("Error saving annotations.", true);
+            }
+        }
+
+        async function loadAnnotations() {
+            if (!userId || !db) { displayFeedback("Cannot load: Auth/DB issue.", true); return; }
+            if (!appId) { displayFeedback("Cannot load: App ID missing.", true); return; }
+
+            try {
+                const docRef = doc(db, "artifacts", appId, "users", userId, "activity_data", "annotations");
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    highlightedKeywordIds = new Set(data.keywords || []);
+                    highlightedIdeaIds = new Set(data.ideas || []);
+                    if (summaryTextarea) summaryTextarea.value = data.summary || '';
+                    
+                    loadInteractiveText(); 
+                    updateKeywordsTextarea(); 
+                    updateKeyIdeasTextarea();
+                    displayFeedback("Annotations loaded successfully!", false);
+                } else {
+                    displayFeedback("No saved annotations found.", false);
+                    clearAnnotations('keywords');
+                    clearAnnotations('ideas');
+                    clearAnnotations('summary');
+                    loadInteractiveText();
+                }
+            } catch (error) {
+                console.error("Error loading annotations:", error);
+                displayFeedback("Error loading annotations.", true);
+                loadInteractiveText();
+            }
+        }
+
+        function copyAllAnnotationsToClipboard() { // Ensure this function is correctly defined
+            let textToCopy = "Student Annotations:\n\n";
+
+            if (keywordsTextarea && keywordsTextarea.value.trim() !== "") {
+                textToCopy += "--- Keywords & Vocabulary ---\n";
+                textToCopy += keywordsTextarea.value.trim() + "\n\n";
+            }
+
+            if (keyIdeasTextarea && keyIdeasTextarea.value.trim() !== "") {
+                textToCopy += "--- Key Ideas ---\n";
+                textToCopy += keyIdeasTextarea.value.trim().replace(/\n---\n/g, "\n\n") + "\n\n"; // Replace separator with double newline
+            }
+
+            if (summaryTextarea && summaryTextarea.value.trim() !== "") {
+                textToCopy += "--- My Short Summary ---\n";
+                textToCopy += summaryTextarea.value.trim() + "\n";
+            }
+            
+            if (textToCopy === "Student Annotations:\n\n") { // No annotations were added
+                displayFeedback("No annotations to copy.", true);
+                return; // This return is valid as it's inside a function
+            }
+
+            // Fallback for copying to clipboard (works in iFrames)
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = textToCopy;
+            tempTextArea.style.position = 'absolute';
+            tempTextArea.style.left = '-9999px'; // Move off-screen
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    displayFeedback('Annotations copied to clipboard!', false);
+                } else {
+                    displayFeedback('Failed to copy annotations.', true);
+                }
+            } catch (err) {
+                console.error('Fallback: Oops, unable to copy', err);
+                displayFeedback('Failed to copy annotations. See console for details.', true);
+            }
+            document.body.removeChild(tempTextArea);
+        }
+        
+        if (keywordsHeader) {
+            keywordsHeader.addEventListener('click', () => switchAnnotationMode('keywords'));
+        }
+        if (keyIdeasHeader) {
+            keyIdeasHeader.addEventListener('click', () => switchAnnotationMode('ideas'));
+        }
+
+        clearButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const clearType = e.target.dataset.clearType;
+                const clearTarget = e.target.dataset.clearTarget;
+                if (clearType) {
+                    clearAnnotations(clearType);
+                } else if (clearTarget && document.getElementById(clearTarget)) {
+                     document.getElementById(clearTarget).value = '';
+                     if (clearTarget === 'summaryTextarea') clearAnnotations('summary'); 
+                     displayFeedback("Summary cleared.", false);
+                }
+            });
+        });
+        
+        if (saveAnnotationsBtn) saveAnnotationsBtn.addEventListener('click', saveAnnotations);
+        if (loadAnnotationsBtn) loadAnnotationsBtn.addEventListener('click', loadAnnotations);
+        if (copyAnnotationsBtn) copyAnnotationsBtn.addEventListener('click', copyAllAnnotationsToClipboard);
+        
+        function initializeAppActivity() { // Ensure this function is correctly defined
+            if (!isAuthReady) {
+                console.log("Auth not ready for initializeAppActivity");
+                return; 
+            }
+            
+            prepareTextData(); 
+            if (keywordsHeader) keywordsHeader.classList.toggle('active-mode', currentMode === 'keywords');
+            if (keyIdeasHeader) keyIdeasHeader.classList.toggle('active-mode', currentMode === 'ideas');
+            
+            loadInteractiveText(); 
+            loadAnnotations(); 
+        }
+
+        if (auth) {
+            const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    console.log("User is signed in:", user.uid);
+                    userId = user.uid;
+                    if (!isAuthReady) { 
+                        isAuthReady = true; 
+                        initializeAppActivity(); 
+                    }
+                } else {
+                    console.log("User is signed out or token needs processing.");
+                    if (initialAuthToken && !auth.currentUser) {
+                        console.log("Attempting sign in with custom token.");
+                        try { 
+                            await signInWithCustomToken(auth, initialAuthToken); 
+                            // onAuthStateChanged will trigger again with the user
+                        } 
+                        catch (error) { 
+                            console.error("Custom token sign-in error:", error); 
+                            if (!auth.currentUser) {
+                                console.log("Falling back to anonymous sign-in after custom token failure.");
+                                trySignInAnonymously(); 
+                            }
+                        }
+                    } else if (!auth.currentUser) {
+                         console.log("No initial token, attempting anonymous sign-in.");
+                         trySignInAnonymously();
+                    }
+                }
+            }, async (error) => { 
+                console.error("Auth state change error:", error);
+                if (!auth.currentUser) {
+                    console.log("Falling back to anonymous sign-in due to auth state error.");
+                    trySignInAnonymously();
+                }
+            });
+
+            // Additional check in case onAuthStateChanged doesn't fire immediately or as expected
+            setTimeout(async () => {
+                if (!auth.currentUser) {
+                    console.log("Timeout: Auth still not ready. Checking for initial token.");
+                    if (initialAuthToken) {
+                        try { 
+                            await signInWithCustomToken(auth, initialAuthToken); 
+                        }
+                        catch (e) { 
+                            if (!auth.currentUser) trySignInAnonymously(); 
+                        }
+                    } else {
+                        if (!auth.currentUser) trySignInAnonymously();
+                    }
+                } else if (!isAuthReady) { 
+                    // This case implies auth.currentUser exists but isAuthReady wasn't set
+                    // (e.g. if onAuthStateChanged fired but initializeAppActivity wasn't called)
+                    console.log("Timeout: Auth ready, ensuring app initialization.");
+                    userId = auth.currentUser.uid;
+                    isAuthReady = true; 
+                    initializeAppActivity();
+                }
+            }, 300); // Increased timeout slightly for robustness
+        } else { 
+            console.warn("Firebase auth object not available. Using local user ID.");
+            userId = 'local_user_' + crypto.randomUUID();
+            isAuthReady = true; 
+            initializeAppActivity();
+        }
+
+        async function trySignInAnonymously() {
+            if (auth.currentUser) {
+                console.log("Already signed in, skipping anonymous sign-in.");
+                return; 
+            }
+            console.log("Attempting to sign in anonymously.");
+            try {
+                await signInAnonymously(auth);
+                // onAuthStateChanged should handle the rest
+            } catch (error) {
+                console.error("Anonymous sign-in error:", error);
+                displayFeedback("Could not authenticate user.", true);
+                if (!userId) userId = 'anonymous_fallback_' + crypto.randomUUID(); 
+                if (!isAuthReady) { 
+                    isAuthReady = true; 
+                    initializeAppActivity(); 
+                }
+            }
+        }
+    </script>
+</body>
+</html>
