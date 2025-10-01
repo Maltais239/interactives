@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>What's the Angle?</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Bangers&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #374151; /* Cool Gray */
+            color: #F9FAFB;
+            touch-action: none;
+        }
+        .title-font {
+            font-family: 'Bangers', cursive;
+            letter-spacing: 2px;
+            color: #FBBF24; /* Amber 400 */
+            text-shadow: 3px 3px 0px #1F2937;
+        }
+        .protractor {
+            position: relative;
+            width: 100%;
+            padding-top: 50%; /* 2:1 aspect ratio */
+        }
+        .protractor-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #handle-grabber {
+            cursor: grab;
+        }
+        #handle-grabber.dragging {
+            cursor: grabbing;
+        }
+        .angle-text {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 28px;
+            fill: #F9FAFB;
+        }
+        .target-angle-text {
+            font-family: 'Poppins', sans-serif; /* Changed from Bangers for readability */
+            font-weight: 700;
+            font-size: 40px;
+            color: #FBBF24;
+        }
+        .score-text {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+        }
+        .btn-guess {
+            background-color: #FBBF24;
+            color: #1F2937;
+            font-family: 'Bangers';
+            letter-spacing: 1px;
+            font-size: 1.5rem;
+            border-bottom: 5px solid #D97706;
+            transition: all 0.1s ease-in-out;
+        }
+        .btn-guess:hover {
+            transform: translateY(-2px);
+            border-bottom-width: 7px;
+        }
+        .btn-guess:active {
+            transform: translateY(2px);
+            border-bottom-width: 3px;
+        }
+        .feedback-panel {
+            transition: opacity 0.3s;
+        }
+        @keyframes pop-in {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .feedback-panel > div {
+            animation: pop-in 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+    </style>
+</head>
+<body class="p-4 flex items-center justify-center min-h-screen">
+    <div class="max-w-3xl w-full">
+        <header class="text-center mb-4">
+            <h1 class="title-font text-6xl">What's the Angle?</h1>
+            <p class="text-gray-300 text-lg">Drag the handle to set the angle!</p>
+        </header>
+
+        <main class="bg-gray-700 p-6 rounded-2xl shadow-2xl relative overflow-hidden">
+            <div class="flex justify-between items-center mb-4">
+                <div class="text-center">
+                    <p class="text-lg text-gray-400">Score</p>
+                    <p id="score" class="text-3xl font-bold score-text">0</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-lg text-gray-400">Target Angle</p>
+                    <p id="targetAngleText" class="target-angle-text">0°</p>
+                </div>
+            </div>
+
+            <div class="protractor">
+                <svg id="protractorSvg" class="protractor-svg" viewBox="0 0 400 200">
+                    <path d="M 20 200 A 180 180 0 0 1 380 200" stroke="#4B5563" stroke-width="2" fill="none" />
+                    <line x1="0" y1="200" x2="400" y2="200" stroke="#4B5563" stroke-width="2" />
+                    <g id="ticks" stroke="#6B7280" stroke-width="1"></g>
+                    <line id="baseLine" x1="200" y1="200" x2="380" y2="200" stroke="#FBBF24" stroke-width="4" />
+                    <line id="userLine" x1="200" y1="200" x2="380" y2="200" stroke="#60A5FA" stroke-width="6" />
+                    <circle id="handle" cx="380" cy="200" r="15" fill="#60A5FA" />
+                    <!-- Invisible larger grab area for the handle -->
+                    <circle id="handle-grabber" cx="380" cy="200" r="30" fill="transparent" />
+                    <circle cx="200" cy="200" r="8" fill="#FBBF24" />
+                    <text id="angleValueText" x="200" y="175" class="angle-text" text-anchor="middle">0°</text>
+                </svg>
+            </div>
+
+            <div class="mt-6 text-center">
+                <button id="guessBtn" class="btn-guess py-3 px-12 rounded-xl">Guess!</button>
+            </div>
+
+            <div id="feedbackPanel" class="feedback-panel hidden absolute inset-0 bg-gray-800/80 p-6 rounded-2xl flex items-center justify-center">
+                <div class="text-center">
+                    <h2 id="feedbackTitle" class="text-4xl font-bold mb-2"></h2>
+                    <p id="feedbackText" class="text-xl mb-4"></p>
+                    <button id="nextBtn" class="btn-guess py-2 px-8 rounded-lg">Next Angle</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const protractorSvg = document.getElementById('protractorSvg');
+        const userLine = document.getElementById('userLine');
+        const handle = document.getElementById('handle');
+        const handleGrabber = document.getElementById('handle-grabber');
+        const angleValueText = document.getElementById('angleValueText');
+        const targetAngleText = document.getElementById('targetAngleText');
+        const scoreEl = document.getElementById('score');
+        const guessBtn = document.getElementById('guessBtn');
+        const feedbackPanel = document.getElementById('feedbackPanel');
+        const feedbackTitle = document.getElementById('feedbackTitle');
+        const feedbackText = document.getElementById('feedbackText');
+        const nextBtn = document.getElementById('nextBtn');
+        const ticksContainer = document.getElementById('ticks');
+
+        const center = { x: 200, y: 200 };
+        const radius = 180;
+        let targetAngle = 0;
+        let score = 0;
+        let currentAngle = 0;
+
+        function generateNewAngle() {
+            targetAngle = Math.floor(Math.random() * 161) + 10;
+            targetAngleText.textContent = `${targetAngle}°`;
+            updateUserAngle(0);
+            angleValueText.style.display = 'none';
+            feedbackPanel.classList.add('hidden');
+            guessBtn.disabled = false;
+        }
+
+        function updateUserAngle(angle) {
+            angle = Math.max(0, Math.min(180, angle));
+            currentAngle = angle;
+            angleValueText.textContent = `${Math.round(angle)}°`;
+            const rad = angle * Math.PI / 180; // FLIPPED: Angle now goes 0 (right) to 180 (left)
+            const x2 = center.x + radius * Math.cos(rad);
+            const y2 = center.y - radius * Math.sin(rad);
+            userLine.setAttribute('x2', x2);
+            userLine.setAttribute('y2', y2);
+            handle.setAttribute('cx', x2);
+            handle.setAttribute('cy', y2);
+            handleGrabber.setAttribute('cx', x2);
+            handleGrabber.setAttribute('cy', y2);
+        }
+
+        function getAngleFromEvent(e) {
+            const rect = protractorSvg.getBoundingClientRect();
+            const touch = e.type.startsWith('touch') ? e.touches[0] : e;
+            const scaleX = protractorSvg.viewBox.baseVal.width / rect.width;
+            const svgX = (touch.clientX - rect.left) * scaleX;
+            const svgY = (touch.clientY - rect.top) * scaleX;
+            const dx = svgX - center.x;
+            const dy = center.y - svgY;
+            let rad = Math.atan2(dy, dx);
+            let angle = rad * 180 / Math.PI;
+            return angle; // FLIPPED: Angle is now calculated from the right
+        }
+
+        function startDrag(e) {
+            e.preventDefault();
+            handleGrabber.classList.add('dragging');
+            if (e.type === 'mousedown') {
+                document.addEventListener('mousemove', drag);
+                document.addEventListener('mouseup', endDrag, { once: true });
+            } else {
+                document.addEventListener('touchmove', drag);
+                document.addEventListener('touchend', endDrag, { once: true });
+            }
+        }
+
+        function drag(e) {
+            e.preventDefault();
+            const angle = getAngleFromEvent(e);
+            updateUserAngle(angle);
+        }
+
+        function endDrag() {
+            handleGrabber.classList.remove('dragging');
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('touchmove', drag);
+        }
+
+        guessBtn.addEventListener('click', () => {
+            const userAngle = currentAngle;
+            const diff = Math.abs(targetAngle - userAngle);
+            let points = 0;
+            if (diff <= 5) {
+                feedbackTitle.textContent = "Awesome!";
+                feedbackTitle.style.color = '#34D399';
+                points = 100;
+            } else if (diff <= 10) {
+                feedbackTitle.textContent = "Great Job!";
+                feedbackTitle.style.color = '#A7F3D0';
+                points = 80;
+            } else if (diff <= 20) {
+                feedbackTitle.textContent = "Good Effort!";
+                feedbackTitle.style.color = '#FDE047';
+                points = 60;
+            } else {
+                feedbackTitle.textContent = "Nice Try!";
+                feedbackTitle.style.color = '#F87171';
+                points = 40;
+            }
+            feedbackText.innerHTML = `Your guess: <strong>${userAngle.toFixed(1)}°</strong><br>You were off by <strong>${diff.toFixed(1)}°</strong>`;
+            score += points;
+            scoreEl.textContent = score;
+            angleValueText.style.display = 'block';
+            feedbackPanel.classList.remove('hidden');
+            guessBtn.disabled = true;
+        });
+
+        nextBtn.addEventListener('click', generateNewAngle);
+        handleGrabber.addEventListener('mousedown', startDrag);
+        handleGrabber.addEventListener('touchstart', startDrag, { passive: false });
+
+        for (let i = 0; i <= 180; i += 10) {
+            const rad = i * Math.PI / 180; // FLIPPED: Ticks now draw from right to left
+            const isMajorTick = i % 30 === 0;
+            const length = isMajorTick ? 15 : 8;
+            const x1 = center.x + (radius - 5) * Math.cos(rad);
+            const y1 = center.y - (radius - 5) * Math.sin(rad);
+            const x2 = center.x + (radius - 5 - length) * Math.cos(rad);
+            const y2 = center.y - (radius - 5 - length) * Math.sin(rad);
+            const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            tick.setAttribute('x1', x1);
+            tick.setAttribute('y1', y1);
+            tick.setAttribute('x2', x2);
+            tick.setAttribute('y2', y2);
+            ticksContainer.appendChild(tick);
+        }
+
+        generateNewAngle();
+    </script>
+</body>
+</html>
+
+
