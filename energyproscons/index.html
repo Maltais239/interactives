@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sorting Game - Specific Energy Pros & Cons</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg: #1A535C; /* Darker Teal */
+            --panel: #F8F7FC;
+            --btn: #4ECDC4; /* Lighter Teal/Mint */
+            --btn-hover: #3AA9A1; /* Darker Mint */
+            --text-light: #FFFFFF;
+            --text-dark: #333333;
+            --border-color: #D1D5DB;
+            --zone-border: #A0A0A0;
+            --zone-over-bg: #E6FFFA; /* Very Light Mint */
+            --correct-border: #22c55e;
+            --incorrect-border: #ef4444;
+            --unplaced-border: #f97316;
+            --item-bg: #FFFFFF;
+            --item-border: #BDBDBD;
+        }
+        *{box-sizing:border-box;}
+        body{
+            margin:0;
+            font-family:'Poppins', sans-serif;
+            background:var(--bg);
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 10px; /* Reduced */
+            overscroll-behavior: none;
+        }
+        h1{
+            font-size: 1.7rem; /* Reduced */
+            color: var(--text-light);
+            margin: 3px 0; /* Reduced */
+            text-align: center;
+        }
+        p{
+            color: var(--text-light);
+            margin: 0 0 10px 0; /* Reduced */
+            text-align: center;
+            font-size: 0.8rem; /* Reduced */
+        }
+
+        .game-container{
+            background: var(--panel);
+            width: 100%;
+            max-width: 900px; /* Was 900px, kept for consistency with 5 items */
+            padding: 20px; /* Reduced */
+            border-radius: 12px; /* Reduced */
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1); /* Reduced */
+            position: relative;
+        }
+
+        #items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px; /* Reduced */
+            justify-content: center;
+            align-items: stretch;
+            margin-bottom: 20px; /* Reduced */
+            min-height: 304px; /* Adjusted for 4 rows of 70px items + gaps: (4*70) + (3*8) = 304 */
+            padding: 10px; /* Reduced */
+            border: 1px solid var(--border-color);
+            border-radius: 6px; /* Reduced */
+            background: #F0F0F0;
+        }
+        .item{
+            width: 140px; /* Adjusted for 5 items across: (900 - 40containerpad - 20itemspad - 4*8gaps) / 5 = ~161.6. Using 140px for robustness. */
+            min-height: 70px; /* Reduced */
+            background: var(--item-bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px; /* Reduced */
+            border: 1px solid var(--item-border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* Reduced */
+            cursor: grab;
+            touch-action: none;
+            user-select: none;
+            position: relative;
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out, border 0.2s ease-out;
+            text-align: center;
+            font-size: 0.75rem; /* Reduced */
+            color: var(--text-dark);
+            padding: 6px; /* Reduced */
+            line-height: 1.2; /* Reduced */
+        }
+        .item img {
+            height: 1.3em; /* Reduced */
+            vertical-align: middle;
+            margin-bottom: 3px; /* Reduced */
+        }
+         .item span {
+            display: block;
+            width: 100%;
+        }
+
+        .item.dragging {
+            opacity: 0.7;
+            cursor: grabbing;
+            position: absolute;
+            z-index: 1000;
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2); /* Reduced */
+            transform: scale(1.03); /* Reduced */
+            transition: none;
+            border: 1px solid var(--btn);
+        }
+        .item.native-dragging { opacity: 0.3; }
+        .item.correct { border: 2px solid var(--correct-border); } /* Thinner border */
+        .item.incorrect { border: 2px solid var(--incorrect-border); } /* Thinner border */
+        .item.unplaced { border: 2px solid var(--unplaced-border); } /* Thinner border */
+
+
+        .zones{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px; /* Reduced */
+            margin-bottom: 20px; /* Reduced */
+        }
+        .zone-label{
+            font-weight: bold;
+            margin-bottom: 6px; /* Reduced */
+            color: var(--text-dark);
+            text-align: center;
+            font-size: 1rem; /* Reduced */
+        }
+        .drop-zone{
+            width: 100%;
+            min-height: 250px; /* Reduced */
+            background: var(--text-light);
+            border: 2px dashed var(--zone-border);
+            border-radius: 6px; /* Reduced */
+            padding: 10px; /* Reduced */
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px; /* Reduced */
+            align-content: flex-start;
+            transition: background .3s, border-style .3s;
+        }
+        .drop-zone.over{
+            background: var(--zone-over-bg);
+            border-style: solid;
+        }
+
+        .controls{ text-align:center; }
+        .controls button{
+            background: var(--btn);
+            color: var(--text-dark);
+            border: none;
+            padding: 8px 16px; /* Reduced */
+            border-radius: 6px; /* Reduced */
+            cursor: pointer;
+            margin: 4px 6px; /* Reduced */
+            font-size: 0.9rem; /* Reduced */
+            font-family: 'Poppins', sans-serif;
+            font-weight: bold;
+            transition: background .3s, transform 0.1s ease-out;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1); /* Reduced */
+        }
+        .controls button:hover{ background: var(--btn-hover); color: var(--text-light); }
+        .controls button:active { transform: scale(0.97); } /* Reduced */
+
+        @media (max-width: 768px) { /* Adjusted breakpoints for conciseness */
+             .item { width: 130px; font-size: 0.7rem; min-height: 65px;} /* Ensures ~5 items fit on tablet */
+             #items { min-height: 280px; } /* 4 rows of 65px items + gaps */
+             .drop-zone { min-height: 220px; }
+             .game-container { padding: 15px; max-width: 100%;}
+        }
+
+        @media (max-width: 480px) { /* More aggressive for very small screens */
+            h1 { font-size: 1.4rem; }
+            p { font-size: 0.75rem; margin-bottom: 8px;}
+            .item { width: calc(50% - 6px); font-size: 0.65rem; min-height: 60px; padding: 5px; } /* 2 items per row */
+            #items { min-height: auto; padding: 8px; gap: 6px; }
+            .zones { grid-template-columns: 1fr; gap: 10px; }
+            .drop-zone { min-height: 180px; padding: 8px;}
+            .game-container { padding: 10px; }
+            .controls button { padding: 6px 12px; font-size: 0.8rem;}
+        }
+    </style>
+</head>
+<body>
+    <h1>Energy: Specific Pros & Cons</h1>
+    <p>Drag each statement to the correct category (Advantages or Disadvantages).</p>
+
+    <div class="game-container">
+        <div id="items">
+            </div>
+
+        <div class="zones">
+            <div class="zone">
+                <div class="zone-label">Advantages (Pros)</div>
+                <div id="pro" class="drop-zone" aria-label="Advantages drop-zone"></div>
+            </div>
+            <div class="zone">
+                <div class="zone-label">Disadvantages (Cons)</div>
+                <div id="con" class="drop-zone" aria-label="Disadvantages drop-zone"></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="check-btn" type="button">Check Answers</button>
+            <button id="reset-btn" type="button">Reset</button>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const om = code => `https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${code}.svg`;
+        const iconStyle = `style="height: 1.3em; vertical-align: middle; margin-bottom: 3px;"`; // Adjusted icon style
+
+        // --- Define Items (Specific Pros & Cons with Icons) ---
+        const ITEMS = [
+            // Solar
+            { text: `<img src="${om('1F506')}" alt="Solar" ${iconStyle}><span>Abundant, renewable, reduces bills.</span>`, category: 'pro' },
+            { text: `<img src="${om('1F506')}" alt="Solar" ${iconStyle}><span>Needs sun, large space.</span>`, category: 'con' },
+            // Wind
+            { text: `<img src="${om('1F32C')}" alt="Wind" ${iconStyle}><span>Clean, no emissions, land dual-use.</span>`, category: 'pro' },
+            { text: `<img src="${om('1F32C')}" alt="Wind" ${iconStyle}><span>Needs wind, visual impact, bird hazard.</span>`, category: 'con' },
+            // Biomass
+            { text: `<img src="${om('1F33F')}" alt="Biomass" ${iconStyle}><span>Uses waste, carbon neutral (managed).</span>`, category: 'pro' },
+            { text: `<img src="${om('1F33F')}" alt="Biomass" ${iconStyle}><span>Deforestation risk, emissions.</span>`, category: 'con' },
+            // Geothermal
+            { text: `<img src="${om('1F30B')}" alt="Geothermal" ${iconStyle}><span>Consistent, small land footprint.</span>`, category: 'pro' },
+            { text: `<img src="${om('1F30B')}" alt="Geothermal" ${iconStyle}><span>Location-specific, high drill cost.</span>`, category: 'con' },
+            // Tidal
+            { text: `<img src="${om('1F30A')}" alt="Tidal" ${iconStyle}><span>Predictable, long plant life.</span>`, category: 'pro' },
+            { text: `<img src="${om('1F30A')}" alt="Tidal" ${iconStyle}><span>Few sites, costly, marine impact.</span>`, category: 'con' },
+            // Hydro
+            { text: `<img src="${om('1F4A7')}" alt="Hydro" ${iconStyle}><span>Renewable, baseload, water storage.</span>`, category: 'pro' },
+            { text: `<img src="${om('1F4A7')}" alt="Hydro" ${iconStyle}><span>Dams impact ecosystems, rain dependent.</span>`, category: 'con' },
+            // Nuclear
+            { text: `<img src="${om('269B')}" alt="Nuclear" ${iconStyle}><span>High power, low operational GHG.</span>`, category: 'pro' },
+            { text: `<img src="${om('269B')}" alt="Nuclear" ${iconStyle}><span>Radioactive waste, accident risk.</span>`, category: 'con' },
+            // Fossil Fuels (Oil)
+            { text: `<img src="${om('1F6E2')}" alt="Oil" ${iconStyle}><span>High energy density, established tech.</span>`, category: 'pro' },
+            { text: `<img src="${om('1F6E2')}" alt="Oil" ${iconStyle}><span>Major GHG source, pollutes, finite.</span>`, category: 'con' },
+            // Natural Gas
+            { text: `<img src="${om('1F525')}" alt="Natural Gas" ${iconStyle}><span>Cleaner than coal, responsive.</span>`, category: 'pro' },
+            { text: `<img src="${om('1F525')}" alt="Natural Gas" ${iconStyle}><span>Fossil fuel (CO2), methane leaks.</span>`, category: 'con' },
+            // Coal
+            { text: `<img src="${om('1FAA8')}" alt="Coal" ${iconStyle}><span>Abundant (some areas), cheap.</span>`, category: 'pro' },
+            { text: `<img src="${om('1FAA8')}" alt="Coal" ${iconStyle}><span>Highest CO2, major pollution.</span>`, category: 'con' }
+        ];
+
+        const itemsContainer = document.getElementById('items');
+        const dropZones = document.querySelectorAll('.drop-zone');
+        const gameContainer = document.querySelector('.game-container');
+        let pointerDraggedItem = null;
+        let offsetX = 0, offsetY = 0;
+        let currentOverZone = null;
+        let isTouchDragging = false;
+
+        function initializeGame() {
+            itemsContainer.innerHTML = '';
+            dropZones.forEach(zone => zone.innerHTML = '');
+            ITEMS.sort(() => Math.random() - 0.5).forEach((itemData, idx) => {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'item';
+                itemElement.draggable = true;
+                itemElement.id = `item-${idx}`;
+                itemElement.dataset.category = itemData.category;
+                itemElement.innerHTML = itemData.text; // Use innerHTML for the icon+text
+                itemElement.addEventListener('dragstart', handleDragStartMouse);
+                itemElement.addEventListener('dragend', handleDragEndMouse);
+                itemElement.addEventListener('pointerdown', handlePointerDown);
+                itemsContainer.appendChild(itemElement);
+            });
+            clearValidationStyles();
+            pointerDraggedItem = null;
+        }
+
+        function clearValidationStyles() {
+            document.querySelectorAll('.item').forEach(item => {
+                item.classList.remove('correct', 'incorrect', 'unplaced');
+            });
+            const existingFeedback = document.querySelector('.feedback-msg');
+            if (existingFeedback) existingFeedback.remove();
+        }
+
+        function handleDragStartMouse(e) {
+             if (e.pointerType !== 'touch') {
+                e.dataTransfer.setData('text/plain', e.currentTarget.id);
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => e.target.classList.add('native-dragging'), 0);
+                isTouchDragging = false;
+                clearValidationStyles();
+             } else { e.preventDefault(); }
+        }
+
+        function handleDragEndMouse(e) {
+            e.target?.classList.remove('native-dragging');
+            dropZones.forEach(zone => zone.classList.remove('over'));
+            isTouchDragging = false; pointerDraggedItem = null;
+        }
+
+        dropZones.forEach(zone => {
+            zone.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; zone.classList.add('over'); });
+            zone.addEventListener('dragleave', e => zone.classList.remove('over'));
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('over');
+                if (e.pointerType !== 'touch') {
+                    const id = e.dataTransfer.getData('text/plain');
+                    const droppedElement = document.getElementById(id);
+                    if (droppedElement && !zone.contains(droppedElement)) {
+                        droppedElement.classList.remove('correct', 'incorrect', 'unplaced');
+                        zone.appendChild(droppedElement);
+                        droppedElement.classList.remove('native-dragging');
+                    }
+                }
+            });
+        });
+
+        function handlePointerDown(e) {
+            if (e.button !== 0 || pointerDraggedItem) return;
+            pointerDraggedItem = e.currentTarget;
+            isTouchDragging = e.pointerType === 'touch' || e.pointerType === 'pen';
+            clearValidationStyles();
+
+            if (isTouchDragging) {
+                e.preventDefault();
+                pointerDraggedItem.setPointerCapture(e.pointerId);
+                const rect = pointerDraggedItem.getBoundingClientRect();
+                offsetX = e.clientX - rect.left;
+                offsetY = e.clientY - rect.top;
+                pointerDraggedItem.classList.add('dragging');
+                document.body.style.cursor = 'grabbing';
+            } else {
+                 try { pointerDraggedItem.setPointerCapture(e.pointerId); } catch (err) {}
+            }
+            document.addEventListener('pointermove', handlePointerMove);
+            document.addEventListener('pointerup', handlePointerUp);
+            document.addEventListener('pointercancel', handlePointerUp);
+            document.body.style.userSelect = 'none';
+        }
+
+        function handlePointerMove(e) {
+            if (!pointerDraggedItem || !pointerDraggedItem.hasPointerCapture(e.pointerId)) {
+                if (!pointerDraggedItem?.hasPointerCapture(e.pointerId)) { handlePointerUp(e); }
+                return;
+            }
+            if (isTouchDragging) {
+                e.preventDefault();
+                const gameRect = gameContainer.getBoundingClientRect();
+                pointerDraggedItem.style.left = `${e.clientX - gameRect.left - offsetX}px`;
+                pointerDraggedItem.style.top = `${e.clientY - gameRect.top - offsetY}px`;
+            }
+
+            pointerDraggedItem.style.visibility = 'hidden';
+            let elementUnderPointer = document.elementFromPoint(e.clientX, e.clientY);
+            pointerDraggedItem.style.visibility = '';
+
+            let dropTarget = elementUnderPointer ? elementUnderPointer.closest('.drop-zone') : null;
+
+            if (currentOverZone !== dropTarget) {
+                currentOverZone?.classList.remove('over');
+                dropTarget?.classList.add('over');
+                currentOverZone = dropTarget;
+            }
+        }
+
+        function handlePointerUp(e) {
+             if (!pointerDraggedItem || !pointerDraggedItem.hasPointerCapture(e.pointerId)) {
+                 document.removeEventListener('pointermove', handlePointerMove);
+                 document.removeEventListener('pointerup', handlePointerUp);
+                 document.removeEventListener('pointercancel', handlePointerUp);
+                 document.body.style.userSelect = '';
+                 document.body.style.cursor = '';
+                 return;
+             }
+            if (isTouchDragging) {
+                pointerDraggedItem.classList.remove('dragging');
+                pointerDraggedItem.style.left = ''; pointerDraggedItem.style.top = '';
+                if (currentOverZone && !currentOverZone.contains(pointerDraggedItem)) {
+                    currentOverZone.appendChild(pointerDraggedItem);
+                } else if (!currentOverZone) {
+                    itemsContainer.appendChild(pointerDraggedItem);
+                }
+            }
+
+            currentOverZone?.classList.remove('over');
+            try { pointerDraggedItem.releasePointerCapture(e.pointerId); } catch (err) {}
+            document.removeEventListener('pointermove', handlePointerMove);
+            document.removeEventListener('pointerup', handlePointerUp);
+            document.removeEventListener('pointercancel', handlePointerUp);
+            document.body.style.userSelect = '';
+            document.body.style.cursor = '';
+            pointerDraggedItem = null; isTouchDragging = false; currentOverZone = null;
+        }
+
+        document.getElementById('check-btn').addEventListener('click', () => {
+            clearValidationStyles();
+            let allCorrectInZones = true;
+            let unplacedCount = 0;
+
+            ['pro', 'con'].forEach(zoneId => {
+                Array.from(document.getElementById(zoneId).children).forEach(item => {
+                    if (item.classList.contains('item')) {
+                        const isCorrect = item.dataset.category === zoneId;
+                        item.classList.add(isCorrect ? 'correct' : 'incorrect');
+                        if (!isCorrect) allCorrectInZones = false;
+                    }
+                });
+            });
+
+            Array.from(itemsContainer.children).forEach(item => {
+                if (item.classList.contains('item')) {
+                    item.classList.add('unplaced');
+                    unplacedCount++;
+                }
+            });
+
+            const allItemsPlaced = unplacedCount === 0;
+            let message = "";
+            let color = "";
+
+            if (allItemsPlaced && allCorrectInZones) {
+                message = "Excellent! You've sorted all specific pros & cons correctly!";
+                color = 'var(--correct-border)';
+            } else if (!allItemsPlaced) {
+                message = `Keep going! ${unplacedCount} statement(s) still need to be placed.`;
+                color = 'var(--unplaced-border)';
+            } else {
+                message = "Almost there! Some specific statements are in the wrong category.";
+                color = 'var(--incorrect-border)';
+            }
+
+            let feedbackMsg = document.createElement('p');
+            feedbackMsg.textContent = message;
+            feedbackMsg.className = 'feedback-msg';
+            feedbackMsg.style.color = color;
+            feedbackMsg.style.textAlign = 'center';
+            feedbackMsg.style.marginTop = '10px';
+            feedbackMsg.style.fontWeight = 'bold';
+            document.querySelector('.controls').insertAdjacentElement('afterend', feedbackMsg);
+            setTimeout(() => feedbackMsg.remove(), 4000);
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', initializeGame);
+        initializeGame();
+    });
+    </script>
+</body>
+</html>
