@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fun English Learning Game</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f0f4f8;
+            font-family: 'Nunito', sans-serif;
+            overflow: hidden;
+        }
+        #game-container {
+            width: 95vw;
+            height: 95vh;
+            max-width: 800px;
+            max-height: 750px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        canvas {
+            background-color: #e0f0ff;
+            border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        #loading-screen {
+            color: #334155;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="loading-screen">
+            <p>🎨 Getting the game ready...</p>
+        </div>
+        <canvas id="gameCanvas" style="display: none;"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('game-container');
+        const loadingScreen = document.getElementById('loading-screen');
+
+        const COLORS = {
+            background: '#e0f0ff',
+            card: '#fef3c7',
+            cardBorder: '#fde68a',
+            cardShadow: 'rgba(0,0,0,0.05)',
+            text: '#374151',
+            correct: '#22c55e',
+            incorrect: '#ef4444',
+            selected: '#3b82f6',
+            progressBar: '#fcd34d',
+            progressBg: '#ffffff',
+            star: '#facc15'
+        };
+
+        const WORD_LEVELS = [
+            // Level 1: Core People & Things
+            [ { emoji: '👦', emojiCode: '1F466', english: 'boy' }, { emoji: '👧', emojiCode: '1F467', english: 'girl' }, { emoji: '👨‍🏫', emojiCode: '1F468-200D-1F3EB', english: 'teacher' }, { emoji: '🧑‍🎓', emojiCode: '1F9D1-200D-1F393', english: 'student' }, { emoji: '✏️', emojiCode: '270F', english: 'pencil' }, { emoji: '📖', emojiCode: '1F4D6', english: 'book' }, { emoji: '🏫', emojiCode: '1F3EB', english: 'school' }, { emoji: '🍎', emojiCode: '1F34E', english: 'apple' }, { emoji: '💧', emojiCode: '1F4A7', english: 'water' }, { emoji: '✋', emojiCode: '270B', english: 'hand' } ],
+            // Level 2: Simple Actions (Strictly Literal Icons)
+            [ { emoji: '😋', emojiCode: '1F60B', english: 'eat' }, { emoji: '😴', emojiCode: '1F634', english: 'sleep' }, { emoji: '🚶', emojiCode: '1F6B6', english: 'walk' }, { emoji: '🏃', emojiCode: '1F3C3', english: 'run' }, { emoji: '✍️', emojiCode: '270D', english: 'write' }, { emoji: '📖', emojiCode: '1F4D6', english: 'read' }, { emoji: '👟', emojiCode: '1F45F', english: 'go' }, { emoji: '🛑', emojiCode: '1F6D1', english: 'stop' }, { emoji: '📬', emojiCode: '1F4EC', english: 'open' }, { emoji: '📪', emojiCode: '1F4EA', english: 'close' } ],
+            // Level 3: Colors & Adjectives
+            [ { emoji: '🟥', emojiCode: '1F7E5', english: 'red' }, { emoji: '🟩', emojiCode: '1F7E9', english: 'green' }, { emoji: '🟦', emojiCode: '1F7E6', english: 'blue' }, { emoji: '🐘', emojiCode: '1F418', english: 'big' }, { emoji: '🐁', emojiCode: '1F401', english: 'small' }, { emoji: '😊', emojiCode: '1F60A', english: 'happy' }, { emoji: '😢', emojiCode: '1F622', english: 'sad' }, { emoji: '👍', emojiCode: '1F44D', english: 'good' }, { emoji: '👎', emojiCode: '1F44E', english: 'bad' }, { emoji: '🔥', emojiCode: '1F525', english: 'hot' } ],
+            // Level 4: Animals
+            [ { emoji: '🐶', emojiCode: '1F436', english: 'dog' }, { emoji: '🐱', emojiCode: '1F431', english: 'cat' }, { emoji: '🐦', emojiCode: '1F426', english: 'bird' }, { emoji: '🐟', emojiCode: '1F41F', english: 'fish' }, { emoji: '🐞', emojiCode: '1F41E', english: 'bug' }, { emoji: '🐻', emojiCode: '1F43B', english: 'bear' }, { emoji: '🦁', emojiCode: '1F981', english: 'lion' }, { emoji: '🐘', emojiCode: '1F418', english: 'elephant' }, { emoji: '🐒', emojiCode: '1F412', english: 'monkey' }, { emoji: '🐢', emojiCode: '1F422', english: 'turtle' } ],
+            // Level 5: Food
+            [ { emoji: '🍌', emojiCode: '1F34C', english: 'banana' }, { emoji: '🥕', emojiCode: '1F955', english: 'carrot' }, { emoji: '🍞', emojiCode: '1F35E', english: 'bread' }, { emoji: '🧀', emojiCode: '1F9C0', english: 'cheese' }, { emoji: '🥚', emojiCode: '1F95A', english: 'egg' }, { emoji: '🥛', emojiCode: '1F95B', english: 'milk' }, { emoji: '🧃', emojiCode: '1F964', english: 'juice' }, { emoji: '🥣', emojiCode: '1F963', english: 'breakfast' }, { emoji: '🥪', emojiCode: '1F96A', english: 'lunch' }, { emoji: '🍽️', emojiCode: '1F37D', english: 'dinner' } ]
+        ];
+        
+        const ALL_SENTENCES = [
+            { text: "the boy can run", hintEmoji: '👦', words: ["the", "boy", "can", "run"], distractors: ["girl", "sleep"], requiredWords: ["boy", "run"] },
+            { text: "read a good book", hintEmoji: '📖', words: ["read", "a", "good", "book"], distractors: ["write", "apple"], requiredWords: ["read", "good", "book"] },
+            { text: "the big dog is happy", hintEmoji: '🐶', words: ["the", "big", "dog", "is", "happy"], distractors: ["small", "sad", "cat"], requiredWords: ["big", "dog", "happy"] },
+            { text: "a small red bird", hintEmoji: '🐦', words: ["a", "small", "red", "bird"], distractors: ["big", "blue", "fish"], requiredWords: ["small", "red", "bird"] }
+        ];
+
+        const TOTAL_LEVELS = WORD_LEVELS.length;
+
+        let gameState = {
+            level: 1, stars: 0, isReviewRound: false, isSentenceMode: false, currentWords: [],
+            wordsToReview: new Map(), incorrectAttempts: new Map(), correctWordsBank: [], cards: [],
+            selectedEmoji: null, selectedEnglish: null, feedback: null, particles: [], isLevelOver: false, isGameOver: false,
+            buttons: {}, practicedSentences: [], reviewMessage: null, reviewMessageTimeout: null
+        };
+
+        async function preloadImages() {
+            const allWords = WORD_LEVELS.flat();
+            const promises = allWords.map(word => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.src = `https://openmoji.org/data/color/svg/${word.emojiCode}.svg`;
+                    img.onload = () => resolve({ ...word, img });
+                    img.onerror = () => resolve({ ...word, img: null });
+                });
+            });
+            const loadedWords = await Promise.all(promises);
+            let wordIndex = 0;
+            return WORD_LEVELS.map(level => level.map(() => loadedWords[wordIndex++]));
+        }
+
+        let loadedWordLevels = [];
+
+        window.onload = async () => {
+            loadedWordLevels = await preloadImages();
+            initGame();
+        };
+
+        function initGame() {
+            loadingScreen.style.display = 'none';
+            canvas.style.display = 'block';
+            window.addEventListener('resize', resizeCanvas);
+            setupEventListeners();
+            resizeCanvas();
+            gameLoop();
+        }
+
+        function resizeCanvas() {
+            const aspectRatio = 800 / 750;
+            let newWidth = container.clientWidth;
+            let newHeight = container.clientHeight;
+            if (newWidth / newHeight > aspectRatio) { newWidth = newHeight * aspectRatio; } else { newHeight = newWidth / aspectRatio; }
+            canvas.width = 800; canvas.height = 750;
+            canvas.style.width = `${newWidth}px`; canvas.style.height = `${newHeight}px`;
+            if (gameState.isSentenceMode) { startSentenceRound(); } else { startLevel(); }
+        }
+
+        function startLevel() {
+            gameState.isSentenceMode = false;
+            if (!gameState.isReviewRound && gameState.level > TOTAL_LEVELS) {
+                if (gameState.wordsToReview.size > 0) {
+                    gameState.isReviewRound = true;
+                    gameState.currentWords = Array.from(gameState.wordsToReview.values());
+                    gameState.wordsToReview.clear();
+                } else {
+                    gameState.isGameOver = true; return;
+                }
+            } else if (!gameState.isReviewRound) {
+                gameState.currentWords = loadedWordLevels[gameState.level - 1];
+            }
+
+            if (!gameState.currentWords || gameState.currentWords.length === 0) {
+                gameState.isGameOver = true; return;
+            }
+
+            gameState.incorrectAttempts.clear();
+            const shuffledEnglish = [...gameState.currentWords];
+            shuffleArray(shuffledEnglish);
+            
+            gameState.isLevelOver = false; gameState.cards = []; gameState.selectedEmoji = null;
+            gameState.selectedEnglish = null; gameState.feedback = null;
+            
+            const numRows = 5;
+            const y_start = canvas.height * 0.26; 
+            const y_step = canvas.height * 0.11;
+            const emojiCardSize = { w: canvas.width * 0.13, h: canvas.height * 0.09 };
+            const englishCardSize = { w: canvas.width * 0.17, h: canvas.height * 0.07 };
+            
+            const emoji_x_positions = [canvas.width * 0.1, canvas.width * 0.3];
+            const english_x_positions = [canvas.width * 0.53, canvas.width * 0.75];
+            
+            for(let i = 0; i < gameState.currentWords.length; i++) {
+                const row = i % numRows; const col = Math.floor(i / numRows);
+                const emoji_x = emoji_x_positions[col]; const emoji_y = y_start + row * y_step;
+                const emojiCard = { type: 'emoji', ...gameState.currentWords[i], x: emoji_x, y: emoji_y, width: emojiCardSize.w, height: emojiCardSize.h, matched: false, scale: 1 };
+                gameState.cards.push(emojiCard);
+                const english_x = english_x_positions[col]; const english_y = emoji_y + (emojiCardSize.h - englishCardSize.h) / 2;
+                const englishCard = { type: 'english', word: shuffledEnglish[i].english, x: english_x, y: english_y, width: englishCardSize.w, height: englishCardSize.h, matched: false, scale: 1 };
+                gameState.cards.push(englishCard);
+            }
+        }
+        
+        function startSentenceRound() {
+            gameState.isSentenceMode = true;
+            gameState.buttons.sentenceNext = null;
+            
+            const availableSentences = ALL_SENTENCES.filter(s => 
+                s.requiredWords.every(w => gameState.correctWordsBank.includes(w))
+            );
+            
+            const unpracticedSentences = availableSentences.filter(s => !gameState.practicedSentences.includes(s.text));
+
+            if (unpracticedSentences.length === 0) {
+                if(availableSentences.length > 0) {
+                     gameState.buttons.sentenceFeedback = "You've practiced all available sentences!";
+                     gameState.practicedSentences = []; 
+                } else {
+                    gameState.buttons.sentenceFeedback = "Learn more words to build sentences!";
+                }
+                gameState.currentSentence = null;
+                return;
+            }
+            
+            gameState.currentSentence = unpracticedSentences[Math.floor(Math.random() * unpracticedSentences.length)];
+            gameState.practicedSentences.push(gameState.currentSentence.text); 
+            gameState.buttons.sentenceFeedback = '';
+            gameState.builtSentence = [];
+
+            const allWords = [...gameState.currentSentence.words, ...gameState.currentSentence.distractors];
+            shuffleArray(allWords);
+
+            gameState.sentenceWordCards = [];
+            const cardWidth = 120, cardHeight = 50, gap = 15;
+            const totalWidth = allWords.length * (cardWidth + gap) - gap;
+            let x = (canvas.width - totalWidth) / 2;
+            let y = canvas.height * 0.6;
+
+            allWords.forEach(word => {
+                gameState.sentenceWordCards.push({ word, x, y, width: cardWidth, height: cardHeight, used: false });
+                x += cardWidth + gap;
+            });
+        }
+
+        function checkMatch() {
+            if (!gameState.selectedEmoji || !gameState.selectedEnglish) return;
+            const isMatch = gameState.selectedEmoji.english === gameState.selectedEnglish.word;
+            let disappearAfterMismatch = false; 
+
+            if (isMatch) {
+                gameState.stars++;
+                gameState.selectedEmoji.matched = true; gameState.selectedEnglish.matched = true;
+                gameState.feedback = { type: 'correct', cards: [gameState.selectedEmoji, gameState.selectedEnglish] };
+                createParticles(gameState.selectedEmoji.x + gameState.selectedEmoji.width / 2, gameState.selectedEmoji.y + gameState.selectedEmoji.height / 2);
+                const word = gameState.selectedEnglish.word;
+                if (!gameState.correctWordsBank.includes(word)) { gameState.correctWordsBank.push(word); }
+                gameState.selectedEmoji.scale = 1.2; gameState.selectedEnglish.scale = 1.2;
+            } else {
+                gameState.feedback = { type: 'incorrect', cards: [gameState.selectedEmoji, gameState.selectedEnglish] };
+                const word = gameState.selectedEnglish.word;
+                const attempts = (gameState.incorrectAttempts.get(word) || 0) + 1;
+                gameState.incorrectAttempts.set(word, attempts);
+
+                if (attempts >= 2) {
+                    const wordData = gameState.cards.find(c => c.type === 'emoji' && c.english === word);
+                    if(wordData && !gameState.wordsToReview.has(word)) { 
+                        gameState.wordsToReview.set(word, wordData);
+                        gameState.reviewMessage = `"${word}" added for review!`;
+                        if (gameState.reviewMessageTimeout) clearTimeout(gameState.reviewMessageTimeout);
+                        gameState.reviewMessageTimeout = setTimeout(() => {
+                            gameState.reviewMessage = null;
+                        }, 2000);
+                        disappearAfterMismatch = true; 
+                    }
+                }
+            }
+            
+            setTimeout(() => {
+                if (disappearAfterMismatch) {
+                    if (gameState.selectedEmoji) gameState.selectedEmoji.matched = true;
+                    if (gameState.selectedEnglish) gameState.selectedEnglish.matched = true;
+                }
+
+                gameState.selectedEmoji = null; 
+                gameState.selectedEnglish = null; 
+                gameState.feedback = null;
+                
+                if (isMatch || disappearAfterMismatch) { 
+                    handleLevelEnd(); 
+                }
+            }, 600);
+        }
+
+        function handleLevelEnd() {
+             if (gameState.cards.filter(c => c.type === 'english' && !c.matched).length === 0) {
+                gameState.isLevelOver = true;
+            }
+        }
+        
+        function showHint() {
+            const selected = gameState.selectedEmoji || gameState.selectedEnglish;
+            if (!selected) return;
+            let partner;
+            if (selected.type === 'emoji') {
+                partner = gameState.cards.find(c => c.type === 'english' && !c.matched && c.word === selected.english);
+            } else {
+                partner = gameState.cards.find(c => c.type === 'emoji' && !c.matched && c.english === selected.word);
+            }
+            if (partner) {
+                const wordToReview = selected.type === 'emoji' ? selected : partner;
+                gameState.wordsToReview.set(wordToReview.english, wordToReview);
+                selected.matched = true; partner.matched = true;
+                gameState.selectedEmoji = null; gameState.selectedEnglish = null;
+                handleLevelEnd();
+            }
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (gameState.isSentenceMode) {
+                drawSentenceMode();
+            } else {
+                drawUI(); 
+                drawWordBank();
+                gameState.cards.forEach(card => {
+                    if(card.scale > 1) card.scale -= 0.02;
+                    if (!card.matched) drawCard(card);
+                });
+                updateAndDrawParticles();
+                if (gameState.isLevelOver) { drawLevelComplete(); }
+                if (gameState.isGameOver) { drawGameOver(); }
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        function drawUI() {
+            const sideMargin = 40;
+            const pbY = 30;
+            const pbHeight = 25;
+            const pbX = sideMargin;
+            const pbWidth = canvas.width - (sideMargin * 2);
+            const totalWordsInGame = TOTAL_LEVELS * 10;
+            const progress = Math.min(1, gameState.stars / totalWordsInGame);
+            ctx.fillStyle = COLORS.progressBg;
+            ctx.beginPath();
+            ctx.roundRect(pbX, pbY, pbWidth, pbHeight, 12);
+            ctx.fill();
+            if (progress > 0) {
+                ctx.fillStyle = COLORS.progressBar;
+                ctx.beginPath();
+                ctx.roundRect(pbX, pbY, pbWidth * progress, pbHeight, 12);
+                ctx.fill();
+            }
+            ctx.strokeStyle = '#a16207';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.roundRect(pbX, pbY, pbWidth, pbHeight, 12);
+            ctx.stroke();
+            const contentAreaY = pbY + pbHeight + 35; 
+            const btnHeight = 45;
+            const btnGap = 10;
+            const buttonBlockHeight = (btnHeight * 2) + btnGap;
+            const verticalCenter = contentAreaY + (buttonBlockHeight / 2);
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = COLORS.star; 
+            ctx.font = `bold ${canvas.width * 0.04}px Nunito`;
+            ctx.textAlign = 'left'; 
+            ctx.fillText(`⭐ ${gameState.stars}`, sideMargin, verticalCenter);
+            ctx.fillStyle = COLORS.text; 
+            ctx.font = `800 ${canvas.width * 0.045}px Nunito`;
+            ctx.textAlign = 'center';
+            const title = gameState.isReviewRound ? "Review Round" : `Level ${gameState.level}`;
+            ctx.fillText(title, canvas.width / 2, verticalCenter);
+            if (gameState.reviewMessage) {
+                ctx.font = `bold ${canvas.width * 0.025}px Nunito`;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.fillText(gameState.reviewMessage, canvas.width / 2, verticalCenter + 40);
+            }
+            const btnWidth = 240;
+            const btnX = canvas.width - btnWidth - sideMargin;
+            const hintBtnY = contentAreaY;
+            const hintBtn = { x: btnX, y: hintBtnY, width: btnWidth, height: btnHeight };
+            gameState.buttons.hint = hintBtn;
+            ctx.fillStyle = '#fef3c7'; ctx.strokeStyle = '#fde68a'; ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(hintBtn.x, hintBtn.y, hintBtn.width, hintBtn.height, 12);
+            ctx.fill(); ctx.stroke();
+            ctx.fillStyle = COLORS.text; ctx.font = `bold ${canvas.width * 0.025}px Nunito`;
+            ctx.textAlign = 'left';
+            ctx.fillText("🤔 I don't know...", hintBtn.x + 20, hintBtn.y + btnHeight / 2 + 2);
+            const sentenceBtnY = hintBtnY + btnHeight + btnGap;
+            const sentenceBtn = { x: btnX, y: sentenceBtnY, width: btnWidth, height: btnHeight };
+            gameState.buttons.sentence = sentenceBtn;
+            const canPractice = ALL_SENTENCES.some(s => s.requiredWords.every(w => gameState.correctWordsBank.includes(w)));
+            ctx.globalAlpha = canPractice ? 1 : 0.5;
+            ctx.fillStyle = '#cce4ff'; ctx.strokeStyle = '#a3bffa';
+            ctx.beginPath();
+            ctx.roundRect(sentenceBtn.x, sentenceBtn.y, sentenceBtn.width, sentenceBtn.height, 12);
+            ctx.fill(); ctx.stroke();
+            ctx.fillStyle = COLORS.text; ctx.font = `bold ${canvas.width * 0.025}px Nunito`;
+            ctx.textAlign = 'left';
+            ctx.fillText("✍️ Practice Sentences", sentenceBtn.x + 20, sentenceBtn.y + btnHeight / 2 + 2);
+            ctx.globalAlpha = 1;
+        }
+
+        function drawSentenceMode() {
+            ctx.fillStyle = COLORS.text; ctx.font = `800 ${canvas.width * 0.06}px Nunito`; ctx.textAlign = 'center';
+            ctx.fillText("Sentence Practice", canvas.width / 2, 80);
+            const exitBtn = {x: canvas.width - 130, y: 55, width: 100, height: 45};
+            gameState.buttons.sentenceExit = exitBtn;
+            ctx.fillStyle = '#fda4af'; ctx.strokeStyle = '#f43f5e';
+            ctx.fillRect(exitBtn.x, exitBtn.y, exitBtn.width, exitBtn.height); ctx.strokeRect(exitBtn.x, exitBtn.y, exitBtn.width, exitBtn.height);
+            ctx.fillStyle = 'white'; ctx.font = `bold ${canvas.width * 0.028}px Nunito`;
+            ctx.fillText("Exit", exitBtn.x + exitBtn.width/2, exitBtn.y + exitBtn.height/2 + 3);
+            if (!gameState.currentSentence) {
+                ctx.fillStyle = COLORS.text; ctx.font = `bold ${canvas.width * 0.035}px Nunito`;
+                ctx.fillText(gameState.buttons.sentenceFeedback, canvas.width/2, canvas.height/2);
+                return;
+            }
+            const sentence = gameState.currentSentence;
+            ctx.fillStyle = COLORS.text; ctx.font = `bold ${canvas.width * 0.03}px Nunito`;
+            ctx.fillText("Make this sentence:", canvas.width / 2, 150);
+            const hintImgData = loadedWordLevels.flat().find(w => w.emoji === sentence.hintEmoji);
+            if(hintImgData && hintImgData.img) { ctx.drawImage(hintImgData.img, canvas.width/2 - 120, 180, 80, 80); }
+            ctx.font = `${canvas.width * 0.04}px Nunito`; ctx.textAlign = 'left';
+            ctx.fillText(sentence.text, canvas.width / 2 - 20, 225);
+            const slotWidth = 130, slotHeight = 60, slotGap = 10;
+            const totalSlotWidth = sentence.words.length * (slotWidth + slotGap) - slotGap;
+            let sx = (canvas.width - totalSlotWidth) / 2;
+            ctx.lineWidth = 2; ctx.strokeStyle = '#cce4ff'; ctx.font = `bold ${canvas.width * 0.03}px Nunito`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            for(let i = 0; i < sentence.words.length; i++) {
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.strokeRect(sx, 320, slotWidth, slotHeight); ctx.fillRect(sx, 320, slotWidth, slotHeight);
+                if (gameState.builtSentence[i]) {
+                    ctx.fillStyle = COLORS.text;
+                    ctx.fillText(gameState.builtSentence[i], sx + slotWidth / 2, 320 + slotHeight / 2);
+                }
+                sx += slotWidth + slotGap;
+            }
+            gameState.sentenceWordCards.forEach(card => {
+                if (card.used) return;
+                ctx.fillStyle = COLORS.card; ctx.strokeStyle = COLORS.cardBorder; ctx.lineWidth = 4;
+                ctx.fillRect(card.x, card.y, card.width, card.height); ctx.strokeRect(card.x, card.y, card.width, card.height);
+                ctx.fillStyle = COLORS.text;
+                ctx.fillText(card.word, card.x + card.width / 2, card.y + card.height / 2);
+            });
+            ctx.font = `bold ${canvas.width * 0.035}px Nunito`;
+            ctx.fillStyle = gameState.buttons.sentenceFeedback === 'Correct!' ? COLORS.correct : COLORS.incorrect;
+            ctx.fillText(gameState.buttons.sentenceFeedback, canvas.width/2, 450);
+            if (gameState.buttons.sentenceNext) {
+                const btn = gameState.buttons.sentenceNext;
+                ctx.fillStyle = COLORS.card; ctx.strokeStyle = COLORS.cardBorder;
+                ctx.fillRect(btn.x, btn.y, btn.width, btn.height); ctx.strokeRect(btn.x, btn.y, btn.width, btn.height);
+                ctx.fillStyle = COLORS.text; ctx.font = `bold ${canvas.width * 0.035}px Nunito`;
+                ctx.fillText("Next Sentence", btn.x + btn.width / 2, btn.y + btn.height / 2);
+            }
+        }
+        
+        function drawWordBank() {
+            const bankAreaY = canvas.height * 0.84;
+            ctx.strokeStyle = '#cce4ff'; ctx.lineWidth = 2; ctx.beginPath();
+            ctx.moveTo(40, bankAreaY); ctx.lineTo(canvas.width - 40, bankAreaY); ctx.stroke();
+            const startX = 50; const titleY = bankAreaY + 25; const firstWordY = titleY + 25;
+            const maxWidth = canvas.width - 100; const lineHeight = 25;
+            let currentX = startX; let currentY = firstWordY;
+            ctx.fillStyle = COLORS.text; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+            ctx.font = `bold ${canvas.width * 0.025}px Nunito`;
+            ctx.fillText('Known Words:', startX, titleY);
+
+            // Add Copy button
+            const titleMetrics = ctx.measureText('Known Words:');
+            const copyBtnX = startX + titleMetrics.width + 15;
+            const copyBtnY = titleY - 15;
+            const copyBtn = {x: copyBtnX, y: copyBtnY, width: 90, height: 30};
+            gameState.buttons.copyWords = copyBtn;
+            ctx.fillStyle = '#dbeafe'; 
+            ctx.strokeStyle = '#93c5fd';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.roundRect(copyBtn.x, copyBtn.y, copyBtn.width, copyBtn.height, 8);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = COLORS.text;
+            ctx.font = `bold ${canvas.width * 0.02}px Nunito`;
+            ctx.textAlign = 'center';
+            ctx.fillText("📋 Copy", copyBtn.x + copyBtn.width / 2, copyBtn.y + copyBtn.height / 2 + 1);
+
+            ctx.font = `${canvas.width * 0.022}px Nunito`;
+            ctx.textAlign = 'left';
+
+            if (gameState.correctWordsBank.length === 0) {
+                ctx.fillStyle = '#94a3b8';
+                ctx.fillText('Your known words will appear here!', startX, firstWordY); return;
+            }
+            ctx.fillStyle = COLORS.text;
+            const words = gameState.correctWordsBank;
+            for (let i = 0; i < words.length; i++) {
+                let word = words[i] + (i < words.length - 1 ? ' • ' : '');
+                let wordWidth = ctx.measureText(word).width;
+                if (currentX + wordWidth > startX + maxWidth) { currentX = startX; currentY += lineHeight; }
+                if (currentY > canvas.height - 20) break;
+                ctx.fillText(word, currentX, currentY); currentX += wordWidth;
+            }
+        }
+
+        function drawCard(card) {
+            ctx.save();
+            ctx.translate(card.x + card.width / 2, card.y + card.height / 2);
+            ctx.scale(card.scale, card.scale);
+            ctx.translate(-(card.x + card.width / 2), -(card.y + card.height / 2));
+            const isSelected = (gameState.selectedEmoji === card || gameState.selectedEnglish === card);
+            const isIncorrect = gameState.feedback?.type === 'incorrect' && gameState.feedback.cards.includes(card);
+            ctx.shadowColor = COLORS.cardShadow; ctx.shadowBlur = 10; ctx.shadowOffsetX = 5; ctx.shadowOffsetY = 5;
+            ctx.fillStyle = COLORS.card;
+            ctx.strokeStyle = isSelected ? COLORS.selected : COLORS.cardBorder;
+            ctx.lineWidth = isSelected ? 6 : 4;
+            ctx.beginPath(); ctx.roundRect(card.x, card.y, card.width, card.height, 15); ctx.fill(); ctx.stroke();
+            ctx.shadowColor = 'transparent';
+            if (isIncorrect) { ctx.strokeStyle = COLORS.incorrect; ctx.lineWidth = 6; ctx.stroke(); }
+            ctx.fillStyle = COLORS.text; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            if (card.type === 'emoji') {
+                if (card.img) {
+                    const imgSize = Math.min(card.width, card.height) * 0.7;
+                    ctx.drawImage(card.img, card.x + (card.width - imgSize) / 2, card.y + (card.height - imgSize) / 2, imgSize, imgSize);
+                } else {
+                    ctx.font = `${card.height * 0.6}px sans-serif`;
+                    ctx.fillText(card.emoji, card.x + card.width / 2, card.y + card.height / 2 + 5);
+                }
+            } else {
+                ctx.font = `bold ${canvas.width * 0.03}px Nunito`;
+                ctx.fillText(card.word, card.x + card.width / 2, card.y + card.height / 2 + 5);
+            }
+            ctx.restore();
+        }
+
+        function createParticles(x, y) {
+            for (let i = 0; i < 30; i++) {
+                gameState.particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6 - 3, alpha: 1, size: Math.random() * 5 + 2, color: `hsl(${Math.random() * 60 + 30}, 100%, 50%)` });
+            }
+        }
+        
+        function updateAndDrawParticles() {
+            for (let i = gameState.particles.length - 1; i >= 0; i--) {
+                const p = gameState.particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.1; p.alpha -= 0.02;
+                if (p.alpha <= 0) { gameState.particles.splice(i, 1); } else {
+                    ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color; ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+                }
+            }
+        }
+
+        function drawLevelComplete() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.font = `800 ${canvas.width * 0.08}px Nunito`;
+            ctx.textAlign = 'center';
+            ctx.fillText('Level Complete!', canvas.width / 2, canvas.height / 2 - 40);
+            
+            const btn = {x: canvas.width/2 - 150, y: canvas.height/2 + 40, width: 300, height: 70};
+            gameState.buttons.continue = btn;
+            ctx.fillStyle = COLORS.card;
+            ctx.fillRect(btn.x, btn.y, btn.width, btn.height);
+            ctx.fillStyle = COLORS.text;
+            ctx.font = `bold ${canvas.width * 0.04}px Nunito`;
+            ctx.fillText('Continue to Next Level', canvas.width/2, canvas.height/2 + 75);
+        }
+        
+        function drawGameOver() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white'; ctx.font = `800 ${canvas.width * 0.1}px Nunito`;
+            ctx.textAlign = 'center'; ctx.fillText('You did it!', canvas.width / 2, canvas.height / 2);
+        }
+
+        function getEventCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width; const scaleY = canvas.height / rect.height;
+            const point = e.changedTouches ? e.changedTouches[0] : e;
+            return { x: (point.clientX - rect.left) * scaleX, y: (point.clientY - rect.top) * scaleY };
+        }
+        
+        function handleInteraction(e) {
+            e.preventDefault();
+            const coords = getEventCoords(e);
+
+            // CORRECTED: This block now reliably handles the "Level Complete" screen interaction.
+            if (gameState.isLevelOver) {
+                if (isPointInRect(coords.x, coords.y, gameState.buttons.continue)) {
+                    if (!gameState.isReviewRound) {
+                        gameState.level++;
+                    }
+                    startLevel();
+                }
+                return; // Exit after handling the overlay click.
+            }
+
+            if (gameState.isGameOver) return;
+            
+            if (gameState.isSentenceMode) {
+                if (gameState.buttons.sentenceExit && isPointInRect(coords.x, coords.y, gameState.buttons.sentenceExit)) {
+                    gameState.isSentenceMode = false;
+                    startLevel(); // Go back to the current level
+                    return;
+                }
+                if (gameState.buttons.sentenceNext && isPointInRect(coords.x, coords.y, gameState.buttons.sentenceNext)) {
+                    startSentenceRound(); // Load a new sentence
+                    return;
+                }
+
+                gameState.sentenceWordCards.forEach(card => {
+                    if (!card.used && isPointInRect(coords.x, coords.y, card)) {
+                        card.used = true;
+                        gameState.builtSentence.push(card.word);
+                        if (gameState.builtSentence.length === gameState.currentSentence.words.length) {
+                             if(gameState.builtSentence.join(' ') === gameState.currentSentence.text) {
+                                gameState.buttons.sentenceFeedback = "Correct!";
+                                gameState.stars += 5;
+                                gameState.buttons.sentenceNext = {x: canvas.width/2 - 150, y: canvas.height * 0.75, width: 300, height: 60};
+                             } else {
+                                gameState.buttons.sentenceFeedback = "Not quite, try again!";
+                             }
+                        }
+                    }
+                });
+                
+                 const slotWidth = 130, slotHeight = 60, slotGap = 10;
+                 const totalSlotWidth = gameState.currentSentence.words.length * (slotWidth + slotGap) - slotGap;
+                 let sx = (canvas.width - totalSlotWidth) / 2;
+                 gameState.builtSentence.forEach((word, index) => {
+                    if (isPointInRect(coords.x, coords.y, {x: sx, y: 320, width: slotWidth, height: slotHeight})) {
+                        const originalCard = gameState.sentenceWordCards.find(c => c.word === word && c.used);
+                        if(originalCard) originalCard.used = false;
+                        gameState.builtSentence.splice(index, 1);
+                        gameState.buttons.sentenceFeedback = '';
+                        gameState.buttons.sentenceNext = null;
+                    }
+                    sx += slotWidth + slotGap;
+                 });
+                return;
+            }
+
+            if (gameState.buttons.hint && isPointInRect(coords.x, coords.y, gameState.buttons.hint)) { showHint(); return; }
+            
+            const canPractice = ALL_SENTENCES.some(s => s.requiredWords.every(w => gameState.correctWordsBank.includes(w)));
+            if (canPractice && gameState.buttons.sentence && isPointInRect(coords.x, coords.y, gameState.buttons.sentence)) {
+                gameState.practicedSentences = [];
+                startSentenceRound();
+                return;
+            }
+
+             if (gameState.buttons.copyWords && isPointInRect(coords.x, coords.y, gameState.buttons.copyWords)) {
+                if (gameState.correctWordsBank.length > 0) {
+                    const wordsText = gameState.correctWordsBank.join(', ');
+                    const textArea = document.createElement("textarea");
+                    textArea.value = wordsText;
+                    textArea.style.position = "fixed"; 
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        gameState.reviewMessage = "Copied to clipboard!";
+                    } catch (err) {
+                        gameState.reviewMessage = "Copy failed.";
+                    }
+                    document.body.removeChild(textArea);
+
+                    if (gameState.reviewMessageTimeout) clearTimeout(gameState.reviewMessageTimeout);
+                    gameState.reviewMessageTimeout = setTimeout(() => {
+                        gameState.reviewMessage = null;
+                    }, 2000);
+                }
+                return;
+            }
+            
+            for (const card of gameState.cards) {
+                if (card.matched || !isPointInRect(coords.x, coords.y, card)) continue;
+                if (card.type === 'emoji') { gameState.selectedEmoji = (gameState.selectedEmoji === card) ? null : card; } 
+                else if (card.type === 'english') { gameState.selectedEnglish = (gameState.selectedEnglish === card) ? null : card; }
+                checkMatch(); return; 
+            }
+        }
+        
+        function setupEventListeners() {
+            const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            canvas.removeEventListener('click', handleInteraction); canvas.removeEventListener('touchend', handleInteraction);
+            if (isTouchDevice) { canvas.addEventListener('touchend', handleInteraction, { passive: false }); } 
+            else { canvas.addEventListener('click', handleInteraction); }
+        }
+
+        function isPointInRect(x, y, rect) {
+            return x > rect.x && x < rect.x + rect.width && y > rect.y && y < rect.y + rect.height;
+        }
+        
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+    </script>
+</body>
+</html>
+
+
