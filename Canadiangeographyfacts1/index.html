@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Map of Canada</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body, html { 
+      margin: 0; 
+      padding: 0; 
+      width: 100%; 
+      height: 100%; 
+      display: flex; 
+      font-family: 'Poppins', sans-serif;
+      background-color: #f0f4f8;
+    }
+    #map { 
+      flex: 1; 
+      height: 100%;
+      border-right: 1px solid #ddd;
+    }
+    #info-panel {
+      width: 380px;
+      max-width: 40%;
+      padding: 2rem;
+      background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+      border-left: 5px solid #4f46e5;
+      overflow-y: auto;
+      box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+    }
+    #info-panel h2 { 
+      margin-top: 0; 
+      color: #312e81; 
+      font-size: 1.75rem; 
+      font-weight: 700;
+      border-bottom: 2px solid #c7d2fe;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    #static-facts {
+      background-color: #eef2ff;
+      border-radius: 8px;
+      padding: 1rem 1.5rem;
+      margin-bottom: 1.5rem;
+      border: 1px solid #c7d2fe;
+      transition: background-color 0.3s ease;
+    }
+    #static-facts h3 {
+      margin-top: 0;
+      margin-bottom: 0.75rem;
+      color: #4338ca;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+    #static-facts ul {
+      list-style-type: '🏒';
+      padding-left: 1.2rem;
+      margin: 0;
+      color: #475569;
+      font-size: 0.9rem;
+    }
+    #static-facts li {
+      padding-left: 0.6rem;
+      margin-bottom: 0.5rem;
+      line-height: 1.5;
+    }
+    #static-facts li:last-child {
+        margin-bottom: 0;
+    }
+
+    #info-content {
+        border-top: 1px solid #ddd;
+        padding-top: 1.5rem;
+    }
+    #info-content h3 { 
+      margin-top: 0;
+      margin-bottom: 1rem; 
+      color: #4f46e5; 
+      font-size: 1.5rem; 
+      font-weight: 600;
+    }
+    #info-content p { 
+      font-size: 1rem; 
+      line-height: 1.6; 
+      margin: 0.5rem 0 1rem 0; 
+      color: #334155;
+    }
+    #info-content p strong {
+        color: #4338ca;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="info-panel">
+    <h2>Dynamic Canuck Facts!</h2>
+    <div id="static-facts">
+        <!-- This content is now dynamically generated -->
+    </div>
+    <div id="info-content">
+      <p>Click a province or territory to discover some quick facts about it!</p>
+    </div>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    const map = L.map('map').setView([60, -98], 4);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(map);
+
+    const infoContent = document.getElementById('info-content');
+    const staticFactsDiv = document.getElementById('static-facts');
+    
+    const provinceNames = [
+      'British Columbia', 'Alberta', 'Saskatchewan', 'Manitoba', 'Ontario', 'Quebec',
+      'New Brunswick', 'Nova Scotia', 'Prince Edward Island', 'Newfoundland and Labrador',
+      'Yukon', 'Northwest Territories', 'Nunavut'
+    ];
+
+    // Static data object for all provinces and territories.
+    const provinceData = {
+        'British Columbia': { capital: 'Victoria', population: '5.4 Million', funFact: 'The Great Bear Rainforest is the only place in the world to see the white Kermode (Spirit) bear.' },
+        'Alberta': { capital: 'Edmonton', population: '4.5 Million', funFact: 'Is home to the world\'s largest dinosaur, a model T-Rex in the town of Drumheller.' },
+        'Saskatchewan': { capital: 'Regina', population: '1.2 Million', funFact: 'Has more roads than any other province, enough to circle the Earth four times!' },
+        'Manitoba': { capital: 'Winnipeg', population: '1.4 Million', funFact: 'Churchill, Manitoba is famously known as the "Polar Bear Capital of the World".' },
+        'Ontario': { capital: 'Toronto', population: '15.3 Million', funFact: 'Contains over 250,000 lakes, holding about one-fifth of the world\'s fresh water.' },
+        'Quebec': { capital: 'Quebec City', population: '8.7 Million', funFact: 'Produces over 70% of the entire world\'s supply of maple syrup. 🍁' },
+        'New Brunswick': { capital: 'Fredericton', population: '800,000', funFact: 'The Bay of Fundy has the highest tides on Earth, with a difference of up to 16 meters (52 ft).' },
+        'Nova Scotia': { capital: 'Halifax', population: '1 Million', funFact: 'Its name is Latin for "New Scotland", and its flag is the reverse of Scotland\'s flag.' },
+        'Prince Edward Island': { capital: 'Charlottetown', population: '175,000', funFact: 'The island\'s famous red soil gets its distinct color from a high concentration of iron oxide (rust).' },
+        'Newfoundland and Labrador': { capital: 'St. John\'s', population: '530,000', funFact: 'Received the first-ever transatlantic wireless signal, sent by Guglielmo Marconi in 1901.' },
+        'Yukon': { capital: 'Whitehorse', population: '44,000', funFact: 'Is home to Mount Logan, the highest mountain in all of Canada.' },
+        'Northwest Territories': { capital: 'Yellowknife', population: '45,000', funFact: 'You can see the spectacular Aurora Borealis for up to 240 nights a year here.' },
+        'Nunavut': { capital: 'Iqaluit', population: '40,000', funFact: 'Makes up 20% of Canada\'s landmass but has less than 0.1% of its population.' }
+    };
+
+    // NEW: Pool of fact sets for the "Canada Quick Facts" section.
+    const canadaFactSets = [
+        [ "World's 2nd largest country by area.", "Has the longest coastline on the planet.", "Contains more lakes than the rest of the world combined!" ],
+        [ "The national sports are hockey (winter) and lacrosse (summer).", "The lowest recorded temperature was -63°C (-81.4°F) in Snag, Yukon.", "The official phone number is 1-800-O-CANADA." ],
+        [ "The motto, 'A Mari Usque Ad Mare', means 'From Sea to Sea'.", "Canadians consume the most doughnuts per capita in the world.", "The Royal Canadian Mint once created a giant gold coin worth $1 million." ],
+        [ "Canada has 10 provinces and 3 territories.", "The beaver is the national animal of Canada.", "At 3,855,103 square miles, Canada is slightly larger than the USA." ]
+    ];
+    let lastFactIndex = -1; // To avoid showing the same fact set twice in a row
+
+    // NEW: This function displays a random set of Canada facts.
+    function showRandomCanadaFacts() {
+        let randomIndex;
+        do {
+            randomIndex = Math.floor(Math.random() * canadaFactSets.length);
+        } while (canadaFactSets.length > 1 && randomIndex === lastFactIndex);
+        
+        lastFactIndex = randomIndex;
+        const factSet = canadaFactSets[randomIndex];
+        const listItems = factSet.map(fact => `<li>${fact}</li>`).join('');
+
+        staticFactsDiv.innerHTML = `
+            <h3>Canada Quick Facts 🍁</h3>
+            <ul>${listItems}</ul>
+        `;
+    }
+
+    // This function shows the province-specific information.
+    function showInfo(name) {
+      // It now ALSO triggers the update for the Canada Quick Facts panel.
+      showRandomCanadaFacts();
+        
+      const provinceKey = provinceNames.find(p => name.includes(p)) || name;
+      const data = provinceData[provinceKey];
+
+      if (data) {
+        infoContent.innerHTML = `
+          <h3>${provinceKey}</h3>
+          <p><strong>Capital:</strong> ${data.capital}</p>
+          <p><strong>Population:</strong> ~${data.population}</p>
+          <p><strong>Fun Fact:</strong> ${data.funFact}</p>
+        `;
+      } else {
+        infoContent.innerHTML = `<h3>${provinceKey}</h3><p>Information not available.</p>`;
+      }
+    }
+
+    // --- Map Styling and Interaction Logic ---
+
+    function getColor(name) {
+      const palette = ['#e57373', '#ffb74d', '#fff176', '#aed581', '#64b5f6', '#ba68c8', '#ff8a65', '#f06292', '#dce775', '#4dd0e1', '#bcaaa4', '#a5d6a7', '#ce93d8'];
+      const provinceKey = provinceNames.find(p => name.includes(p)) || name;
+      const idx = provinceNames.indexOf(provinceKey);
+      return idx >= 0 ? palette[idx % palette.length] : '#bdbdbd';
+    }
+
+    function style(feature) {
+      return { 
+        fillColor: getColor(feature.properties.name), 
+        weight: 2, 
+        opacity: 1,
+        color: 'white', 
+        fillOpacity: 0.7 
+      };
+    }
+
+    function highlightFeature(e) {
+      const layer = e.target;
+      layer.setStyle({
+        weight: 4,
+        color: '#4f46e5',
+        dashArray: '',
+        fillOpacity: 0.85
+      });
+      if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+        layer.bringToFront();
+      }
+    }
+
+    let geojson;
+    function resetHighlight(e) {
+      geojson.resetStyle(e.target);
+    }
+
+    function onEachFeature(feature, layer) {
+      layer.on({
+        mouseover: highlightFeature,
+        mouseout: resetHighlight,
+        click: () => showInfo(feature.properties.name)
+      });
+    }
+    
+    // Initial setup on page load
+    showRandomCanadaFacts(); // Load the first set of random facts.
+
+    fetch('https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@master/public/data/canada.geojson')
+      .then(res => res.json())
+      .then(data => { 
+        geojson = L.geoJson(data, { style, onEachFeature }).addTo(map); 
+      })
+      .catch(err => { 
+        console.error('GeoJSON load error:', err); 
+        infoContent.innerHTML = '<p>Error loading the map data. Please refresh the page.</p>'; 
+      });
+  </script>
+</body>
+</html>
