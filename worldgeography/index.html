@@ -299,16 +299,17 @@
             
             Object.keys(regionBounds).forEach(region => {
                 const regionCountries = Object.values(countriesData).filter(c => region === 'World Tour' || c.region === region);
+                const allQuestionsForRegion = regionCountries.map(country => ({
+                    answer: country.name,
+                    hints: [
+                        `This country is in ${country.subregion || country.region}.`,
+                        `Its neighbors are: ${country.borders?.map(b => getCountryNameByCca3(b)).filter(n=>n).join(', ') || 'None'}.`,
+                        `The capital city is ${country.capital?.[0] || 'N/A'}.`
+                    ]
+                }));
                 quizState[region] = {
-                    allQuestions: regionCountries.map(country => ({
-                        answer: country.name,
-                        hints: [
-                            `This country is in ${country.subregion || country.region}.`,
-                            `Its neighbors are: ${country.borders?.map(b => getCountryNameByCca3(b)).filter(n=>n).join(', ') || 'None'}.`,
-                            `The capital city is ${country.capital?.[0] || 'N/A'}.`
-                        ]
-                    })),
-                    availableQuestions: [],
+                    allQuestions: allQuestionsForRegion,
+                    availableQuestions: [...allQuestionsForRegion], // Initialize with all questions
                     correctlyGuessed: []
                 };
             });
