@@ -41,12 +41,13 @@
     <div id="controls" class="w-full max-w-5xl p-6 bg-white rounded-lg shadow-md space-y-4">
         <div>
             <h2 class="text-xl font-bold text-gray-800">Create Your Own Flashcards</h2>
-            <p class="text-sm text-gray-600">Enter your terms and definitions below, one per line. Use a colon ":" to separate them. To customize an image, add details in parenthesis. For example: <br> <code class="bg-gray-200 p-1 rounded">Car (red sports car): A vehicle for driving.</code></p>
-            <textarea id="custom-vocab-input" class="w-full h-32 p-2 mt-2 border border-gray-300 rounded-md" placeholder="Canyon: A deep valley with very steep sides...&#10;Planet (blue and green marble): A celestial body orbiting a star..."></textarea>
+            <p class="text-sm text-gray-600">Enter terms and definitions below, one per line, separated by a colon ":". To make an image more specific, add a hint in parenthesis. <br>Example: <code class="bg-gray-200 p-1 rounded">Delta (geography): A landform created by deposition of sediment...</code></p>
+            <textarea id="custom-vocab-input" class="w-full h-32 p-2 mt-2 border border-gray-300 rounded-md" placeholder="Canyon: A deep valley with very steep sides..."></textarea>
             <button id="generate-custom-btn" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition transform hover:scale-105">
                 Generate Flashcards
             </button>
         </div>
+        
         <div class="border-t pt-4">
             <div class="flex items-center justify-between">
                 <div>
@@ -72,14 +73,12 @@
             const apiKey = ""; // Canvas will provide the key
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
             
-            let newPrompt;
-            if (card.customPrompt) {
-                newPrompt = `A beautiful, modern graphic design illustration of a '${card.term}' described as '${card.customPrompt}'. High quality, clean lines, vibrant colors, on a white background. No words, no letters, no numbers, no text whatsoever.`;
-            } else {
-                newPrompt = `A beautiful, modern graphic design illustration of '${card.term}'. High quality, clean lines, vibrant colors, on a white background. No words, no letters, no numbers, no text whatsoever.`;
+            let prompt = `A clean and simple clipart illustration of a '${card.term}'. Flat design, vibrant colors, bold outlines, on a white background. No words, no letters, no numbers, no text whatsoever.`;
+            if (card.hint) {
+                prompt = `A clean and simple clipart illustration of a '${card.term}' (${card.hint}). Flat design, vibrant colors, bold outlines, on a white background. No words, no letters, no numbers, no text whatsoever.`
             }
 
-            const payload = { instances: [{ prompt: newPrompt }], parameters: { "sampleCount": 1 } };
+            const payload = { instances: [{ prompt: prompt }], parameters: { "sampleCount": 1 } };
 
             for (let i = 0; i < maxRetries; i++) {
                 try {
@@ -99,11 +98,11 @@
                     }
                 } catch (error) {
                     console.error(`Attempt ${i + 1} for "${card.term}" failed:`, error);
-                    if (i === maxRetries - 1) { return null; } // Return null on final failure
-                    await new Promise(res => setTimeout(res, 1000 * (i + 1))); // Exponential backoff
+                    if (i === maxRetries - 1) { return 'ERROR'; } 
+                    await new Promise(res => setTimeout(res, 1000 * (i + 1))); 
                 }
             }
-            return null; // Return null if all retries fail
+            return 'ERROR';
         }
         
         // --- Card and Page Rendering ---
@@ -120,64 +119,44 @@
                 <div class="card-label text-center text-white flex items-center justify-center px-2 bg-${color}" style="flex-basis: 4.5rem;">
                     <h2 class="text-xl font-bold">${card.term}</h2>
                 </div>
-                <button class="regenerate-btn absolute top-2 right-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 text-xs font-semibold rounded-md shadow-md transition transform hover:scale-105">
-                    New Image
-                </button>
+                <div class="absolute top-2 right-2 flex flex-col items-end space-y-1">
+                     <button class="regenerate-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 text-xs font-semibold rounded-md shadow-md transition transform hover:scale-105">
+                        New Image
+                     </button>
+                     <input type="text" class="hint-input bg-white w-32 text-xs p-1 rounded border border-gray-300 shadow-sm" placeholder="Add/edit hint..." value="${card.hint || ''}">
+                </div>
             `;
 
             const regenerateBtn = cardEl.querySelector('.regenerate-btn');
             const imageContainer = cardEl.querySelector('.image-container');
+            const hintInput = cardEl.querySelector('.hint-input');
 
             regenerateBtn.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 regenerateBtn.disabled = true;
+                hintInput.disabled = true;
                 regenerateBtn.textContent = '...';
                 imageContainer.innerHTML = '<div class="loader"></div>';
 
-                // Find the current card's data object in our main array
-                const cardData = allCardsData.find(c => c.term === card.term);
-                if (!cardData) {
-                    console.error("Card data not found for term:", card.term);
-                    regenerateBtn.disabled = false;
-                    regenerateBtn.textContent = 'New Image';
-                    imageContainer.innerHTML = 'Error';
-                    return;
-                }
+                // Get the current hint from this card's input field
+                const currentHint = hintInput.value.trim();
 
-                // Re-parse the text from the input to get the latest prompt
-                const input = document.getElementById('custom-vocab-input').value;
-                const lines = input.split('\n');
-                const line = lines.find(l => l.trim().startsWith(card.term));
+                // Update the hint in our master data array before regenerating
+                card.hint = currentHint;
 
-                if (line) {
-                    const lineParts = line.split(':');
-                    const termAndPrompt = lineParts[0].trim();
-                    const definition = lineParts.slice(1).join(':').trim();
-
-                    let term = termAndPrompt;
-                    let customPrompt = null;
-                    const promptMatch = termAndPrompt.match(/(.*?)\s*\((.*?)\)/);
-
-                    if (promptMatch && promptMatch.length === 3) {
-                        term = promptMatch[1].trim();
-                        customPrompt = promptMatch[2].trim();
-                    }
-                    
-                    cardData.definition = definition;
-                    cardData.customPrompt = customPrompt;
-                }
+                const newImageUrl = await generateImageWithRetry(card);
                 
-                const newImageUrl = await generateImageWithRetry(cardData);
-                
-                cardData.image = newImageUrl;
+                // Update the image URL on the original card data object
+                card.image = newImageUrl;
 
-                if (newImageUrl) {
-                     imageContainer.innerHTML = `<img src="${newImageUrl}" alt="${cardData.term}" class="max-h-full max-w-full object-contain">`;
+                if (newImageUrl !== 'ERROR') {
+                     imageContainer.innerHTML = `<img src="${newImageUrl}" alt="${card.term}" class="max-h-full max-w-full object-contain">`;
                 } else {
-                     imageContainer.innerHTML = ''; // Clear the container on failure
+                     imageContainer.innerHTML = `<p class="text-red-500 text-center text-sm p-2">Failed. Please try again.</p>`;
                 }
                
                 regenerateBtn.disabled = false;
+                hintInput.disabled = false;
                 regenerateBtn.textContent = 'New Image';
             });
 
@@ -236,26 +215,25 @@
             }
         }
         
-        // --- Event Listeners and Initialization ---
+        // --- Event Listeners ---
         document.getElementById('generate-custom-btn').addEventListener('click', async () => {
             const input = document.getElementById('custom-vocab-input').value;
             const lines = input.split('\n').filter(line => line.includes(':'));
             
             allCardsData = lines.map(line => {
-                const lineParts = line.split(':');
-                const termAndPrompt = lineParts[0].trim();
-                const definition = lineParts.slice(1).join(':').trim();
-
-                let term = termAndPrompt;
-                let customPrompt = null;
-
-                const promptMatch = termAndPrompt.match(/(.*?)\s*\((.*?)\)/);
-                if (promptMatch && promptMatch.length === 3) {
-                    term = promptMatch[1].trim();
-                    customPrompt = promptMatch[2].trim();
+                const parts = line.split(':');
+                const rawTerm = parts[0].trim();
+                const definition = parts.slice(1).join(':').trim();
+                
+                let term = rawTerm;
+                let hint = '';
+                const hintMatch = rawTerm.match(/(.*?)\s*\((.*?)\)/);
+                if (hintMatch && hintMatch.length === 3) {
+                    term = hintMatch[1].trim();
+                    hint = hintMatch[2].trim();
                 }
 
-                return { term, definition, customPrompt, image: null };
+                return { term, definition, image: null, hint };
             }).filter(c => c.term && c.definition);
 
             generateAllPages(); // Display cards with loaders
@@ -272,19 +250,20 @@
                 const cardEl = document.querySelector(`.card[data-term="${card.term}"]`);
                 if (cardEl) {
                     const imageContainer = cardEl.querySelector('.image-container');
-                    if (imageUrl) {
+                    if (imageUrl !== 'ERROR') {
                         imageContainer.innerHTML = `<img src="${imageUrl}" alt="${card.term}" class="max-h-full max-w-full object-contain">`;
                     } else {
-                        imageContainer.innerHTML = ''; // Clear the container on failure
+                        imageContainer.innerHTML = `<p class="text-red-500 text-center text-sm p-2">Failed.</p>`;
                     }
                 }
             });
 
-            await Promise.all(imagePromises); // Wait for all initial images to be generated
+            await Promise.all(imagePromises);
             
             generateBtn.disabled = false;
             generateBtn.textContent = 'Generate Flashcards';
         });
+
 
         function saveForPrinting() {
             const printableHtml = `
@@ -329,9 +308,15 @@
             const color = colors[index % colors.length];
             const cardEl = document.createElement('div');
             cardEl.className = \`card h-full bg-white rounded-2xl border-8 border-\${color} shadow-lg overflow-hidden flex flex-col\`;
+            
+            let imageHtml = '<p class="text-red-500 text-center p-4">Image Error</p>';
+            if (card.image && card.image !== 'ERROR') {
+                 imageHtml = \`<img src="\${card.image}" alt="\${card.term}" class="max-h-full max-w-full object-contain">\`;
+            }
+
             cardEl.innerHTML = \`
                 <div class="image-container flex-1 min-h-0 flex items-center justify-center p-4 overflow-hidden">
-                    <img src="\${card.image}" alt="\${card.term}" class="max-h-full max-w-full object-contain">
+                    \${imageHtml}
                 </div>
                 <div class="card-label text-center text-white flex items-center justify-center px-2 bg-\${color}" style="flex-basis: 4.5rem;">
                     <h2 class="text-xl font-bold">\${card.term}</h2>
@@ -406,5 +391,7 @@
     </script>
 </body>
 </html>
+
+
 
 
