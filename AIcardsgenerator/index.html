@@ -74,9 +74,9 @@
             
             let newPrompt;
             if (card.customPrompt) {
-                newPrompt = `A clean and simple clipart illustration of a '${card.term}' described as '${card.customPrompt}'. Flat design, vibrant colors, bold outlines, on a white background. No words, no letters, no numbers, no text whatsoever.`;
+                newPrompt = `A beautiful, modern graphic design illustration of a '${card.term}' described as '${card.customPrompt}'. High quality, clean lines, vibrant colors, on a white background. No words, no letters, no numbers, no text whatsoever.`;
             } else {
-                newPrompt = `A clean and simple clipart illustration of a '${card.term}'. Flat design, vibrant colors, bold outlines, on a white background. No words, no letters, no numbers, no text whatsoever.`;
+                newPrompt = `A beautiful, modern graphic design illustration of '${card.term}'. High quality, clean lines, vibrant colors, on a white background. No words, no letters, no numbers, no text whatsoever.`;
             }
 
             const payload = { instances: [{ prompt: newPrompt }], parameters: { "sampleCount": 1 } };
@@ -134,15 +134,45 @@
                 regenerateBtn.textContent = '...';
                 imageContainer.innerHTML = '<div class="loader"></div>';
 
-                const newImageUrl = await generateImageWithRetry(card);
-                
+                // Find the current card's data object in our main array
                 const cardData = allCardsData.find(c => c.term === card.term);
-                if (cardData) {
-                    cardData.image = newImageUrl;
+                if (!cardData) {
+                    console.error("Card data not found for term:", card.term);
+                    regenerateBtn.disabled = false;
+                    regenerateBtn.textContent = 'New Image';
+                    imageContainer.innerHTML = 'Error';
+                    return;
                 }
 
+                // Re-parse the text from the input to get the latest prompt
+                const input = document.getElementById('custom-vocab-input').value;
+                const lines = input.split('\n');
+                const line = lines.find(l => l.trim().startsWith(card.term));
+
+                if (line) {
+                    const lineParts = line.split(':');
+                    const termAndPrompt = lineParts[0].trim();
+                    const definition = lineParts.slice(1).join(':').trim();
+
+                    let term = termAndPrompt;
+                    let customPrompt = null;
+                    const promptMatch = termAndPrompt.match(/(.*?)\s*\((.*?)\)/);
+
+                    if (promptMatch && promptMatch.length === 3) {
+                        term = promptMatch[1].trim();
+                        customPrompt = promptMatch[2].trim();
+                    }
+                    
+                    cardData.definition = definition;
+                    cardData.customPrompt = customPrompt;
+                }
+                
+                const newImageUrl = await generateImageWithRetry(cardData);
+                
+                cardData.image = newImageUrl;
+
                 if (newImageUrl) {
-                     imageContainer.innerHTML = `<img src="${newImageUrl}" alt="${card.term}" class="max-h-full max-w-full object-contain">`;
+                     imageContainer.innerHTML = `<img src="${newImageUrl}" alt="${cardData.term}" class="max-h-full max-w-full object-contain">`;
                 } else {
                      imageContainer.innerHTML = ''; // Clear the container on failure
                 }
@@ -376,4 +406,5 @@
     </script>
 </body>
 </html>
+
 
