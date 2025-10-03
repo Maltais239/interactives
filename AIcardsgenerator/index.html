@@ -92,11 +92,11 @@
                     }
                 } catch (error) {
                     console.error(`Attempt ${i + 1} for "${card.term}" failed:`, error);
-                    if (i === maxRetries - 1) { return 'https://placehold.co/400x300/ff0000/ffffff?text=Error'; } // Return error placeholder
+                    if (i === maxRetries - 1) { return null; } // Return null on final failure
                     await new Promise(res => setTimeout(res, 1000 * (i + 1))); // Exponential backoff
                 }
             }
-            return 'https://placehold.co/400x300/ff0000/ffffff?text=Error';
+            return null; // Return null if all retries fail
         }
         
         // --- Card and Page Rendering ---
@@ -134,10 +134,10 @@
                     cardData.image = newImageUrl;
                 }
 
-                if (newImageUrl && newImageUrl.startsWith('data:image')) {
+                if (newImageUrl) {
                      imageContainer.innerHTML = `<img src="${newImageUrl}" alt="${card.term}" class="max-h-full max-w-full object-contain">`;
                 } else {
-                     imageContainer.innerHTML = `<p class="text-red-500 text-center text-sm p-2">Failed to generate image. Please try again.</p>`;
+                     imageContainer.innerHTML = ''; // Clear the container on failure
                 }
                
                 regenerateBtn.disabled = false;
@@ -225,7 +225,11 @@
                 const cardEl = document.querySelector(`.card[data-term="${card.term}"]`);
                 if (cardEl) {
                     const imageContainer = cardEl.querySelector('.image-container');
-                    imageContainer.innerHTML = `<img src="${imageUrl}" alt="${card.term}" class="max-h-full max-w-full object-contain">`;
+                    if (imageUrl) {
+                        imageContainer.innerHTML = `<img src="${imageUrl}" alt="${card.term}" class="max-h-full max-w-full object-contain">`;
+                    } else {
+                        imageContainer.innerHTML = ''; // Clear the container on failure
+                    }
                 }
             });
 
@@ -355,4 +359,3 @@
     </script>
 </body>
 </html>
-
