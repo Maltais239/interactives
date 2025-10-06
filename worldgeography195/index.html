@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>World Geography 195</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0f4f8;
+            overflow: hidden;
+        }
+        /* CSS rules to fix rendering artifacts */
+        .leaflet-container {
+            background: #aadaff;
+            outline: 1px solid transparent; /* Prevents tile tearing */
+        }
+        
+        .map-background-tiles {
+            /* Helps prevent seams between map tiles on some browsers */
+            image-rendering: -webkit-optimize-contrast; /* Chrome/Safari */
+            image-rendering: crisp-edges; /* Firefox/Opera */
+        }
+
+        #map {
+            flex: 1;
+            height: 100%;
+            border-right: 1px solid #ddd;
+        }
+        #info-panel {
+            width: 380px;
+            max-width: 40%;
+            padding: 2rem;
+            background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+            border-left: 5px solid #0d9488;
+            overflow-y: auto;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        #info-panel h2 {
+            margin-top: 0;
+            color: #134e4a;
+            font-size: 1.75rem;
+            font-weight: 700;
+            border-bottom: 2px solid #99f6e4;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .loading-text {
+            text-align: center;
+            font-weight: 500;
+            color: #0f766e;
+            padding: 2rem;
+        }
+
+        /* Mode & Region Switcher */
+        .mode-switcher, .region-switcher {
+            display: flex;
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            background-color: #ccfbf1;
+            padding: 0.25rem;
+            flex-wrap: wrap;
+        }
+        .mode-btn, .region-btn {
+            flex: 1 1 auto;
+            padding: 0.75rem 0.5rem;
+            border: none;
+            background-color: transparent;
+            color: #14b8a6;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: background-color 0.3s, color 0.3s;
+            text-align: center;
+        }
+        .mode-btn.active, .region-btn.active {
+            background-color: #14b8a6;
+            color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .region-switcher {
+             background-color: #e0f2f1;
+             margin-top: -0.5rem;
+        }
+        .region-btn { color: #00796b; font-size: 0.9rem; }
+        .region-btn.active { background-color: #00796b;}
+
+
+        /* Panels */
+        .mode-panel { display: none; }
+        .mode-panel.active { display: block; }
+        #info-content, #result-box {
+             border-top: 1px solid #ddd; padding-top: 1.5rem;
+        }
+        #info-content h3, #result-box h3 {
+            margin-top: 0; margin-bottom: 1rem; color: #0d9488; font-size: 1.5rem; font-weight: 600;
+        }
+        #info-content p, #result-box p {
+            font-size: 1rem; line-height: 1.6; margin: 0.5rem 0 1rem 0; color: #0f766e;
+        }
+        #info-content p strong, #result-box p strong { color: #134e4a; }
+
+        /* Quiz Mode Styling */
+        #question-box {
+            background-color: #f0fdfa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #99f6e4;
+            min-height: 100px;
+            font-size: 1.1rem;
+            color: #115e59;
+            line-height: 1.6;
+            font-weight: 500;
+        }
+        
+        #result-box p.feedback-correct { color: #166534; font-weight: bold; }
+        #result-box p.feedback-incorrect { color: #991b1b; font-weight: bold; }
+
+        /* Button Controls */
+        #button-controls { margin-top: auto; display: flex; gap: 0.5rem; padding-top: 1rem; }
+        .game-btn {
+            flex: 1; padding: 0.75rem; color: white; border: none; border-radius: 8px; font-size: 1rem;
+            font-weight: 600; cursor: pointer; transition: background-color 0.2s, opacity 0.2s;
+        }
+        #next-question-btn { display: none; background-color: #0d9488; }
+        #next-question-btn:hover { background-color: #0f766e; }
+        #play-again-btn { display: none; background-color: #16a34a; }
+        #play-again-btn:hover { background-color: #15803d; }
+        #hint-btn { display: none; background-color: #f59e0b; }
+        #hint-btn:hover { background-color: #d97706; }
+        #hint-btn:disabled { background-color: #9ca3af; cursor: not-allowed; }
+
+        /* Practice Mode Styling */
+        #practice-list { margin-top: 1rem; }
+        .practice-item {
+            padding: 0.75rem 1rem;
+            background-color: #f0fdfa;
+            border: 1px solid #ccfbf1;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s, box-shadow 0.2s;
+            font-weight: 500;
+            color: #115e59;
+        }
+        .practice-item:hover {
+            background-color: #ccfbf1;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="info-panel">
+        <h2>World Geography Hub</h2>
+
+        <div class="mode-switcher">
+            <button id="explore-mode-btn" class="mode-btn active">Explore</button>
+            <button id="quiz-mode-btn" class="mode-btn">Quiz</button>
+            <button id="practice-mode-btn" class="mode-btn">Practice</button>
+        </div>
+
+        <div class="region-switcher">
+            <button class="region-btn active" data-region="World Tour">World Tour</button>
+            <button class="region-btn" data-region="Americas">Americas</button>
+            <button class="region-btn" data-region="Europe">Europe</button>
+            <button class="region-btn" data-region="Africa">Africa</button>
+            <button class="region-btn" data-region="Asia">Asia</button>
+            <button class="region-btn" data-region="Oceania">Oceania</button>
+        </div>
+
+        <div id="explore-panel" class="mode-panel active">
+            <div id="info-content">
+                 <p class="loading-text">Loading map data...</p>
+            </div>
+        </div>
+
+        <div id="quiz-panel" class="mode-panel">
+            <div id="question-box"></div>
+            <div id="result-box"></div>
+            <div id="button-controls">
+                <button id="hint-btn" class="game-btn">Get a Hint 💡</button>
+                <button id="next-question-btn" class="game-btn">Next Question &rarr;</button>
+                <button id="play-again-btn" class="game-btn">Play Again? ↻</button>
+            </div>
+        </div>
+
+        <div id="practice-panel" class="mode-panel">
+            <h3>Practice Bank</h3>
+            <p>Here are the countries you've missed. Click one to find it on the map!</p>
+            <div id="practice-list">Your practice bank is empty.</div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        // --- DOM Elements ---
+        const map = L.map('map', {
+            renderer: L.canvas(), // Use Canvas renderer to prevent SVG rendering glitches
+            worldCopyJump: true, // Fixes rendering of large polygons like Russia across the date line
+            maxBounds: [[-85, -180], [85, 180]], // Prevents scrolling into empty blue space
+            maxBoundsViscosity: 1.0 // Makes the bounds firm
+        }).setView([30, 10], 2);
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 10,
+            minZoom: 2,
+            noWrap: true,
+            className: 'map-background-tiles'
+        }).addTo(map);
+
+        const exploreModeBtn = document.getElementById('explore-mode-btn');
+        const quizModeBtn = document.getElementById('quiz-mode-btn');
+        const practiceModeBtn = document.getElementById('practice-mode-btn');
+        const explorePanel = document.getElementById('explore-panel');
+        const quizPanel = document.getElementById('quiz-panel');
+        const practicePanel = document.getElementById('practice-panel');
+        const practiceList = document.getElementById('practice-list');
+        const infoContent = document.getElementById('info-content');
+        const questionBox = document.getElementById('question-box');
+        const resultBox = document.getElementById('result-box');
+        const nextQuestionBtn = document.getElementById('next-question-btn');
+        const playAgainBtn = document.getElementById('play-again-btn');
+        const hintBtn = document.getElementById('hint-btn');
+        const regionBtns = document.querySelectorAll('.region-btn');
+
+        // --- App State ---
+        let geojson;
+        let countriesData = {};
+        let quizState = {};
+        let currentMode = 'explore';
+        let currentRegion = 'World Tour';
+        let isQuizActive = true;
+        let currentQuestion = {};
+        let currentHintIndex = 0;
+        let incorrectGuesses = 0;
+        let practiceBank = [];
+        let justMissedCountry = null;
+        let hintCircleLayer = null; // Layer for island hint circle
+
+        const regionBounds = {
+            'Americas': [[50, -120], [-55, -50]], 'Europe': [[70, -10], [35, 40]],
+            'Africa': [[35, -20], [-35, 50]], 'Asia': [[70, 40], [0, 140]],
+            'Oceania': [[-10, 110], [-50, 180]], 'World Tour': [[30, 10], 2]
+        };
+        
+        // --- Main Logic ---
+        function initializeApp(worldGeoData) {
+            try {
+                const factsMap = new Map();
+                countryFacts.forEach(fact => factsMap.set(fact.name.common, fact));
+                
+                // Load the HIGH-RES map first to prioritize its shapes for small islands and complex names
+                worldGeoData[1].features.forEach(feature => {
+                    const countryName = feature.properties.ADMIN;
+                    const fact = factsMap.get(countryName);
+                    if (fact) {
+                        countriesData[countryName] = { ...fact, geometry: feature.geometry, name: countryName };
+                    }
+                });
+
+                // Load the primary, stable dataset, but only add countries that we don't already have
+                worldGeoData[0].features.forEach(feature => {
+                    const countryName = feature.properties.name;
+                    const fact = factsMap.get(countryName);
+                    if (fact && !countriesData[countryName]) { // Add if not already present
+                        countriesData[countryName] = { ...fact, geometry: feature.geometry, name: countryName };
+                    }
+                });
+
+                initializeLogic();
+            } catch (error) {
+                console.error("Data processing error:", error);
+                infoContent.innerHTML = `<p class="loading-text">Could not process map data.</p>`;
+            }
+        }
+        
+        function initializeLogic() {
+            infoContent.innerHTML = '<p>Click on a country to learn more about it!</p>';
+            
+            Object.keys(regionBounds).forEach(region => {
+                const regionCountries = Object.values(countriesData).filter(c => c.region === region);
+                // World Tour includes all countries
+                const allQuestionsForRegion = (region === 'World Tour' ? Object.values(countriesData) : regionCountries).map(country => ({
+                    answer: country.name,
+                    hints: [
+                        `This country is in ${country.subregion || country.region}.`,
+                        `Its neighbors are: ${country.borders?.map(b => getCountryNameByCca3(b)).filter(n=>n).join(', ') || 'None'}.`,
+                        `The capital city is ${country.capital?.[0] || 'N/A'}.`
+                    ]
+                }));
+
+                quizState[region] = {
+                    allQuestions: allQuestionsForRegion,
+                    availableQuestions: [...allQuestionsForRegion], // Initialize with all questions
+                    correctlyGuessed: []
+                };
+            });
+
+            const allFeatures = Object.values(countriesData).map(c => ({
+                type: "Feature", properties: { name: c.name }, geometry: c.geometry
+            }));
+            geojson = L.geoJson({ type: "FeatureCollection", features: allFeatures }, { style, onEachFeature }).addTo(map);
+            
+            setMode('explore');
+        }
+
+        // --- Event Listeners ---
+        exploreModeBtn.addEventListener('click', () => setMode('explore'));
+        quizModeBtn.addEventListener('click', () => setMode('quiz'));
+        practiceModeBtn.addEventListener('click', () => setMode('practice'));
+        nextQuestionBtn.addEventListener('click', () => loadNewQuestion());
+        playAgainBtn.addEventListener('click', resetQuiz);
+        hintBtn.addEventListener('click', showHint);
+        
+        regionBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentRegion = btn.dataset.region;
+                regionBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const bounds = regionBounds[currentRegion];
+                currentRegion === 'World Tour' ? map.setView(bounds[0], bounds[1]) : map.flyToBounds(bounds);
+                setTimeout(() => map.invalidateSize(), 400);
+                
+                if (currentMode === 'quiz') {
+                     const state = quizState[currentRegion];
+                    if (state.availableQuestions.length === 0 && state.correctlyGuessed.length > 0) {
+                        // If we are returning to a completed region, show completion message
+                         questionBox.innerHTML = `You've identified all the countries in ${currentRegion}!`;
+                        resultBox.innerHTML = `<h2>Congratulations! 🥳</h2>`;
+                        playAgainBtn.style.display = 'block';
+                        nextQuestionBtn.style.display = 'none';
+                        hintBtn.style.display = 'none';
+                        isQuizActive = false;
+                    } else {
+                        // Otherwise, load a new question
+                        loadNewQuestion();
+                    }
+                }
+
+                if(geojson) geojson.resetStyle();
+            });
+        });
+
+        // --- Mode Switching ---
+        function setMode(mode) {
+            currentMode = mode;
+            exploreModeBtn.classList.toggle('active', mode === 'explore');
+            quizModeBtn.classList.toggle('active', mode === 'quiz');
+            practiceModeBtn.classList.toggle('active', mode === 'practice');
+            explorePanel.classList.toggle('active', mode === 'explore');
+            quizPanel.classList.toggle('active', mode === 'quiz');
+            practicePanel.classList.toggle('active', mode === 'practice');
+            
+            // This logic ensures progress is NOT reset when switching between modes.
+            // A full reset only happens with the "Play Again" button.
+            if (mode === 'quiz') {
+                const hasQuizStarted = Object.values(quizState).some(s => s.correctlyGuessed.length > 0 || s.availableQuestions.length < s.allQuestions.length);
+                if (!hasQuizStarted) {
+                    resetQuiz(); // Only reset fully on the very first time entering quiz mode
+                } else {
+                    loadNewQuestion(); // Otherwise just load a question to reflect current state
+                }
+            }
+            if (mode === 'practice') {
+                updatePracticePanel();
+            }
+            if(geojson) geojson.resetStyle();
+        }
+
+        // --- Quiz Logic ---
+        function resetQuiz() {
+            Object.values(quizState).forEach(s => {
+                s.correctlyGuessed = [];
+                s.availableQuestions = [...s.allQuestions];
+            });
+            practiceBank = []; // Also clear the practice bank on a full reset
+            if(geojson) geojson.resetStyle();
+            loadNewQuestion();
+        }
+        
+        function loadNewQuestion() {
+            // Clear previous hint circle if it exists
+            if (hintCircleLayer) {
+                hintCircleLayer.remove();
+                hintCircleLayer = null;
+            }
+
+            const state = quizState[currentRegion];
+            if (!state || state.availableQuestions.length === 0) {
+                questionBox.innerHTML = `You've identified all the countries in ${currentRegion}!`;
+                resultBox.innerHTML = `<h2>Congratulations! 🥳</h2>`;
+                playAgainBtn.style.display = 'block';
+                nextQuestionBtn.style.display = 'none';
+                hintBtn.style.display = 'none';
+                isQuizActive = false;
+                return;
+            }
+
+            isQuizActive = true;
+            justMissedCountry = null; // Clear previously missed country highlight
+            incorrectGuesses = 0; // Reset guess count for the new question
+            currentHintIndex = 0; // Reset hint index for the new question
+            const questionIndex = Math.floor(Math.random() * state.availableQuestions.length);
+            currentQuestion = state.availableQuestions.splice(questionIndex, 1)[0];
+            
+            // --- Island Hint Logic ---
+            const countryData = countriesData[currentQuestion.answer];
+            // Check if it's an island (no borders)
+            if (countryData && (!countryData.borders || countryData.borders.length === 0)) {
+                let targetLayer;
+                geojson.eachLayer(layer => {
+                    if (layer.feature.properties.name === currentQuestion.answer) {
+                        targetLayer = layer;
+                    }
+                });
+
+                if (targetLayer) {
+                    const bounds = targetLayer.getBounds();
+                    const size = bounds.getCenter().distanceTo(bounds.getNorthEast());
+                    // Threshold to exclude very large islands like Australia. ~600km from center to corner.
+                    if (size < 600000) { 
+                        const center = bounds.getCenter();
+                        // Create a circle with a radius proportional to the island size, but with a minimum visible radius.
+                        hintCircleLayer = L.circle(center, {
+                            radius: Math.max(size * 1.5, 100000), 
+                            color: '#f59e0b',
+                            weight: 2,
+                            dashArray: '8, 8',
+                            fillOpacity: 0.1,
+                            fillColor: '#f59e0b'
+                        }).addTo(map);
+                    }
+                }
+            }
+
+            questionBox.innerHTML = `Find <strong>${currentQuestion.answer}</strong> on the map.`;
+            resultBox.innerHTML = `<p>Click the correct country on the map!</p>`;
+            
+            playAgainBtn.style.display = 'none';
+            nextQuestionBtn.style.display = 'none';
+            hintBtn.style.display = 'block';
+            hintBtn.disabled = false;
+            if (geojson) geojson.resetStyle();
+        }
+
+        function checkAnswer(countryName) {
+            if (!isQuizActive) return;
+
+            if (countryName === currentQuestion.answer) {
+                 // Clear hint circle on correct answer
+                if (hintCircleLayer) {
+                    hintCircleLayer.remove();
+                    hintCircleLayer = null;
+                }
+                isQuizActive = false; // Temporarily disable clicks
+                hintBtn.style.display = 'none';
+
+                // Sync progress across all regions
+                Object.values(quizState).forEach(s => {
+                    // Add to correctlyGuessed if not already there
+                    if (s.allQuestions.some(q => q.answer === countryName) && !s.correctlyGuessed.includes(countryName)) {
+                        s.correctlyGuessed.push(countryName);
+                    }
+                    // Remove from availableQuestions lists to prevent it from being asked again
+                    const indexToRemove = s.availableQuestions.findIndex(q => q.answer === countryName);
+                    if (indexToRemove > -1) {
+                        s.availableQuestions.splice(indexToRemove, 1);
+                    }
+                });
+
+                if (geojson) geojson.resetStyle();
+                
+                resultBox.innerHTML = `<p class="feedback-correct">Correct! It's ${countryName}.</p>`;
+                
+                // Automatically load the next question after a short delay
+                setTimeout(loadNewQuestion, 1200); 
+
+            } else {
+                // On incorrect guess, increment counter and provide a hint
+                incorrectGuesses++;
+                resultBox.innerHTML = `<p class="feedback-incorrect">Not quite! That was ${countryName}. Try again! (${incorrectGuesses}/3)</p>`;
+                showHint();
+
+                if (incorrectGuesses >= 3) {
+                    isQuizActive = false; // Lock the quiz
+                    hintBtn.style.display = 'none';
+                    if (!practiceBank.includes(currentQuestion.answer)) {
+                        practiceBank.push(currentQuestion.answer);
+                    }
+                    justMissedCountry = currentQuestion.answer;
+                    geojson.resetStyle(); // Redraw to show missed country in red
+                    
+                    resultBox.innerHTML = `<p class="feedback-incorrect">The correct answer was <strong>${currentQuestion.answer}</strong>. It's been added to your practice bank.</p>`;
+                    setTimeout(loadNewQuestion, 4000); // Give user time to see the red country
+                }
+            }
+        }
+        
+        function showHint() {
+            if (!isQuizActive || !currentQuestion.hints || currentHintIndex >= currentQuestion.hints.length) {
+                return;
+            }
+            const hintText = `<br><small>Hint: ${currentQuestion.hints[currentHintIndex]}</small>`;
+            if (!questionBox.innerHTML.includes(hintText)) {
+                questionBox.innerHTML += hintText;
+            }
+            currentHintIndex++;
+            if (currentHintIndex >= currentQuestion.hints.length) {
+                hintBtn.disabled = true;
+            }
+        }
+        
+        // --- Map Styling & Interaction ---
+        const palette = ['#e57373', '#ffb74d', '#fff176', '#aed581', '#64b5f6', '#ba68c8', '#ff8a65', '#f06292', '#dce775', '#4dd0e1', '#bcaaa4', '#a5d6a7', '#ce93d8', '#81c784', '#7986cb', '#4fc3f7', '#9575cd', '#fdd835', '#ffab91'];
+        
+        function style(feature) {
+            const countryName = feature.properties.name;
+
+            // Practice Mode: Only highlight missed countries in red
+            if (currentMode === 'practice') {
+                if (practiceBank.includes(countryName)) {
+                    return { fillColor: '#e53935', weight: 1.5, color: 'white', fillOpacity: 0.9 }; // Red for practice
+                } else {
+                    return { fillColor: '#e0e0e0', weight: 0.5, color: '#f5f5f5', fillOpacity: 0.2 }; // Neutral for others
+                }
+            }
+
+            // Quiz Mode: Highlight missed country immediately after 3 wrong guesses
+            if (countryName === justMissedCountry) {
+                return { fillColor: '#e53935', weight: 2, color: 'white', fillOpacity: 0.9, opacity: 1 };
+            }
+
+            const isGuessed = quizState['World Tour']?.correctlyGuessed.includes(countryName);
+            const isVisibleRegion = currentRegion === 'World Tour' || (countriesData[countryName] && countriesData[countryName].region === currentRegion);
+
+            let fillColor = '#e0e0e0';
+            let fillOpacity = 0.2;
+            let weight = 0.5;
+            let color = '#f5f5f5';
+
+            if (isVisibleRegion) {
+                weight = 1.5;
+                color = 'white';
+                if (currentMode === 'quiz' && !isGuessed) {
+                    fillColor = '#b0bec5'; // Grey for unguessed quiz countries
+                    fillOpacity = 0.7;
+                } else { // Explore mode or correctly guessed countries
+                    const hash = countryName.split('').reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
+                    fillColor = palette[Math.abs(hash) % palette.length];
+                    fillOpacity = 0.8;
+                }
+            }
+            
+            return { fillColor, weight, opacity: 1, color, fillOpacity };
+        }
+
+        function highlightFeature(e) {
+            const layer = e.target;
+            if (currentMode === 'quiz' && !isQuizActive) return;
+            // Don't highlight in practice mode unless it's a practice country
+            if (currentMode === 'practice' && !practiceBank.includes(layer.feature.properties.name)) return;
+            
+            layer.setStyle({ weight: 3, color: '#004d40', dashArray: '', fillOpacity: 0.85 });
+            layer.bringToFront();
+        }
+
+        function resetHighlight(e) { geojson.resetStyle(e.target); }
+
+        function onMapClick(featureProps) {
+            const countryName = featureProps.name;
+            if (currentMode === 'explore' || currentMode === 'practice') {
+                const data = countriesData[countryName];
+                if (data) {
+                    infoContent.innerHTML = `
+                        <h3>${data.name}</h3>
+                        <p><strong>Capital:</strong> ${data.capital?.[0] || 'N/A'}</p>
+                        <p><strong>Population:</strong> ${data.population?.toLocaleString() || 'N/A'}</p>
+                        <p><strong>Region:</strong> ${data.subregion || data.region}</p>
+                    `;
+                }
+            } else {
+                checkAnswer(countryName);
+            }
+        }
+
+        function onEachFeature(feature, layer) {
+            layer.on({
+                mouseover: highlightFeature,
+                mouseout: resetHighlight,
+                click: () => onMapClick(feature.properties)
+            });
+        }
+        
+        // --- Practice Mode ---
+        function updatePracticePanel() {
+            practiceList.innerHTML = ''; // Clear the list
+            if (practiceBank.length === 0) {
+                practiceList.innerHTML = 'Your practice bank is empty.';
+                return;
+            }
+
+            practiceBank.sort().forEach(countryName => {
+                const item = document.createElement('div');
+                item.className = 'practice-item';
+                item.textContent = countryName;
+                item.addEventListener('click', () => {
+                    geojson.eachLayer(layer => {
+                        if (layer.feature.properties.name === countryName) {
+                            map.flyToBounds(layer.getBounds().pad(0.2));
+                            layer.setStyle({ fillColor: '#f59e0b', fillOpacity: 0.9 });
+                            setTimeout(() => geojson.resetStyle(layer), 2000);
+                        }
+                    });
+                });
+                practiceList.appendChild(item);
+            });
+        }
+
+        // --- Utility ---
+        function getCountryNameByCca3(cca3) {
+            for (const name in countriesData) {
+                if (countriesData[name].cca3 === cca3) return countriesData[name].name;
+            }
+            return null;
+        }
+
+        // --- Data ---
+        const countryFacts = [{"name":{"common":"Afghanistan"},"cca3":"AFG","capital":["Kabul"],"region":"Asia","subregion":"Southern Asia","population":40218234,"borders":["IRN","PAK","TKM","UZB","TJK","CHN"]},{"name":{"common":"Angola"},"cca3":"AGO","capital":["Luanda"],"region":"Africa","subregion":"Middle Africa","population":32866268,"borders":["COG","COD","ZMB","NAM"]},{"name":{"common":"Albania"},"cca3":"ALB","capital":["Tirana"],"region":"Europe","subregion":"Southeast Europe","population":2837743,"borders":["MNE","GRC","MKD","UNK"]},{"name":{"common":"Andorra"},"cca3":"AND","capital":["Andorra la Vella"],"region":"Europe","subregion":"Southern Europe","population":77265,"borders":["FRA","ESP"]},{"name":{"common":"United Arab Emirates"},"cca3":"ARE","capital":["Abu Dhabi"],"region":"Asia","subregion":"Western Asia","population":9890400,"borders":["OMN","SAU"]},{"name":{"common":"Argentina"},"cca3":"ARG","capital":["Buenos Aires"],"region":"Americas","subregion":"South America","population":45376763,"borders":["BOL","BRA","CHL","PRY","URY"]},{"name":{"common":"Armenia"},"cca3":"ARM","capital":["Yerevan"],"region":"Asia","subregion":"Western Asia","population":2963234,"borders":["AZE","GEO","IRN","TUR"]},{"name":{"common":"Antigua and Barb."},"cca3":"ATG","capital":["Saint John's"],"region":"Americas","subregion":"Caribbean","population":97928,"borders":[]},{"name":{"common":"Australia"},"cca3":"AUS","capital":["Canberra"],"region":"Oceania","subregion":"Australia and New Zealand","population":25687041,"borders":[]},{"name":{"common":"Austria"},"cca3":"AUT","capital":["Vienna"],"region":"Europe","subregion":"Central Europe","population":8917205,"borders":["CZE","DEU","HUN","ITA","LIE","SVK","SVN","CHE"]},{"name":{"common":"Azerbaijan"},"cca3":"AZE","capital":["Baku"],"region":"Asia","subregion":"Western Asia","population":10110116,"borders":["ARM","GEO","IRN","RUS","TUR"]},{"name":{"common":"Burundi"},"cca3":"BDI","capital":["Gitega"],"region":"Africa","subregion":"Eastern Africa","population":11890781,"borders":["COD","RWA","TZA"]},{"name":{"common":"Belgium"},"cca3":"BEL","capital":["Brussels"],"region":"Europe","subregion":"Western Europe","population":11555997,"borders":["FRA","DEU","LUX","NLD"]},{"name":{"common":"Benin"},"cca3":"BEN","capital":["Porto-Novo"],"region":"Africa","subregion":"Western Africa","population":12123198,"borders":["BFA","NER","NGA","TGO"]},{"name":{"common":"Burkina Faso"},"cca3":"BFA","capital":["Ouagadougou"],"region":"Africa","subregion":"Western Africa","population":20903278,"borders":["BEN","CIV","GHA","MLI","NER","TGO"]},{"name":{"common":"Bangladesh"},"cca3":"BGD","capital":["Dhaka"],"region":"Asia","subregion":"Southern Asia","population":164689383,"borders":["MMR","IND"]},{"name":{"common":"Bulgaria"},"cca3":"BGR","capital":["Sofia"],"region":"Europe","subregion":"Southeast Europe","population":6927288,"borders":["GRC","MKD","ROU","SRB","TUR"]},{"name":{"common":"The Bahamas"},"cca3":"BHS","capital":["Nassau"],"region":"Americas","subregion":"Caribbean","population":393248,"borders":[]},{"name":{"common":"Bosnia and Herzegovina"},"cca3":"BIH","capital":["Sarajevo"],"region":"Europe","subregion":"Southeast Europe","population":3280815,"borders":["HRV","MNE","SRB"]},{"name":{"common":"Belarus"},"cca3":"BLR","capital":["Minsk"],"region":"Europe","subregion":"Eastern Europe","population":9398861,"borders":["LVA","LTU","POL","RUS","UKR"]},{"name":{"common":"Belize"},"cca3":"BLZ","capital":["Belmopan"],"region":"Americas","subregion":"Central America","population":397621,"borders":["GTM","MEX"]},{"name":{"common":"Bolivia"},"cca3":"BOL","capital":["Sucre"],"region":"Americas","subregion":"South America","population":11673029,"borders":["ARG","BRA","CHL","PRY","PER"]},{"name":{"common":"Brazil"},"cca3":"BRA","capital":["Brasília"],"region":"Americas","subregion":"South America","population":212559409,"borders":["ARG","BOL","COL","GUF","GUY","PRY","PER","SUR","URY","VEN"]},{"name":{"common":"Barbados"},"cca3":"BRB","capital":["Bridgetown"],"region":"Americas","subregion":"Caribbean","population":287371,"borders":[]},{"name":{"common":"Brunei"},"cca3":"BRN","capital":["Bandar Seri Begawan"],"region":"Asia","subregion":"South-Eastern Asia","population":437483,"borders":["MYS"]},{"name":{"common":"Bhutan"},"cca3":"BTN","capital":["Thimphu"],"region":"Asia","subregion":"Southern Asia","population":771612,"borders":["CHN","IND"]},{"name":{"common":"Botswana"},"cca3":"BWA","capital":["Gaborone"],"region":"Africa","subregion":"Southern Africa","population":2351625,"borders":["NAM","ZAF","ZMB","ZWE"]},{"name":{"common":"Central African Republic"},"cca3":"CAF","capital":["Bangui"],"region":"Africa","subregion":"Middle Africa","population":4829764,"borders":["CMR","TCD","COG","COD","SSD","SDN"]},{"name":{"common":"Canada"},"cca3":"CAN","capital":["Ottawa"],"region":"Americas","subregion":"North America","population":38005238,"borders":["USA"]},{"name":{"common":"Switzerland"},"cca3":"CHE","capital":["Bern"],"region":"Europe","subregion":"Western Europe","population":8654622,"borders":["AUT","FRA","ITA","LIE","DEU"]},{"name":{"common":"Chile"},"cca3":"CHL","capital":["Santiago"],"region":"Americas","subregion":"South America","population":19116209,"borders":["ARG","BOL","PER"]},{"name":{"common":"China"},"cca3":"CHN","capital":["Beijing"],"region":"Asia","subregion":"Eastern Asia","population":1402112000,"borders":["AFG","BTN","MMR","IND","KAZ","PRK","KGZ","LAO","MNG","PAK","RUS","TJK","VNM"]},{"name":{"common":"Ivory Coast"},"cca3":"CIV","capital":["Yamoussoukro"],"region":"Africa","subregion":"Western Africa","population":26378275,"borders":["BFA","GHA","GIN","LBR","MLI"]},{"name":{"common":"Cameroon"},"cca3":"CMR","capital":["Yaoundé"],"region":"Africa","subregion":"Middle Africa","population":26545864,"borders":["CAF","TCD","COG","GNQ","GAB","NGA"]},{"name":{"common":"Democratic Republic of the Congo"},"cca3":"COD","capital":["Kinshasa"],"region":"Africa","subregion":"Middle Africa","population":89561404,"borders":["AGO","BDI","CAF","COG","RWA","SSD","TZA","UGA","ZMB"]},{"name":{"common":"Republic of the Congo"},"cca3":"COG","capital":["Brazzaville"],"region":"Africa","subregion":"Middle Africa","population":5657000,"borders":["AGO","CMR","CAF","COD","GAB"]},{"name":{"common":"Colombia"},"cca3":"COL","capital":["Bogotá"],"region":"Americas","subregion":"South America","population":50882884,"borders":["BRA","ECU","PAN","PER","VEN"]},{"name":{"common":"Costa Rica"},"cca3":"CRI","capital":["San José"],"region":"Americas","subregion":"Central America","population":5094114,"borders":["NIC","PAN"]},{"name":{"common":"Cuba"},"cca3":"CUB","capital":["Havana"],"region":"Americas","subregion":"Caribbean","population":11326616,"borders":[]},{"name":{"common":"Cyprus"},"cca3":"CYP","capital":["Nicosia"],"region":"Europe","subregion":"Southern Europe","population":1207361,"borders":[]},{"name":{"common":"Czechia"},"cca3":"CZE","capital":["Prague"],"region":"Europe","subregion":"Central Europe","population":10698896,"borders":["AUT","DEU","POL","SVK"]},{"name":{"common":"Germany"},"cca3":"DEU","capital":["Berlin"],"region":"Europe","subregion":"Western Europe","population":83240525,"borders":["AUT","BEL","CZE","DNK","FRA","LUX","NLD","POL","CHE"]},{"name":{"common":"Djibouti"},"cca3":"DJI","capital":["Djibouti"],"region":"Africa","subregion":"Eastern Africa","population":988002,"borders":["ERI","ETH","SOM"]},{"name":{"common":"Dominica"},"cca3":"DMA","capital":["Roseau"],"region":"Americas","subregion":"Caribbean","population":71991,"borders":[]},{"name":{"common":"Denmark"},"cca3":"DNK","capital":["Copenhagen"],"region":"Europe","subregion":"Northern Europe","population":5831404,"borders":["DEU"]},{"name":{"common":"Dominican Republic"},"cca3":"DOM","capital":["Santo Domingo"],"region":"Americas","subregion":"Caribbean","population":10847904,"borders":["HTI"]},{"name":{"common":"Algeria"},"cca3":"DZA","capital":["Algiers"],"region":"Africa","subregion":"Northern Africa","population":43851043,"borders":["TUN","LBY","NER","ESH","MRT","MLI","MAR"]},{"name":{"common":"Ecuador"},"cca3":"ECU","capital":["Quito"],"region":"Americas","subregion":"South America","population":17643060,"borders":["COL","PER"]},{"name":{"common":"Egypt"},"cca3":"EGY","capital":["Cairo"],"region":"Africa","subregion":"Northern Africa","population":102334403,"borders":["ISR","LBY","SDN","PSE"]},{"name":{"common":"Eritrea"},"cca3":"ERI","capital":["Asmara"],"region":"Africa","subregion":"Eastern Africa","population":5352000,"borders":["DJI","ETH","SDN"]},{"name":{"common":"Spain"},"cca3":"ESP","capital":["Madrid"],"region":"Europe","subregion":"Southern Europe","population":47351567,"borders":["AND","FRA","GIB","PRT","MAR"]},{"name":{"common":"Estonia"},"cca3":"EST","capital":["Tallinn"],"region":"Europe","subregion":"Northern Europe","population":1331057,"borders":["LVA","RUS"]},{"name":{"common":"Ethiopia"},"cca3":"ETH","capital":["Addis Ababa"],"region":"Africa","subregion":"Eastern Africa","population":114963583,"borders":["DJI","ERI","KEN","SOM","SSD","SDN"]},{"name":{"common":"Finland"},"cca3":"FIN","capital":["Helsinki"],"region":"Europe","subregion":"Northern Europe","population":5530719,"borders":["NOR","SWE","RUS"]},{"name":{"common":"Fiji"},"cca3":"FJI","capital":["Suva"],"region":"Oceania","subregion":"Melanesia","population":896444,"borders":[]},{"name":{"common":"Falkland Islands"},"cca3":"FLK","capital":["Stanley"],"region":"Americas","subregion":"South America","population":2563,"borders":[]},{"name":{"common":"France"},"cca3":"FRA","capital":["Paris"],"region":"Europe","subregion":"Western Europe","population":65273511,"borders":["AND","BEL","DEU","ITA","LUX","MCO","ESP","CHE"]},{"name":{"common":"French Guiana"},"cca3":"GUF","capital":["Cayenne"],"region":"Americas","subregion":"South America","population":294071,"borders":["BRA","SUR"]},{"name":{"common":"Gabon"},"cca3":"GAB","capital":["Libreville"],"region":"Africa","subregion":"Middle Africa","population":2225728,"borders":["CMR","COG","GNQ"]},{"name":{"common":"United Kingdom"},"cca3":"GBR","capital":["London"],"region":"Europe","subregion":"Northern Europe","population":67215293,"borders":["IRL"]},{"name":{"common":"Georgia"},"cca3":"GEO","capital":["Tbilisi"],"region":"Asia","subregion":"Western Asia","population":3714000,"borders":["ARM","AZE","RUS","TUR"]},{"name":{"common":"Ghana"},"cca3":"GHA","capital":["Accra"],"region":"Africa","subregion":"Western Africa","population":31072945,"borders":["BFA","CIV","TGO"]},{"name":{"common":"Guinea"},"cca3":"GIN","capital":["Conakry"],"region":"Africa","subregion":"Western Africa","population":13132792,"borders":["CIV","GNB","LBR","MLI","SEN","SLE"]},{"name":{"common":"Gambia"},"cca3":"GMB","capital":["Banjul"],"region":"Africa","subregion":"Western Africa","population":2416664,"borders":["SEN"]},{"name":{"common":"Guinea-Bissau"},"cca3":"GNB","capital":["Bissau"],"region":"Africa","subregion":"Western Africa","population":1967998,"borders":["GIN","SEN"]},{"name":{"common":"Equatorial Guinea"},"cca3":"GNQ","capital":["Malabo"],"region":"Africa","subregion":"Middle Africa","population":1402985,"borders":["CMR","GAB"]},{"name":{"common":"Greece"},"cca3":"GRC","capital":["Athens"],"region":"Europe","subregion":"Southern Europe","population":10423054,"borders":["ALB","BGR","TUR","MKD"]},{"name":{"common":"Grenada"},"cca3":"GRD","capital":["St. George's"],"region":"Americas","subregion":"Caribbean","population":112519,"borders":[]},{"name":{"common":"Greenland"},"cca3":"GRL","capital":["Nuuk"],"region":"Americas","subregion":"North America","population":56367,"borders":[]},{"name":{"common":"Guatemala"},"cca3":"GTM","capital":["Guatemala City"],"region":"Americas","subregion":"Central America","population":16858333,"borders":["BLZ","SLV","HND","MEX"]},{"name":{"common":"Guyana"},"cca3":"GUY","capital":["Georgetown"],"region":"Americas","subregion":"South America","population":786559,"borders":["BRA","SUR","VEN"]},{"name":{"common":"Honduras"},"cca3":"HND","capital":["Tegucigalpa"],"region":"Americas","subregion":"Central America","population":9904608,"borders":["GTM","SLV","NIC"]},{"name":{"common":"Croatia"},"cca3":"HRV","capital":["Zagreb"],"region":"Europe","subregion":"Southeast Europe","population":4047200,"borders":["BIH","HUN","MNE","SRB","SVN"]},{"name":{"common":"Haiti"},"cca3":"HTI","capital":["Port-au-Prince"],"region":"Americas","subregion":"Caribbean","population":11402533,"borders":["DOM"]},{"name":{"common":"Hungary"},"cca3":"HUN","capital":["Budapest"],"region":"Europe","subregion":"Central Europe","population":9749763,"borders":["AUT","HRV","ROU","SRB","SVK","SVN","UKR"]},{"name":{"common":"Indonesia"},"cca3":"IDN","capital":["Jakarta"],"region":"Asia","subregion":"South-Eastern Asia","population":273523621,"borders":["TLS","MYS","PNG"]},{"name":{"common":"India"},"cca3":"IND","capital":["New Delhi"],"region":"Asia","subregion":"Southern Asia","population":1380004385,"borders":["BGD","BTN","MMR","CHN","NPL","PAK"]},{"name":{"common":"Ireland"},"cca3":"IRL","capital":["Dublin"],"region":"Europe","subregion":"Northern Europe","population":4994724,"borders":["GBR"]},{"name":{"common":"Iran"},"cca3":"IRN","capital":["Tehran"],"region":"Asia","subregion":"Southern Asia","population":83992953,"borders":["AFG","ARM","AZE","IRQ","PAK","TUR","TKM"]},{"name":{"common":"Iraq"},"cca3":"IRQ","capital":["Baghdad"],"region":"Asia","subregion":"Western Asia","population":40222503,"borders":["IRN","JOR","KWT","SAU","SYR","TUR"]},{"name":{"common":"Iceland"},"cca3":"ISL","capital":["Reykjavik"],"region":"Europe","subregion":"Northern Europe","population":366425,"borders":[]},{"name":{"common":"Israel"},"cca3":"ISR","capital":["Jerusalem"],"region":"Asia","subregion":"Western Asia","population":9216900,"borders":["EGY","JOR","LBN","SYR","PSE"]},{"name":{"common":"Italy"},"cca3":"ITA","capital":["Rome"],"region":"Europe","subregion":"Southern Europe","population":59554023,"borders":["AUT","FRA","SMR","SVN","CHE","VAT"]},{"name":{"common":"Jamaica"},"cca3":"JAM","capital":["Kingston"],"region":"Americas","subregion":"Caribbean","population":2961161,"borders":[]},{"name":{"common":"Jordan"},"cca3":"JOR","capital":["Amman"],"region":"Asia","subregion":"Western Asia","population":10203140,"borders":["IRQ","ISR","SAU","SYR","PSE"]},{"name":{"common":"Japan"},"cca3":"JPN","capital":["Tokyo"],"region":"Asia","subregion":"Eastern Asia","population":125836021,"borders":[]},{"name":{"common":"Kazakhstan"},"cca3":"KAZ","capital":["Nur-Sultan"],"region":"Asia","subregion":"Central Asia","population":18754440,"borders":["CHN","KGZ","RUS","TKM","UZB"]},{"name":{"common":"Kenya"},"cca3":"KEN","capital":["Nairobi"],"region":"Africa","subregion":"Eastern Africa","population":53771300,"borders":["ETH","SOM","SSD","TZA","UGA"]},{"name":{"common":"Kyrgyzstan"},"cca3":"KGZ","capital":["Bishkek"],"region":"Asia","subregion":"Central Asia","population":6591600,"borders":["CHN","KAZ","TJK","UZB"]},{"name":{"common":"Cambodia"},"cca3":"KHM","capital":["Phnom Penh"],"region":"Asia","subregion":"South-Eastern Asia","population":16718971,"borders":["LAO","THA","VNM"]},{"name":{"common":"St. Kitts and Nevis"},"cca3":"KNA","capital":["Basseterre"],"region":"Americas","subregion":"Caribbean","population":53192,"borders":[]},{"name":{"common":"Kosovo"},"cca3":"UNK","capital":["Pristina"],"region":"Europe","subregion":"Southeast Europe","population":1775378,"borders":["ALB","MKD","MNE","SRB"]},{"name":{"common":"South Korea"},"cca3":"KOR","capital":["Seoul"],"region":"Asia","subregion":"Eastern Asia","population":51269185,"borders":["PRK"]},{"name":{"common":"Kuwait"},"cca3":"KWT","capital":["Kuwait City"],"region":"Asia","subregion":"Western Asia","population":4270563,"borders":["IRQ","SAU"]},{"name":{"common":"Laos"},"cca3":"LAO","capital":["Viane"],"region":"Asia","subregion":"South-Eastern Asia","population":7275556,"borders":["MMR","KHM","CHN","THA","VNM"]},{"name":{"common":"Lebanon"},"cca3":"LBN","capital":["Beirut"],"region":"Asia","subregion":"Western Asia","population":6825442,"borders":["ISR","SYR"]},{"name":{"common":"Liberia"},"cca3":"LBR","capital":["Monrovia"],"region":"Africa","subregion":"Western Africa","population":5057677,"borders":["GIN","CIV","SLE"]},{"name":{"common":"Libya"},"cca3":"LBY","capital":["Tripoli"],"region":"Africa","subregion":"Northern Africa","population":6871287,"borders":["DZA","TCD","EGY","NER","SDN","TUN"]},{"name":{"common":"Saint Lucia"},"cca3":"LCA","capital":["Castries"],"region":"Americas","subregion":"Caribbean","population":183629,"borders":[]},{"name":{"common":"Sri Lanka"},"cca3":"LKA","capital":["Sri Jayawardenepura Kotte"],"region":"Asia","subregion":"Southern Asia","population":21919000,"borders":[]},{"name":{"common":"Lesotho"},"cca3":"LSO","capital":["Maseru"],"region":"Africa","subregion":"Southern Africa","population":2142252,"borders":["ZAF"]},{"name":{"common":"Lithuania"},"cca3":"LTU","capital":["Vilnius"],"region":"Europe","subregion":"Northern Europe","population":2722289,"borders":["BLR","LVA","POL","RUS"]},{"name":{"common":"Luxembourg"},"cca3":"LUX","capital":["Luxembourg"],"region":"Europe","subregion":"Western Europe","population":632275,"borders":["BEL","FRA","DEU"]},{"name":{"common":"Latvia"},"cca3":"LVA","capital":["Riga"],"region":"Europe","subregion":"Northern Europe","population":1886198,"borders":["BLR","EST","LTU","RUS"]},{"name":{"common":"Morocco"},"cca3":"MAR","capital":["Rabat"],"region":"Africa","subregion":"Northern Africa","population":36910558,"borders":["DZA","ESH","ESP"]},{"name":{"common":"Monaco"},"cca3":"MCO","capital":["Monaco"],"region":"Europe","subregion":"Western Europe","population":39244,"borders":["FRA"]},{"name":{"common":"Moldova"},"cca3":"MDA","capital":["Chișinău"],"region":"Europe","subregion":"Eastern Europe","population":2617820,"borders":["ROU","UKR"]},{"name":{"common":"Madagascar"},"cca3":"MDG","capital":["Antananarivo"],"region":"Africa","subregion":"Eastern Africa","population":27691019,"borders":[]},{"name":{"common":"Mexico"},"cca3":"MEX","capital":["Mexico City"],"region":"Americas","subregion":"North America","population":128932753,"borders":["BLZ","GTM","USA"]},{"name":{"common":"North Macedonia"},"cca3":"MKD","capital":["Skopje"],"region":"Europe","subregion":"Southeast Europe","population":2077132,"borders":["ALB","BGR","GRC","SRB"]},{"name":{"common":"Mali"},"cca3":"MLI","capital":["Bamako"],"region":"Africa","subregion":"Western Africa","population":20250834,"borders":["DZA","BFA","GIN","CIV","MRT","NER","SEN"]},{"name":{"common":"Myanmar"},"cca3":"MMR","capital":["Naypyidaw"],"region":"Asia","subregion":"South-Eastern Asia","population":54409794,"borders":["BGD","CHN","IND","LAO","THA"]},{"name":{"common":"Montenegro"},"cca3":"MNE","capital":["Podgorica"],"region":"Europe","subregion":"Southeast Europe","population":621718,"borders":["ALB","BIH","HRV","SRB"]},{"name":{"common":"Mongolia"},"cca3":"MNG","capital":["Ulan Bator"],"region":"Asia","subregion":"Eastern Asia","population":3278292,"borders":["CHN","RUS"]},{"name":{"common":"Mozambique"},"cca3":"MOZ","capital":["Maputo"],"region":"Africa","subregion":"Eastern Africa","population":31255435,"borders":["MWI","ZAF","SWZ","TZA","ZMB","ZWE"]},{"name":{"common":"Mauritania"},"cca3":"MRT","capital":["Nouakchott"],"region":"Africa","subregion":"Western Africa","population":4649660,"borders":["DZA","MLI","SEN","ESH"]},{"name":{"common":"Malawi"},"cca3":"MWI","capital":["Lilongwe"],"region":"Africa","subregion":"Eastern Africa","population":19129955,"borders":["MOZ","TZA","ZMB"]},{"name":{"common":"Malaysia"},"cca3":"MYS","capital":["Kuala Lumpur"],"region":"Asia","subregion":"South-Eastern Asia","population":32365998,"borders":["BRN","IDN","THA"]},{"name":{"common":"Namibia"},"cca3":"NAM","capital":["Windhoek"],"region":"Africa","subregion":"Southern Africa","population":2540916,"borders":["AGO","BWA","ZAF","ZMB"]},{"name":{"common":"Niger"},"cca3":"NER","capital":["Niamey"],"region":"Africa","subregion":"Western Africa","population":24206636,"borders":["DZA","BEN","BFA","TCD","LBY","MLI","NGA"]},{"name":{"common":"Nigeria"},"cca3":"NGA","capital":["Abuja"],"region":"Africa","subregion":"Western Africa","population":206139587,"borders":["BEN","CMR","TCD","NER"]},{"name":{"common":"Nicaragua"},"cca3":"NIC","capital":["Managua"],"region":"Americas","subregion":"Central America","population":6624554,"borders":["CRI","HND"]},{"name":{"common":"Netherlands"},"cca3":"NLD","capital":["Amsterdam"],"region":"Europe","subregion":"Western Europe","population":17530828,"borders":["BEL","DEU"]},{"name":{"common":"Norway"},"cca3":"NOR","capital":["Oslo"],"region":"Europe","subregion":"Northern Europe","population":5379475,"borders":["FIN","SWE","RUS"]},{"name":{"common":"Nepal"},"cca3":"NPL","capital":["Kathmandu"],"region":"Asia","subregion":"Southern Asia","population":29136808,"borders":["CHN","IND"]},{"name":{"common":"New Zealand"},"cca3":"NZL","capital":["Wellington"],"region":"Oceania","subregion":"Australia and New Zealand","population":5084300,"borders":[]},{"name":{"common":"Oman"},"cca3":"OMN","capital":["Muscat"],"region":"Asia","subregion":"Western Asia","population":5106622,"borders":["SAU","ARE","YEM"]},{"name":{"common":"Pakistan"},"cca3":"PAK","capital":["Islamabad"],"region":"Asia","subregion":"Southern Asia","population":220892331,"borders":["AFG","CHN","IND","IRN"]},{"name":{"common":"Panama"},"cca3":"PAN","capital":["Panama City"],"region":"Americas","subregion":"Central America","population":4314768,"borders":["COL","CRI"]},{"name":{"common":"Peru"},"cca3":"PER","capital":["Lima"],"region":"Americas","subregion":"South America","population":32971846,"borders":["BOL","BRA","CHL","COL","ECU"]},{"name":{"common":"Philippines"},"cca3":"PHL","capital":["Manila"],"region":"Asia","subregion":"South-Eastern Asia","population":109581085,"borders":[]},{"name":{"common":"Papua New Guinea"},"cca3":"PNG","capital":["Port Moresby"],"region":"Oceania","subregion":"Melanesia","population":8947027,"borders":["IDN"]},{"name":{"common":"Poland"},"cca3":"POL","capital":["Warsaw"],"region":"Europe","subregion":"Central Europe","population":37950802,"borders":["BLR","CZE","DEU","LTU","RUS","SVK","UKR"]},{"name":{"common":"Puerto Rico"},"cca3":"PRI","capital":["San Juan"],"region":"Americas","subregion":"Caribbean","population":3194034,"borders":[]},{"name":{"common":"North Korea"},"cca3":"PRK","capital":["Pyongyang"],"region":"Asia","subregion":"Eastern Asia","population":25778815,"borders":["CHN","KOR","RUS"]},{"name":{"common":"Portugal"},"cca3":"PRT","capital":["Lisbon"],"region":"Europe","subregion":"Southern Europe","population":10305564,"borders":["ESP"]},{"name":{"common":"Paraguay"},"cca3":"PRY","capital":["Asunción"],"region":"Americas","subregion":"South America","population":7132530,"borders":["ARG","BOL","BRA"]},{"name":{"common":"Qatar"},"cca3":"QAT","capital":["Doha"],"region":"Asia","subregion":"Western Asia","population":2881060,"borders":["SAU"]},{"name":{"common":"Romania"},"cca3":"ROU","capital":["Bucharest"],"region":"Europe","subregion":"Southeast Europe","population":19286123,"borders":["BGR","HUN","MDA","SRB","UKR"]},{"name":{"common":"Russia"},"cca3":"RUS","capital":["Moscow"],"region":"Europe","subregion":"Eastern Europe","population":144101829,"borders":["AZE","BLR","CHN","EST","FIN","GEO","KAZ","PRK","LVA","LTU","MNG","NOR","POL","UKR"]},{"name":{"common":"Rwanda"},"cca3":"RWA","capital":["Kigali"],"region":"Africa","subregion":"Eastern Africa","population":12952209,"borders":["BDI","COD","TZA","UGA"]},{"name":{"common":"Saudi Arabia"},"cca3":"SAU","capital":["Riyadh"],"region":"Asia","subregion":"Western Asia","population":34813867,"borders":["IRQ","JOR","KWT","OMN","QAT","ARE","YEM"]},{"name":{"common":"Sudan"},"cca3":"SDN","capital":["Khartoum"],"region":"Africa","subregion":"Northern Africa","population":43849269,"borders":["CAF","TCD","EGY","ERI","ETH","LBY","SSD"]},{"name":{"common":"Somaliland"},"cca3":"-99","capital":["Hargeisa"],"region":"Africa","subregion":"Eastern Africa","population":3500000,"borders":["DJI","ETH","SOM"]},{"name":{"common":"South Sudan"},"cca3":"SSD","capital":["Juba"],"region":"Africa","subregion":"Eastern Africa","population":11193729,"borders":["CAF","COD","ETH","KEN","SDN","UGA"]},{"name": {"common": "Senegal"},"cca3": "SEN","capital": ["Dakar"],"region": "Africa","subregion": "Western Africa","population": 16743930,"borders": ["GMB","GIN","GNB","MLI","MRT"]},{"name":{"common":"Singapore"},"cca3":"SGP","capital":["Singapore"],"region":"Asia","subregion":"South-Eastern Asia","population":5685807,"borders":[]},{"name": {"common": "Solomon Islands"},"cca3": "SLB","capital": ["Honiara"],"region": "Oceania","subregion": "Melanesia","population": 686878,"borders": []},{"name": {"common": "Sierra Leone"},"cca3": "SLE","capital": ["Freetown"],"region": "Africa","subregion": "Western Africa","population": 7976993,"borders": ["GIN","LBR"]},{"name": {"common": "El Salvador"},"cca3": "SLV","capital": ["San Salvador"],"region": "Americas","subregion": "Central America","population": 6486201,"borders": ["GTM","HND"]},{"name": {"common": "San Marino"},"cca3": "SMR","capital": ["City of San Marino"],"region": "Europe","subregion": "Southern Europe","population": 33938,"borders": ["ITA"]},{"name": {"common": "Somalia"},"cca3": "SOM","capital": ["Mogadishu"],"region": "Africa","subregion": "Eastern Africa","population": 15893219,"borders": ["DJI","ETH","KEN"]},{"name": {"common":"Republic of Serbia"},"cca3":"SRB","capital":["Belgrade"],"region":"Europe","subregion":"Southeast Europe","population":6908224,"borders":["BIH","BGR","HRV","HUN","UNK","MKD","MNE","ROU"]},{"name": {"common": "Suriname"},"cca3": "SUR","capital": ["Paramaribo"],"region": "Americas","subregion": "South America","population": 586634,"borders": ["BRA","GUF","GUY"]},{"name": {"common": "Slovakia"},"cca3": "SVK","capital": ["Bratislava"],"region": "Europe","subregion": "Central Europe","population": 5458827,"borders": ["AUT","CZE","HUN","POL","UKR"]},{"name": {"common": "Slovenia"},"cca3": "SVN","capital": ["Ljubljana"],"region": "Europe","subregion": "Southern Europe","population": 2100126,"borders": ["AUT","HRV","ITA","HUN"]},{"name": {"common": "Sweden"},"cca3": "SWE","capital": ["Stockholm"],"region": "Europe","subregion": "Northern Europe","population": 10353442,"borders": ["FIN","NOR"]},{"name": {"common":"eSwatini"},"cca3":"SWZ","capital":["Mbabane"],"region":"Africa","subregion":"Southern Africa","population":1160164,"borders":["MOZ","ZAF"]},{"name": {"common": "Syria"},"cca3": "SYR","capital": ["Damascus"],"region": "Asia","subregion":"Western Asia","population": 17500657,"borders": ["IRQ","ISR","JOR","LBN","TUR"]},{"name": {"common": "Chad"},"cca3": "TCD","capital": ["N'Djamena"],"region": "Africa","subregion": "Middle Africa","population": 16425859,"borders": ["CMR","CAF","LBY","NER","NGA","SDN"]},{"name": {"common": "Togo"},"cca3": "TGO","capital": ["Lomé"],"region": "Africa","subregion": "Western Africa","population": 8278737,"borders": ["BEN","BFA","GHA"]},{"name": {"common": "Thailand"},"cca3": "THA","capital": ["Bangkok"],"region": "Asia","subregion": "South-Eastern Asia","population": 69799978,"borders": ["MMR","KHM","LAO","MYS"]},{"name": {"common": "Tajikistan"},"cca3": "TJK","capital": ["Dushanbe"],"region": "Asia","subregion": "Central Asia","population": 9537642,"borders": ["AFG","CHN","KGZ","UZB"]},{"name": {"common": "Turkmenistan"},"cca3": "TKM","capital": ["Ashgabat"],"region": "Asia","subregion":"Central Asia","population": 6031187,"borders": ["AFG","IRN","KAZ","UZB"]},{"name": {"common":"East Timor"},"cca3":"TLS","capital":["Dili"],"region":"Asia","subregion":"South-Eastern Asia","population":1318442,"borders":["IDN"]},{"name": {"common": "Trinidad and Tobago"},"cca3": "TTO","capital": ["Port of Spain"],"region": "Americas","subregion": "Caribbean","population": 1399491,"borders": []},{"name": {"common": "Tunisia"},"cca3": "TUN","capital": ["Tunis"],"region": "Africa","subregion": "Northern Africa","population": 11818618,"borders": ["DZA","LBY"]},{"name": {"common": "Turkey"},"cca3": "TUR","capital": ["Ankara"],"region": "Asia","subregion": "Western Asia","population": 84339067,"borders": ["ARM","AZE","BGR","GEO","GRC","IRN","IRQ","SYR"]},{"name": {"common": "Taiwan"},"cca3": "TWN","capital": ["Taipei"],"region": "Asia","subregion": "Eastern Asia","population": 23503349,"borders": []},{"name": {"common":"United Republic of Tanzania"},"cca3":"TZA","capital":["Dodoma"],"region":"Africa","subregion":"Eastern Africa","population":59734213,"borders":["BDI","COD","KEN","MWI","MOZ","RWA","UGA","ZMB"]},{"name": {"common": "Uganda"},"cca3": "UGA","capital": ["Kampala"],"region": "Africa","subregion": "Eastern Africa","population": 45741000,"borders": ["COD","KEN","RWA","SSD","TZA"]},{"name": {"common": "Ukraine"},"cca3": "UKR","capital": ["Kyiv"],"region": "Europe","subregion": "Eastern Europe","population": 44134693,"borders": ["BLR","HUN","MDA","POL","ROU","RUS","SVK"]},{"name": {"common": "Uruguay"},"cca3": "URY","capital": ["Montevideo"],"region": "Americas","subregion": "South America","population": 3473727,"borders": ["ARG","BRA"]},{"name":{"common":"United States of America"},"cca3":"USA","capital":["Washington, D.C."],"region":"Americas","subregion":"North America","population":329484123,"borders":["CAN","MEX"]},{"name":{"common":"Uzbekistan"},"cca3":"UZB","capital":["Tashkent"],"region":"Asia","subregion":"Central Asia","population":34232050,"borders":["AFG","KAZ","KGZ","TJK","TKM"]},{"name":{"common":"Vatican"},"cca3":"VAT","capital":["Vatican City"],"region":"Europe","subregion":"Southern Europe","population":451,"borders":["ITA"]},{"name":{"common":"St. Vin. and Gren."},"cca3":"VCT","capital":["Kingstown"],"region":"Americas","subregion":"Caribbean","population":110947,"borders":[]},{"name":{"common":"Venezuela"},"cca3":"VEN","capital":["Caracas"],"region":"Americas","subregion":"South America","population":28435943,"borders":["BRA","COL","GUY"]},{"name":{"common":"Vietnam"},"cca3":"VNM","capital":["Hanoi"],"region":"Asia","subregion":"South-Eastern Asia","population":97338583,"borders":["KHM","CHN","LAO"]},{"name":{"common":"Vanuatu"},"cca3":"VUT","capital":["Port Vila"],"region":"Oceania","subregion":"Melanesia","population":307150,"borders":[]},{"name":{"common":"West Bank"},"cca3":"PSE","capital":["Ramallah"],"region":"Asia","subregion":"Western Asia","population":3000000,"borders":["ISR","JOR"]},{"name":{"common":"Western Sahara"},"cca3":"ESH","capital":["El Aaiún"],"region":"Africa","subregion":"Northern Africa","population":510713,"borders":["DZA","MRT","MAR"]},{"name":{"common":"Yemen"},"cca3":"YEM","capital":["Sana'a"],"region":"Asia","subregion":"Western Asia","population":29825968,"borders":["OMN","SAU"]},{"name":{"common":"South Africa"},"cca3":"ZAF","capital":["Pretoria"],"region":"Africa","subregion":"Southern Africa","population":59308690,"borders":["BWA","LSO","MOZ","NAM","SWZ","ZWE"]},{"name":{"common":"Zambia"},"cca3":"ZMB","capital":["Lusaka"],"region":"Africa","subregion":"Eastern Africa","population":18383956,"borders":["AGO","BWA","COD","MWI","MOZ","NAM","TZA","ZWE"]},{"name":{"common":"Zimbabwe"},"cca3":"ZWE","capital":["Harare"],"region":"Africa","subregion":"Eastern Africa","population":14862927,"borders":["BWA","MOZ","ZAF","ZMB"]},
+{"name":{"common":"Bahrain"},"cca3":"BHR","capital":["Manama"],"region":"Asia","subregion":"Western Asia","population":1498712,"borders":[]},
+{"name":{"common":"Cape Verde"},"cca3":"CPV","capital":["Praia"],"region":"Africa","subregion":"Western Africa","population":555988,"borders":[]},
+{"name":{"common":"Comoros"},"cca3":"COM","capital":["Moroni"],"region":"Africa","subregion":"Eastern Africa","population":869595,"borders":[]},
+{"name":{"common":"Kiribati"},"cca3":"KIR","capital":["South Tarawa"],"region":"Oceania","subregion":"Micronesia","population":119446,"borders":[]},
+{"name":{"common":"Liechtenstein"},"cca3":"LIE","capital":["Vaduz"],"region":"Europe","subregion":"Western Europe","population":38137,"borders":["AUT","CHE"]},
+{"name":{"common":"Maldives"},"cca3":"MDV","capital":["Malé"],"region":"Asia","subregion":"Southern Asia","population":540542,"borders":[]},
+{"name":{"common":"Malta"},"cca3":"MLT","capital":["Valletta"],"region":"Europe","subregion":"Southern Europe","population":525285,"borders":[]},
+{"name":{"common":"Marshall Islands"},"cca3":"MHL","capital":["Majuro"],"region":"Oceania","subregion":"Micronesia","population":59194,"borders":[]},
+{"name":{"common":"Mauritius"},"cca3":"MUS","capital":["Port Louis"],"region":"Africa","subregion":"Eastern Africa","population":1265740,"borders":[]},
+{"name":{"common":"Micronesia"},"cca3":"FSM","capital":["Palikir"],"region":"Oceania","subregion":"Micronesia","population":115021,"borders":[]},
+{"name":{"common":"Nauru"},"cca3":"NRU","capital":["Yaren"],"region":"Oceania","subregion":"Micronesia","population":10824,"borders":[]},
+{"name":{"common":"Palau"},"cca3":"PLW","capital":["Ngerulmud"],"region":"Oceania","subregion":"Micronesia","population":18092,"borders":[]},
+{"name":{"common":"Samoa"},"cca3":"WSM","capital":["Apia"],"region":"Oceania","subregion":"Polynesia","population":198410,"borders":[]},
+{"name":{"common":"São Tomé and Principe"},"cca3":"STP","capital":["São Tomé"],"region":"Africa","subregion":"Middle Africa","population":219161,"borders":[]},
+{"name":{"common":"Seychelles"},"cca3":"SYC","capital":["Victoria"],"region":"Africa","subregion":"Eastern Africa","population":98347,"borders":[]},
+{"name":{"common":"Tonga"},"cca3":"TON","capital":["Nuku'alofa"],"region":"Oceania","subregion":"Polynesia","population":105697,"borders":[]},
+{"name":{"common":"Tuvalu"},"cca3":"TUV","capital":["Funafuti"],"region":"Oceania","subregion":"Polynesia","population":11792,"borders":[]}];
+
+        // --- Initial Load ---
+        Promise.all([
+            fetch('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json').then(res => res.json()),
+            fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson').then(res => res.json())
+        ])
+        .then(data => initializeApp(data))
+        .catch(error => {
+            console.error('Failed to load world atlas data:', error);
+            infoContent.innerHTML = `<p class="loading-text">Error: Could not load map data. Please try refreshing the page.</p>`;
+        });
+    </script>
+</body>
+</html>
+
