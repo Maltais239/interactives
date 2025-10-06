@@ -322,6 +322,27 @@
             }));
             geojson = L.geoJson({ type: "FeatureCollection", features: allFeatures }, { style, onEachFeature }).addTo(map);
             
+            // Add a clickable proxy for the Vatican
+            geojson.eachLayer(layer => {
+                if (layer.feature.properties.name === 'Vatican') {
+                    const vaticanCenter = layer.getBounds().getCenter();
+                    const vaticanProxy = L.circleMarker(vaticanCenter, {
+                        radius: 12, // Increased radius for easier clicking
+                        stroke: false,
+                        fill: false,
+                        interactive: true
+                    }).addTo(map);
+
+                    vaticanProxy.on('click', (e) => {
+                        L.DomEvent.stopPropagation(e); // Prevent click from propagating to Italy
+                        onMapClick({ name: 'Vatican' });
+                        // Provide visual feedback for the click
+                        layer.setStyle({ weight: 3, color: '#004d40', dashArray: '', fillOpacity: 0.85 });
+                        setTimeout(() => geojson.resetStyle(layer), 500);
+                    });
+                }
+            });
+
             setMode('explore');
         }
 
@@ -408,7 +429,11 @@
 
             const state = quizState[currentRegion];
             if (!state || state.availableQuestions.length === 0) {
-                questionBox.innerHTML = `You've identified all the countries in ${currentRegion}!`;
+                if (currentRegion === 'Oceania') {
+                     questionBox.innerHTML = `You've identified all the available countries in Oceania! <br><small>(Note: Kiribati, Palau, Tonga, and Samoa have been excluded for better gameplay.)</small>`;
+                } else {
+                    questionBox.innerHTML = `You've identified all the countries in ${currentRegion}!`;
+                }
                 resultBox.innerHTML = `<h2>Congratulations! 🥳</h2>`;
                 playAgainBtn.style.display = 'block';
                 nextQuestionBtn.style.display = 'none';
@@ -424,6 +449,25 @@
             const questionIndex = Math.floor(Math.random() * state.availableQuestions.length);
             currentQuestion = state.availableQuestions.splice(questionIndex, 1)[0];
             
+            // --- Auto-pan for off-screen islands ---
+            const countryDataForPan = countriesData[currentQuestion.answer];
+            if (countryDataForPan && countryDataForPan.region === 'Oceania') {
+                let targetLayerForPan;
+                geojson.eachLayer(layer => {
+                    if (layer.feature.properties.name === currentQuestion.answer) {
+                        targetLayerForPan = layer;
+                    }
+                });
+
+                if (targetLayerForPan) {
+                    const countryBounds = targetLayerForPan.getBounds();
+                    // Check if the country is not reasonably visible in the current map view
+                    if (!map.getBounds().intersects(countryBounds)) {
+                        map.flyToBounds(countryBounds.pad(0.5)); // Zoom to the country with some padding
+                    }
+                }
+            }
+
             // --- Island Hint Logic ---
             const countryData = countriesData[currentQuestion.answer];
             // Check if it's an island (no borders)
@@ -651,7 +695,6 @@
 {"name":{"common":"Bahrain"},"cca3":"BHR","capital":["Manama"],"region":"Asia","subregion":"Western Asia","population":1498712,"borders":[]},
 {"name":{"common":"Cape Verde"},"cca3":"CPV","capital":["Praia"],"region":"Africa","subregion":"Western Africa","population":555988,"borders":[]},
 {"name":{"common":"Comoros"},"cca3":"COM","capital":["Moroni"],"region":"Africa","subregion":"Eastern Africa","population":869595,"borders":[]},
-{"name":{"common":"Kiribati"},"cca3":"KIR","capital":["South Tarawa"],"region":"Oceania","subregion":"Micronesia","population":119446,"borders":[]},
 {"name":{"common":"Liechtenstein"},"cca3":"LIE","capital":["Vaduz"],"region":"Europe","subregion":"Western Europe","population":38137,"borders":["AUT","CHE"]},
 {"name":{"common":"Maldives"},"cca3":"MDV","capital":["Malé"],"region":"Asia","subregion":"Southern Asia","population":540542,"borders":[]},
 {"name":{"common":"Malta"},"cca3":"MLT","capital":["Valletta"],"region":"Europe","subregion":"Southern Europe","population":525285,"borders":[]},
@@ -659,11 +702,8 @@
 {"name":{"common":"Mauritius"},"cca3":"MUS","capital":["Port Louis"],"region":"Africa","subregion":"Eastern Africa","population":1265740,"borders":[]},
 {"name":{"common":"Micronesia"},"cca3":"FSM","capital":["Palikir"],"region":"Oceania","subregion":"Micronesia","population":115021,"borders":[]},
 {"name":{"common":"Nauru"},"cca3":"NRU","capital":["Yaren"],"region":"Oceania","subregion":"Micronesia","population":10824,"borders":[]},
-{"name":{"common":"Palau"},"cca3":"PLW","capital":["Ngerulmud"],"region":"Oceania","subregion":"Micronesia","population":18092,"borders":[]},
-{"name":{"common":"Samoa"},"cca3":"WSM","capital":["Apia"],"region":"Oceania","subregion":"Polynesia","population":198410,"borders":[]},
 {"name":{"common":"São Tomé and Principe"},"cca3":"STP","capital":["São Tomé"],"region":"Africa","subregion":"Middle Africa","population":219161,"borders":[]},
 {"name":{"common":"Seychelles"},"cca3":"SYC","capital":["Victoria"],"region":"Africa","subregion":"Eastern Africa","population":98347,"borders":[]},
-{"name":{"common":"Tonga"},"cca3":"TON","capital":["Nuku'alofa"],"region":"Oceania","subregion":"Polynesia","population":105697,"borders":[]},
 {"name":{"common":"Tuvalu"},"cca3":"TUV","capital":["Funafuti"],"region":"Oceania","subregion":"Polynesia","population":11792,"borders":[]}];
 
         // --- Initial Load ---
