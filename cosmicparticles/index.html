@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Cosmic Canvas v2 - Natural Throw</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        canvas {
+            display: block;
+            cursor: grab;
+        }
+        canvas:active {
+            cursor: grabbing;
+        }
+        .info-box {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            background-color: rgba(10, 20, 30, 0.7);
+            padding: 15px 20px;
+            border-radius: 12px;
+            max-width: 320px;
+            font-size: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px); /* For Safari */
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        h1 {
+            margin-top: 0;
+            font-size: 1.3em;
+            color: #f0f8ff;
+        }
+        p {
+            line-height: 1.6;
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="info-box">
+        <h1>Cosmic Canvas</h1>
+        <p>Drag to attract stardust. Release while moving to "throw" the nebula with natural momentum!</p>
+    </div>
+    <canvas id="cosmicCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('cosmicCanvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // --- Smoothed Velocity Tracking ---
+        // We'll store the last few positions to calculate a smoother velocity
+        const createPointer = () => ({
+            x: null,
+            y: null,
+            vx: 0,
+            vy: 0,
+            history: [],
+            radius: 200,
+            isDown: false,
+        });
+        
+        const pointer = createPointer();
+        const activeTouches = new Map();
+        const VELOCITY_HISTORY_LENGTH = 5;
+
+        // --- Event Listeners ---
+        function updatePointer(p, x, y) {
+            p.x = x;
+            p.y = y;
+            p.history.push({ x, y });
+            if (p.history.length > VELOCITY_HISTORY_LENGTH) {
+                p.history.shift();
+            }
+
+            if (p.history.length > 1) {
+                const first = p.history[0];
+                const last = p.history[p.history.length - 1];
+                p.vx = (last.x - first.x) / p.history.length;
+                p.vy = (last.y - first.y) / p.history.length;
+            }
+        }
+        
+        window.addEventListener('mousemove', (e) => updatePointer(pointer, e.clientX, e.clientY));
+        
+        window.addEventListener('mousedown', (e) => {
+            pointer.isDown = true;
+            updatePointer(pointer, e.clientX, e.clientY); // Reset history on click
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (pointer.isDown) {
+                applyThrowForce(pointer.x, pointer.y, pointer.vx, pointer.vy);
+            }
+            pointer.isDown = false;
+            pointer.vx = 0;
+            pointer.vy = 0;
+            pointer.history = [];
+        });
+
+        window.addEventListener('mouseout', () => {
+            pointer.isDown = false;
+        });
+
+        // Touch support
+        window.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            for (const touch of e.changedTouches) {
+                const newTouch = createPointer();
+                updatePointer(newTouch, touch.clientX, touch.clientY);
+                activeTouches.set(touch.identifier, newTouch);
+            }
+        }, { passive: false });
+        
+        window.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            for (const touch of e.changedTouches) {
+                const trackedTouch = activeTouches.get(touch.identifier);
+                if (trackedTouch) {
+                    updatePointer(trackedTouch, touch.clientX, touch.clientY);
+                }
+            }
+        }, { passive: false });
+
+        const handleTouchEnd = (e) => {
+             e.preventDefault();
+            for (const touch of e.changedTouches) {
+                const trackedTouch = activeTouches.get(touch.identifier);
+                if (trackedTouch) {
+                    applyThrowForce(trackedTouch.x, trackedTouch.y, trackedTouch.vx, trackedTouch.vy);
+                    activeTouches.delete(touch.identifier);
+                }
+            }
+        };
+        window.addEventListener('touchend', handleTouchEnd);
+        window.addEventListener('touchcancel', handleTouchEnd);
+
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            init();
+        });
+
+        let particlesArray;
+        let starsArray;
+
+        // --- Throw Force Function ---
+        function applyThrowForce(x, y, vx, vy) {
+            const throwMultiplier = 1.5; // Adjust for more/less powerful throws
+            const maxThrowVelocity = 30; // Cap the speed
+            
+            let finalVx = vx * throwMultiplier;
+            let finalVy = vy * throwMultiplier;
+
+            // Cap the velocity
+            const speed = Math.sqrt(finalVx * finalVx + finalVy * finalVy);
+            if (speed > maxThrowVelocity) {
+                finalVx = (finalVx / speed) * maxThrowVelocity;
+                finalVy = (finalVy / speed) * maxThrowVelocity;
+            }
+
+            for (const particle of particlesArray) {
+                const dx = x - particle.x;
+                const dy = y - particle.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < pointer.radius) {
+                    // Force falloff: closer particles get more force
+                    const falloff = 1 - (distance / pointer.radius);
+                    particle.vx += finalVx * falloff;
+                    particle.vy += finalVy * falloff;
+                }
+            }
+        }
+
+        // --- Particle Class ---
+        class Particle {
+            constructor(x, y, vx, vy, size, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.size = size;
+                this.color = color;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
+                ctx.fillStyle = this.color;
+                ctx.shadowColor = this.color;
+                ctx.shadowBlur = 10;
+                ctx.fill();
+            }
+
+            update() {
+                // Wall collision
+                if (this.x + this.size > canvas.width || this.x - this.size < 0) this.vx = -this.vx;
+                if (this.y + this.size > canvas.height || this.y - this.size < 0) this.vy = -this.vy;
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                const interactionPoints = [];
+                if (pointer.isDown && pointer.x !== null) {
+                    interactionPoints.push(pointer);
+                }
+                activeTouches.forEach(touch => {
+                    interactionPoints.push(touch);
+                });
+
+                // Apply attraction force
+                for (const point of interactionPoints) {
+                    const dx = point.x - this.x;
+                    const dy = point.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const maxDistance = point.radius;
+
+                    if (distance < maxDistance) {
+                        const forceDirectionX = dx / distance;
+                        const forceDirectionY = dy / distance;
+                        const forceFactor = (maxDistance - distance) / maxDistance;
+                        
+                        this.vx += forceDirectionX * forceFactor * 1.2;
+                        this.vy += forceDirectionY * forceFactor * 1.2;
+                    }
+                }
+                
+                // Apply friction
+                this.vx *= 0.97;
+                this.vy *= 0.97;
+            }
+        }
+        
+        function connectParticles() {
+            const connectDistance = 100;
+            for (let a = 0; a < particlesArray.length; a++) {
+                for (let b = a; b < particlesArray.length; b++) {
+                    const dx = particlesArray[a].x - particlesArray[b].x;
+                    const dy = particlesArray[a].y - particlesArray[b].y;
+                    const distance = Math.sqrt(dx*dx + dy*dy);
+
+                    if (distance < connectDistance) {
+                        const opacity = 1 - (distance / connectDistance);
+                        ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.shadowBlur = 0;
+                        ctx.beginPath();
+                        ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
+                        ctx.lineTo(particlesArray[b].x, particlesArray[b].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+        
+        function drawStars() {
+            ctx.save();
+            ctx.shadowBlur = 0;
+            for (const star of starsArray) {
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        function init() {
+            particlesArray = [];
+            starsArray = [];
+
+            const numberOfStars = (canvas.width * canvas.height) / 8000;
+            for (let i = 0; i < numberOfStars; i++) {
+                const size = Math.random() * 1.5;
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                starsArray.push({ x, y, size });
+            }
+
+            const numberOfParticles = (canvas.width * canvas.height) / 5000; 
+            for (let i = 0; i < numberOfParticles; i++) {
+                const size = Math.random() * 2 + 1;
+                const x = Math.random() * (canvas.width - size * 2) + size;
+                const y = Math.random() * (canvas.height - size * 2) + size;
+                const vx = (Math.random() - 0.5) * 1;
+                const vy = (Math.random() - 0.5) * 1;
+                const color = `hsl(${Math.random() * 360}, 80%, 60%)`;
+                particlesArray.push(new Particle(x, y, vx, vy, size, color));
+            }
+        }
+
+        function animate() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawStars();
+            for (let i = 0; i < particlesArray.length; i++) {
+                particlesArray[i].update();
+                particlesArray[i].draw();
+            }
+            connectParticles();
+            requestAnimationFrame(animate);
+        }
+
+        init();
+        animate();
+    </script>
+</body>
+</html>
