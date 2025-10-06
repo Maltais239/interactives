@@ -11,7 +11,7 @@
     crossorigin=""
   />
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     body, html { 
@@ -175,6 +175,10 @@
       font-weight: 500;
       color: #991b1b;
     }
+    .practice-item small {
+        color: #b91c1c;
+        font-size: 0.8rem;
+    }
     .practice-item:hover {
       background-color: #fee2e2;
       box-shadow: 0 2px 4px rgba(0,0,0,0.05);
@@ -202,11 +206,19 @@
         background: transparent;
         border: none;
         cursor: pointer;
-        transition: color 0.3s, transform 0.3s;
+        transition: color 0.3s, transform 0.3s, text-shadow 0.3s;
     }
     .maple-leaf-icon.quiz-leaf {
         text-shadow: none;
         font-size: 28px;
+    }
+    .maple-leaf-icon.quiz-leaf.guessed-leaf {
+        color: #22c55e; /* Brighter green */
+        text-shadow: 0 0 5px white, 0 0 12px #22c55e, 0 0 18px #22c55e; /* Bolder, layered glow */
+    }
+    .maple-leaf-icon.quiz-leaf.guessed-leaf-wrong {
+        color: #ef4444; /* Red */
+        text-shadow: 0 0 5px white, 0 0 12px #ef4444, 0 0 18px #ef4444; /* Bolder, layered red glow */
     }
     .capital-popup .leaflet-popup-content-wrapper {
         background: #fff;
@@ -310,6 +322,7 @@
     let guessedAnswers = [];
     let capitalMarker = null; // For explore mode
     let capitalQuizMarkers = []; // For quiz mode
+    let practiceCapitalMarker = null; // For showing capitals in practice mode
 
     // --- Data ---
     const provinceData = {
@@ -349,14 +362,12 @@
 
     // --- Game Logic ---
     function setMode(mode) {
-        if (currentMode === 'quiz' && currentQuizType === 'capital') {
-            clearCapitalQuizMarkers();
+        // Clear any persistent practice marker when changing modes
+        if (practiceCapitalMarker) {
+            map.removeLayer(practiceCapitalMarker);
+            practiceCapitalMarker = null;
         }
-        if (currentMode === 'explore' && capitalMarker) {
-            map.removeLayer(capitalMarker);
-            capitalMarker = null;
-        }
-        
+
         currentMode = mode;
         exploreModeBtn.classList.toggle('active', mode === 'explore');
         quizModeBtn.classList.toggle('active', mode === 'quiz');
@@ -366,12 +377,23 @@
         practicePanel.classList.toggle('active', mode === 'practice');
 
         if (mode === 'explore') {
+            if (capitalMarker) {
+                map.removeLayer(capitalMarker);
+                capitalMarker = null;
+            }
+            clearCapitalQuizMarkers();
             showAllCapitalsInExplorePanel();
-        } else if (mode === 'quiz' && availableQuestions.length === 0) {
-            resetQuiz();
-        } else if(mode === 'quiz') {
-            loadNewQuestion();
+        } else if (mode === 'quiz') {
+             if (availableQuestions.length === 0) {
+                resetQuiz();
+             } else {
+                 if(currentQuizType === 'capital' && capitalQuizMarkers.length === 0) {
+                     addCapitalQuizMarkers();
+                 }
+                loadNewQuestion();
+             }
         } else if (mode === 'practice') {
+            clearCapitalQuizMarkers();
             updatePracticePanel();
         }
         
@@ -401,13 +423,13 @@
     }
     
     function setQuizType(type) {
-        clearCapitalQuizMarkers();
         currentQuizType = type;
         quizTypeBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.type === type));
         resetQuiz();
     }
 
     function resetQuiz() {
+        clearCapitalQuizMarkers();
         if (currentQuizType === 'province') {
             questions = Object.keys(provinceData).map(name => ({
                 type: 'province',
@@ -417,10 +439,11 @@
         } else { // capital
             questions = Object.keys(provinceData).map(name => ({
                 type: 'capital',
-                answer: provinceData[name].capital, // The answer is the capital city name
-                province: name, // We need this for the practice bank
+                answer: provinceData[name].capital,
+                province: name,
                 hints: provinceData[name].capital_facts.slice(0, 3)
             }));
+            addCapitalQuizMarkers();
         }
         availableQuestions = [...questions];
         practiceBank = [];
@@ -437,7 +460,6 @@
             nextQuestionBtn.style.display = 'none';
             hintBtn.style.display = 'none';
             isQuizActive = false;
-            clearCapitalQuizMarkers();
             return;
         }
         isQuizActive = true;
@@ -446,12 +468,10 @@
         const questionIndex = Math.floor(Math.random() * availableQuestions.length);
         currentQuestion = availableQuestions.splice(questionIndex, 1)[0];
         
-        clearCapitalQuizMarkers();
         if (currentQuestion.type === 'province') {
             questionBox.innerHTML = `Find <strong>${currentQuestion.answer}</strong>.`;
         } else {
             questionBox.innerHTML = `Click on <strong>${currentQuestion.answer}</strong>.`;
-            addCapitalQuizMarkers();
         }
         
         resultBox.innerHTML = '<p>Click the correct location on the map!</p>';
@@ -480,8 +500,8 @@
             if (incorrectGuesses >= 3) {
                 isQuizActive = false;
                 hintBtn.style.display = 'none';
-                if (!practiceBank.includes(currentQuestion.answer)) {
-                    practiceBank.push(currentQuestion.answer);
+                if (!practiceBank.some(item => item.province === currentQuestion.answer && item.type === 'province')) {
+                    practiceBank.push({ province: currentQuestion.answer, type: 'province' });
                 }
                 justMissed = currentQuestion.answer;
                 geojson.resetStyle();
@@ -501,8 +521,7 @@
             isQuizActive = false;
             hintBtn.style.display = 'none';
             
-            clickedMarker.getElement().style.color = '#16a34a'; // Green
-            clickedMarker.getElement().style.transform = 'scale(1.5)';
+            clickedMarker.getElement().classList.add('guessed-leaf');
             
             resultBox.innerHTML = `<p class="feedback-correct">Correct! It's ${clickedCapital}.</p>`;
             guessedAnswers.push(currentQuestion.answer);
@@ -512,11 +531,14 @@
         } else {
             incorrectGuesses++;
             
-            const originalColor = clickedMarker.getElement().style.color;
-            clickedMarker.getElement().style.color = '#dc2626'; // Red
+            const iconElement = clickedMarker.getElement();
+            if (iconElement.classList.contains('guessed-leaf') || iconElement.classList.contains('guessed-leaf-wrong')) return;
+
+            const originalColor = iconElement.style.color;
+            iconElement.style.color = '#dc2626'; // Red
             setTimeout(() => {
-                if (clickedMarker.getElement().style.color === 'rgb(220, 38, 38)') {
-                     clickedMarker.getElement().style.color = originalColor;
+                if (iconElement.style.color === 'rgb(220, 38, 38)') {
+                     iconElement.style.color = originalColor;
                 }
             }, 1000);
 
@@ -527,17 +549,16 @@
                 isQuizActive = false;
                 hintBtn.style.display = 'none';
 
-                if (!practiceBank.includes(currentQuestion.province)) {
-                    practiceBank.push(currentQuestion.province);
+                if (!practiceBank.some(item => item.province === currentQuestion.province && item.type === 'capital')) {
+                    practiceBank.push({ province: currentQuestion.province, type: 'capital' });
                 }
                 
                 const correctMarker = capitalQuizMarkers.find(m => m.capitalName === currentQuestion.answer);
                 if (correctMarker) {
-                    correctMarker.getElement().style.color = '#16a34a';
-                    correctMarker.getElement().style.transform = 'scale(1.5)';
+                    correctMarker.getElement().classList.add('guessed-leaf-wrong');
                 }
 
-                resultBox.innerHTML = `<p class="feedback-incorrect">The correct answer was <strong>${currentQuestion.answer}</strong>. ${currentQuestion.province} has been added to your practice bank.</p>`;
+                resultBox.innerHTML = `<p class="feedback-incorrect">The correct answer was <strong>${currentQuestion.answer}</strong>. It's now in your practice bank.</p>`;
                 setTimeout(loadNewQuestion, 4000);
             }
         }
@@ -559,20 +580,45 @@
             practiceList.innerHTML = 'Your practice bank is empty.';
             return;
         }
-        practiceBank.sort().forEach(name => {
-            const item = document.createElement('div');
-            item.className = 'practice-item';
-            item.textContent = name;
-            item.addEventListener('click', () => {
+        practiceBank.sort((a, b) => a.province.localeCompare(b.province)).forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'practice-item';
+
+            if (item.type === 'capital') {
+                const capitalName = provinceData[item.province].capital;
+                div.innerHTML = `<strong>${capitalName}</strong> <small>(${item.province})</small>`;
+            } else {
+                div.textContent = item.province;
+            }
+
+            div.addEventListener('click', () => {
+                // Clear previous practice highlight/marker
+                if (practiceCapitalMarker) {
+                    map.removeLayer(practiceCapitalMarker);
+                    practiceCapitalMarker = null;
+                }
+                geojson.resetStyle();
+
+                // Highlight the selected province statically
                 geojson.eachLayer(layer => {
-                    if (layer.feature.properties.name === name) {
-                        map.flyToBounds(layer.getBounds().pad(0.2));
+                    if (layer.feature.properties.name === item.province) {
                         layer.setStyle({ fillColor: '#f59e0b', fillOpacity: 0.9 });
-                        setTimeout(() => geojson.resetStyle(layer), 2000);
                     }
                 });
+
+                // If it's a capital, place a static marker
+                if (item.type === 'capital') {
+                    const data = provinceData[item.province];
+                    const mapleLeafIcon = L.divIcon({
+                        html: '🍁',
+                        className: 'maple-leaf-icon',
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 30],
+                    });
+                    practiceCapitalMarker = L.marker(data.coordinates, { icon: mapleLeafIcon }).addTo(map);
+                }
             });
-            practiceList.appendChild(item);
+            practiceList.appendChild(div);
         });
     }
 
@@ -619,7 +665,6 @@
     }
 
     function addCapitalQuizMarkers() {
-        clearCapitalQuizMarkers();
         for (const provinceName in provinceData) {
             const data = provinceData[provinceName];
             const capitalName = data.capital;
@@ -645,7 +690,7 @@
     }
 
     // --- Map Styling and Interaction ---
-    const palette = ['#e57373', '#ffb74d', '#fff176', '#aed581', '#64b5f6', '#ba68c8', '#ff8a65', '#f06292', '#dce775', '#4dd0e1', '#bcaaa4', '#a5d6a7', '#ce93d8'];
+    const palette = ['#e57373', '#ffb74d', '#fff176', '#aed581', '#64b5f6', '#ba68c8', '#ff8a65', '#f06292', '#dce75', '#4dd0e1', '#bcaaa4', '#a5d6a7', '#ce93d8'];
     const provinceNames = Object.keys(provinceData);
 
     function style(feature) {
@@ -661,11 +706,12 @@
         }
 
         if (currentMode === 'practice') {
+            const isPracticeItem = practiceBank.some(item => item.province === name);
             return {
-                fillColor: practiceBank.includes(name) ? '#ef4444' : '#e0e0e0',
-                weight: practiceBank.includes(name) ? 2 : 0.5,
+                fillColor: isPracticeItem ? '#ef4444' : '#e0e0e0',
+                weight: isPracticeItem ? 2 : 0.5,
                 color: 'white',
-                fillOpacity: practiceBank.includes(name) ? 0.8 : 0.5
+                fillOpacity: isPracticeItem ? 0.8 : 0.5
             };
         }
         
@@ -692,7 +738,7 @@
 
     function highlightFeature(e) {
       if ((currentMode === 'quiz' && !isQuizActive) || currentQuizType === 'capital') return;
-      if (currentMode === 'practice' && !practiceBank.includes(e.target.feature.properties.name)) return;
+      if (currentMode === 'practice' && !practiceBank.some(item => item.province === e.target.feature.properties.name)) return;
       
       const layer = e.target;
       const currentFillColor = layer.options.fillColor;
@@ -758,4 +804,7 @@
   </script>
 </body>
 </html>
+
+
+
 
