@@ -194,6 +194,46 @@
         background-color: #e2e8f0;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
+
+    /* Custom styles for capital marker */
+    .maple-leaf-icon {
+        font-size: 24px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        transition: color 0.3s, transform 0.3s;
+    }
+    .maple-leaf-icon.quiz-leaf {
+        text-shadow: none;
+        font-size: 28px;
+    }
+    .capital-popup .leaflet-popup-content-wrapper {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .capital-popup .leaflet-popup-content {
+        margin: 15px;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        min-width: 200px;
+    }
+    .capital-popup h4 {
+        margin: 0 0 10px 0;
+        color: #b91c1c;
+        border-bottom: 1px solid #fecaca;
+        padding-bottom: 5px;
+    }
+    .capital-popup ul {
+        list-style-type: '🍁';
+        padding-left: 1.5rem;
+        margin: 0;
+    }
+    .capital-popup li {
+        padding-left: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
   </style>
 </head>
 <body>
@@ -268,22 +308,24 @@
     let practiceBank = [];
     let justMissed = null;
     let guessedAnswers = [];
+    let capitalMarker = null; // For explore mode
+    let capitalQuizMarkers = []; // For quiz mode
 
     // --- Data ---
     const provinceData = {
-        'British Columbia': { capital: 'Victoria', population: '5.4M', province_hints: ["Stunning Pacific coastline and mountains.", "Hosted the 2010 Winter Olympics.", "Its capital city is on an island."], capital_hints: ["Named after a British queen.", "Located on the southern tip of Vancouver Island.", "Known for its beautiful gardens."] },
-        'Alberta': { capital: 'Edmonton', population: '4.5M', province_hints: ["Home to the world's largest dinosaur model.", "Famous for oil sands and the Calgary Stampede.", "Home to Banff, Canada's oldest national park."], capital_hints: ["Known as the 'Gateway to the North'.", "Hosts a large summer festival called K-Days.", "Features the largest mall in North America."] },
-        'Saskatchewan': { capital: 'Regina', population: '1.2M', province_hints: ["Known as the 'Land of Living Skies'.", "The only province with entirely man-made borders.", "Major producer of wheat and potash."], capital_hints: ["Home to the RCMP training academy.", "Named for Queen Victoria.", "Wascana Centre is a large urban park located here."] },
-        'Manitoba': { capital: 'Winnipeg', population: '1.4M', province_hints: ["Known as the 'Polar Bear Capital of the World'.", "Located in the longitudinal centre of Canada.", "Its name means 'where the spirit lives' in Cree."], capital_hints: ["Located at the junction of two major rivers.", "Home to the Canadian Museum for Human Rights.", "The historic 'Forks' is a major landmark."] },
-        'Ontario': { capital: 'Toronto', population: '15.3M', province_hints: ["Contains over 250,000 lakes.", "Canada's capital city, Ottawa, is located here.", "Home to the CN Tower."], capital_hints: ["Most populous city in Canada.", "Famous for its multiculturalism and diverse food scene.", "The CN Tower is a defining feature of its skyline."] },
-        'Quebec': { capital: 'Quebec City', population: '8.7M', province_hints: ["Produces over 70% of the world's maple syrup.", "Canada's only predominantly French-speaking province.", "Its flag features a Fleur-de-lis."], capital_hints: ["A historic walled city.", "Overlooks the St. Lawrence River.", "Its winter carnival is world-famous."] },
-        'New Brunswick': { capital: 'Fredericton', population: '800k', province_hints: ["Highest tides on Earth in the Bay of Fundy.", "The only officially bilingual province.", "Borders Quebec to the west and Nova Scotia to the east."], capital_hints: ["Located on the Saint John River.", "Known for its arts and culture scene.", "Home to the Beaverbrook Art Gallery."] },
-        'Nova Scotia': { capital: 'Halifax', population: '1M', province_hints: ["Name is Latin for 'New Scotland'.", "Features the famous Cabot Trail scenic roadway.", "Home to Peggy's Cove lighthouse."], capital_hints: ["A major seaport on the Atlantic Ocean.", "Has a large, historic waterfront.", "Citadel Hill is a prominent historic site."] },
-        'Prince Edward Island': { capital: 'Charlottetown', population: '175k', province_hints: ["Distinct red soil.", "Setting for 'Anne of Green Gables'.", "Smallest province by land area and population."], capital_hints: ["Known as the 'Birthplace of Confederation'.", "A major cruise ship port.", "Province House National Historic Site is here."] },
-        'Newfoundland and Labrador': { capital: 'St. John\'s', population: '530k', province_hints: ["Canada's most easterly province.", "Has its own unique time zone.", "Famous for Gros Morne National Park."], capital_hints: ["One of the oldest cities in North America.", "Known for its colorful houses ('Jellybean Row').", "Signal Hill overlooks the city and harbour."] },
-        'Yukon Territory': { capital: 'Whitehorse', population: '44k', province_hints: ["Home to Mount Logan, Canada's highest mountain.", "Famous for the Klondike Gold Rush.", "Westernmost of Canada's three territories."], capital_hints: ["Named after rapids that resembled a horse's mane.", "Located on the Yukon River.", "Home to the SS Klondike sternwheeler."] },
-        'Northwest Territories': { capital: 'Yellowknife', population: '45k', province_hints: ["See the Aurora Borealis almost 240 nights a year.", "Known as the 'Diamond Capital of North America'.", "Borders Nunavut to the east and Yukon to the west."], capital_hints: ["Located on the shore of Great Slave Lake.", "Known for its houseboat community.", "Capital of its territory since 1967."] },
-        'Nunavut': { capital: 'Iqaluit', population: '40k', province_hints: ["Canada's newest, largest, and northernmost territory.", "Name means 'our land' in Inuktitut.", "The official animal is the Canadian Inuit Dog."], capital_hints: ["Located on Baffin Island.", "Features a unique domed legislative building.", "Its name means 'place of many fish'."] }
+        'British Columbia': { capital: 'Victoria', coordinates: [48.42, -123.36], population: '5.4M', province_hints: ["Stunning Pacific coastline and mountains.", "Hosted the 2010 Winter Olympics.", "Its capital city is on an island."], capital_facts: ["Named after a British queen.", "Located on the southern tip of Vancouver Island.", "Known for its beautiful gardens.", "Home to the world-renowned Butchart Gardens."] },
+        'Alberta': { capital: 'Edmonton', coordinates: [53.54, -113.49], population: '4.5M', province_hints: ["Home to the world's largest dinosaur model.", "Famous for oil sands and the Calgary Stampede.", "Home to Banff, Canada's oldest national park."], capital_facts: ["Known as the 'Gateway to the North'.", "Features the largest mall in North America.", "Has the largest stretch of urban parkland in North America.", "Its professional hockey team is named the Oilers."] },
+        'Saskatchewan': { capital: 'Regina', coordinates: [50.44, -104.61], population: '1.2M', province_hints: ["Known as the 'Land of Living Skies'.", "The only province with entirely man-made borders.", "Major producer of wheat and potash."], capital_facts: ["Home to the RCMP training academy.", "Named for Queen Victoria.", "Wascana Centre is a large urban park located here.", "The Wascana Centre park is larger than Vancouver's Stanley Park."] },
+        'Manitoba': { capital: 'Winnipeg', coordinates: [49.89, -97.13], population: '1.4M', province_hints: ["Known as the 'Polar Bear Capital of the World'.", "Located in the longitudinal centre of Canada.", "Its name means 'where the spirit lives' in Cree."], capital_facts: ["Located at the junction of two major rivers.", "Home to the Canadian Museum for Human Rights.", "The historic 'Forks' is a major landmark.", "The character Winnie-the-Pooh was named after a bear from here."] },
+        'Ontario': { capital: 'Toronto', coordinates: [43.65, -79.38], population: '15.3M', province_hints: ["Contains over 250,000 lakes.", "Canada's capital city, Ottawa, is located here.", "Home to the CN Tower."], capital_facts: ["Most populous city in Canada.", "Famous for its multiculturalism and diverse food scene.", "The CN Tower is a defining feature of its skyline.", "The Rogers Centre was the first stadium with a fully retractable roof."] },
+        'Quebec': { capital: 'Quebec City', coordinates: [46.81, -71.20], population: '8.7M', province_hints: ["Produces over 70% of the world's maple syrup.", "Canada's only predominantly French-speaking province.", "Its flag features a Fleur-de-lis."], capital_facts: ["A historic walled city.", "Overlooks the St. Lawrence River.", "Its winter carnival is world-famous.", "It is the only fortified city north of Mexico."] },
+        'New Brunswick': { capital: 'Fredericton', coordinates: [45.96, -66.64], population: '800k', province_hints: ["Highest tides on Earth in the Bay of Fundy.", "The only officially bilingual province.", "Borders Quebec to the west and Nova Scotia to the east."], capital_facts: ["Located on the Saint John River.", "Known for its arts and culture scene.", "Home to the Beaverbrook Art Gallery.", "Hosts the annual Harvest Jazz & Blues Festival."] },
+        'Nova Scotia': { capital: 'Halifax', coordinates: [44.64, -63.57], population: '1M', province_hints: ["Name is Latin for 'New Scotland'.", "Features the famous Cabot Trail scenic roadway.", "Home to Peggy's Cove lighthouse."], capital_facts: ["A major seaport on the Atlantic Ocean.", "Has a large, historic waterfront.", "Citadel Hill is a prominent historic site.", "Has one of the world's longest natural harbours."] },
+        'Prince Edward Island': { capital: 'Charlottetown', coordinates: [46.23, -63.12], population: '175k', province_hints: ["Distinct red soil.", "Setting for 'Anne of Green Gables'.", "Smallest province by land area and population."], capital_facts: ["Known as the 'Birthplace of Confederation'.", "A major cruise ship port.", "Province House National Historic Site is here.", "Cows Ice Cream, a famous Canadian brand, was founded here."] },
+        'Newfoundland and Labrador': { capital: 'St. John\'s', coordinates: [47.56, -52.70], population: '530k', province_hints: ["Canada's most easterly province.", "Has its own unique time zone.", "Famous for Gros Morne National Park."], capital_facts: ["One of the oldest cities in North America.", "Known for its colorful houses ('Jellybean Row').", "Signal Hill overlooks the city and harbour.", "Cape Spear is the easternmost point in North America."] },
+        'Yukon Territory': { capital: 'Whitehorse', coordinates: [60.72, -135.05], population: '44k', province_hints: ["Home to Mount Logan, Canada's highest mountain.", "Famous for the Klondike Gold Rush.", "Westernmost of Canada's three territories."], capital_facts: ["Named after rapids that resembled a horse's mane.", "Located on the Yukon River.", "Home to the SS Klondike sternwheeler.", "One of the best places in the world to see the Northern Lights."] },
+        'Northwest Territories': { capital: 'Yellowknife', coordinates: [62.45, -114.37], population: '45k', province_hints: ["See the Aurora Borealis almost 240 nights a year.", "Known as the 'Diamond Capital of North America'.", "Borders Nunavut to the east and Yukon to the west."], capital_facts: ["Located on the shore of Great Slave Lake.", "Known for its houseboat community.", "Great Slave Lake is the deepest lake in North America.", "During winter, ice roads are built over frozen lakes."] },
+        'Nunavut': { capital: 'Iqaluit', coordinates: [63.75, -68.51], population: '40k', province_hints: ["Canada's newest, largest, and northernmost territory.", "Name means 'our land' in Inuktitut.", "The official animal is the Canadian Inuit Dog."], capital_facts: ["Located on Baffin Island.", "Features a unique domed legislative building.", "Its name means 'place of many fish'.", "The average temperature in January is around -27°C (-17°F)."] }
     };
     
     let questions = [];
@@ -307,6 +349,14 @@
 
     // --- Game Logic ---
     function setMode(mode) {
+        if (currentMode === 'quiz' && currentQuizType === 'capital') {
+            clearCapitalQuizMarkers();
+        }
+        if (currentMode === 'explore' && capitalMarker) {
+            map.removeLayer(capitalMarker);
+            capitalMarker = null;
+        }
+        
         currentMode = mode;
         exploreModeBtn.classList.toggle('active', mode === 'explore');
         quizModeBtn.classList.toggle('active', mode === 'quiz');
@@ -329,6 +379,11 @@
     }
     
     function showAllCapitalsInExplorePanel() {
+        if (capitalMarker) {
+            map.removeLayer(capitalMarker);
+            capitalMarker = null;
+        }
+        
         let header = '<h3>Provinces, Territories & Capitals</h3><p style="margin-bottom: 1rem;">Click a name below to see it on the map!</p>';
         infoContent.innerHTML = header;
 
@@ -346,6 +401,7 @@
     }
     
     function setQuizType(type) {
+        clearCapitalQuizMarkers();
         currentQuizType = type;
         quizTypeBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.type === type));
         resetQuiz();
@@ -361,9 +417,9 @@
         } else { // capital
             questions = Object.keys(provinceData).map(name => ({
                 type: 'capital',
-                question_subject: provinceData[name].capital,
-                answer: name,
-                hints: provinceData[name].capital_hints
+                answer: provinceData[name].capital, // The answer is the capital city name
+                province: name, // We need this for the practice bank
+                hints: provinceData[name].capital_facts.slice(0, 3)
             }));
         }
         availableQuestions = [...questions];
@@ -381,6 +437,7 @@
             nextQuestionBtn.style.display = 'none';
             hintBtn.style.display = 'none';
             isQuizActive = false;
+            clearCapitalQuizMarkers();
             return;
         }
         isQuizActive = true;
@@ -389,10 +446,12 @@
         const questionIndex = Math.floor(Math.random() * availableQuestions.length);
         currentQuestion = availableQuestions.splice(questionIndex, 1)[0];
         
+        clearCapitalQuizMarkers();
         if (currentQuestion.type === 'province') {
             questionBox.innerHTML = `Find <strong>${currentQuestion.answer}</strong>.`;
         } else {
-            questionBox.innerHTML = `Which province or territory's capital is <strong>${currentQuestion.question_subject}</strong>?`;
+            questionBox.innerHTML = `Click on <strong>${currentQuestion.answer}</strong>.`;
+            addCapitalQuizMarkers();
         }
         
         resultBox.innerHTML = '<p>Click the correct location on the map!</p>';
@@ -432,6 +491,57 @@
             }
         }
     }
+    
+    function checkCapitalAnswer(clickedMarker) {
+        if (!isQuizActive) return;
+
+        const clickedCapital = clickedMarker.capitalName;
+
+        if (clickedCapital === currentQuestion.answer) {
+            isQuizActive = false;
+            hintBtn.style.display = 'none';
+            
+            clickedMarker.getElement().style.color = '#16a34a'; // Green
+            clickedMarker.getElement().style.transform = 'scale(1.5)';
+            
+            resultBox.innerHTML = `<p class="feedback-correct">Correct! It's ${clickedCapital}.</p>`;
+            guessedAnswers.push(currentQuestion.answer);
+
+            setTimeout(loadNewQuestion, 1500);
+
+        } else {
+            incorrectGuesses++;
+            
+            const originalColor = clickedMarker.getElement().style.color;
+            clickedMarker.getElement().style.color = '#dc2626'; // Red
+            setTimeout(() => {
+                if (clickedMarker.getElement().style.color === 'rgb(220, 38, 38)') {
+                     clickedMarker.getElement().style.color = originalColor;
+                }
+            }, 1000);
+
+            resultBox.innerHTML = `<p class="feedback-incorrect">Not quite! That was ${clickedCapital}. Try again! (${incorrectGuesses}/3)</p>`;
+            showHint();
+
+            if (incorrectGuesses >= 3) {
+                isQuizActive = false;
+                hintBtn.style.display = 'none';
+
+                if (!practiceBank.includes(currentQuestion.province)) {
+                    practiceBank.push(currentQuestion.province);
+                }
+                
+                const correctMarker = capitalQuizMarkers.find(m => m.capitalName === currentQuestion.answer);
+                if (correctMarker) {
+                    correctMarker.getElement().style.color = '#16a34a';
+                    correctMarker.getElement().style.transform = 'scale(1.5)';
+                }
+
+                resultBox.innerHTML = `<p class="feedback-incorrect">The correct answer was <strong>${currentQuestion.answer}</strong>. ${currentQuestion.province} has been added to your practice bank.</p>`;
+                setTimeout(loadNewQuestion, 4000);
+            }
+        }
+    }
 
     function showHint() {
         if (!isQuizActive) return;
@@ -466,6 +576,74 @@
         });
     }
 
+    // --- Explore Mode Logic ---
+    function showProvinceDetails(name) {
+        if (capitalMarker) {
+            map.removeLayer(capitalMarker);
+            capitalMarker = null;
+        }
+
+        const data = provinceData[name];
+        if (data) {
+            // Update the info panel
+            const backButton = `<button id="back-to-list-btn" class="mode-btn" style="margin-top: 1rem; width: 100%; background-color: #6b7280; color: white;">&larr; Back to Full List</button>`;
+            infoContent.innerHTML = `<h3>${name}</h3><p><strong>Capital:</strong> ${data.capital}</p><p><strong>Population:</strong> ~${data.population}</p><p style="font-style: italic; color: #4b5563;">Click the 🍁 marker on the map for capital city facts!</p>${backButton}`;
+            
+            // Add capital marker
+            if (data.coordinates) {
+                const mapleLeafIcon = L.divIcon({
+                    html: '🍁',
+                    className: 'maple-leaf-icon',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 30],
+                    popupAnchor: [0, -30]
+                });
+
+                capitalMarker = L.marker(data.coordinates, { icon: mapleLeafIcon }).addTo(map);
+                
+                const popupContent = `
+                    <h4>Facts about ${data.capital}</h4>
+                    <ul>
+                        ${data.capital_facts.map(fact => `<li>${fact}</li>`).join('')}
+                    </ul>
+                `;
+                capitalMarker.bindPopup(popupContent, { className: 'capital-popup' });
+            }
+        }
+    }
+    
+    // --- Capital Quiz Markers ---
+    function clearCapitalQuizMarkers() {
+        capitalQuizMarkers.forEach(marker => map.removeLayer(marker));
+        capitalQuizMarkers = [];
+    }
+
+    function addCapitalQuizMarkers() {
+        clearCapitalQuizMarkers();
+        for (const provinceName in provinceData) {
+            const data = provinceData[provinceName];
+            const capitalName = data.capital;
+
+            const mapleLeafIcon = L.divIcon({
+                html: '🍁',
+                className: 'maple-leaf-icon quiz-leaf',
+                iconSize: [30, 30],
+                iconAnchor: [15, 30]
+            });
+
+            const marker = L.marker(data.coordinates, { icon: mapleLeafIcon }).addTo(map);
+            marker.capitalName = capitalName;
+            marker.provinceName = provinceName;
+
+            marker.on('click', () => {
+                if (isQuizActive) {
+                    checkCapitalAnswer(marker);
+                }
+            });
+            capitalQuizMarkers.push(marker);
+        }
+    }
+
     // --- Map Styling and Interaction ---
     const palette = ['#e57373', '#ffb74d', '#fff176', '#aed581', '#64b5f6', '#ba68c8', '#ff8a65', '#f06292', '#dce775', '#4dd0e1', '#bcaaa4', '#a5d6a7', '#ce93d8'];
     const provinceNames = Object.keys(provinceData);
@@ -473,6 +651,15 @@
     function style(feature) {
         const name = feature.properties.name;
         
+        if (currentMode === 'quiz' && currentQuizType === 'capital') {
+            return {
+                fillColor: '#bdbdbd',
+                weight: 1,
+                color: 'white',
+                fillOpacity: 0.4
+            };
+        }
+
         if (currentMode === 'practice') {
             return {
                 fillColor: practiceBank.includes(name) ? '#ef4444' : '#e0e0e0',
@@ -504,7 +691,7 @@
     }
 
     function highlightFeature(e) {
-      if (currentMode === 'quiz' && !isQuizActive) return;
+      if ((currentMode === 'quiz' && !isQuizActive) || currentQuizType === 'capital') return;
       if (currentMode === 'practice' && !practiceBank.includes(e.target.feature.properties.name)) return;
       
       const layer = e.target;
@@ -519,18 +706,9 @@
     
     function onMapClick(featureProps) {
         const name = featureProps.name;
-        if (currentMode === 'explore' || currentMode === 'practice') {
-            const data = provinceData[name];
-            if(data) {
-                const backButton = `<button id="back-to-list-btn" class="mode-btn" style="margin-top: 1rem; width: 100%; background-color: #6b7280; color: white;">&larr; Back to Full List</button>`;
-                infoContent.innerHTML = `<h3>${name}</h3><p><strong>Capital:</strong> ${data.capital}</p><p><strong>Population:</strong> ~${data.population}</p>${backButton}`;
-                
-                // Add event listener for the new button, only if in explore mode
-                if (currentMode === 'explore') {
-                    document.getElementById('back-to-list-btn').addEventListener('click', showAllCapitalsInExplorePanel);
-                }
-            }
-        } else if (currentMode === 'quiz') {
+        if (currentMode === 'explore') {
+            showProvinceDetails(name);
+        } else if (currentMode === 'quiz' && currentQuizType === 'province') {
             checkAnswer(name);
         }
     }
@@ -548,6 +726,11 @@
     quizTypeBtns.forEach(btn => btn.addEventListener('click', () => setQuizType(btn.dataset.type)));
 
     infoContent.addEventListener('click', (e) => {
+        if (e.target.id === 'back-to-list-btn') {
+            showAllCapitalsInExplorePanel();
+            return;
+        }
+
         if (currentMode !== 'explore') return;
         const target = e.target.closest('.explore-item');
         if (target && target.dataset.provinceName) {
@@ -555,13 +738,9 @@
             geojson.eachLayer(layer => {
                 if (layer.feature.properties.name === provinceName) {
                     map.flyToBounds(layer.getBounds().pad(0.2));
-                    // Temporarily highlight the clicked province
-                    layer.setStyle({ fillColor: '#f59e0b', fillOpacity: 0.9 });
-                    setTimeout(() => {
-                       geojson.resetStyle(layer);
-                    }, 2000);
                 }
             });
+            showProvinceDetails(provinceName);
         }
     });
 
@@ -579,6 +758,4 @@
   </script>
 </body>
 </html>
-
-
 
