@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vocabulary Matching Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            touch-action: none;
+        }
+        canvas {
+            background-color: #f0f9ff; /* sky-blue-50 */
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            cursor: grab;
+        }
+        .action-button {
+            transition: all 0.2s ease-in-out;
+        }
+        .action-button:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .action-button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div class="container mx-auto px-4 py-4 text-center">
+        <header class="mb-4">
+            <div class="bg-teal-600 text-white inline-block px-6 py-2 rounded-xl shadow-lg">
+                <h1 class="text-2xl font-bold">Vocabulary Rounds</h1>
+            </div>
+        </header>
+
+        <section id="start-screen" class="mb-4 p-4 rounded-xl">
+            <h2 id="start-title" class="text-xl font-semibold text-gray-700 mb-3">Import a custom set or play with the default!</h2>
+            <div class="flex justify-center items-center gap-4">
+                 <button id="import-json-btn" class="action-button bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 text-lg rounded-lg shadow-md">Import Custom Set (.json)</button>
+                <button id="start-game-button" class="action-button bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 text-lg rounded-lg shadow-md">Start Game</button>
+            </div>
+            <input type="file" id="json-importer" class="hidden" accept=".json">
+        </section>
+        
+        <main id="game-container" class="hidden flex flex-col items-center">
+            <div id="hud" class="flex justify-between items-center mb-2 text-gray-800 font-semibold text-lg" style="width: 900px;">
+                <div id="round-display">Round: 1</div>
+                <div id="timer-display">Time: 0s</div>
+                <div id="best-time-display">Best: N/A</div>
+            </div>
+             <canvas id="game-canvas"></canvas>
+        </main>
+    </div>
+
+    <script>
+        const startScreen = document.getElementById('start-screen');
+        const startGameButton = document.getElementById('start-game-button');
+        const importJsonButton = document.getElementById('import-json-btn');
+        const jsonImporter = document.getElementById('json-importer');
+        const startTitle = document.getElementById('start-title');
+        const gameContainer = document.getElementById('game-container');
+        const roundDisplay = document.getElementById('round-display');
+        const timerDisplay = document.getElementById('timer-display');
+        const bestTimeDisplay = document.getElementById('best-time-display');
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Master list of all vocabulary. Will be populated by import or default.
+        let MASTER_VOCABULARY = [
+            { term: 'Map', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F5FA.svg', definition: 'A drawing that shows where places are on Earth.' },
+            { term: 'Landmark', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F5FC.svg', definition: 'An important place or building that is easy to recognize.' },
+            { term: 'Settlement', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F3E0.svg', definition: 'A community or place where people build homes and live.' },
+            { term: 'Territory', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F3DD.svg', definition: 'An area of land that belongs to a group of people.' },
+        ];
+        let ROUND_SIZES = [4];
+
+        let workingVocabulary = [];
+        let gameObjects = [];
+        let images = {};
+        let draggedObject = null;
+        let offsetX, offsetY;
+        let timerInterval = null;
+        let secondsElapsed = 0;
+        let currentRound = 0;
+
+        const CARD_WIDTH = 150;
+        const CARD_HEIGHT = 120;
+        const PADDING = 20;
+        canvas.width = 900;
+        canvas.height = 550;
+
+        // --- Import Logic ---
+        importJsonButton.addEventListener('click', () => {
+            jsonImporter.click();
+        });
+
+        jsonImporter.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (!Array.isArray(importedData) || importedData.some(item => !item.term || !item.definition || !item.imageSrc)) {
+                       throw new Error("Invalid JSON format.");
+                    }
+                    MASTER_VOCABULARY = importedData;
+                    
+                    // Dynamically calculate round sizes
+                    ROUND_SIZES = [];
+                    let remaining = MASTER_VOCABULARY.length;
+                    while (remaining > 0) {
+                        const roundSize = Math.min(4, remaining);
+                        ROUND_SIZES.push(roundSize);
+                        remaining -= roundSize;
+                    }
+                    
+                    startTitle.textContent = `✅ ${MASTER_VOCABULARY.length} cards loaded! Ready to play!`;
+                    startGameButton.disabled = false;
+                } catch (error) {
+                    console.error("Failed to parse JSON:", error);
+                    startTitle.textContent = "❌ Error: Could not load the file. Please check the format.";
+                }
+            };
+            reader.readAsText(file);
+        });
+        
+        // --- Game Logic (mostly unchanged) ---
+        function preloadImages(vocabulary, callback) {
+            let loadedCount = 0;
+            const totalImages = vocabulary.length;
+            if (totalImages === 0) { callback(); return; }
+            vocabulary.forEach(item => {
+                const img = new Image();
+                // Base64 images don't need crossOrigin, but doesn't hurt.
+                if (!item.imageSrc.startsWith('data:')) {
+                    img.crossOrigin = "Anonymous";
+                }
+                img.src = item.imageSrc;
+                const onImageLoad = () => {
+                    loadedCount++;
+                    if (loadedCount === totalImages) callback();
+                };
+                img.onload = () => { images[item.term] = img; onImageLoad(); };
+                img.onerror = () => { console.error(`Failed to load image for ${item.term}`); onImageLoad(); }
+            });
+        }
+        
+        function isOverlapping(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width && rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height && rect1.y + rect1.height > rect2.y;
+        }
+
+        function setupGameObjects(vocabulary) {
+            gameObjects = [];
+            let placedObjects = [];
+            const createObject = (item, type) => {
+                let newObj, overlapping;
+                do {
+                    overlapping = false;
+                    const x = PADDING + Math.random() * (canvas.width - CARD_WIDTH - PADDING * 2);
+                    const y = PADDING + Math.random() * (canvas.height - CARD_HEIGHT - PADDING * 2);
+                    newObj = {
+                        id: `${item.term}-${type}`, term: item.term, type: type,
+                        content: type === 'term' ? item.term : item.definition,
+                        x, y, width: CARD_WIDTH, height: CARD_HEIGHT, isMatched: false,
+                    };
+                    for (const placed of placedObjects) {
+                        if (isOverlapping(newObj, placed)) { overlapping = true; break; }
+                    }
+                } while (overlapping);
+                placedObjects.push(newObj);
+                return newObj;
+            };
+            vocabulary.forEach(item => {
+                gameObjects.push(createObject(item, 'term'));
+                gameObjects.push(createObject(item, 'definition'));
+            });
+        }
+
+        function startRound() {
+            const vocabularyForRound = workingVocabulary.splice(0, ROUND_SIZES[currentRound - 1]);
+            preloadImages(vocabularyForRound, () => {
+                setupGameObjects(vocabularyForRound);
+                secondsElapsed = 0;
+                if (timerInterval) clearInterval(timerInterval);
+                timerInterval = setInterval(() => {
+                    secondsElapsed++;
+                    timerDisplay.textContent = `Time: ${secondsElapsed}s`;
+                }, 1000);
+                draw();
+            });
+        }
+
+        function startNextRound() {
+            currentRound++;
+            if (currentRound > ROUND_SIZES.length) {
+                showFinalWinScreen();
+                return;
+            }
+            roundDisplay.textContent = `Round: ${currentRound}`;
+            timerDisplay.textContent = `Time: 0s`;
+            const bestTime = localStorage.getItem(`bestTime_round_${currentRound}`) || 'N/A';
+            bestTimeDisplay.textContent = `Best: ${bestTime === 'N/A' ? 'N/A' : bestTime + 's'}`;
+            startRound();
+        }
+        
+        function wrapText(context, text, x, y, maxWidth, lineHeight) {
+            const words = text.split(' ');
+            let line = '';
+            let lines = [];
+            for (let n = 0; n < words.length; n++) {
+                let testLine = line + words[n] + ' ';
+                if (context.measureText(testLine).width > maxWidth && n > 0) {
+                    lines.push(line);
+                    line = words[n] + ' ';
+                } else {
+                    line = testLine;
+                }
+            }
+            lines.push(line);
+            
+            context.textBaseline = 'middle';
+            const totalHeight = lines.length * lineHeight;
+            let startY = y - totalHeight / 2 + lineHeight / 2;
+
+            for(let i = 0; i < lines.length; i++) {
+                context.fillText(lines[i].trim(), x, startY + i * lineHeight);
+            }
+        }
+        
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            gameObjects.forEach(obj => { if (!obj.isMatched && obj !== draggedObject) drawCard(obj); });
+            if (draggedObject) drawCard(draggedObject);
+        }
+
+        function drawCard(obj) {
+            ctx.lineWidth = 3;
+            ctx.fillStyle = obj.type === 'term' ? '#f3f4f6' : '#eef2ff';
+            ctx.strokeStyle = obj.type === 'term' ? '#4b5563' : '#6366f1';
+            
+            ctx.beginPath();
+            ctx.roundRect(obj.x, obj.y, obj.width, obj.height, [12]);
+            ctx.stroke();
+            ctx.fill();
+
+            ctx.fillStyle = '#1f2937';
+            ctx.textAlign = 'center';
+
+            if (obj.type === 'term') {
+                const img = images[obj.term];
+                if (img) {
+                    const imgHeight = obj.height * 0.5;
+                    const scale = Math.min((obj.width * 0.7) / img.width, imgHeight / img.height);
+                    ctx.drawImage(img, obj.x + (obj.width - img.width * scale) / 2, obj.y + 10, img.width * scale, img.height * scale);
+                }
+                ctx.font = 'bold 16px Poppins';
+                wrapText(ctx, obj.content, obj.x + obj.width / 2, obj.y + obj.height - 25, obj.width - 20, 18);
+            } else {
+                ctx.font = '15px Poppins';
+                wrapText(ctx, obj.content, obj.x + obj.width / 2, obj.y + obj.height / 2, obj.width - 20, 18);
+            }
+        }
+
+        function checkRoundWinCondition() {
+            if (gameObjects.length === 0) return;
+            if (gameObjects.every(obj => obj.isMatched)) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+                
+                const bestTime = localStorage.getItem(`bestTime_round_${currentRound}`);
+                if (!bestTime || secondsElapsed < parseInt(bestTime)) {
+                    localStorage.setItem(`bestTime_round_${currentRound}`, secondsElapsed);
+                }
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 40px Poppins';
+                ctx.textAlign = 'center';
+                ctx.fillText(`Round ${currentRound} Complete!`, canvas.width / 2, canvas.height / 2);
+                
+                setTimeout(startNextRound, 2000);
+            }
+        }
+
+        function showFinalWinScreen() {
+             gameContainer.classList.add('hidden');
+             startScreen.classList.remove('hidden');
+             startScreen.querySelector('h2').textContent = "🎉 You completed the game! Well done! 🎉";
+             startGameButton.textContent = "Play Again";
+        }
+        
+        function initGame() {
+            workingVocabulary = JSON.parse(JSON.stringify(MASTER_VOCABULARY));
+            currentRound = 0;
+            startScreen.classList.add('hidden');
+            gameContainer.classList.remove('hidden');
+            startNextRound();
+        }
+
+        function getMousePos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+            const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+
+        function onDown(evt) {
+            if (!timerInterval) return;
+            const pos = getMousePos(evt);
+            for (let i = gameObjects.length - 1; i >= 0; i--) {
+                const obj = gameObjects[i];
+                if (!obj.isMatched && pos.x > obj.x && pos.x < obj.x + obj.width && pos.y > obj.y && pos.y < obj.y + obj.height) {
+                    draggedObject = obj;
+                    offsetX = pos.x - obj.x;
+                    offsetY = pos.y - obj.y;
+                    canvas.style.cursor = 'grabbing';
+                    break;
+                }
+            }
+        }
+
+        function onMove(evt) {
+            if (draggedObject) {
+                const pos = getMousePos(evt);
+                draggedObject.x = pos.x - offsetX;
+                draggedObject.y = pos.y - offsetY;
+                draw();
+            }
+        }
+
+        function onUp() {
+            canvas.style.cursor = 'grab';
+            if (draggedObject) {
+                const dropTarget = gameObjects.find(obj => obj !== draggedObject && !obj.isMatched &&
+                    obj.term === draggedObject.term && isOverlapping(draggedObject, obj));
+
+                if (dropTarget) {
+                    draggedObject.isMatched = true;
+                    dropTarget.isMatched = true;
+                }
+                draggedObject = null;
+                draw();
+                checkRoundWinCondition();
+            }
+        }
+        
+        startGameButton.addEventListener('click', initGame);
+        canvas.addEventListener('mousedown', onDown);
+        canvas.addEventListener('mousemove', onMove);
+        canvas.addEventListener('mouseup', onUp);
+        canvas.addEventListener('mouseleave', onUp);
+        canvas.addEventListener('touchstart', onDown);
+        canvas.addEventListener('touchmove', onMove);
+        canvas.addEventListener('touchend', onUp);
+    </script>
+</body>
+</html>
