@@ -101,22 +101,49 @@
     .draggable-label.placed {
         display: none; /* Hide label from bank once placed */
     }
+
+    /* --- THE DEFINITIVE LABEL FIX --- */
     .placed-map-label {
-        background-color: #dcfce7; /* Light green */
-        border: 1px solid #15803d; /* Darker green */
+        box-sizing: border-box;
+        position: relative;
+        background-color: #dcfce7;
+        border: 1px solid #15803d;
         border-radius: 6px;
-        padding: 3px 8px;
-        font-size: 13px;
-        font-weight: 600;
-        color: #14532d; /* Dark green text */
-        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-        text-align: center;
+        color: #14532d;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         white-space: nowrap;
+        font-weight: 600;
+        font-size: 13px;
+        padding: 4px 8px;
+        
+        /* New Method: Use Flexbox for robust centering */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        /* Center the entire label box on the map coordinate. */
+        transform: translate(-50%, -50%);
     }
+
     .placed-map-label.small-font {
         font-size: 10px;
-        padding: 2px 5px;
+        padding: 3px 6px;
     }
+    
+    /* This rule prevents Leaflet from adding a background/border to its container */
+    /* Let Leaflet divIcons size to their HTML content (fixes tiny 12×12 default) */
+.label-icon.leaflet-div-icon {
+        background: transparent;
+        border: none;
+        width: auto !important;
+        height: auto !important;
+        pointer-events: none; /* labels shouldn't block map */
+}
+
+/* Keep backward compatibility if any default class slips through */
+.leaflet-div-icon { background: transparent; border: none; }
+    /* --- END OF FIX --- */
+
     /* This is the visual clone for touch dragging */
     .touch-clone {
         position: absolute;
@@ -127,7 +154,6 @@
         z-index: 10000;
         transform: translate(-50%, -50%); /* Center on finger */
     }
-    /* --- End Drag and Drop Styles --- */
 
     #result-box p.feedback-correct { color: #166534; font-weight: bold; }
     #result-box p.feedback-incorrect { color: #991b1b; font-weight: bold; }
@@ -184,19 +210,30 @@
     let draggedProvinceName = null; // The name of the province being dragged
     
     const nameAbbreviations = {
+        'British Columbia': 'B.C.',
+        'Saskatchewan': 'Sask.',
         'Newfoundland and Labrador': 'Nfld. & Lab.',
         'Prince Edward Island': 'P.E.I.',
         'Northwest Territories': 'N.W.T.',
-        'Yukon Territory': 'Yukon'
+        'Yukon Territory': 'Yukon',
+        'New Brunswick': 'N.B.',
+        'Nova Scotia': 'N.S.'
     };
     
     const customCentroids = {
         'British Columbia': [55, -125],
         'Newfoundland and Labrador': [50, -56],
-        'Quebec': [54, -72],
+        'Quebec': [53, -71],
+        'Ontario': [51, -86],
+        'Manitoba': [55, -97],
+        'Saskatchewan': [54, -106],
+        'Alberta': [55, -115],
         'Nunavut': [67, -95],
         'Northwest Territories': [65, -120],
-        'Prince Edward Island': [46.35, -63.5]
+        'Yukon Territory': [64, -135],
+        'Prince Edward Island': [46.5, -63.5],
+        'Nova Scotia': [45, -63],
+        'New Brunswick': [46.5, -66]
     };
 
     const provinceNames = ['British Columbia', 'Alberta', 'Saskatchewan', 'Manitoba', 'Ontario', 'Quebec', 'New Brunswick', 'Nova Scotia', 'Prince Edward Island', 'Newfoundland and Labrador', 'Yukon Territory', 'Northwest Territories', 'Nunavut'];
@@ -231,10 +268,19 @@
         if (!droppedProvinceName) return;
 
         let targetProvince = null;
-        // Find which GeoJSON layer contains the drop coordinates
+        let minDistance = Infinity;
+
+        // Find which GeoJSON layer's center is closest to the drop coordinates
         geojson.eachLayer(layer => {
             if (layer.getBounds().contains(latLng)) {
-                 targetProvince = layer.feature.properties.name;
+                const center = provinceCentroids[layer.feature.properties.name];
+                if (center) {
+                    const distance = latLng.distanceTo(center);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        targetProvince = layer.feature.properties.name;
+                    }
+                }
             }
         });
 
@@ -245,22 +291,23 @@
             
             let labelClassName = 'placed-map-label';
             const smallProvinces = ['Nova Scotia', 'New Brunswick', 'Prince Edward Island'];
-            // Use a smaller font for provinces with long names or that are physically small
             if (droppedProvinceName.length > 18 || smallProvinces.includes(droppedProvinceName)) {
                 labelClassName += ' small-font';
             }
 
             const displayName = nameAbbreviations[droppedProvinceName] || droppedProvinceName;
-
+            
             const icon = L.divIcon({
-                className: labelClassName,
-                html: displayName,
+                className: 'label-icon',
+                html: `<div class="${labelClassName}">${displayName}</div>`,
+                iconSize: null,           // allow content to define size
+                iconAnchor: [0, 0]        // we'll center via CSS transform on inner div
             });
+
             const marker = L.marker(provinceCentroids[droppedProvinceName], { icon: icon, interactive: false }).addTo(map);
             placedLabels.push(marker);
             resultBox.innerHTML = `<p class="feedback-correct">Correct! ${droppedProvinceName} is placed.</p>`;
 
-            // Check for win condition
             const allPlaced = Array.from(labelBank.children).every(child => child.classList.contains('placed'));
             if (allPlaced) {
                 resultBox.innerHTML = `<h3>Congratulations!</h3><p>You've labeled all of Canada!</p>`;
@@ -296,7 +343,10 @@
     map.getContainer().addEventListener('drop', (e) => {
         e.preventDefault();
         const droppedProvinceName = e.dataTransfer.getData('text/plain');
-        const latLng = map.containerPointToLatLng([e.clientX, e.clientY]);
+        // Convert from viewport coords to map-container coords before projecting to lat/lng
+        const rect = map.getContainer().getBoundingClientRect();
+        const containerPoint = [e.clientX - rect.left, e.clientY - rect.top];
+        const latLng = map.containerPointToLatLng(containerPoint);
         checkAndPlaceLabel(droppedProvinceName, latLng);
     });
 
@@ -306,24 +356,21 @@
             const labelEl = e.target;
             draggedProvinceName = labelEl.dataset.province;
 
-            // Create a visual clone of the label to drag around
             touchClone = labelEl.cloneNode(true);
             touchClone.classList.add('touch-clone');
             document.body.appendChild(touchClone);
             
-            // Position the clone
             const touch = e.touches[0];
             touchClone.style.left = `${touch.clientX}px`;
             touchClone.style.top = `${touch.clientY}px`;
             
-            // Hide the original slightly
             labelEl.style.opacity = '0.5';
         }
     }, { passive: true });
 
     document.addEventListener('touchmove', (e) => {
         if (touchClone) {
-            e.preventDefault(); // Prevent page from scrolling
+            e.preventDefault();
             const touch = e.touches[0];
             touchClone.style.left = `${touch.clientX}px`;
             touchClone.style.top = `${touch.clientY}px`;
@@ -332,16 +379,16 @@
 
     document.addEventListener('touchend', (e) => {
         if (touchClone) {
-            // Find the element that was being touched
             const labelEl = labelBank.querySelector(`[data-province="${draggedProvinceName}"]`);
             if (labelEl) labelEl.style.opacity = '1';
 
             const touch = e.changedTouches[0];
-            const latLng = map.containerPointToLatLng([touch.clientX, touch.clientY]);
+            const rect = map.getContainer().getBoundingClientRect();
+            const containerPoint = [touch.clientX - rect.left, touch.clientY - rect.top];
+            const latLng = map.containerPointToLatLng(containerPoint);
             
             checkAndPlaceLabel(draggedProvinceName, latLng);
 
-            // Cleanup
             document.body.removeChild(touchClone);
             touchClone = null;
             draggedProvinceName = null;
@@ -355,11 +402,9 @@
       .then(res => res.json())
       .then(data => { 
         geojson = L.geoJson(data, { style: style, interactive: false }).addTo(map);
-        // Calculate and store the center point of each province for placing labels
         geojson.eachLayer(layer => {
             const name = layer.feature.properties.name;
             if (provinceNames.includes(name)) {
-                // Use the custom coordinate if it exists, otherwise calculate the center
                 provinceCentroids[name] = customCentroids[name] ? L.latLng(customCentroids[name]) : layer.getBounds().getCenter();
             }
         });
@@ -372,9 +417,4 @@
   </script>
 </body>
 </html>
-
-
-
-
-
 
