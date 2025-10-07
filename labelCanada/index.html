@@ -50,6 +50,49 @@
       padding-bottom: 0.5rem;
       margin-bottom: 1rem;
     }
+
+    #timer-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        background-color: #f8fafc;
+        padding: 0.75rem;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        gap: 1rem; /* Add space between elements */
+    }
+    #race-btn {
+        padding: 0.5rem 1rem;
+        color: white;
+        background-color: #3b82f6; /* A nice blue */
+        border: none;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    #race-btn:hover {
+        background-color: #2563eb;
+    }
+    #timer {
+        display: none; /* Initially hidden */
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #374151;
+        font-family: 'ui-monospace', 'SFMono-Regular', Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    #best-time-display {
+        font-size: 0.9rem;
+        color: #475569;
+        font-weight: 500;
+        display: none; /* Hidden until a best time is set */
+    }
+    #best-time {
+        font-weight: 700;
+        color: #1e293b;
+    }
     
     #result-box h3 { 
       margin-top: 0;
@@ -130,18 +173,17 @@
         padding: 3px 6px;
     }
     
-    /* This rule prevents Leaflet from adding a background/border to its container */
     /* Let Leaflet divIcons size to their HTML content (fixes tiny 12×12 default) */
-.label-icon.leaflet-div-icon {
+    .label-icon.leaflet-div-icon {
         background: transparent;
         border: none;
         width: auto !important;
         height: auto !important;
         pointer-events: none; /* labels shouldn't block map */
-}
+    }
 
-/* Keep backward compatibility if any default class slips through */
-.leaflet-div-icon { background: transparent; border: none; }
+    /* Keep backward compatibility if any default class slips through */
+    .leaflet-div-icon { background: transparent; border: none; }
     /* --- END OF FIX --- */
 
     /* This is the visual clone for touch dragging */
@@ -181,6 +223,12 @@
   <div id="info-panel">
     <h2>Canada Labeling Challenge</h2>
     
+    <div id="timer-controls">
+        <button id="race-btn">Want to race? ⏱️</button>
+        <div id="timer">0.0s</div>
+        <div id="best-time-display">Best: <span id="best-time">--</span></div>
+    </div>
+
     <div id="result-box"></div>
     <div id="label-bank"><!-- Draggable labels appear here --></div>
     <button id="play-again-btn">Play Again? ↻</button>
@@ -201,6 +249,10 @@
     const resultBox = document.getElementById('result-box');
     const playAgainBtn = document.getElementById('play-again-btn');
     const labelBank = document.getElementById('label-bank');
+    const timerEl = document.getElementById('timer');
+    const raceBtn = document.getElementById('race-btn');
+    const bestTimeDisplay = document.getElementById('best-time-display');
+    const bestTimeEl = document.getElementById('best-time');
 
     // --- App State ---
     let geojson;
@@ -208,6 +260,9 @@
     let provinceCentroids = {};
     let touchClone = null; // For the visual element being dragged on touch
     let draggedProvinceName = null; // The name of the province being dragged
+    let timerInterval = null;
+    let startTime = 0;
+    let bestTime = localStorage.getItem('canadaLabelBestTime') || Infinity;
     
     const nameAbbreviations = {
         'British Columbia': 'B.C.',
@@ -243,7 +298,17 @@
 
     // --- Game Logic ---
     function startGame() {
+        // Stop any active timer
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+
+        // Reset UI elements to default state
         playAgainBtn.style.display = 'none';
+        raceBtn.style.display = 'block';
+        timerEl.style.display = 'none';
+        timerEl.textContent = '0.0s';
         resultBox.innerHTML = '<p>Drag the labels from the bank onto the correct province or territory.</p>';
         
         // Clear old map labels
@@ -262,6 +327,22 @@
             labelEl.dataset.province = name;
             labelBank.appendChild(labelEl);
         });
+    }
+
+    function startRace() {
+        // Reset board & state before starting
+        startGame(); 
+        
+        // Set up race state
+        raceBtn.style.display = 'none';
+        timerEl.style.display = 'block';
+        resultBox.innerHTML = '<p>Go! Place all the labels as fast as you can!</p>';
+
+        startTime = Date.now();
+        timerInterval = setInterval(() => {
+            const elapsed = (Date.now() - startTime) / 1000;
+            timerEl.textContent = `${elapsed.toFixed(1)}s`;
+        }, 100);
     }
 
     function checkAndPlaceLabel(droppedProvinceName, latLng) {
@@ -300,7 +381,7 @@
             const icon = L.divIcon({
                 className: 'label-icon',
                 html: `<div class="${labelClassName}">${displayName}</div>`,
-                iconSize: null,           // allow content to define size
+                iconSize: null,         // allow content to define size
                 iconAnchor: [0, 0]        // we'll center via CSS transform on inner div
             });
 
@@ -310,8 +391,24 @@
 
             const allPlaced = Array.from(labelBank.children).every(child => child.classList.contains('placed'));
             if (allPlaced) {
-                resultBox.innerHTML = `<h3>Congratulations!</h3><p>You've labeled all of Canada!</p>`;
                 playAgainBtn.style.display = 'block';
+                if (timerInterval) { // It was a race
+                    clearInterval(timerInterval);
+                    const finalTime = (Date.now() - startTime) / 1000;
+                    timerInterval = null; // Mark timer as stopped
+
+                    if (finalTime < bestTime) {
+                        bestTime = finalTime;
+                        localStorage.setItem('canadaLabelBestTime', bestTime);
+                        bestTimeEl.textContent = `${bestTime.toFixed(1)}s`;
+                        bestTimeDisplay.style.display = 'block';
+                        resultBox.innerHTML = `<h3>New Record!</h3><p>You finished in ${finalTime.toFixed(1)} seconds!</p>`;
+                    } else {
+                        resultBox.innerHTML = `<h3>Congratulations!</h3><p>You finished in ${finalTime.toFixed(1)} seconds!</p>`;
+                    }
+                } else { // Not a race
+                    resultBox.innerHTML = `<h3>Congratulations!</h3><p>You've labeled all of Canada!</p>`;
+                }
             }
         } else {
             resultBox.innerHTML = `<p class="feedback-incorrect">Not quite! That's not the right spot for ${droppedProvinceName}. Try again.</p>`;
@@ -396,8 +493,16 @@
     });
     
     playAgainBtn.addEventListener('click', startGame);
+    raceBtn.addEventListener('click', startRace);
 
     // --- Initial Load ---
+    function loadBestTime() {
+        if (bestTime !== Infinity) {
+            bestTimeDisplay.style.display = 'block';
+            bestTimeEl.textContent = `${parseFloat(bestTime).toFixed(1)}s`;
+        }
+    }
+
     fetch('https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@master/public/data/canada.geojson')
       .then(res => res.json())
       .then(data => { 
@@ -409,6 +514,7 @@
             }
         });
         startGame();
+        loadBestTime();
       })
       .catch(err => { 
         console.error('GeoJSON load error:', err); 
@@ -417,4 +523,6 @@
   </script>
 </body>
 </html>
+
+
 
