@@ -1,262 +1,380 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Draggable Canada Puzzle</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-    <style>
-        body,
-        html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            font-family: 'Poppins', sans-serif;
-            background-color: #f0f4f8;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Canada Labeling Challenge</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body, html { 
+      margin: 0; 
+      padding: 0; 
+      width: 100%; 
+      height: 100%; 
+      display: flex; 
+      font-family: 'Poppins', sans-serif;
+      background-color: #f0f4f8;
+      overflow: hidden; /* Important for a full-screen app feel */
+    }
+    #map { 
+      flex: 1; 
+      height: 100%;
+      border-right: 1px solid #ddd;
+      background-color: #aadaff;
+    }
+    #info-panel {
+      width: 380px;
+      max-width: 40%;
+      padding: 2rem;
+      background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+      border-left: 5px solid #d91e2a; /* Canadian Red */
+      overflow-y: auto;
+      box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+    }
+    #info-panel h2 { 
+      margin-top: 0; 
+      color: #374151; 
+      font-size: 1.75rem; 
+      font-weight: 700;
+      border-bottom: 2px solid #ef4444;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    #result-box h3 { 
+      margin-top: 0;
+      margin-bottom: 1rem; 
+      color: #b91c1c; 
+      font-size: 1.5rem; 
+      font-weight: 600;
+    }
+     #result-box p { 
+      font-size: 1rem; 
+      line-height: 1.6; 
+      margin: 0.5rem 0 1rem 0; 
+      color: #374151;
+      min-height: 50px; /* Reserve space for feedback */
+    }
+    
+    /* --- Drag and Drop Styles --- */
+    #label-bank {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding: 1rem;
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        margin-top: 1rem;
+    }
+    .draggable-label {
+        padding: 0.5rem 0.75rem;
+        background-color: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        cursor: grab;
+        font-weight: 500;
+        color: #334155;
+        user-select: none;
+        transition: background-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+        white-space: nowrap; /* Prevent text from wrapping */
+    }
+    .draggable-label:hover {
+        background-color: #f1f5f9;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .draggable-label.dragging {
+        opacity: 0.5;
+        background-color: #e2e8f0;
+        cursor: grabbing;
+    }
+    .draggable-label.placed {
+        display: none; /* Hide label from bank once placed */
+    }
+    .placed-map-label {
+        background-color: #dcfce7; /* Light green */
+        border: 1px solid #15803d; /* Darker green */
+        border-radius: 6px;
+        padding: 3px 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #14532d; /* Dark green text */
+        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+        text-align: center;
+        white-space: nowrap;
+    }
+    .placed-map-label.small-font {
+        font-size: 10px;
+        padding: 2px 5px;
+    }
+    /* This is the visual clone for touch dragging */
+    .touch-clone {
+        position: absolute;
+        top: 0;
+        left: 0;
+        opacity: 0.8;
+        pointer-events: none; /* So it doesn't interfere with drop detection */
+        z-index: 10000;
+        transform: translate(-50%, -50%); /* Center on finger */
+    }
+    /* --- End Drag and Drop Styles --- */
 
-        #header {
-            padding: 1rem;
-            text-align: center;
-            color: #374151;
-            background-color: #ffffff;
-            width: 100%;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            border-bottom: 3px solid #d91e2a;
-        }
-
-        #header h1 {
-            margin: 0;
-            font-size: 1.75rem;
-        }
-        #header p {
-            margin: 0.25rem 0 0 0;
-            color: #6b7280;
-        }
-
-        #canvas-container {
-            flex-grow: 1;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        canvas {
-            display: block;
-            background: linear-gradient(135deg, #aadaff 0%, #dce7ff 100%);
-            border-radius: 12px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-        }
-    </style>
+    #result-box p.feedback-correct { color: #166534; font-weight: bold; }
+    #result-box p.feedback-incorrect { color: #991b1b; font-weight: bold; }
+    
+    #play-again-btn {
+        margin-top: auto; /* Pushes button to the bottom */
+        padding-top: 1rem;
+        width: 100%;
+        display: none; /* Hidden initially */
+        padding: 0.75rem;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s, opacity 0.2s;
+        background-color: #16a34a;
+    }
+    #play-again-btn:hover { background-color: #15803d; }
+  </style>
 </head>
 <body>
-    <div id="header">
-        <h1>Canadian Province Puzzle</h1>
-        <p>Click and drag the pieces to assemble the map of Canada!</p>
-    </div>
-    <div id="canvas-container" touch-action="none"></div>
+  <div id="map"></div>
+  <div id="info-panel">
+    <h2>Canada Labeling Challenge</h2>
+    
+    <div id="result-box"></div>
+    <div id="label-bank"><!-- Draggable labels appear here --></div>
+    <button id="play-again-btn">Play Again? ↻</button>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  </div>
 
-    <script>
-        // --- Basic Setup ---
-        const container = document.getElementById('canvas-container');
-        let scene, camera, renderer, raycaster, mouse;
-        let provinceMeshes = [];
-        let selectedObject = null;
-        let offset = new THREE.Vector3();
-        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo" crossorigin=""></script>
+  <script>
+    const map = L.map('map', { zoomControl: false }).setView([62, -98], 4);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 10,
+      minZoom: 3,
+    }).addTo(map);
 
-        // --- Palette for provinces ---
-        const palette = ['#e57373', '#ffb74d', '#fff176', '#aed581', '#64b5f6', '#ba68c8', '#ff8a65', '#f06292', '#dce775', '#4dd0e1', '#bcaaa4', '#a5d6a7', '#ce93d8'];
+    // --- DOM Elements ---
+    const resultBox = document.getElementById('result-box');
+    const playAgainBtn = document.getElementById('play-again-btn');
+    const labelBank = document.getElementById('label-bank');
 
-        function init() {
-            // --- Scene and Camera ---
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xf0f4f8);
+    // --- App State ---
+    let geojson;
+    let placedLabels = [];
+    let provinceCentroids = {};
+    let touchClone = null; // For the visual element being dragged on touch
+    let draggedProvinceName = null; // The name of the province being dragged
+    
+    const nameAbbreviations = {
+        'Newfoundland and Labrador': 'Nfld. & Lab.',
+        'Prince Edward Island': 'P.E.I.',
+        'Northwest Territories': 'N.W.T.',
+        'Yukon Territory': 'Yukon'
+    };
+    
+    const customCentroids = {
+        'British Columbia': [55, -125],
+        'Newfoundland and Labrador': [50, -56],
+        'Quebec': [54, -72],
+        'Nunavut': [67, -95],
+        'Northwest Territories': [65, -120],
+        'Prince Edward Island': [46.35, -63.5]
+    };
 
-            const aspect = container.clientWidth / container.clientHeight;
-            const frustumSize = 150;
-            camera = new THREE.OrthographicCamera(
-                frustumSize * aspect / -2,
-                frustumSize * aspect / 2,
-                frustumSize / 2,
-                frustumSize / -2,
-                1,
-                1000
-            );
-            camera.position.z = 5;
+    const provinceNames = ['British Columbia', 'Alberta', 'Saskatchewan', 'Manitoba', 'Ontario', 'Quebec', 'New Brunswick', 'Nova Scotia', 'Prince Edward Island', 'Newfoundland and Labrador', 'Yukon Territory', 'Northwest Territories', 'Nunavut'];
 
-            // --- Renderer ---
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(container.clientWidth, container.clientHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            const canvasElement = renderer.domElement;
-            container.appendChild(canvasElement);
-            
-            // --- Raycaster and Mouse ---
-            raycaster = new THREE.Raycaster();
-            mouse = new THREE.Vector2();
+    // --- Utility ---
+    const shuffleArray = (array) => array.sort(() => Math.random() - 0.5);
 
-            // --- Event Listeners ---
-            canvasElement.addEventListener('pointerdown', onPointerDown);
-            canvasElement.addEventListener('pointermove', onPointerMove);
-            canvasElement.addEventListener('pointerup', onPointerUp);
-            window.addEventListener('resize', onWindowResize);
-            
-            // --- Initial Load ---
-            loadGeoData();
-        }
-
-        function loadGeoData() {
-            fetch('https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@master/public/data/canada.geojson')
-                .then(res => res.json())
-                .then(data => {
-                    processGeoJSON(data);
-                    animate();
-                })
-                .catch(err => {
-                    console.error('GeoJSON load error:', err);
-                    container.innerHTML = '<p>Error loading map data. Please refresh.</p>';
-                });
-        }
-
-        function processGeoJSON(data) {
-            // Find the bounding box of the entire country to scale it properly
-            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-            data.features.forEach(feature => {
-                const coords = feature.geometry.coordinates;
-                const type = feature.geometry.type;
-                const polygons = (type === 'Polygon') ? [coords] : coords;
-                
-                polygons.forEach(polygon => {
-                    polygon[0].forEach(point => {
-                        minX = Math.min(minX, point[0]);
-                        maxX = Math.max(maxX, point[0]);
-                        minY = Math.min(minY, point[1]);
-                        maxY = Math.max(maxY, point[1]);
-                    });
-                });
-            });
-
-            const scale = 140; // Arbitrary scale factor for the puzzle size
-            const offsetX = (minX + maxX) / 2;
-            const offsetY = (minY + maxY) / 2;
-
-            data.features.forEach((feature, index) => {
-                const color = new THREE.Color(palette[index % palette.length]);
-                const geometry = feature.geometry;
-                const polygons = (geometry.type === 'Polygon') ? [geometry.coordinates] : geometry.coordinates;
-
-                polygons.forEach(polygonCoords => {
-                    const shape = new THREE.Shape();
-                    // Outer boundary
-                    polygonCoords[0].forEach((p, i) => {
-                        const x = (p[0] - offsetX) * (scale / (maxX - minX));
-                        const y = (p[1] - offsetY) * (scale / (maxY - minY)) * 1.5; // Adjust for aspect ratio
-                        if (i === 0) shape.moveTo(x, y);
-                        else shape.lineTo(x, y);
-                    });
-
-                    // Holes
-                    for (let i = 1; i < polygonCoords.length; i++) {
-                        const holePath = new THREE.Path();
-                        polygonCoords[i].forEach((p, j) => {
-                           const x = (p[0] - offsetX) * (scale / (maxX - minX));
-                           const y = (p[1] - offsetY) * (scale / (maxY - minY)) * 1.5;
-                           if (j === 0) holePath.moveTo(x, y);
-                           else holePath.lineTo(x, y);
-                        });
-                        shape.holes.push(holePath);
-                    }
-                    
-                    const shapeGeom = new THREE.ShapeGeometry(shape);
-                    const material = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide });
-                    const mesh = new THREE.Mesh(shapeGeom, material);
-                    
-                    // Assign random starting positions
-                    mesh.position.x = (Math.random() - 0.5) * 120;
-                    mesh.position.y = (Math.random() - 0.5) * 80;
-                    
-                    // Store province name for potential future use (e.g., tooltips)
-                    mesh.userData.name = feature.properties.name;
-                    
-                    scene.add(mesh);
-                    provinceMeshes.push(mesh);
-                });
-            });
-        }
+    // --- Game Logic ---
+    function startGame() {
+        playAgainBtn.style.display = 'none';
+        resultBox.innerHTML = '<p>Drag the labels from the bank onto the correct province or territory.</p>';
         
-        // --- Interaction ---
-        function updateMousePosition(event) {
-            const rect = renderer.domElement.getBoundingClientRect();
-            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-        }
+        // Clear old map labels
+        placedLabels.forEach(label => map.removeLayer(label));
+        placedLabels = [];
+        if (geojson) geojson.resetStyle();
+
+        // Create and add new draggable labels
+        labelBank.innerHTML = '';
+        const labels = shuffleArray([...provinceNames]);
+        labels.forEach(name => {
+            const labelEl = document.createElement('div');
+            labelEl.className = 'draggable-label';
+            labelEl.textContent = name;
+            labelEl.draggable = true;
+            labelEl.dataset.province = name;
+            labelBank.appendChild(labelEl);
+        });
+    }
+
+    function checkAndPlaceLabel(droppedProvinceName, latLng) {
+        if (!droppedProvinceName) return;
+
+        let targetProvince = null;
+        // Find which GeoJSON layer contains the drop coordinates
+        geojson.eachLayer(layer => {
+            if (layer.getBounds().contains(latLng)) {
+                 targetProvince = layer.feature.properties.name;
+            }
+        });
+
+        const labelElement = labelBank.querySelector(`.draggable-label[data-province="${droppedProvinceName}"]`);
         
-        function onPointerDown(event) {
-            updateMousePosition(event);
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(provinceMeshes, true);
-
-            if (intersects.length > 0) {
-                // Bring selected piece to the front
-                selectedObject = intersects[0].object;
-                const group = selectedObject.parent;
-                group.remove(selectedObject);
-                group.add(selectedObject);
-                
-                // Calculate offset from object center to click point
-                const intersectionPoint = new THREE.Vector3();
-                raycaster.ray.intersectPlane(plane, intersectionPoint);
-                offset.copy(intersectionPoint).sub(selectedObject.position);
+        if (targetProvince && droppedProvinceName === targetProvince) {
+            labelElement.classList.add('placed');
+            
+            let labelClassName = 'placed-map-label';
+            const smallProvinces = ['Nova Scotia', 'New Brunswick', 'Prince Edward Island'];
+            // Use a smaller font for provinces with long names or that are physically small
+            if (droppedProvinceName.length > 18 || smallProvinces.includes(droppedProvinceName)) {
+                labelClassName += ' small-font';
             }
-        }
 
-        function onPointerMove(event) {
-            if (selectedObject) {
-                updateMousePosition(event);
-                raycaster.setFromCamera(mouse, camera);
+            const displayName = nameAbbreviations[droppedProvinceName] || droppedProvinceName;
 
-                const intersectionPoint = new THREE.Vector3();
-                if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
-                    selectedObject.position.copy(intersectionPoint).sub(offset);
-                }
+            const icon = L.divIcon({
+                className: labelClassName,
+                html: displayName,
+            });
+            const marker = L.marker(provinceCentroids[droppedProvinceName], { icon: icon, interactive: false }).addTo(map);
+            placedLabels.push(marker);
+            resultBox.innerHTML = `<p class="feedback-correct">Correct! ${droppedProvinceName} is placed.</p>`;
+
+            // Check for win condition
+            const allPlaced = Array.from(labelBank.children).every(child => child.classList.contains('placed'));
+            if (allPlaced) {
+                resultBox.innerHTML = `<h3>Congratulations!</h3><p>You've labeled all of Canada!</p>`;
+                playAgainBtn.style.display = 'block';
             }
+        } else {
+            resultBox.innerHTML = `<p class="feedback-incorrect">Not quite! That's not the right spot for ${droppedProvinceName}. Try again.</p>`;
         }
+    }
 
-        function onPointerUp() {
-            selectedObject = null;
+    // --- Map Styling ---
+    function style(feature) {
+      return { fillColor: '#bdbdbd', weight: 1.5, color: 'white', fillOpacity: 0.5 };
+    }
+
+    // --- Mouse Drag and Drop Listeners ---
+    labelBank.addEventListener('dragstart', (e) => {
+        if (e.target.classList.contains('draggable-label')) {
+            e.target.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', e.target.dataset.province);
+            e.dataTransfer.effectAllowed = 'move';
         }
+    });
 
-        // --- Window Resizing ---
-        function onWindowResize() {
-            const aspect = container.clientWidth / container.clientHeight;
-            camera.left = -75 * aspect;
-            camera.right = 75 * aspect;
-            camera.top = 75;
-            camera.bottom = -75;
-            camera.updateProjectionMatrix();
-            renderer.setSize(container.clientWidth, container.clientHeight);
+    labelBank.addEventListener('dragend', (e) => {
+        if (e.target.classList.contains('draggable-label')) {
+            e.target.classList.remove('dragging');
         }
+    });
+    
+    map.getContainer().addEventListener('dragover', (e) => e.preventDefault());
+    
+    map.getContainer().addEventListener('drop', (e) => {
+        e.preventDefault();
+        const droppedProvinceName = e.dataTransfer.getData('text/plain');
+        const latLng = map.containerPointToLatLng([e.clientX, e.clientY]);
+        checkAndPlaceLabel(droppedProvinceName, latLng);
+    });
 
-        // --- Animation Loop ---
-        function animate() {
-            requestAnimationFrame(animate);
-            renderer.render(scene, camera);
+    // --- Touch Event Listeners ---
+    labelBank.addEventListener('touchstart', (e) => {
+        if (e.target.classList.contains('draggable-label')) {
+            const labelEl = e.target;
+            draggedProvinceName = labelEl.dataset.province;
+
+            // Create a visual clone of the label to drag around
+            touchClone = labelEl.cloneNode(true);
+            touchClone.classList.add('touch-clone');
+            document.body.appendChild(touchClone);
+            
+            // Position the clone
+            const touch = e.touches[0];
+            touchClone.style.left = `${touch.clientX}px`;
+            touchClone.style.top = `${touch.clientY}px`;
+            
+            // Hide the original slightly
+            labelEl.style.opacity = '0.5';
         }
+    }, { passive: true });
 
-        // --- Start ---
-        init();
-    </script>
+    document.addEventListener('touchmove', (e) => {
+        if (touchClone) {
+            e.preventDefault(); // Prevent page from scrolling
+            const touch = e.touches[0];
+            touchClone.style.left = `${touch.clientX}px`;
+            touchClone.style.top = `${touch.clientY}px`;
+        }
+    }, { passive: false });
+
+    document.addEventListener('touchend', (e) => {
+        if (touchClone) {
+            // Find the element that was being touched
+            const labelEl = labelBank.querySelector(`[data-province="${draggedProvinceName}"]`);
+            if (labelEl) labelEl.style.opacity = '1';
+
+            const touch = e.changedTouches[0];
+            const latLng = map.containerPointToLatLng([touch.clientX, touch.clientY]);
+            
+            checkAndPlaceLabel(draggedProvinceName, latLng);
+
+            // Cleanup
+            document.body.removeChild(touchClone);
+            touchClone = null;
+            draggedProvinceName = null;
+        }
+    });
+    
+    playAgainBtn.addEventListener('click', startGame);
+
+    // --- Initial Load ---
+    fetch('https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@master/public/data/canada.geojson')
+      .then(res => res.json())
+      .then(data => { 
+        geojson = L.geoJson(data, { style: style, interactive: false }).addTo(map);
+        // Calculate and store the center point of each province for placing labels
+        geojson.eachLayer(layer => {
+            const name = layer.feature.properties.name;
+            if (provinceNames.includes(name)) {
+                // Use the custom coordinate if it exists, otherwise calculate the center
+                provinceCentroids[name] = customCentroids[name] ? L.latLng(customCentroids[name]) : layer.getBounds().getCenter();
+            }
+        });
+        startGame();
+      })
+      .catch(err => { 
+        console.error('GeoJSON load error:', err); 
+        labelBank.innerHTML = '<p>Error loading map data. Please refresh.</p>'; 
+      });
+  </script>
 </body>
 </html>
+
+
+
+
+
 
