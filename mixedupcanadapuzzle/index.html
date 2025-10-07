@@ -1,380 +1,242 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>Canada Labeling Challenge</title>
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin=""
-  />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Canada SVG Puzzle – drag provinces into place</title>
   <style>
-    body, html { 
-      margin: 0; 
-      padding: 0; 
-      width: 100%; 
-      height: 100%; 
-      display: flex; 
-      font-family: 'Poppins', sans-serif;
-      background-color: #f0f4f8;
-      overflow: hidden; /* Important for a full-screen app feel */
-    }
-    #map { 
-      flex: 1; 
-      height: 100%;
-      border-right: 1px solid #ddd;
-      background-color: #aadaff;
-    }
-    #info-panel {
-      width: 380px;
-      max-width: 40%;
-      padding: 2rem;
-      background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
-      border-left: 5px solid #d91e2a; /* Canadian Red */
-      overflow-y: auto;
-      box-shadow: -5px 0 15px rgba(0,0,0,0.1);
-      display: flex;
-      flex-direction: column;
-    }
-    #info-panel h2 { 
-      margin-top: 0; 
-      color: #374151; 
-      font-size: 1.75rem; 
-      font-weight: 700;
-      border-bottom: 2px solid #ef4444;
-      padding-bottom: 0.5rem;
-      margin-bottom: 1rem;
-    }
-    
-    #result-box h3 { 
-      margin-top: 0;
-      margin-bottom: 1rem; 
-      color: #b91c1c; 
-      font-size: 1.5rem; 
-      font-weight: 600;
-    }
-     #result-box p { 
-      font-size: 1rem; 
-      line-height: 1.6; 
-      margin: 0.5rem 0 1rem 0; 
-      color: #374151;
-      min-height: 50px; /* Reserve space for feedback */
-    }
-    
-    /* --- Drag and Drop Styles --- */
-    #label-bank {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        padding: 1rem;
-        background-color: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        margin-top: 1rem;
-    }
-    .draggable-label {
-        padding: 0.5rem 0.75rem;
-        background-color: #fff;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        cursor: grab;
-        font-weight: 500;
-        color: #334155;
-        user-select: none;
-        transition: background-color 0.2s, box-shadow 0.2s, opacity 0.2s;
-        white-space: nowrap; /* Prevent text from wrapping */
-    }
-    .draggable-label:hover {
-        background-color: #f1f5f9;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    .draggable-label.dragging {
-        opacity: 0.5;
-        background-color: #e2e8f0;
-        cursor: grabbing;
-    }
-    .draggable-label.placed {
-        display: none; /* Hide label from bank once placed */
-    }
-    .placed-map-label {
-        background-color: #dcfce7; /* Light green */
-        border: 1px solid #15803d; /* Darker green */
-        border-radius: 6px;
-        padding: 3px 8px;
-        font-size: 13px;
-        font-weight: 600;
-        color: #14532d; /* Dark green text */
-        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-        text-align: center;
-        white-space: nowrap;
-    }
-    .placed-map-label.small-font {
-        font-size: 10px;
-        padding: 2px 5px;
-    }
-    /* This is the visual clone for touch dragging */
-    .touch-clone {
-        position: absolute;
-        top: 0;
-        left: 0;
-        opacity: 0.8;
-        pointer-events: none; /* So it doesn't interfere with drop detection */
-        z-index: 10000;
-        transform: translate(-50%, -50%); /* Center on finger */
-    }
-    /* --- End Drag and Drop Styles --- */
+    :root { --bg:#0b1020; --panel:#0e1532; --ink:#e8ecf6; --accent:#7dd3fc; --ok:#16a34a; --warn:#f59e0b; --border:#223; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { display:grid; grid-template-columns: 1fr 360px; gap:0; background: var(--bg); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    #stage { position: relative; background:#09112a; }
+    #boardWrap { position:absolute; inset:0; display:grid; place-items:center; }
+    svg#board { width: 100%; height: 100%; max-width: 1200px; aspect-ratio: 1000/600; background:#eef5fb; border-right:1px solid #c7d4e9; touch-action:none; }
+    /* Targets (faint map in correct spots) */
+    #targets path { fill:#e7eef8; stroke:#bcd3f5; stroke-width:1; }
+    #targets g.done path { fill:#eaf7ee; stroke:#a7e3ba; }
 
-    #result-box p.feedback-correct { color: #166534; font-weight: bold; }
-    #result-box p.feedback-incorrect { color: #991b1b; font-weight: bold; }
-    
-    #play-again-btn {
-        margin-top: auto; /* Pushes button to the bottom */
-        padding-top: 1rem;
-        width: 100%;
-        display: none; /* Hidden initially */
-        padding: 0.75rem;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-size: 1rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background-color 0.2s, opacity 0.2s;
-        background-color: #16a34a;
-    }
-    #play-again-btn:hover { background-color: #15803d; }
+    /* Draggable pieces */
+    #pieces g.piece { cursor: grab; filter: drop-shadow(0 2px 6px rgba(0,0,0,.3)); }
+    #pieces g.piece.dragging { cursor: grabbing; opacity:.9; }
+    #pieces g.piece.placed { cursor: default; filter:none; }
+
+    aside { border-left:1px solid var(--border); background: var(--panel); padding:14px; overflow:auto; }
+    h1 { font-size: 18px; margin:0 0 8px 0; }
+    .muted { opacity:.85; }
+    .row { display:flex; gap:8px; align-items:center; margin:10px 0; }
+    .btn { background:#172149; color:#cde; border:1px solid #30427a; border-radius:10px; padding:8px 12px; font-weight:600; cursor:pointer; }
+    .btn:hover { filter:brightness(1.08); }
+    input[type="file"] { width:100%; }
+    .log { font-family: ui-monospace, Menlo, Consolas, monospace; background:#0a1128; border:1px solid #22345e; border-radius:8px; padding:10px; height:140px; overflow:auto; white-space:pre-wrap; }
+    .ok { color:#22c55e; }
   </style>
 </head>
 <body>
-  <div id="map"></div>
-  <div id="info-panel">
-    <h2>Canada Labeling Challenge</h2>
-    
-    <div id="result-box"></div>
-    <div id="label-bank"><!-- Draggable labels appear here --></div>
-    <button id="play-again-btn">Play Again? ↻</button>
-
+  <div id="stage">
+    <div id="boardWrap">
+      <svg id="board" viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg">
+        <g id="targets"></g>
+        <g id="pieces"></g>
+      </svg>
+    </div>
   </div>
+  <aside>
+    <h1>Canada SVG Puzzle</h1>
+    <p class="muted">Drag each province/territory shape to its spot. When it’s close, it <em>snaps</em> and locks. Works with your GeoJSON, or use the default.</p>
+    <div class="row">
+      <button class="btn" id="shuffle">Shuffle</button>
+      <button class="btn" id="reset">Reset</button>
+    </div>
+    <div class="row">
+      <input type="file" id="file" accept=".json,.geojson" />
+    </div>
+    <div class="log" id="log"></div>
+  </aside>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo" crossorigin=""></script>
+  <script src="https://unpkg.com/d3@7/dist/d3.min.js"></script>
   <script>
-    const map = L.map('map', { zoomControl: false }).setView([62, -98], 4);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: 'abcd',
-      maxZoom: 10,
-      minZoom: 3,
-    }).addTo(map);
+    const logEl = document.getElementById('log');
+    const log = (...a)=>{ logEl.textContent += a.join(' ') + '\n'; logEl.scrollTop = logEl.scrollHeight; };
 
-    // --- DOM Elements ---
-    const resultBox = document.getElementById('result-box');
-    const playAgainBtn = document.getElementById('play-again-btn');
-    const labelBank = document.getElementById('label-bank');
+    const board = document.getElementById('board');
+    const gTargets = document.getElementById('targets');
+    const gPieces  = document.getElementById('pieces');
+    const fileInput = document.getElementById('file');
 
-    // --- App State ---
-    let geojson;
-    let placedLabels = [];
-    let provinceCentroids = {};
-    let touchClone = null; // For the visual element being dragged on touch
-    let draggedProvinceName = null; // The name of the province being dragged
-    
-    const nameAbbreviations = {
-        'Newfoundland and Labrador': 'Nfld. & Lab.',
-        'Prince Edward Island': 'P.E.I.',
-        'Northwest Territories': 'N.W.T.',
-        'Yukon Territory': 'Yukon'
-    };
-    
-    const customCentroids = {
-        'British Columbia': [55, -125],
-        'Newfoundland and Labrador': [50, -56],
-        'Quebec': [54, -72],
-        'Nunavut': [67, -95],
-        'Northwest Territories': [65, -120],
-        'Prince Edward Island': [46.35, -63.5]
-    };
+    const W = 1000, H = 600; // board viewBox
 
-    const provinceNames = ['British Columbia', 'Alberta', 'Saskatchewan', 'Manitoba', 'Ontario', 'Quebec', 'New Brunswick', 'Nova Scotia', 'Prince Edward Island', 'Newfoundland and Labrador', 'Yukon Territory', 'Northwest Territories', 'Nunavut'];
+    let projection, path, features=[], targetsByName={}, piecesByName={};
 
-    // --- Utility ---
-    const shuffleArray = (array) => array.sort(() => Math.random() - 0.5);
-
-    // --- Game Logic ---
-    function startGame() {
-        playAgainBtn.style.display = 'none';
-        resultBox.innerHTML = '<p>Drag the labels from the bank onto the correct province or territory.</p>';
-        
-        // Clear old map labels
-        placedLabels.forEach(label => map.removeLayer(label));
-        placedLabels = [];
-        if (geojson) geojson.resetStyle();
-
-        // Create and add new draggable labels
-        labelBank.innerHTML = '';
-        const labels = shuffleArray([...provinceNames]);
-        labels.forEach(name => {
-            const labelEl = document.createElement('div');
-            labelEl.className = 'draggable-label';
-            labelEl.textContent = name;
-            labelEl.draggable = true;
-            labelEl.dataset.province = name;
-            labelBank.appendChild(labelEl);
-        });
+    function normName(props){
+      // Handle differing property keys across datasets
+      return props.name || props.province || props.NAME || props.admin || props.abbrev || 'Unknown';
     }
 
-    function checkAndPlaceLabel(droppedProvinceName, latLng) {
-        if (!droppedProvinceName) return;
-
-        let targetProvince = null;
-        // Find which GeoJSON layer contains the drop coordinates
-        geojson.eachLayer(layer => {
-            if (layer.getBounds().contains(latLng)) {
-                 targetProvince = layer.feature.properties.name;
-            }
-        });
-
-        const labelElement = labelBank.querySelector(`.draggable-label[data-province="${droppedProvinceName}"]`);
-        
-        if (targetProvince && droppedProvinceName === targetProvince) {
-            labelElement.classList.add('placed');
-            
-            let labelClassName = 'placed-map-label';
-            const smallProvinces = ['Nova Scotia', 'New Brunswick', 'Prince Edward Island'];
-            // Use a smaller font for provinces with long names or that are physically small
-            if (droppedProvinceName.length > 18 || smallProvinces.includes(droppedProvinceName)) {
-                labelClassName += ' small-font';
-            }
-
-            const displayName = nameAbbreviations[droppedProvinceName] || droppedProvinceName;
-
-            const icon = L.divIcon({
-                className: labelClassName,
-                html: displayName,
-            });
-            const marker = L.marker(provinceCentroids[droppedProvinceName], { icon: icon, interactive: false }).addTo(map);
-            placedLabels.push(marker);
-            resultBox.innerHTML = `<p class="feedback-correct">Correct! ${droppedProvinceName} is placed.</p>`;
-
-            // Check for win condition
-            const allPlaced = Array.from(labelBank.children).every(child => child.classList.contains('placed'));
-            if (allPlaced) {
-                resultBox.innerHTML = `<h3>Congratulations!</h3><p>You've labeled all of Canada!</p>`;
-                playAgainBtn.style.display = 'block';
-            }
-        } else {
-            resultBox.innerHTML = `<p class="feedback-incorrect">Not quite! That's not the right spot for ${droppedProvinceName}. Try again.</p>`;
-        }
+    function colorFor(name){
+      // stable bright-ish color
+      let h=0; for(const c of name) h=(h*31 + c.charCodeAt(0))>>>0; return `hsl(${h%360} 80% 60%)`;
     }
 
-    // --- Map Styling ---
-    function style(feature) {
-      return { fillColor: '#bdbdbd', weight: 1.5, color: 'white', fillOpacity: 0.5 };
+    function fitProjection(fc){
+      projection = d3.geoMercator().fitSize([W,H], fc);
+      path = d3.geoPath(projection);
     }
 
-    // --- Mouse Drag and Drop Listeners ---
-    labelBank.addEventListener('dragstart', (e) => {
-        if (e.target.classList.contains('draggable-label')) {
-            e.target.classList.add('dragging');
-            e.dataTransfer.setData('text/plain', e.target.dataset.province);
-            e.dataTransfer.effectAllowed = 'move';
-        }
-    });
-
-    labelBank.addEventListener('dragend', (e) => {
-        if (e.target.classList.contains('draggable-label')) {
-            e.target.classList.remove('dragging');
-        }
-    });
-    
-    map.getContainer().addEventListener('dragover', (e) => e.preventDefault());
-    
-    map.getContainer().addEventListener('drop', (e) => {
-        e.preventDefault();
-        const droppedProvinceName = e.dataTransfer.getData('text/plain');
-        const latLng = map.containerPointToLatLng([e.clientX, e.clientY]);
-        checkAndPlaceLabel(droppedProvinceName, latLng);
-    });
-
-    // --- Touch Event Listeners ---
-    labelBank.addEventListener('touchstart', (e) => {
-        if (e.target.classList.contains('draggable-label')) {
-            const labelEl = e.target;
-            draggedProvinceName = labelEl.dataset.province;
-
-            // Create a visual clone of the label to drag around
-            touchClone = labelEl.cloneNode(true);
-            touchClone.classList.add('touch-clone');
-            document.body.appendChild(touchClone);
-            
-            // Position the clone
-            const touch = e.touches[0];
-            touchClone.style.left = `${touch.clientX}px`;
-            touchClone.style.top = `${touch.clientY}px`;
-            
-            // Hide the original slightly
-            labelEl.style.opacity = '0.5';
-        }
-    }, { passive: true });
-
-    document.addEventListener('touchmove', (e) => {
-        if (touchClone) {
-            e.preventDefault(); // Prevent page from scrolling
-            const touch = e.touches[0];
-            touchClone.style.left = `${touch.clientX}px`;
-            touchClone.style.top = `${touch.clientY}px`;
-        }
-    }, { passive: false });
-
-    document.addEventListener('touchend', (e) => {
-        if (touchClone) {
-            // Find the element that was being touched
-            const labelEl = labelBank.querySelector(`[data-province="${draggedProvinceName}"]`);
-            if (labelEl) labelEl.style.opacity = '1';
-
-            const touch = e.changedTouches[0];
-            const latLng = map.containerPointToLatLng([touch.clientX, touch.clientY]);
-            
-            checkAndPlaceLabel(draggedProvinceName, latLng);
-
-            // Cleanup
-            document.body.removeChild(touchClone);
-            touchClone = null;
-            draggedProvinceName = null;
-        }
-    });
-    
-    playAgainBtn.addEventListener('click', startGame);
-
-    // --- Initial Load ---
-    fetch('https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@master/public/data/canada.geojson')
-      .then(res => res.json())
-      .then(data => { 
-        geojson = L.geoJson(data, { style: style, interactive: false }).addTo(map);
-        // Calculate and store the center point of each province for placing labels
-        geojson.eachLayer(layer => {
-            const name = layer.feature.properties.name;
-            if (provinceNames.includes(name)) {
-                // Use the custom coordinate if it exists, otherwise calculate the center
-                provinceCentroids[name] = customCentroids[name] ? L.latLng(customCentroids[name]) : layer.getBounds().getCenter();
-            }
-        });
-        startGame();
-      })
-      .catch(err => { 
-        console.error('GeoJSON load error:', err); 
-        labelBank.innerHTML = '<p>Error loading map data. Please refresh.</p>'; 
+    function geoToPaths(fc){
+      fitProjection(fc);
+      // Draw targets (true positions)
+      gTargets.innerHTML='';
+      targetsByName={};
+      const targetG = d3.select(gTargets)
+        .selectAll('g').data(fc.features).enter().append('g').attr('data-name',d=>normName(d.properties));
+      targetG.append('path').attr('d', d=>path(d)).attr('fill', '#e7eef8').attr('stroke','#bcd3f5').attr('stroke-width',1);
+      targetG.each(function(d){
+        const name = normName(d.properties);
+        const c = path.centroid(d);
+        targetsByName[name] = { x:c[0], y:c[1], path: path(d), node:this };
       });
+
+      // Spawn shuffled pieces
+      spawnPieces(fc);
+    }
+
+    function spawnPieces(fc){
+      d3.select(gPieces).selectAll('*').remove();
+      piecesByName={};
+      const shuffled = d3.shuffle([...fc.features]);
+      const cols = 5, padX=40, padY=H-180, cell=110;
+      let i=0;
+      const pieces = d3.select(gPieces).selectAll('g.piece')
+        .data(shuffled, d=>normName(d.properties))
+        .enter().append('g')
+          .attr('class','piece')
+          .attr('data-name', d=>normName(d.properties))
+          .each(function(d){ piecesByName[normName(d.properties)] = this; })
+          .call(d3.drag()
+            .on('start', dragStarted)
+            .on('drag', dragged)
+            .on('end', dragEnded)
+          );
+
+      // draw paths and center each piece around its own centroid so it can be moved anywhere
+      pieces.each(function(d){
+        const g = d3.select(this);
+        const c = path.centroid(d); // in board coordinates
+        g.attr('data-cx', c[0]).attr('data-cy', c[1]);
+        g.append('path')
+          .attr('d', path(d))
+          .attr('fill', colorFor(normName(d.properties)))
+          .attr('stroke', '#1f2937')
+          .attr('stroke-width', 1);
+      });
+
+      // Initial random-ish positions at bottom of board — translate by (x - cx, y - cy)
+      pieces.attr('transform', function(){
+        const cx = +this.getAttribute('data-cx');
+        const cy = +this.getAttribute('data-cy');
+        const x = padX + (i%cols)*cell + (Math.random()*40-20);
+        const y = padY + Math.floor(i/cols)*80 + (Math.random()*30-15);
+        i++;
+        return `translate(${x - cx},${y - cy})`;
+      });
+    }
+
+    function getTranslate(el){
+      const m = /translate\(([-0-9.]+),\s*([-0-9.]+)\)/.exec(el.getAttribute('transform')||'translate(0,0)');
+      return {x: +m[1], y:+m[2]};
+    }
+
+    function dragStarted(event){
+      if(this.classList.contains('placed')) return;
+      this.classList.add('dragging');
+      this._t0 = getTranslate(this);
+    }
+    function dragged(event){
+      if(this.classList.contains('placed')) return;
+      const x = this._t0.x + event.dx; const y = this._t0.y + event.dy;
+      this.setAttribute('transform', `translate(${x},${y})`);
+      this._t0 = {x,y};
+    }
+    function dragEnded(event){
+      this.classList.remove('dragging');
+      if(this.classList.contains('placed')) return;
+      const name = this.getAttribute('data-name');
+      const tgt = targetsByName[name]; if(!tgt) return;
+      // With pieces centered on their own centroid, the current centroid = translate + (cx, cy)
+      const t = getTranslate(this);
+      const cx = +this.getAttribute('data-cx');
+      const cy = +this.getAttribute('data-cy');
+      const current = { x: t.x + cx, y: t.y + cy };
+      const dist = Math.hypot(current.x - tgt.x, current.y - tgt.y);
+      const snapRadius = 28; // pixels in board space
+      if(dist < snapRadius){
+        // Snap so centroid aligns exactly
+        const nx = t.x + (tgt.x - current.x);
+        const ny = t.y + (tgt.y - current.y);
+        this.setAttribute('transform', `translate(${nx},${ny})`);
+        this.classList.add('placed');
+        this.style.filter = 'none';
+        d3.select(tgt.node).classed('done', true);
+        log('✔', name, 'placed');
+        checkWin();
+      }
+    }
+
+    function checkWin(){
+      const all = [...gPieces.querySelectorAll('g.piece')];
+      if(all.length && all.every(n=>n.classList.contains('placed'))){
+        log('🎉 All pieces placed!');
+        alert('Great job! All provinces and territories placed.');
+      }
+    }
+
+    // Buttons
+    document.getElementById('shuffle').onclick = ()=> spawnPieces({type:'FeatureCollection', features});
+    document.getElementById('reset').onclick = ()=> geoToPaths({type:'FeatureCollection', features});
+
+    // File loader (your SimpleMaps GeoJSON)
+    fileInput.addEventListener('change', async (e)=>{
+      const f = e.target.files[0]; if(!f) return;
+      const text = await f.text();
+      try{
+        const data = JSON.parse(text);
+        initWithGeoJSON(data);
+        log('Loaded GeoJSON from file:', f.name);
+      }catch(err){
+        log('Error parsing file:', err.message);
+      }
+    });
+
+    function coerceToFeatureCollection(data){
+      if(data.type === 'FeatureCollection') return data;
+      if(data.type === 'Feature') return { type:'FeatureCollection', features:[data] };
+      if(Array.isArray(data)) return { type:'FeatureCollection', features:data };
+      throw new Error('Unsupported GeoJSON structure');
+    }
+
+    function pickCanadaFeatures(fc){
+      // Keep only province/territory polygon features
+      const keep = fc.features.filter(f=> (f.geometry && /Polygon/i.test(f.geometry.type)) );
+      // If dataset contains the full world, filter by admin=Canada when present
+      const filtered = keep.filter(f=>{
+        const p=f.properties||{}; const admin=p.admin||p.country||p.COUNTRY||p.sov_a3||'';
+        return (String(admin).toLowerCase().includes('canada')) || keep.length<=20; // heuristic
+      });
+      return { type:'FeatureCollection', features: filtered };
+    }
+
+    function initWithGeoJSON(raw){
+      const fc = pickCanadaFeatures(coerceToFeatureCollection(raw));
+      features = fc.features;
+      geoToPaths(fc);
+    }
+
+    // Fallback: load a public Canada provinces GeoJSON (in case no file is provided)
+    fetch('https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@master/public/data/canada.geojson')
+      .then(res=>res.json())
+      .then(data=>{ initWithGeoJSON(data); log('Loaded default Canada GeoJSON.'); })
+      .catch(err=>{ log('Failed to load default map:', err.message); });
   </script>
 </body>
 </html>
-
-
-
-
-
-
