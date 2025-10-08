@@ -8,10 +8,10 @@
     :root { --bg:#0b1020; --panel:#0e1532; --ink:#e8ecf6; --accent:#7dd3fc; --ok:#16a34a; --warn:#f59e0b; --border:#223; }
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; }
-    body { display:grid; grid-template-columns: 1fr 360px; gap:0; background: var(--bg); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    #stage { position: relative; background:#09112a; }
-    #boardWrap { position:absolute; inset:0; display:grid; place-items:center; }
-    svg#board { width: 100%; height: 100%; max-width: 1200px; aspect-ratio: 1000/600; background:#eef5fb; border-right:1px solid #c7d4e9; touch-action:none; }
+    body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    #stage { position: fixed; inset: 0; background:#09112a; }
+    #boardWrap { position:absolute; inset:0; display:grid; place-items:center; pointer-events:auto; }
+    svg#board { width: 100%; height: 100%; max-width: 1800px; aspect-ratio: 1000/600; background:#eef5fb; touch-action:none; }
     /* Targets (faint map in correct spots) */
     #targets path { fill:#e7eef8; stroke:#bcd3f5; stroke-width:1; }
     #targets g.done path { fill:#eaf7ee; stroke:#a7e3ba; }
@@ -27,8 +27,8 @@
     .row { display:flex; gap:8px; align-items:center; margin:10px 0; }
     .btn { background:#172149; color:#cde; border:1px solid #30427a; border-radius:10px; padding:8px 12px; font-weight:600; cursor:pointer; }
     .btn:hover { filter:brightness(1.08); }
-    input[type="file"] { width:100%; }
-    .log { font-family: ui-monospace, Menlo, Consolas, monospace; background:#0a1128; border:1px solid #22345e; border-radius:8px; padding:10px; height:140px; overflow:auto; white-space:pre-wrap; }
+    .controls { position:absolute; top:12px; left:12px; display:flex; gap:8px; z-index:10; }
+    .log { font-family: ui-monospace, Menlo, Consolas, monospace; background:#0a1128; border:1px solid #22345e; border-radius:8px; padding:10px; height:160px; overflow:auto; white-space:pre-wrap; }
     .ok { color:#22c55e; }
   </style>
 </head>
@@ -41,40 +41,49 @@
       </svg>
     </div>
   </div>
-  <aside>
-    <h1>Canada SVG Puzzle</h1>
-    <p class="muted">Drag each province/territory shape to its spot. When it’s close, it <em>snaps</em> and locks. Works with your GeoJSON, or use the default.</p>
-    <div class="row">
-      <button class="btn" id="shuffle">Shuffle</button>
-      <button class="btn" id="reset">Reset</button>
-    </div>
-    <div class="row">
-      <input type="file" id="file" accept=".json,.geojson" />
-    </div>
-    <div class="log" id="log"></div>
-  </aside>
+  <div id="controls" class="controls"><button class="btn" id="shuffle">Shuffle</button><button class="btn" id="reset">Reset</button></div>
 
   <script src="https://unpkg.com/d3@7/dist/d3.min.js"></script>
   <script>
-    const logEl = document.getElementById('log');
-    const log = (...a)=>{ logEl.textContent += a.join(' ') + '\n'; logEl.scrollTop = logEl.scrollHeight; };
+    const log = (...a)=>{ console.log('[puzzle]', ...a); };
 
     const board = document.getElementById('board');
     const gTargets = document.getElementById('targets');
     const gPieces  = document.getElementById('pieces');
-    const fileInput = document.getElementById('file');
 
     const W = 1000, H = 600; // board viewBox
+
+    // -------------------------------------------------------------------
+    // EMBED YOUR SIMPLEMAPS JSON HERE
+    // Paste the entire JSON as a string between the backticks. This avoids
+    // the common "Unexpected token ']'" error from partial objects or trailing
+    // commas. We'll JSON.parse() it safely and fall back if it fails.
+    // -------------------------------------------------------------------
+    const EMBEDDED_JSON_TEXT = ``; // ← paste the JSON from simplemaps.com here (complete FeatureCollection)
+
+    // Try to parse the embedded text (and lightly sanitize trailing commas)
+    let EMBEDDED_GEOJSON = null;
+    (function(){
+      const raw = EMBEDDED_JSON_TEXT.trim();
+      if(!raw) return; // nothing embedded; we'll load fallback below
+      try{
+        // remove simple trailing commas before ] or } to guard against copy/paste artifacts
+        const sanitized = raw
+          .replace(/,\s*([\]\}])/g, '$1') // trailing commas
+          .replace(/\u0000/g, '');         // stray nulls
+        EMBEDDED_GEOJSON = JSON.parse(sanitized);
+      }catch(err){
+        log('❌ Could not parse embedded JSON:', err.message);
+      }
+    })();
 
     let projection, path, features=[], targetsByName={}, piecesByName={};
 
     function normName(props){
-      // Handle differing property keys across datasets
       return props.name || props.province || props.NAME || props.admin || props.abbrev || 'Unknown';
     }
 
     function colorFor(name){
-      // stable bright-ish color
       let h=0; for(const c of name) h=(h*31 + c.charCodeAt(0))>>>0; return `hsl(${h%360} 80% 60%)`;
     }
 
@@ -190,23 +199,10 @@
         alert('Great job! All provinces and territories placed.');
       }
     }
-
     // Buttons
     document.getElementById('shuffle').onclick = ()=> spawnPieces({type:'FeatureCollection', features});
     document.getElementById('reset').onclick = ()=> geoToPaths({type:'FeatureCollection', features});
 
-    // File loader (your SimpleMaps GeoJSON)
-    fileInput.addEventListener('change', async (e)=>{
-      const f = e.target.files[0]; if(!f) return;
-      const text = await f.text();
-      try{
-        const data = JSON.parse(text);
-        initWithGeoJSON(data);
-        log('Loaded GeoJSON from file:', f.name);
-      }catch(err){
-        log('Error parsing file:', err.message);
-      }
-    });
 
     function coerceToFeatureCollection(data){
       if(data.type === 'FeatureCollection') return data;
@@ -232,11 +228,48 @@
       geoToPaths(fc);
     }
 
-    // Fallback: load a public Canada provinces GeoJSON (in case no file is provided)
-    fetch('https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@master/public/data/canada.geojson')
-      .then(res=>res.json())
-      .then(data=>{ initWithGeoJSON(data); log('Loaded default Canada GeoJSON.'); })
-      .catch(err=>{ log('Failed to load default map:', err.message); });
+    // --- Self tests (basic data validation) ---
+    function selfTest(raw, label='embedded/default'){
+      try{
+        const fc = coerceToFeatureCollection(raw);
+        console.assert(Array.isArray(fc.features), 'features should be an array');
+        if(!Array.isArray(fc.features)) log('❌ features is not an array');
+        const n = fc.features.length;
+        log(`Test: ${label} → features: ${n}`);
+        // Expect 13 (10 provinces + 3 territories)
+        if(n !== 13) log('⚠️ Expected 13 provinces/territories; got', n);
+        const bad = fc.features.filter(f=> !(f.geometry && /Polygon/i.test(f.geometry.type)));
+        if(bad.length) log('⚠️ Non-polygon/multipolygon features found:', bad.length);
+        const gotNames = new Set(fc.features.map(f=> (f.properties||{}).name || (f.properties||{}).province || (f.properties||{}).NAME ));
+        const expected = ['British Columbia','Alberta','Saskatchewan','Manitoba','Ontario','Quebec','New Brunswick','Nova Scotia','Prince Edward Island','Newfoundland and Labrador','Yukon Territory','Northwest Territories','Nunavut'];
+        const missing = expected.filter(nm=> !gotNames.has(nm));
+        if(missing.length) log('⚠️ Missing names:', missing.join(', '));
+      }catch(e){ log('❌ Self test failed:', e.message); }
+    }
+
+    // Initialize: try embedded JSON first, then fall back to a public dataset
+    (async function start(){
+      if(EMBEDDED_GEOJSON){
+        selfTest(EMBEDDED_GEOJSON, 'embedded');
+        const fc = coerceToFeatureCollection(EMBEDDED_GEOJSON);
+        if(!Array.isArray(fc.features) || fc.features.length !== 13){
+          log('❌ Embedded dataset must contain exactly 13 features (10 provinces + 3 territories).');
+        } else {
+          initWithGeoJSON(EMBEDDED_GEOJSON);
+          log('Loaded embedded GeoJSON.');
+          return;
+        }
+      }
+      // Fallback: public Canada provinces GeoJSON so the game always works
+      try{
+        const data = await fetch('https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@master/public/data/canada.geojson').then(r=>r.json());
+        selfTest(data, 'fallback');
+        initWithGeoJSON(data);
+        log('Loaded fallback Canada GeoJSON.');
+      }catch(err){
+        log('❌ Failed to load fallback dataset:', err.message);
+      }
+    })();
   </script>
 </body>
 </html>
