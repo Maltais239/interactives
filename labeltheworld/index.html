@@ -115,7 +115,6 @@
             font-weight: 500;
             color: #334155;
             user-select: none;
-            /* Refined transition for smoother feel */
             transition: background-color 0.2s, box-shadow 0.2s;
             white-space: nowrap;
         }
@@ -177,7 +176,7 @@
         <button id="play-again-btn">Play Again? ↻</button>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo" crossorigin=""></script>
     <script>
         const map = L.map('map', {
             renderer: L.canvas(), worldCopyJump: true,
@@ -200,7 +199,8 @@
         let geojson;
         let countriesData = {};
         let countryCentroids = {};
-        let placedLabels = [];
+        let placedLabels = []; // Holds leaflet markers for the CURRENT view
+        let allPlacedLabels = {}; // Holds names of all correct countries, keyed by subregion
         let touchClone = null;
         let draggedCountryName = null;
         let currentRegion = 'Americas';
@@ -216,17 +216,17 @@
         };
 
         const subregionBounds = {
-            'North America': { center: [55, -100], zoom: 3 }, 'Central America': { center: [15, -90], zoom: 4 },
-            'Caribbean': { center: [20, -75], zoom: 4 }, 'South America': { center: [-20, -60], zoom: 3 },
-            'Northern Europe': { center: [60, 10], zoom: 4 }, 'Western Europe': { center: [48, 5], zoom: 4 },
-            'Central Europe': { center: [50, 15], zoom: 4 }, 'Eastern Europe': { center: [55, 30], zoom: 3 }, 
-            'Southern Europe': { center: [42, 15], zoom: 4 }, 'Southeast Europe': { center: [44, 22], zoom: 4 }, 
-            'Northern Africa': { center: [28, 10], zoom: 4 }, 'Western Africa': { center: [12, 0], zoom: 4 }, 
-            'Middle Africa': { center: [0, 20], zoom: 4 }, 'Eastern Africa': { center: [0, 35], zoom: 4 }, 
-            'Southern Africa': { center: [-25, 25], zoom: 4 }, 'Western Asia': { center: [30, 45], zoom: 4 }, 
+            'North America': { center: [55, -100], zoom: 3.5 }, 'Central America': { center: [15, -90], zoom: 5 },
+            'Caribbean': { center: [20, -75], zoom: 5 }, 'South America': { center: [-20, -60], zoom: 3.5 },
+            'Northern Europe': { center: [60, 10], zoom: 4.5 }, 'Western Europe': { center: [48, 5], zoom: 5 },
+            'Central Europe': { center: [50, 15], zoom: 5 }, 'Eastern Europe': { center: [55, 30], zoom: 4 }, 
+            'Southern Europe': { center: [42, 15], zoom: 5 }, 'Southeast Europe': { center: [44, 22], zoom: 5 }, 
+            'Northern Africa': { center: [28, 10], zoom: 4 }, 'Western Africa': { center: [12, 0], zoom: 4.5 }, 
+            'Middle Africa': { center: [0, 20], zoom: 4.5 }, 'Eastern Africa': { center: [0, 35], zoom: 4 }, 
+            'Southern Africa': { center: [-25, 25], zoom: 4.5 }, 'Western Asia': { center: [30, 45], zoom: 4.5 }, 
             'Central Asia': { center: [45, 65], zoom: 4 }, 'Southern Asia': { center: [20, 78], zoom: 4 }, 
-            'Eastern Asia': { center: [35, 110], zoom: 4 }, 'South-Eastern Asia': { center: [0, 115], zoom: 4 }, 
-            'Australia and New Zealand': { center: [-25, 145], zoom: 3 }, 'Melanesia': { center: [-10, 160], zoom: 4 }
+            'Eastern Asia': { center: [35, 110], zoom: 4 }, 'South-Eastern Asia': { center: [0, 115], zoom: 4.5 }, 
+            'Australia and New Zealand': { center: [-25, 145], zoom: 4 }, 'Melanesia': { center: [-10, 160], zoom: 4.5 }
         };
         
         const excludedCountries = [
@@ -247,6 +247,22 @@
         const shuffleArray = (array) => array.sort(() => Math.random() - 0.5);
 
         // --- Game Logic ---
+        function placeMapMarker(countryName) {
+            const displayName = nameAbbreviations[countryName] || countryName;
+            let labelClassName = 'placed-map-label';
+            if (displayName.length > 10) labelClassName += ' small-font';
+
+            const icon = L.divIcon({ className: 'label-icon', html: `<div class="${labelClassName}">${displayName}</div>`, iconSize: null, iconAnchor: [0, 0] });
+            const marker = L.marker(countryCentroids[countryName], { icon, interactive: false }).addTo(map);
+            placedLabels.push(marker);
+        }
+
+        function showCompletionMessage() {
+            playAgainBtn.style.display = 'block';
+            resultBox.innerHTML = `<h3>Congratulations!</h3><p>You've labeled all of ${currentSubregion}!</p>`;
+            labelBank.innerHTML = '';
+        }
+
         function startGame() {
             playAgainBtn.style.display = 'none';
             resultBox.innerHTML = '<p>Drag the labels onto the correct country.</p>';
@@ -256,12 +272,22 @@
             if (geojson) geojson.resetStyle();
 
             labelBank.innerHTML = '';
-            const regionCountries = Object.values(countriesData)
+            
+            const allSubregionCountries = Object.values(countriesData)
                 .filter(c => c.subregion === currentSubregion)
                 .map(c => c.name);
 
-            const labels = shuffleArray(regionCountries);
+            const previouslyPlaced = allPlacedLabels[currentSubregion] || [];
+            previouslyPlaced.forEach(countryName => placeMapMarker(countryName));
+
+            const labelsToPlace = allSubregionCountries.filter(name => !previouslyPlaced.includes(name));
             
+            if (labelsToPlace.length === 0 && allSubregionCountries.length > 0) {
+                showCompletionMessage();
+                return;
+            }
+
+            const labels = shuffleArray(labelsToPlace);
             labels.forEach(name => {
                 const labelEl = document.createElement('div');
                 labelEl.className = 'draggable-label';
@@ -277,36 +303,57 @@
 
             let targetCountry = null;
             let minDistance = Infinity;
+            let candidateCountries = [];
 
             geojson.eachLayer(layer => {
-                const layerName = layer.feature.properties.name;
-                const centroid = countryCentroids[layerName];
-                if (centroid) {
-                     const distance = latLng.distanceTo(centroid);
-                     if (distance < minDistance) {
-                         minDistance = distance;
-                         targetCountry = layerName;
-                     }
+                if (layer.getBounds().contains(latLng)) {
+                    candidateCountries.push(layer);
                 }
             });
+
+            if (candidateCountries.length > 0) {
+                candidateCountries.forEach(layer => {
+                    const layerName = layer.feature.properties.name;
+                    const centroid = countryCentroids[layerName];
+                    if (centroid) {
+                        const distance = latLng.distanceTo(centroid);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            targetCountry = layerName;
+                        }
+                    }
+                });
+            } else {
+                geojson.eachLayer(layer => {
+                    const layerName = layer.feature.properties.name;
+                    const centroid = countryCentroids[layerName];
+                    if (centroid) {
+                        const distance = latLng.distanceTo(centroid);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            targetCountry = layerName;
+                        }
+                    }
+                });
+            }
 
             const labelElement = labelBank.querySelector(`.draggable-label[data-country="${droppedCountryName}"]`);
 
             if (targetCountry && droppedCountryName === targetCountry) {
-                labelElement.classList.add('placed');
-                const displayName = nameAbbreviations[droppedCountryName] || droppedCountryName;
-                let labelClassName = 'placed-map-label';
-                 if (displayName.length > 10) labelClassName += ' small-font';
+                if (!allPlacedLabels[currentSubregion]) {
+                    allPlacedLabels[currentSubregion] = [];
+                }
+                if (!allPlacedLabels[currentSubregion].includes(droppedCountryName)) {
+                    allPlacedLabels[currentSubregion].push(droppedCountryName);
+                }
 
-                const icon = L.divIcon({ className: 'label-icon', html: `<div class="${labelClassName}">${displayName}</div>`, iconSize: null, iconAnchor: [0, 0] });
-                const marker = L.marker(countryCentroids[droppedCountryName], { icon, interactive: false }).addTo(map);
-                placedLabels.push(marker);
+                labelElement.classList.add('placed');
+                placeMapMarker(droppedCountryName);
                 resultBox.innerHTML = `<p class="feedback-correct">Correct! ${droppedCountryName} is placed.</p>`;
 
                 const allPlaced = Array.from(labelBank.children).every(child => child.classList.contains('placed'));
                 if (allPlaced) {
-                    playAgainBtn.style.display = 'block';
-                    resultBox.innerHTML = `<h3>Congratulations!</h3><p>You've labeled all of ${currentSubregion}!</p>`;
+                    showCompletionMessage();
                 }
             } else {
                 resultBox.innerHTML = `<p class="feedback-incorrect">Not quite! That's not ${droppedCountryName}. Try again.</p>`;
@@ -343,12 +390,17 @@
         }
         
         // --- Event Listeners ---
-        playAgainBtn.addEventListener('click', startGame);
+        playAgainBtn.addEventListener('click', () => {
+            if (allPlacedLabels[currentSubregion]) {
+                allPlacedLabels[currentSubregion] = [];
+            }
+            startGame();
+        });
 
         regionBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 currentRegion = btn.dataset.region;
-                currentSubregion = subregions[currentRegion][0]; // Default to first subregion
+                currentSubregion = subregions[currentRegion][0];
                 regionBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 updateSubregionButtons();
@@ -419,12 +471,9 @@
                  }
             });
 
-            // Handles cases where GeoJSON name differs from our country facts name
             const geoJsonNameMap = {
-                'Czech Republic': 'Czechia',
-                'Macedonia': 'North Macedonia',
-                'Swaziland': 'eSwatini',
-                'Guinea Bissau': 'Guinea-Bissau'
+                'Czech Republic': 'Czechia', 'Macedonia': 'North Macedonia',
+                'Swaziland': 'eSwatini', 'Guinea Bissau': 'Guinea-Bissau'
             };
             
             worldGeoData.features.forEach(feature => {
@@ -433,7 +482,6 @@
                 const fact = factsMap.get(factName);
 
                 if (fact) {
-                    // Store the data using the GeoJSON name as the key, as that's what we use for matching
                     countriesData[geoJsonName] = { ...fact, name: geoJsonName };
                 }
             });
