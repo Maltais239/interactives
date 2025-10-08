@@ -3,273 +3,293 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Canada SVG Puzzle – drag provinces into place</title>
+  <title>Canada SVG Puzzle – OFFLINE</title>
   <style>
-    :root { --bg:#0b1020; --panel:#0e1532; --ink:#e8ecf6; --accent:#7dd3fc; --ok:#16a34a; --warn:#f59e0b; --border:#223; }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; }
-    body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    #stage { position: fixed; inset: 0; background:#09112a; }
-    #boardWrap { position:absolute; inset:0; display:grid; place-items:center; pointer-events:auto; }
-    svg#board { width: 100%; height: 100%; max-width: 1800px; aspect-ratio: 1000/600; background:#eef5fb; touch-action:none; }
-    /* Targets (faint map in correct spots) */
-    #targets path { fill:#e7eef8; stroke:#bcd3f5; stroke-width:1; }
-    #targets g.done path { fill:#eaf7ee; stroke:#a7e3ba; }
+    :root {
+      --bg: #f8f9fa;
+      --ink: #212529;
+      --border-color: #dee2e6;
+      --primary: #007bff;
+      --success: #28a745;
+    }
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font: 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      overflow: hidden;
+    }
+    #stage {
+      position: fixed;
+      inset: 0;
+      background: #f1f3f5;
+    }
+    #boardWrap {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 50px 20px 20px;
+      box-sizing: border-box;
+    }
+    svg#board {
+      width: 100%;
+      height: 100%;
+      max-width: 1400px;
+      aspect-ratio: 1000/600;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.1);
+      touch-action: none;
+    }
+    #targets path {
+      fill: #e9ecef;
+      stroke: #ced4da;
+      stroke-width: 1;
+    }
+    #targets g.done path {
+      fill: #d4edda;
+      stroke: #b2dfc0;
+    }
+    #pieces g.piece {
+      cursor: grab;
+      transition: filter 0.2s ease, opacity 0.2s ease;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,.15));
+    }
+    #pieces g.piece:hover {
+       filter: drop-shadow(0 6px 12px rgba(0,0,0,.2));
+    }
+    #pieces g.piece.dragging {
+      cursor: grabbing;
+      opacity: .85;
+      filter: drop-shadow(0 8px 16px rgba(0,0,0,.25));
+    }
+    #pieces g.piece.placed {
+      cursor: default;
+      filter: none;
+      opacity: 1;
+    }
+    .controls {
+      position: absolute;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+      z-index: 10;
+      background: rgba(255,255,255,.7);
+      padding: 8px;
+      border-radius: 12px;
+      backdrop-filter: blur(5px);
+    }
+    .btn {
+      background: #fff;
+      color: #343a40;
+      border: 1px solid #ced4da;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 4px rgba(0,0,0,.05);
+    }
+    .btn:hover {
+      background: #f8f9fa;
+      border-color: #adb5bd;
+      transform: translateY(-1px);
+    }
 
-    /* Draggable pieces */
-    #pieces g.piece { cursor: grab; filter: drop-shadow(0 2px 6px rgba(0,0,0,.3)); }
-    #pieces g.piece.dragging { cursor: grabbing; opacity:.9; }
-    #pieces g.piece.placed { cursor: default; filter:none; }
-
-    aside { border-left:1px solid var(--border); background: var(--panel); padding:14px; overflow:auto; }
-    h1 { font-size: 18px; margin:0 0 8px 0; }
-    .muted { opacity:.85; }
-    .row { display:flex; gap:8px; align-items:center; margin:10px 0; }
-    .btn { background:#172149; color:#cde; border:1px solid #30427a; border-radius:10px; padding:8px 12px; font-weight:600; cursor:pointer; }
-    .btn:hover { filter:brightness(1.08); }
-    .controls { position:absolute; top:12px; left:12px; display:flex; gap:8px; z-index:10; }
-    .log { font-family: ui-monospace, Menlo, Consolas, monospace; background:#0a1128; border:1px solid #22345e; border-radius:8px; padding:10px; height:160px; overflow:auto; white-space:pre-wrap; }
-    .ok { color:#22c55e; }
+    /* Win Modal Styles */
+    #winModal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    #winModal.show {
+      opacity: 1;
+      visibility: visible;
+    }
+    .win-modal-content {
+      background: white;
+      padding: 40px;
+      border-radius: 16px;
+      text-align: center;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      transform: scale(0.9);
+      transition: transform 0.3s ease;
+    }
+    #winModal.show .win-modal-content {
+      transform: scale(1);
+    }
+    .win-modal-content h2 {
+      margin-top: 0;
+      font-size: 2.5rem;
+      color: var(--success);
+    }
+    .win-modal-content p {
+      margin-bottom: 24px;
+      font-size: 1.1rem;
+      color: #495057;
+    }
   </style>
 </head>
 <body>
   <div id="stage">
     <div id="boardWrap">
       <svg id="board" viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg">
-        <g id="targets"></g>
-        <g id="pieces"></g>
+        <defs>
+          <clipPath id="boardClip"><rect x="0" y="0" width="1000" height="600" /></clipPath>
+        </defs>
+        <g clip-path="url(#boardClip)">
+          <g id="targets"></g>
+          <g id="pieces"></g>
+        </g>
       </svg>
     </div>
   </div>
-  <div id="controls" class="controls"><button class="btn" id="shuffle">Shuffle</button><button class="btn" id="reset">Reset</button></div>
+  <div class="controls"><button class="btn" id="shuffle">Shuffle</button><button class="btn" id="reset">Reset</button></div>
+  
+  <div id="winModal">
+    <div class="win-modal-content">
+      <h2>Congratulations!</h2>
+      <p>You've successfully assembled Canada.</p>
+      <button class="btn" id="playAgain">Play Again</button>
+    </div>
+  </div>
 
   <script src="https://unpkg.com/d3@7/dist/d3.min.js"></script>
   <script>
-    const log = (...a)=>{ console.log('[puzzle]', ...a); };
-
-    const board = document.getElementById('board');
+    const log = (...a) => console.log('[puzzle]', ...a);
     const gTargets = document.getElementById('targets');
-    const gPieces  = document.getElementById('pieces');
+    const gPieces = document.getElementById('pieces');
+    const BOARD_WIDTH = 1000, BOARD_HEIGHT = 600;
+    let projection, path, features = [], targetsByName = {};
 
-    const W = 1000, H = 600; // board viewBox
-
-    // -------------------------------------------------------------------
-    // EMBED YOUR SIMPLEMAPS JSON HERE
-    // Paste the entire JSON as a string between the backticks. This avoids
-    // the common "Unexpected token ']'" error from partial objects or trailing
-    // commas. We'll JSON.parse() it safely and fall back if it fails.
-    // -------------------------------------------------------------------
-    const EMBEDDED_JSON_TEXT = ``; // ← paste the JSON from simplemaps.com here (complete FeatureCollection)
-
-    // Try to parse the embedded text (and lightly sanitize trailing commas)
-    let EMBEDDED_GEOJSON = null;
-    (function(){
-      const raw = EMBEDDED_JSON_TEXT.trim();
-      if(!raw) return; // nothing embedded; we'll load fallback below
-      try{
-        // remove simple trailing commas before ] or } to guard against copy/paste artifacts
-        const sanitized = raw
-          .replace(/,\s*([\]\}])/g, '$1') // trailing commas
-          .replace(/\u0000/g, '');         // stray nulls
-        EMBEDDED_GEOJSON = JSON.parse(sanitized);
-      }catch(err){
-        log('❌ Could not parse embedded JSON:', err.message);
-      }
-    })();
-
-    let projection, path, features=[], targetsByName={}, piecesByName={};
-
-    function normName(props){
-      return props.name || props.province || props.NAME || props.admin || props.abbrev || 'Unknown';
+    // Curated color palette inspired by your image, slightly darker
+    const provinceColors = {
+      'British Columbia': '#e09489',
+      'Alberta': '#e2ac91',
+      'Saskatchewan': '#eecb8a',
+      'Manitoba': '#9ed47a',
+      'Ontario': '#8cb7e0',
+      'Quebec': '#a8c2e4',
+      'New Brunswick': '#79d0e0',
+      'Nova Scotia': '#6fd283',
+      'Prince Edward Island': '#e08371',
+      'Newfoundland and Labrador': '#b1a0cf',
+      'Yukon Territory': '#b1c6b1',
+      'Northwest Territories': '#e0b8a8',
+      'Nunavut': '#bac0e0',
+      'Unknown': '#92b3b5'
+    };
+    function getColorForProvince(name) {
+      return provinceColors[name] || provinceColors['Unknown'];
     }
 
-    function colorFor(name){
-      let h=0; for(const c of name) h=(h*31 + c.charCodeAt(0))>>>0; return `hsl(${h%360} 80% 60%)`;
-    }
-
-    function fitProjection(fc){
-      projection = d3.geoMercator().fitSize([W,H], fc);
+    function normName(p) { return p.name || p.province || p.NAME || p.admin || p.abbrev || 'Unknown' }
+    
+    function fitProjection(fc) { 
+      projection = d3.geoMercator().fitSize([BOARD_WIDTH, BOARD_HEIGHT], fc);
       path = d3.geoPath(projection);
     }
 
-    function geoToPaths(fc){
+    function geoToPaths(fc) {
       fitProjection(fc);
-      // Draw targets (true positions)
-      gTargets.innerHTML='';
-      targetsByName={};
-      const targetG = d3.select(gTargets)
-        .selectAll('g').data(fc.features).enter().append('g').attr('data-name',d=>normName(d.properties));
-      targetG.append('path').attr('d', d=>path(d)).attr('fill', '#e7eef8').attr('stroke','#bcd3f5').attr('stroke-width',1);
-      targetG.each(function(d){
-        const name = normName(d.properties);
-        const c = path.centroid(d);
-        targetsByName[name] = { x:c[0], y:c[1], path: path(d), node:this };
-      });
-
-      // Spawn shuffled pieces
+      gTargets.innerHTML = '';
+      targetsByName = {};
+      const tg = d3.select(gTargets).selectAll('g').data(fc.features).enter().append('g').attr('data-name', d => normName(d.properties));
+      tg.append('path').attr('d', d => path(d)).attr('fill-rule', 'evenodd').attr('vector-effect', 'non-scaling-stroke');
+      tg.each(function (d) { const n = normName(d.properties); const c = path.centroid(d); targetsByName[n] = { x: c[0], y: c[1], path: path(d), node: this } });
       spawnPieces(fc);
     }
 
-    function spawnPieces(fc){
+    function spawnPieces(fc) {
       d3.select(gPieces).selectAll('*').remove();
-      piecesByName={};
-      const shuffled = d3.shuffle([...fc.features]);
-      const cols = 5, padX=40, padY=H-180, cell=110;
-      let i=0;
-      const pieces = d3.select(gPieces).selectAll('g.piece')
-        .data(shuffled, d=>normName(d.properties))
-        .enter().append('g')
-          .attr('class','piece')
-          .attr('data-name', d=>normName(d.properties))
-          .each(function(d){ piecesByName[normName(d.properties)] = this; })
-          .call(d3.drag()
-            .on('start', dragStarted)
-            .on('drag', dragged)
-            .on('end', dragEnded)
-          );
-
-      // draw paths and center each piece around its own centroid so it can be moved anywhere
-      pieces.each(function(d){
+      const sh = d3.shuffle([...fc.features]);
+      const cols = 5, padX = 40, padY = BOARD_HEIGHT - 220, cell = 120;
+      let i = 0;
+      const pcs = d3.select(gPieces).selectAll('g.piece').data(sh, d => normName(d.properties)).enter().append('g').attr('class', 'piece').attr('data-name', d => normName(d.properties)).call(d3.drag().on('start', dragStarted).on('drag', dragged).on('end', dragEnded));
+      pcs.each(function (d) {
         const g = d3.select(this);
-        const c = path.centroid(d); // in board coordinates
+        const c = path.centroid(d);
         g.attr('data-cx', c[0]).attr('data-cy', c[1]);
         g.append('path')
           .attr('d', path(d))
-          .attr('fill', colorFor(normName(d.properties)))
-          .attr('stroke', '#1f2937')
-          .attr('stroke-width', 1);
+          .attr('fill', getColorForProvince(normName(d.properties)))
+          .attr('stroke', '#ffffff')
+          .attr('stroke-width', 2)
+          .attr('fill-rule', 'evenodd')
+          .attr('vector-effect', 'non-scaling-stroke');
       });
-
-      // Initial random-ish positions at bottom of board — translate by (x - cx, y - cy)
-      pieces.attr('transform', function(){
+      pcs.attr('transform', function () {
         const cx = +this.getAttribute('data-cx');
         const cy = +this.getAttribute('data-cy');
-        const x = padX + (i%cols)*cell + (Math.random()*40-20);
-        const y = padY + Math.floor(i/cols)*80 + (Math.random()*30-15);
+        const x = padX + (i % cols) * cell + (Math.random() * 40 - 20);
+        const y = padY + Math.floor(i / cols) * 90 + (Math.random() * 30 - 15);
         i++;
-        return `translate(${x - cx},${y - cy})`;
+        return `translate(${x - cx}, ${y - cy})`
       });
     }
 
-    function getTranslate(el){
-      const m = /translate\(([-0-9.]+),\s*([-0-9.]+)\)/.exec(el.getAttribute('transform')||'translate(0,0)');
-      return {x: +m[1], y:+m[2]};
-    }
-
-    function dragStarted(event){
-      if(this.classList.contains('placed')) return;
-      this.classList.add('dragging');
-      this._t0 = getTranslate(this);
-    }
-    function dragged(event){
-      if(this.classList.contains('placed')) return;
-      const x = this._t0.x + event.dx; const y = this._t0.y + event.dy;
-      this.setAttribute('transform', `translate(${x},${y})`);
-      this._t0 = {x,y};
-    }
-    function dragEnded(event){
+    function getTranslate(el) { const m = /translate\(([-0-9.]+),\s*([-0-9.]+)\)/.exec(el.getAttribute('transform') || 'translate(0,0)'); return { x: +m[1], y: +m[2] } }
+    function dragStarted(e) { if (this.classList.contains('placed')) return; d3.select(this).raise(); this.classList.add('dragging'); this._t0 = getTranslate(this) }
+    function dragged(e) { if (this.classList.contains('placed')) return; const x = this._t0.x + e.dx; const y = this._t0.y + e.dy; this.setAttribute('transform', `translate(${x},${y})`); this._t0 = { x, y } }
+    function dragEnded(e) {
       this.classList.remove('dragging');
-      if(this.classList.contains('placed')) return;
+      if (this.classList.contains('placed')) return;
       const name = this.getAttribute('data-name');
-      const tgt = targetsByName[name]; if(!tgt) return;
-      // With pieces centered on their own centroid, the current centroid = translate + (cx, cy)
+      const tgt = targetsByName[name];
+      if (!tgt) return;
       const t = getTranslate(this);
       const cx = +this.getAttribute('data-cx');
       const cy = +this.getAttribute('data-cy');
-      const current = { x: t.x + cx, y: t.y + cy };
-      const dist = Math.hypot(current.x - tgt.x, current.y - tgt.y);
-      const snapRadius = 28; // pixels in board space
-      if(dist < snapRadius){
-        // Snap so centroid aligns exactly
-        const nx = t.x + (tgt.x - current.x);
-        const ny = t.y + (tgt.y - current.y);
-        this.setAttribute('transform', `translate(${nx},${ny})`);
-        this.classList.add('placed');
-        this.style.filter = 'none';
-        d3.select(tgt.node).classed('done', true);
-        log('✔', name, 'placed');
-        checkWin();
+      const cur = { x: t.x + cx, y: t.y + cy };
+      const dist = Math.hypot(cur.x - tgt.x, cur.y - tgt.y);
+      const R = 35; // Increased snap radius
+      if (dist < R) {
+        const nx = t.x + (tgt.x - cur.x);
+        const ny = t.y + (tgt.y - cur.y);
+        d3.select(this).transition().duration(250).attr('transform', `translate(${nx},${ny})`).on('end', () => {
+          this.classList.add('placed');
+          d3.select(tgt.node).classed('done', true);
+          checkWin();
+        });
       }
     }
 
-    function checkWin(){
+    function checkWin() {
       const all = [...gPieces.querySelectorAll('g.piece')];
-      if(all.length && all.every(n=>n.classList.contains('placed'))){
-        log('🎉 All pieces placed!');
-        alert('Great job! All provinces and territories placed.');
+      if (all.length && all.every(n => n.classList.contains('placed'))) {
+        document.getElementById('winModal').classList.add('show');
       }
     }
-    // Buttons
-    document.getElementById('shuffle').onclick = ()=> spawnPieces({type:'FeatureCollection', features});
-    document.getElementById('reset').onclick = ()=> geoToPaths({type:'FeatureCollection', features});
 
+    document.getElementById('shuffle').onclick = () => spawnPieces({ type: 'FeatureCollection', features });
+    document.getElementById('reset').onclick = () => {
+        document.getElementById('winModal').classList.remove('show');
+        geoToPaths({ type: 'FeatureCollection', features });
+    };
+    document.getElementById('playAgain').onclick = () => {
+        document.getElementById('winModal').classList.remove('show');
+        geoToPaths({ type: 'FeatureCollection', features });
+    };
 
-    function coerceToFeatureCollection(data){
-      if(data.type === 'FeatureCollection') return data;
-      if(data.type === 'Feature') return { type:'FeatureCollection', features:[data] };
-      if(Array.isArray(data)) return { type:'FeatureCollection', features:data };
-      throw new Error('Unsupported GeoJSON structure');
-    }
+    function coerceToFeatureCollection(d) { if (d.type === 'FeatureCollection') return d; if (d.type === 'Feature') return { type: 'FeatureCollection', features: [d] }; if (Array.isArray(d)) return { type: 'FeatureCollection', features: d }; throw new Error('Unsupported GeoJSON structure') }
+    function pickCanadaFeatures(fc) { const keep = fc.features.filter(f => f.geometry && /Polygon/i.test(f.geometry.type)); const expected = new Set(['British Columbia', 'Alberta', 'Saskatchewan', 'Manitoba', 'Ontario', 'Quebec', 'New Brunswick', 'Nova Scotia', 'Prince Edward Island', 'Newfoundland and Labrador', 'Yukon Territory', 'Northwest Territories', 'Nunavut']); const withNames = keep.filter(f => expected.has((f.properties || {}).name) || expected.has((f.properties || {}).province) || expected.has((f.properties || {}).NAME)); const chosen = withNames.length === 13 ? withNames : keep; return { type: 'FeatureCollection', features: chosen } }
+    function initWithGeoJSON(raw) { const fc = pickCanadaFeatures(coerceToFeatureCollection(raw)); features = fc.features; geoToPaths(fc) }
 
-    function pickCanadaFeatures(fc){
-      // Keep only province/territory polygon features
-      const keep = fc.features.filter(f=> (f.geometry && /Polygon/i.test(f.geometry.type)) );
-      // If dataset contains the full world, filter by admin=Canada when present
-      const filtered = keep.filter(f=>{
-        const p=f.properties||{}; const admin=p.admin||p.country||p.COUNTRY||p.sov_a3||'';
-        return (String(admin).toLowerCase().includes('canada')) || keep.length<=20; // heuristic
-      });
-      return { type:'FeatureCollection', features: filtered };
-    }
-
-    function initWithGeoJSON(raw){
-      const fc = pickCanadaFeatures(coerceToFeatureCollection(raw));
-      features = fc.features;
-      geoToPaths(fc);
-    }
-
-    // --- Self tests (basic data validation) ---
-    function selfTest(raw, label='embedded/default'){
-      try{
-        const fc = coerceToFeatureCollection(raw);
-        console.assert(Array.isArray(fc.features), 'features should be an array');
-        if(!Array.isArray(fc.features)) log('❌ features is not an array');
-        const n = fc.features.length;
-        log(`Test: ${label} → features: ${n}`);
-        // Expect 13 (10 provinces + 3 territories)
-        if(n !== 13) log('⚠️ Expected 13 provinces/territories; got', n);
-        const bad = fc.features.filter(f=> !(f.geometry && /Polygon/i.test(f.geometry.type)));
-        if(bad.length) log('⚠️ Non-polygon/multipolygon features found:', bad.length);
-        const gotNames = new Set(fc.features.map(f=> (f.properties||{}).name || (f.properties||{}).province || (f.properties||{}).NAME ));
-        const expected = ['British Columbia','Alberta','Saskatchewan','Manitoba','Ontario','Quebec','New Brunswick','Nova Scotia','Prince Edward Island','Newfoundland and Labrador','Yukon Territory','Northwest Territories','Nunavut'];
-        const missing = expected.filter(nm=> !gotNames.has(nm));
-        if(missing.length) log('⚠️ Missing names:', missing.join(', '));
-      }catch(e){ log('❌ Self test failed:', e.message); }
-    }
-
-    // Initialize: try embedded JSON first, then fall back to a public dataset
-    (async function start(){
-      if(EMBEDDED_GEOJSON){
-        selfTest(EMBEDDED_GEOJSON, 'embedded');
-        const fc = coerceToFeatureCollection(EMBEDDED_GEOJSON);
-        if(!Array.isArray(fc.features) || fc.features.length !== 13){
-          log('❌ Embedded dataset must contain exactly 13 features (10 provinces + 3 territories).');
-        } else {
-          initWithGeoJSON(EMBEDDED_GEOJSON);
-          log('Loaded embedded GeoJSON.');
-          return;
-        }
-      }
-      // Fallback: public Canada provinces GeoJSON so the game always works
-      try{
-        const data = await fetch('https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@master/public/data/canada.geojson').then(r=>r.json());
-        selfTest(data, 'fallback');
-        initWithGeoJSON(data);
-        log('Loaded fallback Canada GeoJSON.');
-      }catch(err){
-        log('❌ Failed to load fallback dataset:', err.message);
-      }
-    })();
+    (function start() { fetch('https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@master/public/data/canada.geojson').then(r => r.json()).then(d => initWithGeoJSON(d)); })();
   </script>
 </body>
 </html>
+
