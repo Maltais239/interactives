@@ -49,14 +49,20 @@
       fill: #e9ecef;
       stroke: #ced4da;
       stroke-width: 1;
+      transition: fill 0.3s, stroke 0.3s;
     }
     #targets g.done path {
       fill: #d4edda;
       stroke: #b2dfc0;
     }
+    /* Style for difficult mode - hides the unsolved target outlines */
+    body.difficult-mode #targets g:not(.done) path {
+        fill: transparent;
+        stroke: transparent;
+    }
     #pieces g.piece {
       cursor: grab;
-      transition: filter 0.2s ease, opacity 0.2s ease;
+      transition: filter 0.2s ease, opacity 0.2s ease, transform 0.3s ease-out;
       filter: drop-shadow(0 4px 8px rgba(0,0,0,.15));
     }
     #pieces g.piece:hover {
@@ -66,6 +72,7 @@
       cursor: grabbing;
       opacity: .85;
       filter: drop-shadow(0 8px 16px rgba(0,0,0,.25));
+      transition: none;
     }
     #pieces g.piece.placed {
       cursor: default;
@@ -95,6 +102,8 @@
       cursor: pointer;
       transition: all 0.2s ease;
       box-shadow: 0 2px 4px rgba(0,0,0,.05);
+      min-width: 80px;
+      text-align: center;
     }
     .btn:hover {
       background: #f8f9fa;
@@ -157,7 +166,7 @@
       </svg>
     </div>
   </div>
-  <div class="controls"><button class="btn" id="shuffle">Shuffle</button><button class="btn" id="reset">Reset</button></div>
+  <div class="controls"><button class="btn" id="shuffle">Shuffle</button><button class="btn" id="reset">Reset</button><button class="btn" id="difficulty">Easy</button></div>
   
   <div id="winModal">
     <div class="win-modal-content">
@@ -172,8 +181,10 @@
     const log = (...a) => console.log('[puzzle]', ...a);
     const gTargets = document.getElementById('targets');
     const gPieces = document.getElementById('pieces');
+    const difficultyBtn = document.getElementById('difficulty');
     const BOARD_WIDTH = 1000, BOARD_HEIGHT = 600;
     let projection, path, features = [], targetsByName = {};
+    let isDifficult = false;
 
     // Curated color palette inspired by your image, slightly darker
     const provinceColors = {
@@ -213,16 +224,34 @@
       spawnPieces(fc);
     }
 
+    const explodedPositions = {
+      'British Columbia': { x: 120, y: 400 },
+      'Alberta': { x: 120, y: 510 },
+      'Saskatchewan': { x: 220, y: 510 },
+      'Manitoba': { x: 880, y: 510 },
+      'Ontario': { x: 800, y: 350 },
+      'Quebec': { x: 880, y: 180 },
+      'New Brunswick': { x: 920, y: 340 },
+      'Nova Scotia': { x: 940, y: 400 },
+      'Prince Edward Island': { x: 910, y: 380 },
+      'Newfoundland and Labrador': { x: 920, y: 80 },
+      'Yukon Territory': { x: 150, y: 120 },
+      'Northwest Territories': { x: 150, y: 250 },
+      'Nunavut': { x: 800, y: 60 },
+    };
+
     function spawnPieces(fc) {
       d3.select(gPieces).selectAll('*').remove();
       const sh = d3.shuffle([...fc.features]);
-      const cols = 5, padX = 40, padY = BOARD_HEIGHT - 220, cell = 120;
-      let i = 0;
+      
       const pcs = d3.select(gPieces).selectAll('g.piece').data(sh, d => normName(d.properties)).enter().append('g').attr('class', 'piece').attr('data-name', d => normName(d.properties)).call(d3.drag().on('start', dragStarted).on('drag', dragged).on('end', dragEnded));
+      
       pcs.each(function (d) {
         const g = d3.select(this);
         const c = path.centroid(d);
         g.attr('data-cx', c[0]).attr('data-cy', c[1]);
+        const bbox = g.node().getBBox();
+        g.attr('data-width', bbox.width).attr('data-height', bbox.height);
         g.append('path')
           .attr('d', path(d))
           .attr('fill', getColorForProvince(normName(d.properties)))
@@ -231,13 +260,24 @@
           .attr('fill-rule', 'evenodd')
           .attr('vector-effect', 'non-scaling-stroke');
       });
-      pcs.attr('transform', function () {
+
+      // "Exploded" view logic using predefined positions
+      pcs.attr('transform', function (d) {
+        const name = normName(d.properties);
+        const targetPos = explodedPositions[name];
+
+        if (!targetPos) {
+          // Fallback for any piece not in our map (shouldn't happen)
+          return 'translate(0,0)';
+        }
+
         const cx = +this.getAttribute('data-cx');
         const cy = +this.getAttribute('data-cy');
-        const x = padX + (i % cols) * cell + (Math.random() * 40 - 20);
-        const y = padY + Math.floor(i / cols) * 90 + (Math.random() * 30 - 15);
-        i++;
-        return `translate(${x - cx}, ${y - cy})`
+        
+        const translateX = targetPos.x - cx;
+        const translateY = targetPos.y - cy;
+        
+        return `translate(${translateX}, ${translateY})`;
       });
     }
 
@@ -284,8 +324,21 @@
         geoToPaths({ type: 'FeatureCollection', features });
     };
 
+    difficultyBtn.addEventListener('click', () => {
+        isDifficult = !isDifficult;
+        document.body.classList.toggle('difficult-mode', isDifficult);
+        difficultyBtn.textContent = isDifficult ? 'Difficult' : 'Easy';
+    });
+
     function coerceToFeatureCollection(d) { if (d.type === 'FeatureCollection') return d; if (d.type === 'Feature') return { type: 'FeatureCollection', features: [d] }; if (Array.isArray(d)) return { type: 'FeatureCollection', features: d }; throw new Error('Unsupported GeoJSON structure') }
-    function pickCanadaFeatures(fc) { const keep = fc.features.filter(f => f.geometry && /Polygon/i.test(f.geometry.type)); const expected = new Set(['British Columbia', 'Alberta', 'Saskatchewan', 'Manitoba', 'Ontario', 'Quebec', 'New Brunswick', 'Nova Scotia', 'Prince Edward Island', 'Newfoundland and Labrador', 'Yukon Territory', 'Northwest Territories', 'Nunavut']); const withNames = keep.filter(f => expected.has((f.properties || {}).name) || expected.has((f.properties || {}).province) || expected.has((f.properties || {}).NAME)); const chosen = withNames.length === 13 ? withNames : keep; return { type: 'FeatureCollection', features: chosen } }
+    function pickCanadaFeatures(fc) { 
+        const keep = fc.features.filter(f => f.geometry && /Polygon/i.test(f.geometry.type)); 
+        const expected = new Set(['British Columbia', 'Alberta', 'Saskatchewan', 'Manitoba', 'Ontario', 'Quebec', 'New Brunswick', 'Nova Scotia', 'Prince Edward Island', 'Newfoundland and Labrador', 'Yukon Territory', 'Northwest Territories', 'Nunavut']); 
+        const withNames = keep.filter(f => expected.has((f.properties || {}).name) || expected.has((f.properties || {}).province) || expected.has((f.properties || {}).NAME)); 
+        // FIX: The original logic was brittle. This is more robust.
+        const chosen = withNames;
+        return { type: 'FeatureCollection', features: chosen } 
+    }
     function initWithGeoJSON(raw) { const fc = pickCanadaFeatures(coerceToFeatureCollection(raw)); features = fc.features; geoToPaths(fc) }
 
     (function start() { fetch('https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@master/public/data/canada.geojson').then(r => r.json()).then(d => initWithGeoJSON(d)); })();
