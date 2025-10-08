@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Canada SVG Puzzle</title>
+  <title>Canada SVG Puzzle – OFFLINE</title>
   <style>
     :root { --bg:#0b1020; --ink:#e8ecf6; }
     html, body { height:100%; margin:0; }
@@ -43,38 +43,20 @@
     const gPieces=document.getElementById('pieces');
     const BOARD_WIDTH=1000,BOARD_HEIGHT=600;let projection,path,features=[],targetsByName={};
 
-    // New color palette from your image
-    const provinceColors = {
-      'British Columbia': '#d99c82',
-      'Alberta': '#e6b48a',
-      'Saskatchewan': '#f2d091',
-      'Manitoba': '#9fca80',
-      'Ontario': '#8cb7e0',
-      'Quebec': '#a8c2e4',
-      'New Brunswick': '#89d7d3',
-      'Nova Scotia': '#6fd283',
-      'Prince Edward Island': '#80d4a5',
-      'Newfoundland and Labrador': '#c7a9d9',
-      'Yukon': '#92b3b5',
-      'Northwest Territories': '#e8b19d',
-      'Nunavut': '#c1c9e8',
-      'Unknown': '#c0c0c0'
-    };
-    function getColorForProvince(name) {
-      return provinceColors[name] || provinceColors['Unknown'];
-    }
+    const EMBEDDED_JSON_TEXT = ``;
 
     function normName(p){return p.name||p.province||p.NAME||p.admin||p.abbrev||'Unknown'}
+    function colorFor(n){let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))>>>0;return `hsl(${h%360} 80% 60%)`}
     function fitProjection(fc){projection=d3.geoMercator().fitSize([BOARD_WIDTH,BOARD_HEIGHT],fc);path=d3.geoPath(projection)}
 
     function geoToPaths(fc){fitProjection(fc);gTargets.innerHTML='';targetsByName={};const tg=d3.select(gTargets).selectAll('g').data(fc.features).enter().append('g').attr('data-name',d=>normName(d.properties));tg.append('path').attr('d',d=>path(d)).attr('fill','#e7eef8').attr('stroke','#bcd3f5').attr('stroke-width',1).attr('fill-rule','evenodd').attr('vector-effect','non-scaling-stroke');tg.each(function(d){const n=normName(d.properties);const c=path.centroid(d);targetsByName[n]={x:c[0],y:c[1],path:path(d),node:this}});spawnPieces(fc)}
 
-    function spawnPieces(fc){d3.select(gPieces).selectAll('*').remove();const sh=d3.shuffle([...fc.features]);const cols=5,padX=40,padY=BOARD_HEIGHT-180,cell=110;let i=0;const pcs=d3.select(gPieces).selectAll('g.piece').data(sh,d=>normName(d.properties)).enter().append('g').attr('class','piece').attr('data-name',d=>normName(d.properties)).call(d3.drag().on('start',dragStarted).on('drag',dragged).on('end',dragEnded));pcs.each(function(d){const g=d3.select(this);const c=path.centroid(d);g.attr('data-cx',c[0]).attr('data-cy',c[1]);g.append('path').attr('d',path(d)).attr('fill',getColorForProvince(normName(d.properties))).attr('stroke','#1f2937').attr('stroke-width',1).attr('fill-rule','evenodd').attr('vector-effect','non-scaling-stroke')});pcs.attr('transform',function(){const cx=+this.getAttribute('data-cx');const cy=+this.getAttribute('data-cy');const x=padX+(i%cols)*cell+(Math.random()*40-20);const y=padY+Math.floor(i/cols)*80+(Math.random()*30-15);i++;return `translate(${x-cx},${y-cy})`})}
+    function spawnPieces(fc){d3.select(gPieces).selectAll('*').remove();const sh=d3.shuffle([...fc.features]);const cols=5,padX=40,padY=BOARD_HEIGHT-180,cell=110;let i=0;const pcs=d3.select(gPieces).selectAll('g.piece').data(sh,d=>normName(d.properties)).enter().append('g').attr('class','piece').attr('data-name',d=>normName(d.properties)).call(d3.drag().on('start',dragStarted).on('drag',dragged).on('end',dragEnded));pcs.each(function(d){const g=d3.select(this);const c=path.centroid(d);g.attr('data-cx',c[0]).attr('data-cy',c[1]);g.append('path').attr('d',path(d)).attr('fill',colorFor(normName(d.properties))).attr('stroke','#1f2937').attr('stroke-width',1).attr('fill-rule','evenodd').attr('vector-effect','non-scaling-stroke')});pcs.attr('transform',function(){const cx=+this.getAttribute('data-cx');const cy=+this.getAttribute('data-cy');const x=padX+(i%cols)*cell+(Math.random()*40-20);const y=padY+Math.floor(i/cols)*80+(Math.random()*30-15);i++;return `translate(${x-cx},${y-cy})`})}
 
     function getTranslate(el){const m=/translate\(([-0-9.]+),\s*([-0-9.]+)\)/.exec(el.getAttribute('transform')||'translate(0,0)');return{x:+m[1],y:+m[2]}}
-    function dragStarted(e){if(this.classList.contains('placed'))return;d3.select(this).raise();this.classList.add('dragging');this._t0=getTranslate(this)}
+    function dragStarted(e){if(this.classList.contains('placed'))return;this.classList.add('dragging');this._t0=getTranslate(this)}
     function dragged(e){if(this.classList.contains('placed'))return;const x=this._t0.x+e.dx;const y=this._t0.y+e.dy;this.setAttribute('transform',`translate(${x},${y})`);this._t0={x,y}}
-    function dragEnded(e){this.classList.remove('dragging');if(this.classList.contains('placed'))return;const name=this.getAttribute('data-name');const tgt=targetsByName[name];if(!tgt)return;const t=getTranslate(this);const cx=+this.getAttribute('data-cx');const cy=+this.getAttribute('data-cy');const cur={x:t.x+cx,y:t.y+cy};const dist=Math.hypot(cur.x-tgt.x,cur.y-tgt.y);const R=28;if(dist<R){const nx=t.x+(tgt.x-cur.x);const ny=t.y+(tgt.y-cur.y);d3.select(this).transition().duration(250).attr('transform',`translate(${nx},${ny})`).on('end', () => { this.classList.add('placed'); d3.select(tgt.node).classed('done',true); checkWin() });}}
+    function dragEnded(e){this.classList.remove('dragging');if(this.classList.contains('placed'))return;const name=this.getAttribute('data-name');const tgt=targetsByName[name];if(!tgt)return;const t=getTranslate(this);const cx=+this.getAttribute('data-cx');const cy=+this.getAttribute('data-cy');const cur={x:t.x+cx,y:t.y+cy};const dist=Math.hypot(cur.x-tgt.x,cur.y-tgt.y);const R=28;if(dist<R){const nx=t.x+(tgt.x-cur.x);const ny=t.y+(tgt.y-cur.y);this.setAttribute('transform',`translate(${nx},${ny})`);this.classList.add('placed');this.style.filter='none';d3.select(tgt.node).classed('done',true);checkWin()}}
 
     function checkWin(){const all=[...gPieces.querySelectorAll('g.piece')];if(all.length&&all.every(n=>n.classList.contains('placed'))){alert('Great job! All provinces and territories placed.')}}
 
@@ -82,13 +64,7 @@
     document.getElementById('reset').onclick=()=>geoToPaths({type:'FeatureCollection',features});
 
     function coerceToFeatureCollection(d){if(d.type==='FeatureCollection')return d;if(d.type==='Feature')return{type:'FeatureCollection',features:[d]};if(Array.isArray(d))return{type:'FeatureCollection',features:d};throw new Error('Unsupported GeoJSON structure')}
-    function pickCanadaFeatures(fc) {
-        const keep = fc.features.filter(f => f.geometry && /Polygon/i.test(f.geometry.type));
-        const expected = new Set(['British Columbia', 'Alberta', 'Saskatchewan', 'Manitoba', 'Ontario', 'Quebec', 'New Brunswick', 'Nova Scotia', 'Prince Edward Island', 'Newfoundland and Labrador', 'Yukon', 'Northwest Territories', 'Nunavut']);
-        // This is the robust filter that prevents provinces from disappearing.
-        const chosen = keep.filter(f => expected.has(normName(f.properties)));
-        return { type: 'FeatureCollection', features: chosen }
-    }
+    function pickCanadaFeatures(fc){const keep=fc.features.filter(f=>f.geometry&&/Polygon/i.test(f.geometry.type));const expected=new Set(['British Columbia','Alberta','Saskatchewan','Manitoba','Ontario','Quebec','New Brunswick','Nova Scotia','Prince Edward Island','Newfoundland and Labrador','Yukon','Northwest Territories','Nunavut']);const withNames=keep.filter(f=> expected.has((f.properties||{}).name)|| expected.has((f.properties||{}).province)|| expected.has((f.properties||{}).NAME));const chosen=withNames.length===13?withNames:keep;return{type:'FeatureCollection',features:chosen}}
     function initWithGeoJSON(raw){const fc=pickCanadaFeatures(coerceToFeatureCollection(raw));features=fc.features;geoToPaths(fc)}
 
     (function start(){fetch('https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@master/public/data/canada.geojson').then(r=>r.json()).then(d=>initWithGeoJSON(d));})();
