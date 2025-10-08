@@ -5,20 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Canada SVG Puzzle – OFFLINE</title>
   <style>
-    :root { --bg:#0b1020; --ink:#e8ecf6; }
+    :root { --bg:#ffffff; --ink:#212529; }
     html, body { height:100%; margin:0; }
     body { background:var(--bg); color:var(--ink); font:14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    #stage { position:fixed; inset:0; background:#09112a; }
+    #stage { position:fixed; inset:0; background:#f8f9fa; }
     #boardWrap { position:absolute; inset:0; display:grid; place-items:center; }
-    svg#board { width:100%; height:100%; max-width:1800px; aspect-ratio:1000/600; background:#eef5fb; touch-action:none; }
-    #targets path { fill:#e7eef8; stroke:#bcd3f5; stroke-width:1; }
-    #targets g.done path { fill:#eaf7ee; stroke:#a7e3ba; }
-    #pieces g.piece { cursor:grab; filter:drop-shadow(0 2px 6px rgba(0,0,0,.3)); }
-    #pieces g.piece.dragging { cursor:grabbing; opacity:.9; }
+    svg#board { width:100%; height:100%; max-width:1800px; aspect-ratio:1000/600; background:#ffffff; touch-action:none; box-shadow: 0 8px 30px rgba(0,0,0,.07); border-radius: 16px;}
+    #targets path { fill:#e9ecef; stroke:#dee2e6; stroke-width:1; transition: fill 0.3s, stroke 0.3s; }
+    #targets g.done path { fill:#d4edda; stroke:#c3e6cb; }
+    /* Style for difficult mode - hides the unsolved target outlines */
+    body.difficult-mode #targets g:not(.done) path {
+        fill: transparent;
+        stroke: transparent;
+    }
+    #pieces g.piece { cursor:grab; filter:drop-shadow(0 4px 8px rgba(0,0,0,.15)); }
+    #pieces g.piece:hover { filter:drop-shadow(0 6px 12px rgba(0,0,0,.2)); }
+    #pieces g.piece.dragging { cursor:grabbing; opacity:.9; filter:drop-shadow(0 8px 16px rgba(0,0,0,.25));}
     #pieces g.piece.placed { cursor:default; filter:none; }
-    .controls { position:absolute; top:12px; left:12px; display:flex; gap:8px; z-index:10; }
-    .btn { background:#172149; color:#cde; border:1px solid #30427a; border-radius:10px; padding:8px 12px; font-weight:600; cursor:pointer; }
-    .btn:hover { filter:brightness(1.08); }
+    .controls { position:absolute; top:15px; left:50%; transform: translateX(-50%); display:flex; gap:8px; z-index:10; background: rgba(255,255,255,.7); padding: 8px; border-radius: 12px; backdrop-filter: blur(5px);}
+    .btn { background:#fff; color:#343a40; border:1px solid #ced4da; border-radius:8px; padding:8px 12px; font-weight:600; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,.05); }
+    .btn:hover { background:#f8f9fa; border-color: #adb5bd; }
   </style>
 </head>
 <body>
@@ -35,13 +41,19 @@
       </svg>
     </div>
   </div>
-  <div class="controls"><button class="btn" id="shuffle">Shuffle</button><button class="btn" id="reset">Reset</button></div>
+  <div class="controls">
+      <button class="btn" id="shuffle">Shuffle</button>
+      <button class="btn" id="reset">Reset</button>
+      <button class="btn" id="difficulty">Easy</button>
+    </div>
   <script src="https://unpkg.com/d3@7/dist/d3.min.js"></script>
   <script>
     const log=(...a)=>console.log('[puzzle]',...a);
     const gTargets=document.getElementById('targets');
     const gPieces=document.getElementById('pieces');
-    const BOARD_WIDTH=1000,BOARD_HEIGHT=600;let projection,path,features=[],targetsByName={};
+    const difficultyBtn = document.getElementById('difficulty');
+    const BOARD_WIDTH=1000,BOARD_HEIGHT=600;
+    let projection,path,features=[],targetsByName={}, isDifficult = false;
 
     const explodedPositions = {
       'British Columbia': { x: 120, y: 400 },
@@ -59,11 +71,8 @@
       'Nunavut': { x: 800, y: 60 },
     };
 
-    const EMBEDDED_JSON_TEXT = ``;
-
     function normName(p){return p.name||p.province||p.NAME||p.admin||p.abbrev||'Unknown'}
     
-    // CORRECTED color palette from your latest image
     const provinceColors = {
       'British Columbia': '#e09489',
       'Alberta': '#e2ac91',
@@ -82,25 +91,30 @@
     };
 
     function getPieceColor(name) {
-      // This function now uses the complete color palette for all provinces.
       return provinceColors[name] || provinceColors['Unknown'];
     }
 
     function fitProjection(fc){projection=d3.geoMercator().fitSize([BOARD_WIDTH,BOARD_HEIGHT],fc);path=d3.geoPath(projection)}
 
-    function geoToPaths(fc){fitProjection(fc);gTargets.innerHTML='';targetsByName={};const tg=d3.select(gTargets).selectAll('g').data(fc.features).enter().append('g').attr('data-name',d=>normName(d.properties));tg.append('path').attr('d',d=>path(d)).attr('fill','#e7eef8').attr('stroke','#bcd3f5').attr('stroke-width',1).attr('fill-rule','evenodd').attr('vector-effect','non-scaling-stroke');tg.each(function(d){const n=normName(d.properties);const c=path.centroid(d);targetsByName[n]={x:c[0],y:c[1],path:path(d),node:this}});spawnPieces(fc)}
+    function geoToPaths(fc){fitProjection(fc);gTargets.innerHTML='';targetsByName={};const tg=d3.select(gTargets).selectAll('g').data(fc.features).enter().append('g').attr('data-name',d=>normName(d.properties));tg.append('path').attr('d',d=>path(d)).attr('fill-rule','evenodd').attr('vector-effect','non-scaling-stroke');tg.each(function(d){const n=normName(d.properties);const c=path.centroid(d);targetsByName[n]={x:c[0],y:c[1],path:path(d),node:this}});spawnPieces(fc)}
 
     function spawnPieces(fc){d3.select(gPieces).selectAll('*').remove();const sh=d3.shuffle([...fc.features]);const pcs=d3.select(gPieces).selectAll('g.piece').data(sh,d=>normName(d.properties)).enter().append('g').attr('class','piece').attr('data-name',d=>normName(d.properties)).call(d3.drag().on('start',dragStarted).on('drag',dragged).on('end',dragEnded));pcs.each(function(d){const g=d3.select(this);const c=path.centroid(d);g.attr('data-cx',c[0]).attr('data-cy',c[1]);g.append('path').attr('d',path(d)).attr('fill',getPieceColor(normName(d.properties))).attr('stroke', normName(d.properties) === 'Prince Edward Island' ? '#000000' : '#ffffff').attr('stroke-width',1).attr('fill-rule','evenodd').attr('vector-effect','non-scaling-stroke')});pcs.attr('transform',function(d){const name = normName(d.properties);const targetPos = explodedPositions[name];if (!targetPos) { console.warn(`No exploded position for ${name}`); return 'translate(50,50)'; }const cx=+this.getAttribute('data-cx');const cy=+this.getAttribute('data-cy');return `translate(${targetPos.x - cx}, ${targetPos.y - cy})`})}
 
-    function getTranslate(el){const m=/translate\(([-0-notify.js - 9.]+),\s*([-0-9.]+)\)/.exec(el.getAttribute('transform')||'translate(0,0)');return{x:+m[1],y:+m[2]}}
+    function getTranslate(el){const m=/translate\(([-0-9.]+),\s*([-0-9.]+)\)/.exec(el.getAttribute('transform')||'translate(0,0)');return{x:+m[1],y:+m[2]}}
     function dragStarted(e){if(this.classList.contains('placed'))return;this.classList.add('dragging');this._t0=getTranslate(this)}
     function dragged(e){if(this.classList.contains('placed'))return;const x=this._t0.x+e.dx;const y=this._t0.y+e.dy;this.setAttribute('transform',`translate(${x},${y})`);this._t0={x,y}}
-    function dragEnded(e){this.classList.remove('dragging');if(this.classList.contains('placed'))return;const name=this.getAttribute('data-name');const tgt=targetsByName[name];if(!tgt)return;const t=getTranslate(this);const cx=+this.getAttribute('data-cx');const cy=+this.getAttribute('data-cy');const cur={x:t.x+cx,y:t.y+cy};const dist=Math.hypot(cur.x-tgt.x,cur.y-tgt.y);const R=28;if(dist<R){const nx=t.x+(tgt.x-cur.x);const ny=t.y+(tgt.y-cur.y);this.setAttribute('transform',`translate(${nx},${ny})`);this.classList.add('placed');this.style.filter='none';d3.select(tgt.node).classed('done',true);checkWin()}}
+    function dragEnded(e){this.classList.remove('dragging');if(this.classList.contains('placed'))return;const name=this.getAttribute('data-name');const tgt=targetsByName[name];if(!tgt)return;const t=getTranslate(this);const cx=+this.getAttribute('data-cx');const cy=+this.getAttribute('data-cy');const cur={x:t.x+cx,y:t.y+cy};const dist=Math.hypot(cur.x-tgt.x,cur.y-tgt.y);const R=28;if(dist<R){const nx=t.x+(tgt.x-cur.x);const ny=t.y+(tgt.y-cur.y);d3.select(this).transition().duration(250).attr('transform',`translate(${nx},${ny})`).on('end', () => { this.classList.add('placed'); d3.select(tgt.node).classed('done', true); checkWin(); });}}
 
     function checkWin(){const all=[...gPieces.querySelectorAll('g.piece')];if(all.length&&all.every(n=>n.classList.contains('placed'))){alert('Great job! All provinces and territories placed.')}}
 
     document.getElementById('shuffle').onclick=()=>spawnPieces({type:'FeatureCollection',features});
     document.getElementById('reset').onclick=()=>geoToPaths({type:'FeatureCollection',features});
+    
+    difficultyBtn.addEventListener('click', () => {
+        isDifficult = !isDifficult;
+        document.body.classList.toggle('difficult-mode', isDifficult);
+        difficultyBtn.textContent = isDifficult ? 'Difficult' : 'Easy';
+    });
 
     function coerceToFeatureCollection(d){if(d.type==='FeatureCollection')return d;if(d.type==='Feature')return{type:'FeatureCollection',features:[d]};if(Array.isArray(d))return{type:'FeatureCollection',features:d};throw new Error('Unsupported GeoJSON structure')}
     function pickCanadaFeatures(fc){const keep=fc.features.filter(f=>f.geometry&&/Polygon/i.test(f.geometry.type));const expected=new Set(['British Columbia','Alberta','Saskatchewan','Manitoba','Ontario','Quebec','New Brunswick','Nova Scotia','Prince Edward Island','Newfoundland and Labrador','Yukon','Northwest Territories','Nunavut']);const withNames=keep.filter(f=> expected.has((f.properties||{}).name)|| expected.has((f.properties||{}).province)|| expected.has((f.properties||{}).NAME));const chosen=withNames.length===13?withNames:keep;return{type:'FeatureCollection',features:chosen}}
@@ -110,11 +124,5 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-
 
 
