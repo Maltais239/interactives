@@ -120,16 +120,6 @@
             background-color: #16a34a; width: 100%; margin-top: auto; padding-top: 1rem;
         }
         #new-trek-btn:hover { background-color: #15803d; }
-
-        /* Pulsing animation for current city */
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.4); }
-            100% { transform: scale(1); }
-        }
-        .pulsing-marker {
-            animation: pulse 1.5s infinite;
-        }
     </style>
 </head>
 <body>
@@ -204,9 +194,9 @@
             'Manitoba': { capital: 'Winnipeg', borders: ['Saskatchewan', 'Ontario', 'Nunavut'], coords: [49.8951, -97.1384] },
             'Ontario': { capital: 'Toronto', borders: ['Manitoba', 'Quebec'], coords: [43.6532, -79.3832] },
             'Quebec': { capital: 'Quebec City', borders: ['Ontario', 'New Brunswick', 'Newfoundland and Labrador'], coords: [46.8139, -71.2080] },
-            'New Brunswick': { capital: 'Fredericton', borders: ['Quebec', 'Nova Scotia'], coords: [45.9636, -66.6431] },
+            'New Brunswick': { capital: 'Fredericton', borders: ['Quebec', 'Nova Scotia', 'Prince Edward Island'], coords: [45.9636, -66.6431] },
             'Nova Scotia': { capital: 'Halifax', borders: ['New Brunswick'], coords: [44.6488, -63.5752] },
-            'Prince Edward Island': { capital: 'Charlottetown', borders: [], coords: [46.2382, -63.1311] },
+            'Prince Edward Island': { capital: 'Charlottetown', borders: ['New Brunswick'], coords: [46.2382, -63.1311] }, // Connected by Confederation Bridge
             'Newfoundland and Labrador': { capital: 'St. John\'s', borders: ['Quebec'], coords: [47.5615, -52.7126] },
             'Yukon Territory': { capital: 'Whitehorse', borders: ['British Columbia', 'Northwest Territories'], coords: [60.7212, -135.0568] },
             'Northwest Territories': { capital: 'Yellowknife', borders: ['Yukon Territory', 'British Columbia', 'Alberta', 'Saskatchewan', 'Nunavut'], coords: [62.4540, -114.3718] },
@@ -214,10 +204,8 @@
         };
         const capitalToProvinceMap = Object.fromEntries(Object.entries(provinceData).map(([prov, data]) => [data.capital.toLowerCase(), prov]));
 
-
         // --- Main Logic ---
         function initializeGame(geoData) {
-            // Normalize GeoJSON properties to match internal data keys
             geoData.features.forEach(feature => {
                 if (feature.properties.name === "Yukon") {
                     feature.properties.name = "Yukon Territory";
@@ -232,12 +220,8 @@
             for (const provName in provinceData) {
                 const data = provinceData[provName];
                 const marker = L.circleMarker(data.coords, {
-                    radius: 8,
-                    fillColor: "#64748b",
-                    color: "#fff",
-                    weight: 2,
-                    opacity: 1,
-                    fillOpacity: 0.8
+                    radius: 8, fillColor: "#64748b", color: "#fff",
+                    weight: 2, opacity: 1, fillOpacity: 0.8
                 }).addTo(map);
                 marker.bindTooltip(data.capital);
                 marker.on('click', () => handleGuess(data.capital));
@@ -264,16 +248,10 @@
         }
 
         function startNewTrek() {
-            if (trekPathLayer) {
-                map.removeLayer(trekPathLayer);
-                trekPathLayer = null;
-            }
-            Object.values(capitalMarkers).forEach(m => {
-                m.setStyle({ fillColor: "#64748b", radius: 8 });
-                m.getElement()?.classList.remove('pulsing-marker');
-            });
+            if (trekPathLayer) { map.removeLayer(trekPathLayer); trekPathLayer = null; }
+            Object.values(capitalMarkers).forEach(m => m.setStyle({ fillColor: "#64748b", radius: 8 }));
             
-            const candidateProvinces = Object.keys(provinceData).filter(p => provinceData[p].borders.length > 0);
+            const candidateProvinces = Object.keys(provinceData);
             let start, end, path;
             let attempts = 0;
             do {
@@ -283,9 +261,7 @@
                 attempts++;
             } while (attempts < 200 && (start === end || !path || path.length < 3));
 
-            if (!path || path.length < 3) { 
-                startNewTrek(); return; // Failsafe
-            }
+            if (!path || path.length < 3) { startNewTrek(); return; }
 
             trekState = {
                 start, end, current: start, pathTaken: [start],
@@ -298,17 +274,15 @@
                 trekChallenge.innerHTML = `Your trek starts in <strong>${start}</strong> and your destination is <strong>${end}</strong>.`;
                 distanceDisplay.style.display = 'none';
                 trekGuessInput.placeholder = "Enter province/territory...";
-                Object.values(capitalMarkers).forEach(m => m.setRadius(0)); // Hide markers
+                Object.values(capitalMarkers).forEach(m => m.setRadius(0));
             } else {
                 trekChallenge.innerHTML = `Trek from <strong>${provinceData[start].capital}</strong> (${start}) to <strong>${provinceData[end].capital}</strong> (${end}).`;
                 distanceDisplay.style.display = 'block';
                 distanceValue.textContent = '0';
                 trekGuessInput.placeholder = "Enter capital city...";
-                Object.values(capitalMarkers).forEach(m => m.setRadius(8)); // Show markers
-                capitalMarkers[start].setStyle({ fillColor: '#16a34a' }); // Green
-                capitalMarkers[end].setStyle({ fillColor: '#f59e0b' });   // Orange
-                capitalMarkers[start].getElement()?.classList.add('pulsing-marker');
-
+                Object.values(capitalMarkers).forEach(m => m.setRadius(8));
+                capitalMarkers[start].setStyle({ fillColor: '#16a34a', radius: 10 }); // Start - Green, Larger
+                capitalMarkers[end].setStyle({ fillColor: '#f97316' });   // End - Orange
             }
 
             trekGuessesList.innerHTML = '';
@@ -334,7 +308,7 @@
             }
         }
 
-        function handleGuess(guessValue) {
+        async function handleGuess(guessValue) {
             if (trekState.isComplete) return;
 
             let officialName, isValidMove = false, distance = 0;
@@ -367,10 +341,10 @@
                 if (currentMode === 'capital') {
                     const prevCoords = provinceData[prevProvince].coords;
                     const currentCoords = provinceData[officialName].coords;
-                    L.polyline([prevCoords, currentCoords], { color: '#3b82f6', weight: 3 }).addTo(trekPathLayer);
-                    capitalMarkers[prevProvince].getElement()?.classList.remove('pulsing-marker');
-                    capitalMarkers[prevProvince].setStyle({ fillColor: '#3b82f6' }); // Blue for visited
-                    capitalMarkers[officialName].getElement()?.classList.add('pulsing-marker');
+                    await drawRoute(prevCoords, currentCoords);
+                    
+                    capitalMarkers[prevProvince].setStyle({ fillColor: '#7e22ce', radius: 8 }); // Visited - Purple
+                    capitalMarkers[officialName].setStyle({ fillColor: '#2563eb', radius: 10 }); // Current - Blue, Larger
                 }
 
                 if (distance > 0) {
@@ -382,6 +356,7 @@
                 
                 if (officialName === trekState.end) {
                     trekState.isComplete = true;
+                    capitalMarkers[officialName].setStyle({ fillColor: '#f97316', radius: 8 }); // Final is orange
                     const stepsTaken = trekState.pathTaken.length - 1;
                     const points = calculateScore(stepsTaken);
                     currentScore += points;
@@ -508,6 +483,28 @@
             return R * c;
         }
 
+        async function drawRoute(fromCoords, toCoords) {
+            const [lat1, lon1] = fromCoords;
+            const [lat2, lon2] = toCoords;
+            const url = `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data.routes && data.routes.length > 0) {
+                    const routeGeometry = data.routes[0].geometry;
+                    L.geoJSON(routeGeometry, {
+                        style: { color: '#2563eb', weight: 4, opacity: 0.7 }
+                    }).addTo(trekPathLayer);
+                } else {
+                    L.polyline([fromCoords, toCoords], { color: '#2563eb', weight: 3, dashArray: '5, 5' }).addTo(trekPathLayer);
+                }
+            } catch (error) {
+                console.error("Routing error:", error);
+                L.polyline([fromCoords, toCoords], { color: '#2563eb', weight: 3, dashArray: '5, 5' }).addTo(trekPathLayer);
+            }
+        }
+
         // --- Map Styling & Interaction ---
         function getLayerByName(name) {
             let foundLayer = null;
@@ -524,22 +521,21 @@
         function style(feature) {
             const name = feature.properties.name;
             if (currentMode === 'capital') {
-                 if (name === trekState.start || name === trekState.end) {
+                 if (trekState.start && (name === trekState.start || name === trekState.end)) {
                     return { fillColor: '#e0e7ff', weight: 1, color: '#f5f5f5', fillOpacity: 0.6 };
                  }
             } else if (trekState.start) { // Province mode styling
                 if (name === trekState.start) return { fillColor: '#16a34a', weight: 2, color: 'white', fillOpacity: 0.9 };
-                if (name === trekState.end) return { fillColor: '#f59e0b', weight: 2, color: 'white', fillOpacity: 0.9 };
-                if (trekState.pathTaken.includes(name)) return { fillColor: '#3b82f6', weight: 1.5, color: 'white', fillOpacity: 0.8 };
+                if (name === trekState.end) return { fillColor: '#f97316', weight: 2, color: 'white', fillOpacity: 0.9 };
+                if (trekState.pathTaken.includes(name)) return { fillColor: '#2563eb', weight: 1.5, color: 'white', fillOpacity: 0.8 };
             }
             return { fillColor: '#e0e0e0', weight: 1, color: '#f5f5f5', fillOpacity: 0.5 };
         }
+
         function onEachFeature(feature, layer) {
             layer.on('click', () => {
-                const provinceName = feature.properties.name;
-                const guess = currentMode === 'province' ? provinceName : provinceData[provinceName]?.capital;
-                if (guess) {
-                    handleGuess(guess);
+                if (currentMode === 'province') {
+                    handleGuess(feature.properties.name);
                 }
             });
         }
