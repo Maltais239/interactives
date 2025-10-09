@@ -123,6 +123,18 @@
         }
         .difficulty-btn { color: #075985; }
         .difficulty-btn.active { background-color: #0369a1; }
+        
+        .mode-toggle {
+            margin-bottom: 1.5rem;
+        }
+        #touchscreen-mode-btn {
+            width: 100%;
+            background-color: #64748b;
+        }
+         #touchscreen-mode-btn.active {
+            background-color: #1e293b;
+        }
+
 
         /* Panels */
         #trek-panel {
@@ -200,6 +212,23 @@
             background-color: #fee2e2;
             color: #991b1b;
         }
+
+        /* Touchscreen Mode */
+        #trek-choices-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        .choice-btn {
+            padding: 1rem 0.5rem;
+            background-color: #0ea5e9;
+        }
+        .choice-btn:hover {
+            background-color: #0284c7;
+        }
+
+
         #trek-feedback {
             font-weight: 500;
             text-align: center;
@@ -236,15 +265,23 @@
             <button class="difficulty-btn active" data-difficulty="medium">Medium</button>
             <button class="difficulty-btn" data-difficulty="hard">Hard</button>
         </div>
+
+        <div class="mode-toggle">
+            <button id="touchscreen-mode-btn" class="game-btn">Enable Touchscreen Mode ⌨️</button>
+        </div>
         
         <div id="trek-panel">
             <h3>Country Trek</h3>
             <div id="trek-challenge">Loading new trek...</div>
+            
             <div id="trek-input-container">
                 <input type="text" id="trek-guess-input" placeholder="Enter next country...">
                 <button id="trek-hint-btn" class="game-btn">Hint 💡</button>
                 <button id="trek-guess-btn" class="game-btn">Guess</button>
             </div>
+
+            <div id="trek-choices-container" style="display: none;"></div>
+
             <div id="trek-guesses">
                 <ul id="trek-guesses-list"></ul>
             </div>
@@ -275,12 +312,15 @@
         const regionBtns = document.querySelectorAll('.region-btn');
         const difficultyBtns = document.querySelectorAll('.difficulty-btn');
         const scoreValue = document.getElementById('score-value');
+        const touchscreenModeBtn = document.getElementById('touchscreen-mode-btn');
 
         // Trek DOM Elements
         const trekChallenge = document.getElementById('trek-challenge');
+        const trekInputContainer = document.getElementById('trek-input-container');
         const trekGuessInput = document.getElementById('trek-guess-input');
         const trekGuessBtn = document.getElementById('trek-guess-btn');
         const trekHintBtn = document.getElementById('trek-hint-btn');
+        const trekChoicesContainer = document.getElementById('trek-choices-container');
         const trekGuessesList = document.getElementById('trek-guesses-list');
         const trekFeedback = document.getElementById('trek-feedback');
         const newTrekBtn = document.getElementById('new-trek-btn');
@@ -293,6 +333,7 @@
         let currentRegion = 'World Tour';
         let currentDifficulty = 'medium';
         let currentScore = 0;
+        let isTouchscreenMode = false;
 
         const difficultySettings = {
             easy: { min: 3, max: 4, multiplier: 1 },
@@ -352,10 +393,12 @@
 
         // --- Event Listeners ---
         newTrekBtn.addEventListener('click', startNewTrek);
-        trekGuessBtn.addEventListener('click', handleTrekGuess);
+        trekGuessBtn.addEventListener('click', () => handleGuess(trekGuessInput.value));
         trekHintBtn.addEventListener('click', provideHint);
-        trekGuessInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') handleTrekGuess(); });
+        trekGuessInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') handleGuess(trekGuessInput.value); });
         
+        touchscreenModeBtn.addEventListener('click', toggleTouchscreenMode);
+
         regionBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 currentRegion = btn.dataset.region;
@@ -458,26 +501,31 @@
                 hintUsed: false,
             };
 
-            trekChallenge.innerHTML = `Your trek starts in <strong>${startCapital}</strong> (${trekState.start}) and your destination is <strong>${endCapital}</strong> (${trekState.end}).`;
+            trekChallenge.innerHTML = `Your trek starts in ${startCapital} (<strong>${trekState.start}</strong>) and your destination is ${endCapital} (<strong>${trekState.end}</strong>).`;
             trekGuessesList.innerHTML = '';
             trekFeedback.innerHTML = `You are currently in ${trekState.start}. Enter a bordering country to continue.`;
             trekGuessInput.value = '';
-            trekGuessInput.disabled = false;
-            trekGuessBtn.disabled = false;
-            trekHintBtn.disabled = false;
-            trekGuessInput.focus();
+            
+            if (isTouchscreenMode) {
+                generateTouchscreenChoices();
+            } else {
+                trekGuessInput.disabled = false;
+                trekGuessBtn.disabled = false;
+                trekHintBtn.disabled = false;
+                trekGuessInput.focus();
+            }
 
             if (geojson) geojson.resetStyle();
             map.flyToBounds(L.geoJSON({ type: "FeatureCollection", features: [countriesData[start.name], countriesData[end.name]].map(c => ({ type: "Feature", geometry: c.geometry })) }).getBounds().pad(0.2));
         }
 
-        function handleTrekGuess() {
+        function handleGuess(guessValue) {
             if (trekState.isComplete) return;
 
-            const guess = trekGuessInput.value.trim();
-            const officialName = countryNameMap[guess.toLowerCase()];
+            const guess = guessValue.trim();
+            const officialName = countryNameMap[guess.toLowerCase()] || guess; // Fallback for touch mode
 
-            if (!officialName) {
+            if (!countriesData[officialName]) {
                 trekFeedback.innerHTML = `"${guess}" is not a recognized country. Try again.`;
                 return;
             }
@@ -510,7 +558,12 @@
                     trekGuessInput.disabled = true;
                     trekGuessBtn.disabled = true;
                     trekHintBtn.disabled = true;
+                    trekChoicesContainer.innerHTML = '';
                     setTimeout(startNewTrek, 4000); // Automatically start new trek
+                } else {
+                    if (isTouchscreenMode) {
+                        generateTouchscreenChoices();
+                    }
                 }
             } else {
                 li.className = 'incorrect';
@@ -519,24 +572,22 @@
             
             trekGuessesList.appendChild(li);
             trekGuessInput.value = '';
-            trekGuessInput.focus();
+            if(!isTouchscreenMode) trekGuessInput.focus();
             if (geojson) geojson.resetStyle();
         }
         
         function provideHint() {
             if (trekState.isComplete || trekState.hintUsed) return;
 
-            trekState.hintUsed = true;
-            trekHintBtn.disabled = true; // Visually show it's used
+            const hintPath = findPath(trekState.current, trekState.end);
 
-            const currentCountryData = countriesData[trekState.current];
-            const neighbors = (currentCountryData.borders || []).map(b => getCountryNameByCca3(b)).filter(Boolean);
-
-            if (neighbors.length > 0) {
-                const hint = neighbors[Math.floor(Math.random() * neighbors.length)];
-                trekFeedback.innerHTML = `A hint costs half your points for this trek! One border of ${trekState.current} is <strong>${hint}</strong>.`;
+            if (hintPath && hintPath.length > 1) {
+                trekState.hintUsed = true;
+                trekHintBtn.disabled = true; 
+                const hint = hintPath[1];
+                trekFeedback.innerHTML = `A hint costs half your points for this trek! Try heading to <strong>${hint}</strong>.`;
             } else {
-                trekFeedback.innerHTML = `${trekState.current} has no land borders to give a hint for.`;
+                trekFeedback.innerHTML = `Cannot find a path to the destination from here to provide a hint.`;
             }
         }
         
@@ -556,6 +607,79 @@
         function updateScoreDisplay() {
             scoreValue.textContent = currentScore;
         }
+
+        // --- Touchscreen Mode ---
+        function toggleTouchscreenMode() {
+            isTouchscreenMode = !isTouchscreenMode;
+            updateUIMode();
+        }
+
+        function updateUIMode() {
+             if (isTouchscreenMode) {
+                touchscreenModeBtn.textContent = 'Disable Touchscreen Mode 💻';
+                touchscreenModeBtn.classList.add('active');
+                trekInputContainer.style.display = 'none';
+                trekChoicesContainer.style.display = 'grid';
+                if (!trekState.isComplete) generateTouchscreenChoices();
+            } else {
+                touchscreenModeBtn.textContent = 'Enable Touchscreen Mode ⌨️';
+                touchscreenModeBtn.classList.remove('active');
+                trekInputContainer.style.display = 'flex';
+                trekChoicesContainer.style.display = 'none';
+                trekChoicesContainer.innerHTML = ''; // Clear choices
+                if (!trekState.isComplete) trekGuessInput.focus();
+            }
+        }
+
+        function generateTouchscreenChoices() {
+            if (trekState.isComplete) return;
+
+            const currentCountryData = countriesData[trekState.current];
+            const neighbors = (currentCountryData.borders || []).map(b => getCountryNameByCca3(b)).filter(Boolean);
+
+            if (neighbors.length === 0) {
+                trekChoicesContainer.innerHTML = '<p>No land borders from here!</p>';
+                return;
+            }
+
+            const optimalPath = findPath(trekState.current, trekState.end);
+            let correctChoice;
+
+            if (optimalPath && optimalPath.length > 1) {
+                correctChoice = optimalPath[1];
+            } else {
+                // Fallback to a random neighbor if no path is found (should be rare)
+                correctChoice = neighbors[Math.floor(Math.random() * neighbors.length)];
+            }
+            
+            const choices = new Set([correctChoice]);
+            
+            let allCountries = Object.values(countriesData);
+            if (currentRegion !== 'World Tour') {
+                allCountries = allCountries.filter(c => c.region === currentRegion);
+            }
+            
+            const distractors = allCountries.filter(c => c.name !== trekState.current && !neighbors.includes(c.name));
+
+            while (choices.size < 4 && distractors.length > 0) {
+                const randIndex = Math.floor(Math.random() * distractors.length);
+                choices.add(distractors[randIndex].name);
+                distractors.splice(randIndex, 1); // Avoid picking same distractor twice
+            }
+
+            // Shuffle and create buttons
+            const shuffledChoices = Array.from(choices).sort(() => Math.random() - 0.5);
+            trekChoicesContainer.innerHTML = ''; // Clear old choices
+            shuffledChoices.forEach(choice => {
+                const btn = document.createElement('button');
+                btn.className = 'game-btn choice-btn';
+                btn.textContent = choice;
+                btn.dataset.country = choice;
+                btn.addEventListener('click', () => handleGuess(choice));
+                trekChoicesContainer.appendChild(btn);
+            });
+        }
+
 
         // --- Map Styling & Interaction ---
         function style(feature) {
