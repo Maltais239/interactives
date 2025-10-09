@@ -643,29 +643,43 @@
             }
 
             const optimalPath = findPath(trekState.current, trekState.end);
-            let correctChoice;
+            let optimalChoice;
 
             if (optimalPath && optimalPath.length > 1) {
-                correctChoice = optimalPath[1];
+                optimalChoice = optimalPath[1];
             } else {
-                // Fallback to a random neighbor if no path is found (should be rare)
-                correctChoice = neighbors[Math.floor(Math.random() * neighbors.length)];
+                optimalChoice = neighbors[Math.floor(Math.random() * neighbors.length)];
             }
             
-            const choices = new Set([correctChoice]);
-            
-            let allCountries = Object.values(countriesData);
-            if (currentRegion !== 'World Tour') {
-                allCountries = allCountries.filter(c => c.region === currentRegion);
-            }
-            
-            const distractors = allCountries.filter(c => c.name !== trekState.current && !neighbors.includes(c.name));
+            const choices = new Set([optimalChoice]);
+            const lessEfficientNeighbors = neighbors.filter(n => n !== optimalChoice);
+            lessEfficientNeighbors.sort(() => Math.random() - 0.5);
 
-            while (choices.size < 4 && distractors.length > 0) {
-                const randIndex = Math.floor(Math.random() * distractors.length);
-                choices.add(distractors[randIndex].name);
-                distractors.splice(randIndex, 1); // Avoid picking same distractor twice
+            for (const neighbor of lessEfficientNeighbors) {
+                if (choices.size < 4) {
+                    choices.add(neighbor);
+                } else {
+                    break;
+                }
             }
+            
+            if (choices.size < 4) {
+                 let allCountries = Object.values(countriesData);
+                if (currentRegion !== 'World Tour') {
+                    allCountries = allCountries.filter(c => c.region === currentRegion);
+                }
+                
+                const distractors = allCountries.filter(c => c.name !== trekState.current && !neighbors.includes(c.name));
+
+                while (choices.size < 4 && distractors.length > 0) {
+                    const randIndex = Math.floor(Math.random() * distractors.length);
+                    if (!choices.has(distractors[randIndex].name)) {
+                         choices.add(distractors[randIndex].name);
+                    }
+                    distractors.splice(randIndex, 1);
+                }
+            }
+
 
             // Shuffle and create buttons
             const shuffledChoices = Array.from(choices).sort(() => Math.random() - 0.5);
