@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CanadaTrek</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            font-family: 'Poppins', sans-serif;
+            background-color: #f1f5f9;
+            overflow: hidden;
+        }
+        #map {
+            flex: 1;
+            height: 100%;
+            border-right: 1px solid #ddd;
+            background-color: #aadaff;
+        }
+        #info-panel {
+            width: 380px;
+            max-width: 40%;
+            padding: 2rem;
+            background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+            border-left: 5px solid #4f46e5; /* New Color */
+            overflow-y: auto;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        #info-panel h2 {
+            margin-top: 0;
+            color: #312e81; /* New Color */
+            font-size: 1.75rem;
+            font-weight: 700;
+            border-bottom: 2px solid #c7d2fe; /* New Color */
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        .loading-text {
+            text-align: center; font-weight: 500; color: #4338ca; padding: 2rem;
+        }
+        #score-display {
+            text-align: center; font-size: 1.25rem; font-weight: 600; color: #4338ca; /* New Color */
+            background-color: #eef2ff; /* New Color */
+            padding: 0.75rem; border-radius: 8px;
+            margin-bottom: 1.5rem; border: 1px solid #c7d2fe; /* New Color */
+        }
+        #score-display span { font-weight: 700; color: #4f46e5; } /* New Color */
+
+        .switcher {
+            display: flex; margin-bottom: 1rem; border-radius: 8px; padding: 0.25rem; flex-wrap: wrap;
+        }
+        .switcher-btn {
+            flex: 1 1 auto; padding: 0.75rem 0.5rem; border: none; background-color: transparent;
+            font-size: 0.9rem; font-weight: 600; cursor: pointer; border-radius: 6px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .mode-switcher { background-color: #e0e7ff; } /* New Color */
+        .mode-btn { color: #3730a3; } /* New Color */
+        .mode-btn.active { background-color: #4338ca; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } /* New Color */
+        
+        .difficulty-switcher { background-color: #e0e7ff; }
+        .difficulty-btn { color: #3730a3; }
+        .difficulty-btn.active { background-color: #4338ca; color: white; }
+
+        .mode-toggle { margin-bottom: 1.5rem; }
+        #touchscreen-mode-btn { width: 100%; background-color: #64748b; }
+        #touchscreen-mode-btn.active { background-color: #1e293b; }
+
+        #trek-panel { border-top: 1px solid #ddd; padding-top: 1.5rem; }
+        #trek-panel h3 { margin-top: 0; margin-bottom: 1rem; color: #4f46e5; font-size: 1.5rem; font-weight: 600; } /* New Color */
+        #trek-challenge {
+            padding: 1rem; background-color: #eef2ff; border: 1px solid #c7d2fe; /* New Colors */
+            border-radius: 8px; margin-bottom: 1.5rem; text-align: center; font-size: 1.1rem;
+            font-weight: 500; color: #4338ca; line-height: 1.6; /* New Color */
+        }
+        #trek-challenge strong { color: #4f46e5; } /* New Color */
+        #trek-input-container { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+        #trek-guess-input {
+            flex: 1; padding: 0.75rem; border: 1px solid #c7d2fe; border-radius: 8px; /* New Color */
+            font-size: 1rem; font-family: 'Poppins', sans-serif;
+        }
+        .game-btn {
+            padding: 0.75rem; color: white; border: none; border-radius: 8px; font-size: 1rem;
+            font-weight: 600; cursor: pointer; transition: background-color 0.2s, opacity 0.2s;
+        }
+        .game-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        #trek-guess-btn { padding: 0.75rem 1rem; background-color: #4f46e5; } /* New Color */
+        #trek-guess-btn:hover { background-color: #4338ca; } /* New Color */
+        #trek-hint-btn { background-color: #f59e0b; }
+        #trek-hint-btn:hover { background-color: #d97706; }
+        
+        #trek-guesses-list { list-style: none; padding: 0; margin-bottom: 1rem; }
+        #trek-guesses-list li { padding: 0.5rem; border-radius: 4px; margin-bottom: 0.25rem; }
+        #trek-guesses-list li.correct { background-color: #dcfce7; color: #166534; }
+        #trek-guesses-list li.incorrect { background-color: #fee2e2; color: #991b1b; }
+
+        #trek-choices-container { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem; }
+        .choice-btn { padding: 1rem 0.5rem; background-color: #4f46e5; } /* New Color */
+        .choice-btn:hover { background-color: #4338ca; } /* New Color */
+
+        #trek-feedback { font-weight: 500; text-align: center; padding: 1rem; min-height: 50px; }
+        #new-trek-btn {
+            background-color: #16a34a; width: 100%; margin-top: auto; padding-top: 1rem;
+        }
+        #new-trek-btn:hover { background-color: #15803d; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="info-panel">
+        <h2>🍁 CanadaTrek 🍁</h2>
+        <div id="score-display">Score: <span id="score-value">0</span></div>
+        <div class="switcher mode-switcher">
+            <button class="switcher-btn mode-btn active" data-mode="province">Province Trek</button>
+            <button class="switcher-btn mode-btn" data-mode="capital">Capital Trek</button>
+        </div>
+        <div class="switcher difficulty-switcher">
+            <button class="switcher-btn difficulty-btn" data-difficulty="easy">Easy</button>
+            <button class="switcher-btn difficulty-btn active" data-difficulty="medium">Medium</button>
+            <button class="switcher-btn difficulty-btn" data-difficulty="hard">Hard</button>
+        </div>
+        <div class="mode-toggle">
+            <button id="touchscreen-mode-btn" class="game-btn">Enable Touchscreen Mode ⌨️</button>
+        </div>
+        <div id="trek-panel">
+            <div id="trek-challenge">Loading new trek...</div>
+            <div id="trek-input-container">
+                <input type="text" id="trek-guess-input" placeholder="Enter province/territory...">
+                <button id="trek-hint-btn" class="game-btn">Hint 💡</button>
+                <button id="trek-guess-btn" class="game-btn">Guess</button>
+            </div>
+            <div id="trek-choices-container" style="display: none;"></div>
+            <div id="trek-guesses">
+                <ul id="trek-guesses-list"></ul>
+            </div>
+            <div id="trek-feedback"></div>
+            <button id="new-trek-btn" class="game-btn">New Trek 🗺️</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        // --- DOM Elements ---
+        const map = L.map('map').setView([62, -98], 3.5);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd', maxZoom: 10, minZoom: 3,
+        }).addTo(map);
+
+        const modeBtns = document.querySelectorAll('.mode-btn');
+        const difficultyBtns = document.querySelectorAll('.difficulty-btn');
+        const scoreValue = document.getElementById('score-value');
+        const touchscreenModeBtn = document.getElementById('touchscreen-mode-btn');
+        const trekChallenge = document.getElementById('trek-challenge');
+        const trekInputContainer = document.getElementById('trek-input-container');
+        const trekGuessInput = document.getElementById('trek-guess-input');
+        const trekGuessBtn = document.getElementById('trek-guess-btn');
+        const trekHintBtn = document.getElementById('trek-hint-btn');
+        const trekChoicesContainer = document.getElementById('trek-choices-container');
+        const trekGuessesList = document.getElementById('trek-guesses-list');
+        const trekFeedback = document.getElementById('trek-feedback');
+        const newTrekBtn = document.getElementById('new-trek-btn');
+
+        // --- App State ---
+        let geojson;
+        let trekState = {};
+        let currentMode = 'province';
+        let currentDifficulty = 'medium';
+        let currentScore = 0;
+        let isTouchscreenMode = false;
+
+        const difficultySettings = {
+            easy: { min: 2, max: 3, multiplier: 1 },
+            medium: { min: 4, max: 5, multiplier: 2 },
+            hard: { min: 6, max: 8, multiplier: 3 }
+        };
+
+        // --- Data ---
+        const provinceData = {
+            'British Columbia': { capital: 'Victoria', borders: ['Alberta', 'Yukon Territory', 'Northwest Territories'] },
+            'Alberta': { capital: 'Edmonton', borders: ['British Columbia', 'Saskatchewan', 'Northwest Territories'] },
+            'Saskatchewan': { capital: 'Regina', borders: ['Alberta', 'Manitoba', 'Northwest Territories'] },
+            'Manitoba': { capital: 'Winnipeg', borders: ['Saskatchewan', 'Ontario', 'Nunavut'] },
+            'Ontario': { capital: 'Toronto', borders: ['Manitoba', 'Quebec'] },
+            'Quebec': { capital: 'Quebec City', borders: ['Ontario', 'New Brunswick', 'Newfoundland and Labrador'] },
+            'New Brunswick': { capital: 'Fredericton', borders: ['Quebec', 'Nova Scotia'] },
+            'Nova Scotia': { capital: 'Halifax', borders: ['New Brunswick'] },
+            'Newfoundland and Labrador': { capital: 'St. John\'s', borders: ['Quebec'] },
+            'Yukon Territory': { capital: 'Whitehorse', borders: ['British Columbia', 'Northwest Territories'] },
+            'Northwest Territories': { capital: 'Yellowknife', borders: ['Yukon Territory', 'British Columbia', 'Alberta', 'Saskatchewan', 'Nunavut'] },
+            'Nunavut': { capital: 'Iqaluit', borders: ['Northwest Territories', 'Manitoba'] }
+        };
+
+        // --- Main Logic ---
+        function initializeGame(geoData) {
+            geojson = L.geoJson(geoData, { style, onEachFeature }).addTo(map);
+            startNewTrek();
+        }
+
+        function findPath(startName, endName) {
+            let queue = [[startName]];
+            const visited = new Set([startName]);
+            while (queue.length > 0) {
+                let path = queue.shift();
+                let currentName = path[path.length - 1];
+                if (currentName === endName) return path;
+                const neighbors = provinceData[currentName]?.borders || [];
+                for (const neighbor of neighbors) {
+                    if (!visited.has(neighbor)) {
+                        visited.add(neighbor);
+                        let newPath = [...path, neighbor];
+                        queue.push(newPath);
+                    }
+                }
+            }
+            return null;
+        }
+
+        function startNewTrek() {
+            const candidateProvinces = Object.keys(provinceData).filter(p => provinceData[p].borders.length > 0);
+            let start, end, path;
+            let attempts = 0;
+            const { min, max } = difficultySettings[currentDifficulty];
+
+            while ((!path || path.length < min || path.length > max) && attempts < 100) {
+                start = candidateProvinces[Math.floor(Math.random() * candidateProvinces.length)];
+                end = candidateProvinces[Math.floor(Math.random() * candidateProvinces.length)];
+                if (start && end && start !== end) {
+                    path = findPath(start, end);
+                }
+                attempts++;
+            }
+
+            if (!path) {
+                trekChallenge.innerHTML = `Could not generate a trek. Try again!`;
+                return;
+            }
+
+            trekState = {
+                start, end, current: start, pathTaken: [start],
+                optimalPathLength: path.length - 1, isComplete: false, hintUsed: false,
+            };
+
+            if (currentMode === 'province') {
+                trekChallenge.innerHTML = `Your trek starts in <strong>${start}</strong> and your destination is <strong>${end}</strong>.`;
+            } else { // capital mode
+                trekChallenge.innerHTML = `Trek from <strong>${provinceData[start].capital}</strong> (${start}) to <strong>${provinceData[end].capital}</strong> (${end}).`;
+            }
+
+            trekGuessesList.innerHTML = '';
+            trekFeedback.innerHTML = `You are currently in ${trekState.current}. Guess a bordering province or territory.`;
+            trekGuessInput.value = '';
+            
+            updateUIMode();
+            if (!isTouchscreenMode) {
+                trekGuessInput.disabled = false;
+                trekGuessBtn.disabled = false;
+                trekHintBtn.disabled = false;
+                trekGuessInput.focus();
+            }
+
+            if (geojson) {
+                 geojson.resetStyle();
+                 const startLayer = getLayerByName(start);
+                 const endLayer = getLayerByName(end);
+                 if (startLayer && endLayer) {
+                     const bounds = L.latLngBounds(startLayer.getBounds(), endLayer.getBounds());
+                     map.flyToBounds(bounds.pad(0.3));
+                 }
+            }
+        }
+
+        function handleGuess(guessValue) {
+            if (trekState.isComplete) return;
+            const guess = guessValue.trim();
+            const officialName = Object.keys(provinceData).find(p => p.toLowerCase() === guess.toLowerCase()) || guess;
+
+            if (!provinceData[officialName]) {
+                trekFeedback.innerHTML = `"${guess}" is not a recognized province or territory.`;
+                return;
+            }
+
+            const neighbors = provinceData[trekState.current].borders;
+            const li = document.createElement('li');
+            li.textContent = officialName;
+
+            if (neighbors.includes(officialName)) {
+                trekState.pathTaken.push(officialName);
+                trekState.current = officialName;
+                li.className = 'correct';
+                trekFeedback.innerHTML = `Correct! You are now in ${officialName}.`;
+                
+                if (officialName === trekState.end) {
+                    trekState.isComplete = true;
+                    const stepsTaken = trekState.pathTaken.length - 1;
+                    const points = calculateScore(stepsTaken, trekState.optimalPathLength, trekState.hintUsed);
+                    currentScore += points;
+                    scoreValue.textContent = currentScore;
+                    let feedbackMessage = `Congratulations! You reached ${trekState.end} in ${stepsTaken} steps and earned ${points} points! Loading next trek...`;
+                    trekFeedback.innerHTML = feedbackMessage;
+                    setTimeout(startNewTrek, 4000);
+                } else if (isTouchscreenMode) {
+                    generateTouchscreenChoices();
+                }
+            } else {
+                li.className = 'incorrect';
+                trekFeedback.innerHTML = `Incorrect. ${officialName} does not border ${trekState.current}.`;
+            }
+            
+            trekGuessesList.appendChild(li);
+            trekGuessInput.value = '';
+            if (!isTouchscreenMode) trekGuessInput.focus();
+            if (geojson) geojson.resetStyle();
+        }
+
+        // --- UI & Event Handlers ---
+        newTrekBtn.addEventListener('click', startNewTrek);
+        trekGuessBtn.addEventListener('click', () => handleGuess(trekGuessInput.value));
+        trekGuessInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') handleGuess(trekGuessInput.value); });
+        trekHintBtn.addEventListener('click', provideHint);
+        touchscreenModeBtn.addEventListener('click', toggleTouchscreenMode);
+
+        modeBtns.forEach(btn => btn.addEventListener('click', () => {
+            currentMode = btn.dataset.mode;
+            modeBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            startNewTrek();
+        }));
+        difficultyBtns.forEach(btn => btn.addEventListener('click', () => {
+            currentDifficulty = btn.dataset.difficulty;
+            difficultyBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            startNewTrek();
+        }));
+
+        function provideHint() {
+            if (trekState.isComplete || trekState.hintUsed) return;
+            const hintPath = findPath(trekState.current, trekState.end);
+            if (hintPath && hintPath.length > 1) {
+                trekState.hintUsed = true;
+                trekHintBtn.disabled = true; 
+                const hint = hintPath[1];
+                trekFeedback.innerHTML = `A hint costs half your points! Try heading to <strong>${hint}</strong>.`;
+            } else {
+                trekFeedback.innerHTML = `Cannot find a path to provide a hint.`;
+            }
+        }
+        
+        function calculateScore(stepsTaken, optimalSteps, hintUsed) {
+            const basePoints = 100;
+            const efficiencyBonus = Math.max(0, (optimalSteps * 25) - ((stepsTaken - optimalSteps) * 15));
+            let total = (basePoints + efficiencyBonus) * difficultySettings[currentDifficulty].multiplier;
+            if (hintUsed) total *= 0.5;
+            return Math.round(total);
+        }
+
+        function toggleTouchscreenMode() {
+            isTouchscreenMode = !isTouchscreenMode;
+            updateUIMode();
+        }
+
+        function updateUIMode() {
+             if (isTouchscreenMode) {
+                touchscreenModeBtn.textContent = 'Disable Touchscreen Mode 💻';
+                touchscreenModeBtn.classList.add('active');
+                trekInputContainer.style.display = 'none';
+                trekChoicesContainer.style.display = 'grid';
+                if (!trekState.isComplete) generateTouchscreenChoices();
+            } else {
+                touchscreenModeBtn.textContent = 'Enable Touchscreen Mode ⌨️';
+                touchscreenModeBtn.classList.remove('active');
+                trekInputContainer.style.display = 'flex';
+                trekChoicesContainer.style.display = 'none';
+                trekChoicesContainer.innerHTML = '';
+                if (!trekState.isComplete) trekGuessInput.focus();
+            }
+        }
+
+        function generateTouchscreenChoices() {
+            if (trekState.isComplete) return;
+            const neighbors = provinceData[trekState.current].borders;
+            if (neighbors.length === 0) {
+                trekChoicesContainer.innerHTML = '<p>No land borders from here!</p>';
+                return;
+            }
+
+            const optimalPath = findPath(trekState.current, trekState.end);
+            let optimalChoice = (optimalPath && optimalPath.length > 1) ? optimalPath[1] : neighbors[0];
+            
+            const choices = new Set([optimalChoice]);
+            const otherNeighbors = neighbors.filter(n => n !== optimalChoice).sort(() => 0.5 - Math.random());
+            otherNeighbors.forEach(n => choices.size < 4 && choices.add(n));
+
+            const allProvinces = Object.keys(provinceData);
+            const distractors = allProvinces.filter(p => p !== trekState.current && !neighbors.includes(p));
+            while (choices.size < 4 && distractors.length > 0) {
+                const randIndex = Math.floor(Math.random() * distractors.length);
+                choices.add(distractors.splice(randIndex, 1)[0]);
+            }
+
+            const shuffledChoices = Array.from(choices).sort(() => 0.5 - Math.random());
+            trekChoicesContainer.innerHTML = '';
+            shuffledChoices.forEach(choice => {
+                const btn = document.createElement('button');
+                btn.className = 'game-btn choice-btn';
+                btn.textContent = choice;
+                btn.addEventListener('click', () => handleGuess(choice));
+                trekChoicesContainer.appendChild(btn);
+            });
+        }
+        
+        // --- Map Styling & Interaction ---
+        function getLayerByName(name) {
+            let foundLayer = null;
+            geojson.eachLayer(layer => {
+                if (layer.feature.properties.name === name) {
+                    foundLayer = layer;
+                }
+            });
+            return foundLayer;
+        }
+
+        function style(feature) {
+            const name = feature.properties.name;
+            if (trekState.start) {
+                if (name === trekState.start) return { fillColor: '#16a34a', weight: 2, color: 'white', fillOpacity: 0.9 };
+                if (name === trekState.end) return { fillColor: '#f59e0b', weight: 2, color: 'white', fillOpacity: 0.9 };
+                if (trekState.pathTaken.includes(name)) return { fillColor: '#3b82f6', weight: 1.5, color: 'white', fillOpacity: 0.8 };
+            }
+            return { fillColor: '#e0e0e0', weight: 1, color: '#f5f5f5', fillOpacity: 0.5 };
+        }
+        function onEachFeature(feature, layer) {
+            layer.on('click', () => handleGuess(feature.properties.name));
+        }
+
+        // --- Initial Load ---
+        fetch('https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@master/public/data/canada.geojson')
+            .then(res => res.json())
+            .then(data => initializeGame(data))
+            .catch(err => { console.error('GeoJSON load error:', err); });
+    </script>
+</body>
+</html>
+
