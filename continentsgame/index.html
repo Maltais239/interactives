@@ -272,6 +272,43 @@
             .then(data => {
                 const countries = topojson.feature(data, data.objects.countries);
                 
+                // --- FIX for French Guiana and France ---
+                // Find the original feature for France (ID 250) which includes French Guiana
+                const franceFeatureIndex = countries.features.findIndex(f => f.id === '250');
+                if (franceFeatureIndex !== -1) {
+                    const originalFranceFeature = countries.features[franceFeatureIndex];
+                    
+                    const europeanPolygons = [];
+                    const guianaPolygons = [];
+
+                    // Separate the polygons based on longitude. This works because the two landmasses are so far apart.
+                    originalFranceFeature.geometry.coordinates.forEach(polygon => {
+                        const sampleLongitude = polygon[0][0][0]; 
+                        if (sampleLongitude < -20) { // Longitude for South America
+                            guianaPolygons.push(polygon);
+                        } else { // Longitude for Europe
+                            europeanPolygons.push(polygon);
+                        }
+                    });
+
+                    // Update the original France feature to only contain European parts
+                    originalFranceFeature.geometry.coordinates = europeanPolygons;
+
+                    // If there were any polygons for French Guiana, create a new feature for it
+                    if (guianaPolygons.length > 0) {
+                        const frenchGuianaFeature = {
+                            type: 'Feature',
+                            id: '999', // Assign a unique custom ID
+                            properties: { name: 'French Guiana' }, // Set its name
+                            geometry: {
+                                type: 'MultiPolygon',
+                                coordinates: guianaPolygons
+                            }
+                        };
+                        countries.features.push(frenchGuianaFeature);
+                    }
+                }
+                
                 const continentMapping = {
                     'Africa': [12, 24, 72, 108, 120, 132, 140, 148, 174, 175, 178, 180, 204, 231, 232, 262, 266, 270, 288, 324, 384, 404, 426, 430, 434, 450, 454, 466, 478, 480, 504, 508, 516, 562, 566, 624, 638, 646, 654, 678, 686, 690, 694, 706, 710, 716, 728, 729, 732, 748, 768, 788, 800, 818, 834, 854, 894],
                     'Antarctica': [10],
@@ -279,7 +316,7 @@
                     'Europe': [8, 20, 40, 51, 56, 70, 100, 191, 196, 203, 208, 233, 234, 246, 248, 250, 276, 292, 300, 336, 348, 352, 372, 380, 428, 438, 440, 442, 470, 492, 498, 499, 528, 578, 616, 620, 642, 674, 688, 703, 705, 724, 744, 752, 756, 804, 807, 826, 831, 832, 833],
                     'North America': [28, 44, 52, 60, 84, 92, 124, 136, 188, 192, 212, 214, 222, 304, 308, 312, 320, 328, 332, 388, 474, 484, 500, 530, 531, 533, 534, 535, 660, 662, 663, 666, 670, 740, 780, 796, 840, 850],
                     'Oceania': [16, 36, 90, 162, 184, 242, 258, 296, 316, 520, 548, 554, 570, 574, 580, 583, 584, 585, 598, 612, 772, 776, 798, 876, 882],
-                    'South America': [32, 68, 76, 152, 170, 218, 238, 239, 254, 328, 600, 604, 740, 858, 862]
+                    'South America': [32, 68, 76, 152, 170, 218, 238, 239, 254, 328, 600, 604, 740, 858, 862, 999]
                 };
                 
                 const countryToContinent = {};
