@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Geo-Locator Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f8ff;
+            color: #333;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #4682b4;
+        }
+        #game-ui {
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 1000px;
+        }
+        #target-coords {
+            color: #2e8b57;
+            font-size: 1.5em;
+            margin: 0 0 10px 0;
+        }
+        #feedback-message {
+            font-style: italic;
+            color: #555;
+            min-height: 20px;
+        }
+        #next-btn {
+            background-color: #4682b4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #next-btn:hover {
+            background-color: #5a9bd3;
+        }
+        #map { 
+            height: 500px; 
+            width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            max-width: 1000px;
+        }
+        .leaflet-container {
+            background: #add8e6;
+        }
+        /* Style for the grid labels */
+        .grid-label div {
+            font-size: 12px;
+            font-weight: bold;
+            color: rgba(0, 0, 0, 0.7);
+            text-shadow: 1px 1px 0px #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+            white-space: nowrap;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Geo-Locator Challenge</h1>
+    
+    <div id="game-ui">
+        <h2 id="target-coords">Loading...</h2>
+        <p id="feedback-message">Click on the map to make your guess!</p>
+        <button id="next-btn">Next Target</button>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        // DOM Elements
+        const targetCoordsEl = document.getElementById('target-coords');
+        const feedbackMessageEl = document.getElementById('feedback-message');
+        const nextBtn = document.getElementById('next-btn');
+
+        // Game State
+        let targetLat, targetLng;
+        let targetMarker, guessMarker, guessLine;
+
+        // Initialize the map: noWrap prevents horizontal repeating
+        const map = L.map('map', {
+            noWrap: true,
+            minZoom: 2,
+        }).setView([20, 0], 2);
+        
+        // Set bounds to prevent panning outside the world
+        map.setMaxBounds([[-90, -180], [90, 180]]);
+
+        // Base map layer from CartoDB
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+
+        // --- Manually draw grid lines and labels ---
+        const majorLineStyle = { color: 'rgba(0, 0, 0, 0.6)', weight: 1.2, interactive: false };
+        const minorLineStyle = { color: 'rgba(0, 0, 0, 0.3)', weight: 0.8, interactive: false };
+
+        // Function to create a text label icon
+        function createLabelIcon(labelText) {
+            return L.divIcon({
+                className: 'grid-label',
+                html: `<div>${labelText}</div>`,
+                iconSize: [40, 20],
+                iconAnchor: [20, 10]
+            });
+        }
+
+        // Draw longitude lines and labels
+        for (let i = -180; i <= 180; i += 10) {
+            const isMajor = i % 30 === 0;
+            const style = isMajor ? majorLineStyle : minorLineStyle;
+            L.polyline([[85, i], [-85, i]], style).addTo(map); // Shorten lines to avoid pole clutter
+
+            if (isMajor && i !== -180 && i !== 180) {
+                let labelText = (i === 0) ? '0°' : `${Math.abs(i)}° ${i > 0 ? 'E' : 'W'}`;
+                L.marker([85, i], { icon: createLabelIcon(labelText), interactive: false }).addTo(map);
+            }
+        }
+        
+        // Draw latitude lines and labels
+        for (let i = -90; i <= 90; i += 10) {
+            const isMajor = i % 30 === 0;
+            const style = isMajor ? majorLineStyle : minorLineStyle;
+            L.polyline([[i, -180], [i, 180]], style).addTo(map);
+
+            if (isMajor && i !== -90 && i !== 90) {
+                let labelText = (i === 0) ? '0°' : `${Math.abs(i)}° ${i > 0 ? 'N' : 'S'}`;
+                L.marker([i, -170], { icon: createLabelIcon(labelText), interactive: false }).addTo(map);
+            }
+        }
+        // --- End of grid ---
+        
+        // Overlay layer with labels
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
+        	attribution: '',
+        	subdomains: 'abcd',
+        	pane: 'shadowPane' // Ensures labels are on top
+        }).addTo(map);
+
+
+        function cleanUpMap() {
+            // Remove markers and line from previous turn
+            if (guessMarker) map.removeLayer(guessMarker);
+            if (guessLine) map.removeLayer(guessLine);
+            if (targetMarker) targetMarker.setOpacity(0);
+        }
+
+        function generateNewLocation() {
+            cleanUpMap();
+
+            targetLat = (Math.random() * 180 - 90).toFixed(2);
+            targetLng = (Math.random() * 360 - 180).toFixed(2);
+
+            // Format coordinates for display
+            const latDir = targetLat >= 0 ? 'N' : 'S';
+            const lngDir = targetLng >= 0 ? 'E' : 'W';
+            const displayLat = Math.abs(targetLat).toFixed(2);
+            const displayLng = Math.abs(targetLng).toFixed(2);
+
+            targetCoordsEl.textContent = `Find: ${displayLat}° ${latDir}, ${displayLng}° ${lngDir}`;
+            feedbackMessageEl.textContent = 'Click on the map to make your guess!';
+
+            // Create or move the target marker (initially hidden)
+            if (!targetMarker) {
+                targetMarker = L.marker([targetLat, targetLng], { opacity: 0 }).addTo(map);
+            } else {
+                targetMarker.setLatLng([targetLat, targetLng]);
+            }
+        }
+
+        map.on('click', function(e) {
+            // Remove previous guess from this turn, if any
+            if (guessMarker) map.removeLayer(guessMarker);
+            if (guessLine) map.removeLayer(guessLine);
+
+            const clickLatLng = e.latlng;
+            const targetLatLng = L.latLng(targetLat, targetLng);
+            const distance = map.distance(clickLatLng, targetLatLng) / 1000; // in kilometers
+
+            // Add a marker for the user's guess
+            guessMarker = L.marker(clickLatLng).addTo(map);
+            guessMarker.bindPopup("Your guess").openPopup();
+
+            // Draw a dotted line between the guess and the target
+            guessLine = L.polyline([clickLatLng, targetLatLng], { 
+                color: 'red', 
+                dashArray: '5, 10' 
+            }).addTo(map);
+
+            // Show the actual location
+            targetMarker.setOpacity(1).bindPopup(`<b>Correct Location!</b><br>You were ${distance.toLocaleString(undefined, {maximumFractionDigits:0})} km away.`).openPopup();
+
+            if (distance < 500) {
+                feedbackMessageEl.textContent = `Excellent! You were only ${Math.round(distance)} km away.`;
+            } else if (distance < 2000) {
+                feedbackMessageEl.textContent = `So close! You were ${Math.round(distance)} km off.`;
+            } else {
+                feedbackMessageEl.textContent = `Not quite. You were ${Math.round(distance)} km away. Keep practicing!`;
+            }
+        });
+        
+        nextBtn.addEventListener('click', generateNewLocation);
+
+        // Start the game
+        generateNewLocation();
+    </script>
+</body>
+</html>
+
