@@ -38,6 +38,12 @@
             color: #555;
             min-height: 20px;
         }
+        #score-display {
+            font-size: 1.2em;
+            color: #333;
+            font-weight: bold;
+            margin-top: 10px;
+        }
         #next-btn {
             background-color: #4682b4;
             color: white;
@@ -47,6 +53,7 @@
             font-size: 1em;
             cursor: pointer;
             transition: background-color 0.3s;
+            margin-top: 10px;
         }
         #next-btn:hover {
             background-color: #5a9bd3;
@@ -78,6 +85,7 @@
     <div id="game-ui">
         <h2 id="target-coords">Loading...</h2>
         <p id="feedback-message">Click on the map to make your guess!</p>
+        <h3 id="score-display">Score: 0</h3>
         <button id="next-btn">Next Target</button>
     </div>
 
@@ -88,11 +96,14 @@
         // DOM Elements
         const targetCoordsEl = document.getElementById('target-coords');
         const feedbackMessageEl = document.getElementById('feedback-message');
+        const scoreDisplayEl = document.getElementById('score-display');
         const nextBtn = document.getElementById('next-btn');
 
         // Game State
         let targetLat, targetLng;
         let targetMarker, guessMarker, guessLine;
+        let score = 0;
+        let roundOver = false;
 
         // Initialize the map: noWrap prevents horizontal repeating
         const map = L.map('map', {
@@ -114,7 +125,6 @@
         const majorLineStyle = { color: 'rgba(0, 0, 0, 0.6)', weight: 1.2, interactive: false };
         const minorLineStyle = { color: 'rgba(0, 0, 0, 0.3)', weight: 0.8, interactive: false };
 
-        // Function to create a text label icon
         function createLabelIcon(labelText) {
             return L.divIcon({
                 className: 'grid-label',
@@ -124,53 +134,50 @@
             });
         }
 
-        // Draw longitude lines and labels
         for (let i = -180; i <= 180; i += 10) {
             const isMajor = i % 30 === 0;
             const style = isMajor ? majorLineStyle : minorLineStyle;
-            L.polyline([[85, i], [-85, i]], style).addTo(map); // Shorten lines to avoid pole clutter
-
+            L.polyline([[85, i], [-85, i]], style).addTo(map);
             if (isMajor && i !== -180 && i !== 180) {
                 let labelText = (i === 0) ? '0°' : `${Math.abs(i)}° ${i > 0 ? 'E' : 'W'}`;
                 L.marker([85, i], { icon: createLabelIcon(labelText), interactive: false }).addTo(map);
+                L.marker([-85, i], { icon: createLabelIcon(labelText), interactive: false }).addTo(map);
             }
         }
         
-        // Draw latitude lines and labels
         for (let i = -90; i <= 90; i += 10) {
             const isMajor = i % 30 === 0;
             const style = isMajor ? majorLineStyle : minorLineStyle;
             L.polyline([[i, -180], [i, 180]], style).addTo(map);
-
             if (isMajor && i !== -90 && i !== 90) {
                 let labelText = (i === 0) ? '0°' : `${Math.abs(i)}° ${i > 0 ? 'N' : 'S'}`;
                 L.marker([i, -170], { icon: createLabelIcon(labelText), interactive: false }).addTo(map);
+                L.marker([i, 170], { icon: createLabelIcon(labelText), interactive: false }).addTo(map);
             }
         }
-        // --- End of grid ---
         
-        // Overlay layer with labels
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
         	attribution: '',
         	subdomains: 'abcd',
-        	pane: 'shadowPane' // Ensures labels are on top
+        	pane: 'shadowPane'
         }).addTo(map);
 
-
         function cleanUpMap() {
-            // Remove markers and line from previous turn
             if (guessMarker) map.removeLayer(guessMarker);
             if (guessLine) map.removeLayer(guessLine);
-            if (targetMarker) targetMarker.setOpacity(0);
+            if (targetMarker) {
+                map.closePopup();
+                targetMarker.setOpacity(0);
+            }
         }
 
         function generateNewLocation() {
             cleanUpMap();
+            roundOver = false;
 
             targetLat = (Math.random() * 180 - 90).toFixed(2);
             targetLng = (Math.random() * 360 - 180).toFixed(2);
 
-            // Format coordinates for display
             const latDir = targetLat >= 0 ? 'N' : 'S';
             const lngDir = targetLng >= 0 ? 'E' : 'W';
             const displayLat = Math.abs(targetLat).toFixed(2);
@@ -179,7 +186,6 @@
             targetCoordsEl.textContent = `Find: ${displayLat}° ${latDir}, ${displayLng}° ${lngDir}`;
             feedbackMessageEl.textContent = 'Click on the map to make your guess!';
 
-            // Create or move the target marker (initially hidden)
             if (!targetMarker) {
                 targetMarker = L.marker([targetLat, targetLng], { opacity: 0 }).addTo(map);
             } else {
@@ -188,39 +194,39 @@
         }
 
         map.on('click', function(e) {
-            // Remove previous guess from this turn, if any
-            if (guessMarker) map.removeLayer(guessMarker);
-            if (guessLine) map.removeLayer(guessLine);
+            if (roundOver) return;
+            roundOver = true;
 
             const clickLatLng = e.latlng;
             const targetLatLng = L.latLng(targetLat, targetLng);
-            const distance = map.distance(clickLatLng, targetLatLng) / 1000; // in kilometers
+            const distance = map.distance(clickLatLng, targetLatLng) / 1000;
 
-            // Add a marker for the user's guess
+            const pointsAwarded = Math.max(0, 10000 - Math.round(distance));
+            score += pointsAwarded;
+            scoreDisplayEl.textContent = `Score: ${score.toLocaleString()}`;
+
             guessMarker = L.marker(clickLatLng).addTo(map);
             guessMarker.bindPopup("Your guess").openPopup();
 
-            // Draw a dotted line between the guess and the target
             guessLine = L.polyline([clickLatLng, targetLatLng], { 
                 color: 'red', 
                 dashArray: '5, 10' 
             }).addTo(map);
 
-            // Show the actual location
             targetMarker.setOpacity(1).bindPopup(`<b>Correct Location!</b><br>You were ${distance.toLocaleString(undefined, {maximumFractionDigits:0})} km away.`).openPopup();
 
+            const feedbackBase = `You earned ${pointsAwarded.toLocaleString()} points.`;
             if (distance < 500) {
-                feedbackMessageEl.textContent = `Excellent! You were only ${Math.round(distance)} km away.`;
+                feedbackMessageEl.textContent = `Excellent! You were only ${Math.round(distance)} km away. ${feedbackBase}`;
             } else if (distance < 2000) {
-                feedbackMessageEl.textContent = `So close! You were ${Math.round(distance)} km off.`;
+                feedbackMessageEl.textContent = `So close! You were ${Math.round(distance)} km off. ${feedbackBase}`;
             } else {
-                feedbackMessageEl.textContent = `Not quite. You were ${Math.round(distance)} km away. Keep practicing!`;
+                feedbackMessageEl.textContent = `Not quite. You were ${Math.round(distance)} km away. ${feedbackBase}`;
             }
         });
         
         nextBtn.addEventListener('click', generateNewLocation);
 
-        // Start the game
         generateNewLocation();
     </script>
 </body>
