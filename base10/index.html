@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base 10 Blocks Interactive</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Fredoka+One&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            touch-action: none;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .game-title {
+            font-family: 'Fredoka One', cursive;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        .feedback {
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+            font-family: 'Fredoka One', cursive;
+        }
+        .feedback.correct {
+            color: #22c55e; /* green-500 */
+            transform: scale(1.2) rotate(-5deg);
+        }
+        .feedback.incorrect {
+            color: #ef4444; /* red-500 */
+            transform: scale(1.2) rotate(5deg);
+        }
+        .btn-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+        }
+        canvas {
+            background-image: radial-gradient(#d4d4d8 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <header class="text-center mb-6">
+        <h1 class="game-title text-4xl md:text-5xl font-bold">Base 10 Blocks Challenge</h1>
+        <p class="text-indigo-100 mt-2 text-lg">Build the number! Double-click a block to break it apart.</p>
+    </header>
+
+    <div class="w-full max-w-6xl bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl p-6 md:p-8">
+        <div class="flex flex-col md:flex-row justify-between items-center bg-gray-50 p-4 rounded-xl mb-4 border border-gray-200">
+            <div class="text-center md:text-left mb-4 md:mb-0">
+                <span class="text-lg font-semibold text-gray-700">Build this number:</span>
+                <span id="target-number" class="text-4xl lg:text-5xl font-bold text-indigo-600 ml-2 tabular-nums">123</span>
+            </div>
+             <div id="feedback-message" class="feedback text-3xl font-bold h-10">&nbsp;</div>
+            <div class="text-center md:text-right">
+                <span class="text-lg font-semibold text-gray-700">Your total:</span>
+                <span id="current-total" class="text-4xl lg:text-5xl font-bold text-gray-800 ml-2 tabular-nums">0</span>
+            </div>
+        </div>
+
+        <canvas id="mathCanvas" class="w-full h-auto bg-indigo-50 rounded-lg border-2 border-indigo-200 cursor-grab active:cursor-grabbing"></canvas>
+
+        <footer class="mt-6 flex flex-wrap justify-center gap-4">
+            <button id="check-answer-btn" class="flex items-center bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all transform hover:scale-110 hover:-translate-y-1">
+                <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                Check Answer
+            </button>
+            <button id="new-number-btn" class="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all transform hover:scale-110 hover:-translate-y-1">
+                <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5M4 4l5 5M20 20l-5-5"></path></svg>
+                New Number
+            </button>
+            <button id="clear-btn" class="flex items-center bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all transform hover:scale-110 hover:-translate-y-1">
+                <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                Clear Board
+            </button>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('mathCanvas');
+            const ctx = canvas.getContext('2d');
+
+            const targetNumberEl = document.getElementById('target-number');
+            const currentTotalEl = document.getElementById('current-total');
+            const feedbackMessageEl = document.getElementById('feedback-message');
+            const checkAnswerBtn = document.getElementById('check-answer-btn');
+            const newNumberBtn = document.getElementById('new-number-btn');
+            const clearBtn = document.getElementById('clear-btn');
+
+            let targetNumber = 0;
+            let paletteBlocks = [];
+            let workspaceBlocks = [];
+            let draggedBlock = null;
+            let isDragging = false;
+            let startX, startY;
+            let lastTap = { time: 0, target: null };
+
+            // --- Block Configuration ---
+            const blockTypes = {
+                unit: { value: 1, color: '#facc15', highlight: '#fde047', shadow: '#eab308', size: 22 },
+                rod: { value: 10, color: '#38bdf8', highlight: '#7dd3fc', shadow: '#0ea5e9', width: 22, height: 110 },
+                flat: { value: 100, color: '#4ade80', highlight: '#86efac', shadow: '#22c55e', size: 110 },
+                cube: { value: 1000, color: '#f87171', highlight: '#fca5a5', shadow: '#ef4444', size: 120 },
+            };
+
+            const paletteAreaWidth = 180;
+
+            // --- Canvas and Drawing Logic ---
+            function resizeCanvas() {
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = 500;
+                setupPalette();
+                draw();
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.fillRect(0, 0, paletteAreaWidth, canvas.height);
+                ctx.strokeStyle = '#e0e7ff';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(paletteAreaWidth, 0);
+                ctx.lineTo(paletteAreaWidth, canvas.height);
+                ctx.stroke();
+
+                ctx.fillStyle = "#4f46e5";
+                ctx.font = "700 18px 'Poppins'";
+                ctx.textAlign = "center";
+                ctx.fillText("BLOCKS", paletteAreaWidth / 2, 35);
+
+                [...paletteBlocks, ...workspaceBlocks].forEach(block => drawBlock(block));
+
+                if (isDragging && draggedBlock) {
+                    drawBlock(draggedBlock, true);
+                }
+            }
+            
+            function drawBlock(block, isDragged = false) {
+                const x = block.x;
+                const y = block.y;
+                let w = block.width;
+                let h = block.height;
+
+                ctx.save();
+                if (isDragged) {
+                    // This fixes the "doubling" bug. We calculate the new position
+                    // for drawing without modifying the block's actual x/y properties.
+                    const scale = 1.1;
+                    const drawX = x - (w * (scale - 1)) / 2;
+                    const drawY = y - (h * (scale - 1)) / 2;
+                    w *= scale;
+                    h *= scale;
+                    
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+                    ctx.shadowBlur = 15;
+                    ctx.shadowOffsetX = 5;
+                    ctx.shadowOffsetY = 5;
+                    
+                    // Use the temporary draw positions
+                    _drawBlockGeometry(block, drawX, drawY, w, h);
+                } else {
+                    _drawBlockGeometry(block, x, y, w, h);
+                }
+                ctx.restore();
+            }
+
+            function _drawBlockGeometry(block, x, y, w, h) {
+                const s = w; 
+                ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+                ctx.lineWidth = 1;
+
+                if (block.type === 'unit') {
+                    const offset = 4;
+                    ctx.fillStyle = block.shadow;
+                    ctx.fillRect(x + offset, y + offset, w, h);
+                    ctx.fillStyle = block.color;
+                    ctx.fillRect(x, y, w, h);
+                    ctx.strokeRect(x, y, w, h);
+                } else if (block.type === 'rod') {
+                    const offset = 4;
+                    ctx.fillStyle = block.shadow;
+                    ctx.fillRect(x + offset, y + offset, w, h);
+                    ctx.fillStyle = block.color;
+                    ctx.fillRect(x, y, w, h);
+                    ctx.strokeRect(x, y, w, h);
+                    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+                    for (let i = 1; i < 10; i++) {
+                        ctx.beginPath();
+                        ctx.moveTo(x, y + (h / 10) * i);
+                        ctx.lineTo(x + w, y + (h / 10) * i);
+                        ctx.stroke();
+                    }
+                } else if (block.type === 'flat') {
+                    const offset = 6;
+                    ctx.fillStyle = block.shadow;
+                    ctx.fillRect(x + offset, y + offset, w, h);
+                    ctx.fillStyle = block.color;
+                    ctx.fillRect(x, y, w, h);
+                    ctx.strokeRect(x, y, w, h);
+                    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+                    for (let i = 1; i < 10; i++) {
+                        ctx.beginPath();
+                        ctx.moveTo(x + (w / 10) * i, y);
+                        ctx.lineTo(x + (w / 10) * i, y + h);
+                        ctx.moveTo(x, y + (h / 10) * i);
+                        ctx.lineTo(x + w, y + (h / 10) * i);
+                        ctx.stroke();
+                    }
+                } else if (block.type === 'cube') {
+                    const o = s * 0.2;
+                    ctx.fillStyle = block.shadow;
+                    ctx.beginPath();
+                    ctx.moveTo(x + o, y); ctx.lineTo(x + s, y); ctx.lineTo(x + s, y + s - o);
+                    ctx.lineTo(x + s - o, y + s); ctx.lineTo(x, y + s); ctx.lineTo(x, y + o);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    ctx.fillStyle = block.highlight;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y + o); ctx.lineTo(x + o, y); ctx.lineTo(x + s, y); ctx.lineTo(x + s - o, y + o);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.fillStyle = block.color;
+                    ctx.fillRect(x, y + o, s - o, s-o);
+                }
+            }
+
+
+            // --- Game Logic ---
+            function generateNewNumber() {
+                targetNumber = Math.floor(Math.random() * 1999) + 1;
+                targetNumberEl.textContent = targetNumber;
+                clearWorkspace();
+                clearFeedback();
+            }
+
+            function clearWorkspace() {
+                workspaceBlocks = [];
+                updateCurrentTotal();
+                draw();
+            }
+            
+            function updateCurrentTotal() {
+                const total = workspaceBlocks.reduce((sum, block) => sum + block.value, 0);
+                currentTotalEl.textContent = total;
+                return total;
+            }
+
+            function checkAnswer() {
+                const total = updateCurrentTotal();
+                clearFeedback();
+                setTimeout(() => {
+                    if (total === targetNumber) {
+                        feedbackMessageEl.textContent = "Correct! 🎉";
+                        feedbackMessageEl.classList.add('correct');
+                    } else {
+                        feedbackMessageEl.textContent = "Try Again!";
+                        feedbackMessageEl.classList.add('incorrect');
+                    }
+                }, 10);
+            }
+
+            function clearFeedback() {
+                feedbackMessageEl.textContent = '\u00A0';
+                feedbackMessageEl.classList.remove('correct', 'incorrect');
+            }
+            
+            // --- NEW: Block Breaking Logic ---
+            function breakBlock(blockToBreak) {
+                if (!blockToBreak || blockToBreak.type === 'unit') return;
+
+                const index = workspaceBlocks.findIndex(b => b.id === blockToBreak.id);
+                if (index === -1) return;
+
+                let newBlocks = [];
+                let newType, newConfig;
+
+                switch (blockToBreak.type) {
+                    case 'cube': newType = 'flat'; break;
+                    case 'flat': newType = 'rod'; break;
+                    case 'rod': newType = 'unit'; break;
+                }
+                newConfig = blockTypes[newType];
+
+                for (let i = 0; i < 10; i++) {
+                    const newBlock = {
+                        type: newType,
+                        ...newConfig,
+                        id: Date.now() + Math.random() + i,
+                        x: blockToBreak.x + (i % 5) * (newConfig.width || newConfig.size + 5),
+                        y: blockToBreak.y + Math.floor(i / 5) * (newConfig.height || newConfig.size + 5),
+                        width: newConfig.width || newConfig.size,
+                        height: newConfig.height || newConfig.size,
+                    };
+                    newBlocks.push(newBlock);
+                }
+                
+                workspaceBlocks.splice(index, 1, ...newBlocks);
+                updateCurrentTotal();
+                draw();
+            }
+
+
+            // --- Interaction Handling ---
+            function getPointerPos(evt) {
+                const rect = canvas.getBoundingClientRect();
+                const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+                const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+                return {
+                    x: (clientX - rect.left) * (canvas.width / rect.width),
+                    y: (clientY - rect.top) * (canvas.height / rect.height)
+                };
+            }
+
+            function isOverBlock(pos, block) {
+                return pos.x > block.x && pos.x < block.x + block.width &&
+                       pos.y > block.y && pos.y < block.y + block.height;
+            }
+
+            function onDown(e) {
+                e.preventDefault();
+                const pos = getPointerPos(e);
+                let blockUnderPointer = null;
+
+                for (let i = workspaceBlocks.length - 1; i >= 0; i--) {
+                    if (isOverBlock(pos, workspaceBlocks[i])) {
+                        blockUnderPointer = workspaceBlocks[i];
+                        break;
+                    }
+                }
+
+                // Double tap/click logic
+                const now = Date.now();
+                if (now - lastTap.time < 300 && lastTap.target?.id === blockUnderPointer?.id) {
+                    breakBlock(blockUnderPointer);
+                    lastTap = { time: 0, target: null }; // Reset tap
+                    return; // End the function here to prevent dragging
+                }
+                lastTap = { time: now, target: blockUnderPointer };
+
+                let blockToDrag = blockUnderPointer;
+                if (blockToDrag) {
+                     workspaceBlocks.splice(workspaceBlocks.indexOf(blockToDrag), 1);
+                     workspaceBlocks.push(blockToDrag);
+                } else {
+                    for (const block of paletteBlocks) {
+                        if (isOverBlock(pos, block)) {
+                            blockToDrag = { ...block, id: Date.now() + Math.random() }; 
+                            workspaceBlocks.push(blockToDrag);
+                            break;
+                        }
+                    }
+                }
+
+                if (blockToDrag) {
+                    draggedBlock = blockToDrag;
+                    isDragging = true;
+                    startX = pos.x - draggedBlock.x;
+                    startY = pos.y - draggedBlock.y;
+                    draw();
+                }
+            }
+
+            function onMove(e) {
+                if (!isDragging || !draggedBlock) return;
+                e.preventDefault();
+                const pos = getPointerPos(e);
+                draggedBlock.x = pos.x - startX;
+                draggedBlock.y = pos.y - startY;
+                draw();
+            }
+
+            function onUp(e) {
+                if (!isDragging) return;
+                isDragging = false;
+                
+                if (draggedBlock && draggedBlock.x < paletteAreaWidth) {
+                    workspaceBlocks = workspaceBlocks.filter(b => b.id !== draggedBlock.id);
+                }
+
+                draggedBlock = null;
+                updateCurrentTotal();
+                draw();
+            }
+
+            function setupPalette() {
+                paletteBlocks = [];
+                const padding = (paletteAreaWidth - blockTypes.cube.size) / 2;
+                
+                const cube = { type: 'cube', ...blockTypes.cube, x: padding, y: 50, width: blockTypes.cube.size, height: blockTypes.cube.size };
+                const flat = { type: 'flat', ...blockTypes.flat, x: (paletteAreaWidth - blockTypes.flat.size) / 2, y: cube.y + cube.height + 25, width: blockTypes.flat.size, height: blockTypes.flat.size };
+                const rod = { type: 'rod', ...blockTypes.rod, x: (paletteAreaWidth - blockTypes.rod.width) / 2, y: flat.y + flat.height + 25, width: blockTypes.rod.width, height: blockTypes.rod.height };
+                const unit = { type: 'unit', ...blockTypes.unit, x: (paletteAreaWidth - blockTypes.unit.size) / 2, y: rod.y + rod.height + 25, width: blockTypes.unit.size, height: blockTypes.unit.size };
+
+                paletteBlocks.push(cube, flat, rod, unit);
+            }
+
+            function init() {
+                resizeCanvas();
+                window.addEventListener('resize', resizeCanvas);
+
+                canvas.addEventListener('mousedown', onDown);
+                canvas.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+
+                canvas.addEventListener('touchstart', onDown, { passive: false });
+                canvas.addEventListener('touchmove', onMove, { passive: false });
+                document.addEventListener('touchend', onUp);
+
+                checkAnswerBtn.addEventListener('click', checkAnswer);
+                newNumberBtn.addEventListener('click', generateNewNumber);
+                clearBtn.addEventListener('click', () => {
+                   clearWorkspace();
+                   clearFeedback();
+                });
+
+                generateNewNumber();
+            }
+
+            init();
+        });
+    </script>
+</body>
+</html>
+
