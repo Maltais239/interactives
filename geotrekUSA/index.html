@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>US States Trek Game</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0f4f8;
+            overflow: hidden;
+        }
+        /* CSS rules to fix rendering artifacts */
+        .leaflet-container {
+            background: #aadaff;
+            outline: 1px solid transparent; /* Prevents tile tearing */
+        }
+        
+        .map-background-tiles {
+            /* Helps prevent seams between map tiles on some browsers */
+            image-rendering: -webkit-optimize-contrast; /* Chrome/Safari */
+            image-rendering: crisp-edges; /* Firefox/Opera */
+        }
+
+        #map {
+            flex: 1;
+            height: 100%;
+            border-right: 1px solid #ddd;
+        }
+        #info-panel {
+            width: 380px;
+            max-width: 40%;
+            padding: 2rem;
+            background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+            border-left: 5px solid #0d9488;
+            overflow-y: auto;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        #info-panel h2 {
+            margin-top: 0;
+            color: #134e4a;
+            font-size: 1.75rem;
+            font-weight: 700;
+            border-bottom: 2px solid #99f6e4;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        .loading-text {
+            text-align: center;
+            font-weight: 500;
+            color: #0f766e;
+            padding: 2rem;
+        }
+
+        /* Score Display */
+        #score-display {
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #0f766e;
+            background-color: #f0fdfa;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            border: 1px solid #99f6e4;
+        }
+        #score-display span {
+            font-weight: 700;
+            color: #14b8a6;
+        }
+
+        /* Switcher Styles */
+        .region-switcher, .difficulty-switcher {
+            display: flex;
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            background-color: #ccfbf1;
+            padding: 0.25rem;
+            flex-wrap: wrap;
+        }
+        .region-btn, .difficulty-btn {
+            flex: 1 1 auto;
+            padding: 0.75rem 0.5rem;
+            border: none;
+            background-color: transparent;
+            color: #14b8a6;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: background-color 0.3s, color 0.3s, opacity 0.3s;
+            text-align: center;
+        }
+        .region-btn:disabled, .difficulty-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .region-btn.active, .difficulty-btn.active {
+            background-color: #14b8a6;
+            color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .difficulty-switcher {
+            background-color: #e0f2fe;
+            margin-bottom: 1.5rem;
+        }
+        .difficulty-btn { color: #075985; }
+        .difficulty-btn.active { background-color: #0369a1; }
+        
+        .mode-toggle {
+            margin-bottom: 1.5rem;
+        }
+        #touchscreen-mode-btn {
+            width: 100%;
+            background-color: #64748b;
+        }
+         #touchscreen-mode-btn.active {
+            background-color: #1e293b;
+        }
+
+
+        /* Panels */
+        #trek-panel {
+             border-top: 1px solid #ddd; padding-top: 1.5rem;
+        }
+        #trek-panel h3 {
+            margin-top: 0; margin-bottom: 1rem; color: #0d9488; font-size: 1.5rem; font-weight: 600;
+        }
+
+        /* Trek Mode Styling */
+        #trek-challenge {
+            padding: 1rem;
+            background-color: #f0fdfa;
+            border: 1px solid #99f6e4;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: #115e59;
+            line-height: 1.6;
+        }
+        #trek-challenge strong {
+            color: #0d9488;
+        }
+        #trek-input-container {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        #trek-guess-input {
+            flex: 1;
+            padding: 0.75rem;
+            border: 1px solid #99f6e4;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: 'Poppins', sans-serif;
+        }
+        .game-btn {
+            padding: 0.75rem; color: white; border: none; border-radius: 8px; font-size: 1rem;
+            font-weight: 600; cursor: pointer; transition: background-color 0.2s, opacity 0.2s;
+        }
+        .game-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        #trek-guess-btn {
+            padding: 0.75rem 1rem;
+            background-color: #14b8a6;
+        }
+        #trek-guess-btn:hover {
+            background-color: #0f766e;
+        }
+        #trek-hint-btn {
+             background-color: #f59e0b;
+        }
+        #trek-hint-btn:hover {
+            background-color: #d97706;
+        }
+        #trek-guesses-list {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 1rem;
+        }
+        #trek-guesses-list li {
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin-bottom: 0.25rem;
+        }
+        #trek-guesses-list li.correct {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+        #trek-guesses-list li.incorrect {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Touchscreen Mode */
+        #trek-choices-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        .choice-btn {
+            padding: 1rem 0.5rem;
+            background-color: #0ea5e9;
+        }
+        .choice-btn:hover {
+            background-color: #0284c7;
+        }
+
+
+        #trek-feedback {
+            font-weight: 500;
+            text-align: center;
+            padding: 1rem;
+            min-height: 50px;
+        }
+        #new-trek-btn {
+            background-color: #16a34a;
+            width: 100%;
+            margin-top: auto; /* Pushes button to the bottom */
+            padding-top: 1rem;
+        }
+         #new-trek-btn:hover { background-color: #15803d; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="info-panel">
+        <h2>US States Trek</h2>
+
+        <div id="score-display">Score: <span id="score-value">0</span></div>
+
+        <div class="region-switcher">
+            <button class="region-btn active" data-region="All States">All States</button>
+            <button class="region-btn" data-region="Northeast">Northeast</button>
+            <button class="region-btn" data-region="South">South</button>
+            <button class="region-btn" data-region="Midwest">Midwest</button>
+            <button class="region-btn" data-region="West">West</button>
+        </div>
+
+        <div class="difficulty-switcher">
+            <button class="difficulty-btn" data-difficulty="easy">Easy</button>
+            <button class="difficulty-btn active" data-difficulty="medium">Medium</button>
+            <button class="difficulty-btn" data-difficulty="hard">Hard</button>
+        </div>
+
+        <div class="mode-toggle">
+            <button id="touchscreen-mode-btn" class="game-btn">Enable Touchscreen Mode ⌨️</button>
+        </div>
+        
+        <div id="trek-panel">
+            <h3>State Trek</h3>
+            <div id="trek-challenge">Loading new trek...</div>
+            
+            <div id="trek-input-container">
+                <input type="text" id="trek-guess-input" placeholder="Enter next state...">
+                <button id="trek-hint-btn" class="game-btn">Hint 💡</button>
+                <button id="trek-guess-btn" class="game-btn">Guess</button>
+            </div>
+
+            <div id="trek-choices-container" style="display: none;"></div>
+
+            <div id="trek-guesses">
+                <ul id="trek-guesses-list"></ul>
+            </div>
+            <div id="trek-feedback"></div>
+            <button id="new-trek-btn" class="game-btn">New Trek 🗺️</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        // --- DOM Elements ---
+        const map = L.map('map', {
+            renderer: L.canvas(),
+            worldCopyJump: false, 
+            maxBounds: [[10, -140], [60, -60]], 
+            maxBoundsViscosity: 1.0
+        }).setView([39.8283, -98.5795], 4);
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 10,
+            minZoom: 3,
+            noWrap: true,
+            className: 'map-background-tiles'
+        }).addTo(map);
+
+        const regionBtns = document.querySelectorAll('.region-btn');
+        const difficultyBtns = document.querySelectorAll('.difficulty-btn');
+        const scoreValue = document.getElementById('score-value');
+        const touchscreenModeBtn = document.getElementById('touchscreen-mode-btn');
+
+        // Trek DOM Elements
+        const trekChallenge = document.getElementById('trek-challenge');
+        const trekInputContainer = document.getElementById('trek-input-container');
+        const trekGuessInput = document.getElementById('trek-guess-input');
+        const trekGuessBtn = document.getElementById('trek-guess-btn');
+        const trekHintBtn = document.getElementById('trek-hint-btn');
+        const trekChoicesContainer = document.getElementById('trek-choices-container');
+        const trekGuessesList = document.getElementById('trek-guesses-list');
+        const trekFeedback = document.getElementById('trek-feedback');
+        const newTrekBtn = document.getElementById('new-trek-btn');
+
+        // --- App State ---
+        let geojson;
+        let statesData = {};
+        let stateNameMap = {}; // For quick lookup of official name by alternatives
+        let trekState = {};
+        let currentRegion = 'All States';
+        let currentDifficulty = 'medium';
+        let currentScore = 0;
+        let isTouchscreenMode = false;
+
+        const difficultySettings = {
+            easy: { min: 3, max: 4, multiplier: 1 },
+            medium: { min: 5, max: 7, multiplier: 2 },
+            hard: { min: 8, max: 10, multiplier: 3 }
+        };
+
+        const regionBounds = {
+            'Northeast': [[47, -80], [38, -66]], 'South': [[38, -104], [24, -75]],
+            'Midwest': [[49, -104], [36, -82]], 'West': [[49, -125], [31, -103]],
+            'All States': [[39.8283, -98.5795], 4]
+        };
+        
+        // --- Main Logic ---
+        function initializeApp(geoData) {
+            try {
+                const factsMap = new Map();
+                stateFacts.forEach(fact => {
+                    factsMap.set(fact.name.common, fact);
+                     stateNameMap[fact.name.common.toLowerCase()] = fact.name.common;
+                });
+                
+                geoData.features.forEach(feature => {
+                    const stateName = feature.properties.name;
+                    const fact = factsMap.get(stateName);
+                    if (fact) {
+                        statesData[stateName] = { ...fact, geometry: feature.geometry, name: stateName };
+                    }
+                });
+
+                initializeLogic();
+            } catch (error) {
+                console.error("Data processing error:", error);
+                trekChallenge.innerHTML = `<p class="loading-text">Could not process map data.</p>`;
+            }
+        }
+        
+        function initializeLogic() {
+            const allFeatures = Object.values(statesData).map(c => ({
+                type: "Feature", properties: { name: c.name }, geometry: c.geometry
+            }));
+            geojson = L.geoJson({ type: "FeatureCollection", features: allFeatures }, { style, onEachFeature }).addTo(map);
+            startNewTrek();
+        }
+
+        // --- Event Listeners ---
+        newTrekBtn.addEventListener('click', startNewTrek);
+        trekGuessBtn.addEventListener('click', () => handleGuess(trekGuessInput.value));
+        trekHintBtn.addEventListener('click', provideHint);
+        trekGuessInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') handleGuess(trekGuessInput.value); });
+        
+        touchscreenModeBtn.addEventListener('click', toggleTouchscreenMode);
+
+        regionBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentRegion = btn.dataset.region;
+                regionBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const bounds = regionBounds[currentRegion];
+                currentRegion === 'All States' ? map.setView(bounds[0], bounds[1]) : map.flyToBounds(bounds);
+                setTimeout(() => map.invalidateSize(), 400);
+                startNewTrek();
+            });
+        });
+
+        difficultyBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentDifficulty = btn.dataset.difficulty;
+                difficultyBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                startNewTrek();
+            });
+        });
+
+        // --- Trek Logic ---
+        function findPath(startName, endName) {
+            const startNode = statesData[startName];
+            if (!startNode) return null;
+
+            let queue = [[startNode.name]];
+            const visited = new Set([startNode.name]);
+
+            while (queue.length > 0) {
+                let path = queue.shift();
+                let currentName = path[path.length - 1];
+
+                if (currentName === endName) return path;
+
+                const currentNode = statesData[currentName];
+                const neighbors = (currentNode.borders || []).map(getStateNameByAbbr).filter(Boolean);
+
+                for (const neighbor of neighbors) {
+                    if (!visited.has(neighbor)) {
+                        visited.add(neighbor);
+                        let newPath = [...path, neighbor];
+                        queue.push(newPath);
+                    }
+                }
+            }
+            return null;
+        }
+
+        function startNewTrek() {
+            let candidateStates = Object.values(statesData).filter(c => c.borders && c.borders.length > 0);
+
+            if (currentRegion !== 'All States') {
+                candidateStates = candidateStates.filter(c => c.region === currentRegion);
+            }
+
+            if (candidateStates.length < 2) {
+                trekChallenge.innerHTML = `Not enough connected states in ${currentRegion} to start a trek.`;
+                trekFeedback.innerHTML = 'Please select another region.';
+                trekGuessInput.disabled = true;
+                trekGuessBtn.disabled = true;
+                trekHintBtn.disabled = true;
+                return;
+            }
+
+            let start, end, path;
+            let attempts = 0;
+            const { min, max } = difficultySettings[currentDifficulty];
+
+            while ((!path || path.length < min || path.length > max) && attempts < 100) {
+                start = candidateStates[Math.floor(Math.random() * candidateStates.length)];
+                end = candidateStates[Math.floor(Math.random() * candidateStates.length)];
+                if (start && end && start.name !== end.name) {
+                    path = findPath(start.name, end.name);
+                }
+                attempts++;
+            }
+
+            if (!path) {
+                console.error("Could not find a suitable trek path in", currentRegion, "with difficulty", currentDifficulty);
+                trekChallenge.innerHTML = `Could not generate a ${currentDifficulty} trek in ${currentRegion}.`;
+                trekFeedback.innerHTML = 'Please try a new trek or select another region/difficulty.';
+                trekGuessInput.disabled = true;
+                trekGuessBtn.disabled = true;
+                trekHintBtn.disabled = true;
+                if(geojson) geojson.resetStyle();
+                return;
+            }
+            
+            const startCapital = statesData[start.name]?.capital?.[0] || start.name;
+            const endCapital = statesData[end.name]?.capital?.[0] || end.name;
+
+            trekState = {
+                start: start.name,
+                end: end.name,
+                current: start.name,
+                pathTaken: [start.name],
+                optimalPathLength: path.length - 1,
+                isComplete: false,
+                hintUsed: false,
+            };
+
+            trekChallenge.innerHTML = `Your trek starts in ${startCapital} (<strong>${trekState.start}</strong>) and your destination is ${endCapital} (<strong>${trekState.end}</strong>).`;
+            trekGuessesList.innerHTML = '';
+            trekFeedback.innerHTML = `You are currently in ${trekState.current}. Enter a bordering state to continue.`;
+            trekGuessInput.value = '';
+            
+            if (isTouchscreenMode) {
+                generateTouchscreenChoices();
+            } else {
+                trekGuessInput.disabled = false;
+                trekGuessBtn.disabled = false;
+                trekHintBtn.disabled = false;
+                trekGuessInput.focus();
+            }
+
+            if (geojson) geojson.resetStyle();
+            map.flyToBounds(L.geoJSON({ type: "FeatureCollection", features: [statesData[start.name], statesData[end.name]].map(c => ({ type: "Feature", geometry: c.geometry })) }).getBounds().pad(0.2));
+        }
+
+        function handleGuess(guessValue) {
+            if (trekState.isComplete) return;
+
+            const guess = guessValue.trim();
+            const officialName = stateNameMap[guess.toLowerCase()] || guess; 
+
+            if (!statesData[officialName]) {
+                trekFeedback.innerHTML = `"${guess}" is not a recognized state. Try again.`;
+                return;
+            }
+
+            const currentStateData = statesData[trekState.current];
+            const neighbors = (currentStateData.borders || []).map(b => getStateNameByAbbr(b));
+
+            const li = document.createElement('li');
+            li.textContent = officialName;
+
+            if (neighbors.includes(officialName)) {
+                trekState.pathTaken.push(officialName);
+                trekState.current = officialName;
+                li.className = 'correct';
+                trekFeedback.innerHTML = `Correct! You are now in ${officialName}.`;
+                
+                if (officialName === trekState.end) {
+                    trekState.isComplete = true;
+                    const stepsTaken = trekState.pathTaken.length - 1;
+                    const points = calculateScore(stepsTaken, trekState.optimalPathLength, trekState.hintUsed);
+                    currentScore += points;
+                    updateScoreDisplay();
+                    let feedbackMessage = `Congratulations! You reached ${trekState.end} in ${stepsTaken} steps and earned ${points} points!`;
+                    if(trekState.hintUsed) {
+                        feedbackMessage += " (Hint penalty applied)";
+                    }
+                    feedbackMessage += " Loading next trek...";
+
+                    trekFeedback.innerHTML = feedbackMessage;
+                    trekGuessInput.disabled = true;
+                    trekGuessBtn.disabled = true;
+                    trekHintBtn.disabled = true;
+                    trekChoicesContainer.innerHTML = '';
+                    setTimeout(startNewTrek, 4000); // Automatically start new trek
+                } else {
+                    if (isTouchscreenMode) {
+                        generateTouchscreenChoices();
+                    }
+                }
+            } else {
+                li.className = 'incorrect';
+                trekFeedback.innerHTML = `Incorrect. ${officialName} does not border ${trekState.current}.`;
+            }
+            
+            trekGuessesList.appendChild(li);
+            trekGuessInput.value = '';
+            if(!isTouchscreenMode) trekGuessInput.focus();
+            if (geojson) geojson.resetStyle();
+        }
+        
+        function provideHint() {
+            if (trekState.isComplete || trekState.hintUsed) return;
+
+            const hintPath = findPath(trekState.current, trekState.end);
+
+            if (hintPath && hintPath.length > 1) {
+                trekState.hintUsed = true;
+                trekHintBtn.disabled = true; 
+                const hint = hintPath[1];
+                trekFeedback.innerHTML = `A hint costs half your points for this trek! Try heading to <strong>${hint}</strong>.`;
+            } else {
+                trekFeedback.innerHTML = `Cannot find a path to the destination from here to provide a hint.`;
+            }
+        }
+        
+        // --- Scoring Logic ---
+        function calculateScore(stepsTaken, optimalSteps, hintUsed) {
+            const basePoints = 100;
+            const efficiencyBonus = Math.max(0, (optimalSteps * 50) - ((stepsTaken - optimalSteps) * 25));
+            let total = (basePoints + efficiencyBonus) * difficultySettings[currentDifficulty].multiplier;
+            
+            if(hintUsed) {
+                total *= 0.5;
+            }
+
+            return Math.round(total);
+        }
+        
+        function updateScoreDisplay() {
+            scoreValue.textContent = currentScore;
+        }
+
+        // --- Touchscreen Mode ---
+        function toggleTouchscreenMode() {
+            isTouchscreenMode = !isTouchscreenMode;
+            updateUIMode();
+        }
+
+        function updateUIMode() {
+             if (isTouchscreenMode) {
+                touchscreenModeBtn.textContent = 'Disable Touchscreen Mode 💻';
+                touchscreenModeBtn.classList.add('active');
+                trekInputContainer.style.display = 'none';
+                trekChoicesContainer.style.display = 'grid';
+                if (!trekState.isComplete) generateTouchscreenChoices();
+            } else {
+                touchscreenModeBtn.textContent = 'Enable Touchscreen Mode ⌨️';
+                touchscreenModeBtn.classList.remove('active');
+                trekInputContainer.style.display = 'flex';
+                trekChoicesContainer.style.display = 'none';
+                trekChoicesContainer.innerHTML = ''; // Clear choices
+                if (!trekState.isComplete) trekGuessInput.focus();
+            }
+        }
+
+        function generateTouchscreenChoices() {
+            if (trekState.isComplete) return;
+
+            const currentStateData = statesData[trekState.current];
+            const neighbors = (currentStateData.borders || []).map(b => getStateNameByAbbr(b)).filter(Boolean);
+
+            if (neighbors.length === 0) {
+                trekChoicesContainer.innerHTML = '<p>No land borders from here!</p>';
+                return;
+            }
+
+            const optimalPath = findPath(trekState.current, trekState.end);
+            let optimalChoice = (optimalPath && optimalPath.length > 1) ? optimalPath[1] : neighbors[Math.floor(Math.random() * neighbors.length)];
+            
+            const choices = new Set([optimalChoice]);
+            
+            const distractors = Object.values(statesData)
+                .map(s => s.name)
+                .filter(name => name !== trekState.current && !neighbors.includes(name));
+
+            while (choices.size < 4 && distractors.length > 0) {
+                const randIndex = Math.floor(Math.random() * distractors.length);
+                choices.add(distractors[randIndex]);
+                distractors.splice(randIndex, 1);
+            }
+
+            const shuffledChoices = Array.from(choices).sort(() => Math.random() - 0.5);
+            trekChoicesContainer.innerHTML = ''; // Clear old choices
+            shuffledChoices.forEach(choice => {
+                const btn = document.createElement('button');
+                btn.className = 'game-btn choice-btn';
+                btn.textContent = choice;
+                btn.dataset.state = choice;
+                btn.addEventListener('click', () => handleGuess(choice));
+                trekChoicesContainer.appendChild(btn);
+            });
+        }
+
+
+        // --- Map Styling & Interaction ---
+        function style(feature) {
+            const stateName = feature.properties.name;
+
+            if (trekState.start) {
+                if (stateName === trekState.start) return { fillColor: '#16a34a', weight: 2, color: 'white', fillOpacity: 0.9 }; // Green for start
+                if (stateName === trekState.end) return { fillColor: '#f59e0b', weight: 2, color: 'white', fillOpacity: 0.9 }; // Amber for end
+                if (trekState.pathTaken.includes(stateName)) return { fillColor: '#2563eb', weight: 1.5, color: 'white', fillOpacity: 0.8 }; // Blue for path taken
+            }
+            
+            return { fillColor: '#e0e0e0', weight: 0.5, color: '#f5f5f5', fillOpacity: 0.4 }; 
+        }
+
+        function onEachFeature(feature, layer) {
+            // No interactions on map click for this game
+        }
+
+        // --- Utility ---
+        function getStateNameByAbbr(abbr) {
+            for (const name in statesData) {
+                if (statesData[name].cca3 === abbr) return statesData[name].name;
+            }
+            return null;
+        }
+
+        // --- Data ---
+        const stateFacts = [{"name":{"common":"Alabama"},"cca3":"AL","capital":["Montgomery"],"region":"South","subregion":"East South Central","population":5024279,"borders":["FL","GA","MS","TN"]},{"name":{"common":"Alaska"},"cca3":"AK","capital":["Juneau"],"region":"West","subregion":"Pacific","population":733391,"borders":[]},{"name":{"common":"Arizona"},"cca3":"AZ","capital":["Phoenix"],"region":"West","subregion":"Mountain","population":7151502,"borders":["CA","CO","NV","NM","UT"]},{"name":{"common":"Arkansas"},"cca3":"AR","capital":["Little Rock"],"region":"South","subregion":"West South Central","population":3011524,"borders":["LA","MS","MO","OK","TN","TX"]},{"name":{"common":"California"},"cca3":"CA","capital":["Sacramento"],"region":"West","subregion":"Pacific","population":39538223,"borders":["AZ","NV","OR"]},{"name":{"common":"Colorado"},"cca3":"CO","capital":["Denver"],"region":"West","subregion":"Mountain","population":5773714,"borders":["AZ","KS","NE","NM","OK","UT","WY"]},{"name":{"common":"Connecticut"},"cca3":"CT","capital":["Hartford"],"region":"Northeast","subregion":"New England","population":3605944,"borders":["MA","NY","RI"]},{"name":{"common":"Delaware"},"cca3":"DE","capital":["Dover"],"region":"South","subregion":"South Atlantic","population":989948,"borders":["MD","NJ","PA"]},{"name":{"common":"Florida"},"cca3":"FL","capital":["Tallahassee"],"region":"South","subregion":"South Atlantic","population":21538187,"borders":["AL","GA"]},{"name":{"common":"Georgia"},"cca3":"GA","capital":["Atlanta"],"region":"South","subregion":"South Atlantic","population":10711908,"borders":["AL","FL","NC","SC","TN"]},{"name":{"common":"Hawaii"},"cca3":"HI","capital":["Honolulu"],"region":"West","subregion":"Pacific","population":1455271,"borders":[]},{"name":{"common":"Idaho"},"cca3":"ID","capital":["Boise"],"region":"West","subregion":"Mountain","population":1839106,"borders":["MT","NV","OR","UT","WA","WY"]},{"name":{"common":"Illinois"},"cca3":"IL","capital":["Springfield"],"region":"Midwest","subregion":"East North Central","population":12812508,"borders":["IN","IA","KY","MI","MO","WI"]},{"name":{"common":"Indiana"},"cca3":"IN","capital":["Indianapolis"],"region":"Midwest","subregion":"East North Central","population":6785528,"borders":["IL","KY","MI","OH"]},{"name":{"common":"Iowa"},"cca3":"IA","capital":["Des Moines"],"region":"Midwest","subregion":"West North Central","population":3190369,"borders":["IL","MN","MO","NE","SD","WI"]},{"name":{"common":"Kansas"},"cca3":"KS","capital":["Topeka"],"region":"Midwest","subregion":"West North Central","population":2937880,"borders":["CO","MO","NE","OK"]},{"name":{"common":"Kentucky"},"cca3":"KY","capital":["Frankfort"],"region":"South","subregion":"East South Central","population":4505836,"borders":["IL","IN","MO","OH","TN","VA","WV"]},{"name":{"common":"Louisiana"},"cca3":"LA","capital":["Baton Rouge"],"region":"South","subregion":"West South Central","population":4657757,"borders":["AR","MS","TX"]},{"name":{"common":"Maine"},"cca3":"ME","capital":["Augusta"],"region":"Northeast","subregion":"New England","population":1362359,"borders":["NH"]},{"name":{"common":"Maryland"},"cca3":"MD","capital":["Annapolis"],"region":"South","subregion":"South Atlantic","population":6177224,"borders":["DE","PA","VA","WV"]},{"name":{"common":"Massachusetts"},"cca3":"MA","capital":["Boston"],"region":"Northeast","subregion":"New England","population":7029917,"borders":["CT","NH","NY","RI","VT"]},{"name":{"common":"Michigan"},"cca3":"MI","capital":["Lansing"],"region":"Midwest","subregion":"East North Central","population":10077331,"borders":["IL","IN","OH","WI"]},{"name":{"common":"Minnesota"},"cca3":"MN","capital":["Saint Paul"],"region":"Midwest","subregion":"West North Central","population":5706494,"borders":["IA","ND","SD","WI"]},{"name":{"common":"Mississippi"},"cca3":"MS","capital":["Jackson"],"region":"South","subregion":"East South Central","population":2961279,"borders":["AL","AR","LA","TN"]},{"name":{"common":"Missouri"},"cca3":"MO","capital":["Jefferson City"],"region":"Midwest","subregion":"West North Central","population":6154913,"borders":["AR","IL","IA","KS","KY","NE","OK","TN"]},{"name":{"common":"Montana"},"cca3":"MT","capital":["Helena"],"region":"West","subregion":"Mountain","population":1084225,"borders":["ID","ND","SD","WY"]},{"name":{"common":"Nebraska"},"cca3":"NE","capital":["Lincoln"],"region":"Midwest","subregion":"West North Central","population":1961504,"borders":["CO","IA","KS","MO","SD","WY"]},{"name":{"common":"Nevada"},"cca3":"NV","capital":["Carson City"],"region":"West","subregion":"Mountain","population":3104614,"borders":["AZ","CA","ID","OR","UT"]},{"name":{"common":"New Hampshire"},"cca3":"NH","capital":["Concord"],"region":"Northeast","subregion":"New England","population":1377529,"borders":["ME","MA","VT"]},{"name":{"common":"New Jersey"},"cca3":"NJ","capital":["Trenton"],"region":"Northeast","subregion":"Mid-Atlantic","population":9288994,"borders":["DE","NY","PA"]},{"name":{"common":"New Mexico"},"cca3":"NM","capital":["Santa Fe"],"region":"West","subregion":"Mountain","population":2117522,"borders":["AZ","CO","OK","TX","UT"]},{"name":{"common":"New York"},"cca3":"NY","capital":["Albany"],"region":"Northeast","subregion":"Mid-Atlantic","population":20201249,"borders":["CT","MA","NJ","PA","VT"]},{"name":{"common":"North Carolina"},"cca3":"NC","capital":["Raleigh"],"region":"South","subregion":"South Atlantic","population":10439388,"borders":["GA","SC","TN","VA"]},{"name":{"common":"North Dakota"},"cca3":"ND","capital":["Bismarck"],"region":"Midwest","subregion":"West North Central","population":779094,"borders":["MN","MT","SD"]},{"name":{"common":"Ohio"},"cca3":"OH","capital":["Columbus"],"region":"Midwest","subregion":"East North Central","population":11799448,"borders":["IN","KY","MI","PA","WV"]},{"name":{"common":"Oklahoma"},"cca3":"OK","capital":["Oklahoma City"],"region":"South","subregion":"West South Central","population":3959353,"borders":["AR","CO","KS","MO","NM","TX"]},{"name":{"common":"Oregon"},"cca3":"OR","capital":["Salem"],"region":"West","subregion":"Pacific","population":4237256,"borders":["CA","ID","NV","WA"]},{"name":{"common":"Pennsylvania"},"cca3":"PA","capital":["Harrisburg"],"region":"Northeast","subregion":"Mid-Atlantic","population":13002700,"borders":["DE","MD","NJ","NY","OH","WV"]},{"name":{"common":"Rhode Island"},"cca3":"RI","capital":["Providence"],"region":"Northeast","subregion":"New England","population":1097379,"borders":["CT","MA"]},{"name":{"common":"South Carolina"},"cca3":"SC","capital":["Columbia"],"region":"South","subregion":"South Atlantic","population":5118425,"borders":["GA","NC"]},{"name":{"common":"South Dakota"},"cca3":"SD","capital":["Pierre"],"region":"Midwest","subregion":"West North Central","population":886667,"borders":["IA","MN","MT","NE","ND","WY"]},{"name":{"common":"Tennessee"},"cca3":"TN","capital":["Nashville"],"region":"South","subregion":"East South Central","population":6910840,"borders":["AL","AR","GA","KY","MS","MO","NC","VA"]},{"name":{"common":"Texas"},"cca3":"TX","capital":["Austin"],"region":"South","subregion":"West South Central","population":29145505,"borders":["AR","LA","NM","OK"]},{"name":{"common":"Utah"},"cca3":"UT","capital":["Salt Lake City"],"region":"West","subregion":"Mountain","population":3271616,"borders":["AZ","CO","ID","NV","NM","WY"]},{"name":{"common":"Vermont"},"cca3":"VT","capital":["Montpelier"],"region":"Northeast","subregion":"New England","population":643077,"borders":["MA","NH","NY"]},{"name":{"common":"Virginia"},"cca3":"VA","capital":["Richmond"],"region":"South","subregion":"South Atlantic","population":8631393,"borders":["KY","MD","NC","TN","WV"]},{"name":{"common":"Washington"},"cca3":"WA","capital":["Olympia"],"region":"West","subregion":"Pacific","population":7705281,"borders":["ID","OR"]},{"name":{"common":"West Virginia"},"cca3":"WV","capital":["Charleston"],"region":"South","subregion":"South Atlantic","population":1793716,"borders":["KY","MD","OH","PA","VA"]},{"name":{"common":"Wisconsin"},"cca3":"WI","capital":["Madison"],"region":"Midwest","subregion":"East North Central","population":5893718,"borders":["IL","IA","MI","MN"]},{"name":{"common":"Wyoming"},"cca3":"WY","capital":["Cheyenne"],"region":"West","subregion":"Mountain","population":576851,"borders":["CO","ID","MT","NE","SD","UT"]}];
+
+        // --- Initial Load ---
+        fetch('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json')
+            .then(res => res.json())
+            .then(data => initializeApp(data))
+            .catch(error => {
+                console.error('Failed to load US atlas data:', error);
+                trekChallenge.innerHTML = `<p class="loading-text">Error: Could not load map data. Please try refreshing the page.</p>`;
+            });
+    </script>
+</body>
+</html>
