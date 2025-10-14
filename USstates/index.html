@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>US States Geography Game</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0f4f8;
+            overflow: hidden;
+        }
+        /* CSS rules to fix rendering artifacts */
+        .leaflet-container {
+            background: #aadaff;
+            outline: 1px solid transparent; /* Prevents tile tearing */
+        }
+        
+        .map-background-tiles {
+            /* Helps prevent seams between map tiles on some browsers */
+            image-rendering: -webkit-optimize-contrast; /* Chrome/Safari */
+            image-rendering: crisp-edges; /* Firefox/Opera */
+        }
+
+        #map {
+            flex: 1;
+            height: 100%;
+            border-right: 1px solid #ddd;
+        }
+        #info-panel {
+            width: 380px;
+            max-width: 40%;
+            padding: 2rem;
+            background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+            border-left: 5px solid #0d9488;
+            overflow-y: auto;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        #info-panel h2 {
+            margin-top: 0;
+            color: #134e4a;
+            font-size: 1.75rem;
+            font-weight: 700;
+            border-bottom: 2px solid #99f6e4;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .loading-text {
+            text-align: center;
+            font-weight: 500;
+            color: #0f766e;
+            padding: 2rem;
+        }
+
+        /* Mode & Region Switcher */
+        .mode-switcher, .region-switcher {
+            display: flex;
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            background-color: #ccfbf1;
+            padding: 0.25rem;
+            flex-wrap: wrap;
+        }
+        .mode-btn, .region-btn {
+            flex: 1 1 auto;
+            padding: 0.75rem 0.5rem;
+            border: none;
+            background-color: transparent;
+            color: #14b8a6;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: background-color 0.3s, color 0.3s;
+            text-align: center;
+        }
+        .mode-btn.active, .region-btn.active {
+            background-color: #14b8a6;
+            color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .region-switcher {
+             background-color: #e0f2f1;
+             margin-top: -0.5rem;
+        }
+        .region-btn { color: #00796b; font-size: 0.9rem; }
+        .region-btn.active { background-color: #00796b;}
+
+
+        /* Panels */
+        .mode-panel { display: none; }
+        .mode-panel.active { display: block; }
+        #info-content, #result-box {
+             border-top: 1px solid #ddd; padding-top: 1.5rem;
+        }
+        #info-content h3, #result-box h3 {
+            margin-top: 0; margin-bottom: 1rem; color: #0d9488; font-size: 1.5rem; font-weight: 600;
+        }
+        #info-content p, #result-box p {
+            font-size: 1rem; line-height: 1.6; margin: 0.5rem 0 1rem 0; color: #0f766e;
+        }
+        #info-content p strong, #result-box p strong { color: #134e4a; }
+
+        /* Quiz Mode Styling */
+        #question-box {
+            background-color: #f0fdfa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #99f6e4;
+            min-height: 100px;
+            font-size: 1.1rem;
+            color: #115e59;
+            line-height: 1.6;
+            font-weight: 500;
+        }
+        
+        #result-box p.feedback-correct { color: #166534; font-weight: bold; }
+        #result-box p.feedback-incorrect { color: #991b1b; font-weight: bold; }
+
+        /* Button Controls */
+        #button-controls { margin-top: auto; display: flex; gap: 0.5rem; padding-top: 1rem; }
+        .game-btn {
+            flex: 1; padding: 0.75rem; color: white; border: none; border-radius: 8px; font-size: 1rem;
+            font-weight: 600; cursor: pointer; transition: background-color 0.2s, opacity 0.2s;
+        }
+        #next-question-btn { display: none; background-color: #0d9488; }
+        #next-question-btn:hover { background-color: #0f766e; }
+        #play-again-btn { display: none; background-color: #16a34a; }
+        #play-again-btn:hover { background-color: #15803d; }
+        #hint-btn { display: none; background-color: #f59e0b; }
+        #hint-btn:hover { background-color: #d97706; }
+        #hint-btn:disabled { background-color: #9ca3af; cursor: not-allowed; }
+
+        /* Practice Mode Styling */
+        #practice-list { margin-top: 1rem; }
+        .practice-item {
+            padding: 0.75rem 1rem;
+            background-color: #f0fdfa;
+            border: 1px solid #ccfbf1;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s, box-shadow 0.2s;
+            font-weight: 500;
+            color: #115e59;
+        }
+        .practice-item:hover {
+            background-color: #ccfbf1;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="info-panel">
+        <h2>US States Hub</h2>
+
+        <div class="mode-switcher">
+            <button id="explore-mode-btn" class="mode-btn active">Explore</button>
+            <button id="quiz-mode-btn" class="mode-btn">Quiz</button>
+            <button id="practice-mode-btn" class="mode-btn">Practice</button>
+        </div>
+
+        <div class="region-switcher">
+            <button class="region-btn active" data-region="All States">All States</button>
+            <button class="region-btn" data-region="Northeast">Northeast</button>
+            <button class="region-btn" data-region="South">South</button>
+            <button class="region-btn" data-region="Midwest">Midwest</button>
+            <button class="region-btn" data-region="West">West</button>
+        </div>
+
+        <div id="explore-panel" class="mode-panel active">
+            <div id="info-content">
+                 <p class="loading-text">Loading map data...</p>
+            </div>
+        </div>
+
+        <div id="quiz-panel" class="mode-panel">
+            <div id="question-box"></div>
+            <div id="result-box"></div>
+            <div id="button-controls">
+                <button id="hint-btn" class="game-btn">Get a Hint 💡</button>
+                <button id="next-question-btn" class="game-btn">Next Question &rarr;</button>
+                <button id="play-again-btn" class="game-btn">Play Again? ↻</button>
+            </div>
+        </div>
+
+        <div id="practice-panel" class="mode-panel">
+            <h3>Practice Bank</h3>
+            <p>Here are the states you've missed. Click one to find it on the map!</p>
+            <div id="practice-list">Your practice bank is empty.</div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        // --- DOM Elements ---
+        const map = L.map('map', {
+            renderer: L.canvas(),
+            worldCopyJump: false, 
+            maxBounds: [[10, -140], [60, -60]], 
+            maxBoundsViscosity: 1.0
+        }).setView([39.8283, -98.5795], 4);
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 10,
+            minZoom: 3,
+            noWrap: true,
+            className: 'map-background-tiles'
+        }).addTo(map);
+
+        const exploreModeBtn = document.getElementById('explore-mode-btn');
+        const quizModeBtn = document.getElementById('quiz-mode-btn');
+        const practiceModeBtn = document.getElementById('practice-mode-btn');
+        const explorePanel = document.getElementById('explore-panel');
+        const quizPanel = document.getElementById('quiz-panel');
+        const practicePanel = document.getElementById('practice-panel');
+        const practiceList = document.getElementById('practice-list');
+        const infoContent = document.getElementById('info-content');
+        const questionBox = document.getElementById('question-box');
+        const resultBox = document.getElementById('result-box');
+        const nextQuestionBtn = document.getElementById('next-question-btn');
+        const playAgainBtn = document.getElementById('play-again-btn');
+        const hintBtn = document.getElementById('hint-btn');
+        const regionBtns = document.querySelectorAll('.region-btn');
+
+        // --- App State ---
+        let geojson;
+        let statesData = {};
+        let quizState = {};
+        let currentMode = 'explore';
+        let currentRegion = 'All States';
+        let isQuizActive = true;
+        let currentQuestion = {};
+        let currentHintIndex = 0;
+        let incorrectGuesses = 0;
+        let practiceBank = [];
+        let justMissedState = null;
+        
+        const regionBounds = {
+            'Northeast': [[47, -80], [38, -66]], 'South': [[38, -104], [24, -75]],
+            'Midwest': [[49, -104], [36, -82]], 'West': [[49, -125], [31, -103]],
+            'All States': [[39.8283, -98.5795], 4]
+        };
+        
+        // --- Main Logic ---
+        function initializeApp(geoData) {
+            try {
+                const factsMap = new Map();
+                stateFacts.forEach(fact => factsMap.set(fact.name.common, fact));
+                
+                geoData.features.forEach(feature => {
+                    const stateName = feature.properties.name;
+                    const fact = factsMap.get(stateName);
+                    if (fact) {
+                        statesData[stateName] = { ...fact, geometry: feature.geometry, name: stateName };
+                    }
+                });
+
+                initializeLogic();
+            } catch (error) {
+                console.error("Data processing error:", error);
+                infoContent.innerHTML = `<p class="loading-text">Could not process map data.</p>`;
+            }
+        }
+        
+        function initializeLogic() {
+            infoContent.innerHTML = '<p>Click on a state to learn more about it!</p>';
+            
+            Object.keys(regionBounds).forEach(region => {
+                const regionStates = Object.values(statesData).filter(c => c.region === region);
+                // 'All States' includes all states
+                const allQuestionsForRegion = (region === 'All States' ? Object.values(statesData) : regionStates).map(state => ({
+                    answer: state.name,
+                    hints: [
+                        `This state is in the ${state.subregion || state.region} region.`,
+                        `Its neighbors are: ${state.borders?.map(b => getStateNameByAbbr(b)).filter(n=>n).join(', ') || 'None'}.`,
+                        `The capital city is ${state.capital?.[0] || 'N/A'}.`
+                    ]
+                }));
+
+                quizState[region] = {
+                    allQuestions: allQuestionsForRegion,
+                    availableQuestions: [...allQuestionsForRegion], // Initialize with all questions
+                    correctlyGuessed: []
+                };
+            });
+
+            const allFeatures = Object.values(statesData).map(c => ({
+                type: "Feature", properties: { name: c.name }, geometry: c.geometry
+            }));
+            geojson = L.geoJson({ type: "FeatureCollection", features: allFeatures }, { style, onEachFeature }).addTo(map);
+            
+            setMode('explore');
+        }
+
+        // --- Event Listeners ---
+        exploreModeBtn.addEventListener('click', () => setMode('explore'));
+        quizModeBtn.addEventListener('click', () => setMode('quiz'));
+        practiceModeBtn.addEventListener('click', () => setMode('practice'));
+        nextQuestionBtn.addEventListener('click', () => loadNewQuestion());
+        playAgainBtn.addEventListener('click', resetQuiz);
+        hintBtn.addEventListener('click', showHint);
+        
+        regionBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentRegion = btn.dataset.region;
+                regionBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const bounds = regionBounds[currentRegion];
+                currentRegion === 'All States' ? map.setView(bounds[0], bounds[1]) : map.flyToBounds(bounds);
+                setTimeout(() => map.invalidateSize(), 400);
+                
+                if (currentMode === 'quiz') {
+                     const state = quizState[currentRegion];
+                    if (state.availableQuestions.length === 0 && state.correctlyGuessed.length > 0) {
+                        // If we are returning to a completed region, show completion message
+                         questionBox.innerHTML = `You've identified all the states in the ${currentRegion}!`;
+                        resultBox.innerHTML = `<h2>Congratulations! 🥳</h2>`;
+                        playAgainBtn.style.display = 'block';
+                        nextQuestionBtn.style.display = 'none';
+                        hintBtn.style.display = 'none';
+                        isQuizActive = false;
+                    } else {
+                        // Otherwise, load a new question
+                        loadNewQuestion();
+                    }
+                }
+
+                if(geojson) geojson.resetStyle();
+            });
+        });
+
+        // --- Mode Switching ---
+        function setMode(mode) {
+            currentMode = mode;
+            exploreModeBtn.classList.toggle('active', mode === 'explore');
+            quizModeBtn.classList.toggle('active', mode === 'quiz');
+            practiceModeBtn.classList.toggle('active', mode === 'practice');
+            explorePanel.classList.toggle('active', mode === 'explore');
+            quizPanel.classList.toggle('active', mode === 'quiz');
+            practicePanel.classList.toggle('active', mode === 'practice');
+            
+            if (mode === 'quiz') {
+                const hasQuizStarted = Object.values(quizState).some(s => s.correctlyGuessed.length > 0 || s.availableQuestions.length < s.allQuestions.length);
+                if (!hasQuizStarted) {
+                    resetQuiz();
+                } else {
+                    loadNewQuestion();
+                }
+            }
+            if (mode === 'practice') {
+                updatePracticePanel();
+            }
+            if(geojson) geojson.resetStyle();
+        }
+
+        // --- Quiz Logic ---
+        function resetQuiz() {
+            Object.values(quizState).forEach(s => {
+                s.correctlyGuessed = [];
+                s.availableQuestions = [...s.allQuestions];
+            });
+            practiceBank = [];
+            if(geojson) geojson.resetStyle();
+            loadNewQuestion();
+        }
+        
+        function loadNewQuestion() {
+            const state = quizState[currentRegion];
+            if (!state || state.availableQuestions.length === 0) {
+                questionBox.innerHTML = `You've identified all the states in the ${currentRegion}!`;
+                resultBox.innerHTML = `<h2>Congratulations! 🥳</h2>`;
+                playAgainBtn.style.display = 'block';
+                nextQuestionBtn.style.display = 'none';
+                hintBtn.style.display = 'none';
+                isQuizActive = false;
+                return;
+            }
+
+            isQuizActive = true;
+            justMissedState = null; 
+            incorrectGuesses = 0;
+            currentHintIndex = 0;
+            const questionIndex = Math.floor(Math.random() * state.availableQuestions.length);
+            currentQuestion = state.availableQuestions.splice(questionIndex, 1)[0];
+            
+            questionBox.innerHTML = `Find <strong>${currentQuestion.answer}</strong> on the map.`;
+            resultBox.innerHTML = `<p>Click the correct state on the map!</p>`;
+            
+            playAgainBtn.style.display = 'none';
+            nextQuestionBtn.style.display = 'none';
+            hintBtn.style.display = 'block';
+            hintBtn.disabled = false;
+            if (geojson) geojson.resetStyle();
+        }
+
+        function checkAnswer(stateName) {
+            if (!isQuizActive) return;
+
+            if (stateName === currentQuestion.answer) {
+                isQuizActive = false;
+                hintBtn.style.display = 'none';
+
+                Object.values(quizState).forEach(s => {
+                    if (s.allQuestions.some(q => q.answer === stateName) && !s.correctlyGuessed.includes(stateName)) {
+                        s.correctlyGuessed.push(stateName);
+                    }
+                    const indexToRemove = s.availableQuestions.findIndex(q => q.answer === stateName);
+                    if (indexToRemove > -1) {
+                        s.availableQuestions.splice(indexToRemove, 1);
+                    }
+                });
+
+                if (geojson) geojson.resetStyle();
+                resultBox.innerHTML = `<p class="feedback-correct">Correct! It's ${stateName}.</p>`;
+                setTimeout(loadNewQuestion, 1200); 
+
+            } else {
+                incorrectGuesses++;
+                resultBox.innerHTML = `<p class="feedback-incorrect">Not quite! That was ${stateName}. Try again! (${incorrectGuesses}/3)</p>`;
+                showHint();
+
+                if (incorrectGuesses >= 3) {
+                    isQuizActive = false;
+                    hintBtn.style.display = 'none';
+                    if (!practiceBank.includes(currentQuestion.answer)) {
+                        practiceBank.push(currentQuestion.answer);
+                    }
+                    justMissedState = currentQuestion.answer;
+                    geojson.resetStyle();
+                    
+                    resultBox.innerHTML = `<p class="feedback-incorrect">The correct answer was <strong>${currentQuestion.answer}</strong>. It's been added to your practice bank.</p>`;
+                    setTimeout(loadNewQuestion, 4000);
+                }
+            }
+        }
+        
+        function showHint() {
+            if (!isQuizActive || !currentQuestion.hints || currentHintIndex >= currentQuestion.hints.length) {
+                return;
+            }
+            const hintText = `<br><small>Hint: ${currentQuestion.hints[currentHintIndex]}</small>`;
+            if (!questionBox.innerHTML.includes(hintText)) {
+                questionBox.innerHTML += hintText;
+            }
+            currentHintIndex++;
+            if (currentHintIndex >= currentQuestion.hints.length) {
+                hintBtn.disabled = true;
+            }
+        }
+        
+        // --- Map Styling & Interaction ---
+        const palette = ['#e57373', '#ffb74d', '#fff176', '#aed581', '#64b5f6', '#ba68c8', '#ff8a65', '#f06292', '#dce775', '#4dd0e1', '#bcaaa4', '#a5d6a7', '#ce93d8', '#81c784', '#7986cb', '#4fc3f7', '#9575cd', '#fdd835', '#ffab91'];
+        
+        function style(feature) {
+            const stateName = feature.properties.name;
+
+            if (currentMode === 'practice') {
+                return { 
+                    fillColor: practiceBank.includes(stateName) ? '#e53935' : '#e0e0e0',
+                    weight: practiceBank.includes(stateName) ? 1.5 : 0.5,
+                    color: 'white',
+                    fillOpacity: practiceBank.includes(stateName) ? 0.9 : 0.2
+                };
+            }
+
+            if (stateName === justMissedState) {
+                return { fillColor: '#e53935', weight: 2, color: 'white', fillOpacity: 0.9, opacity: 1 };
+            }
+
+            const isGuessed = quizState['All States']?.correctlyGuessed.includes(stateName);
+            const isVisibleRegion = currentRegion === 'All States' || (statesData[stateName] && statesData[stateName].region === currentRegion);
+
+            let fillColor = '#e0e0e0';
+            let fillOpacity = 0.2;
+            let weight = 0.5;
+            let color = '#f5f5f5';
+
+            if (isVisibleRegion) {
+                weight = 1.5;
+                color = 'white';
+                if (currentMode === 'quiz' && !isGuessed) {
+                    fillColor = '#b0bec5';
+                    fillOpacity = 0.7;
+                } else {
+                    const hash = stateName.split('').reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
+                    fillColor = palette[Math.abs(hash) % palette.length];
+                    fillOpacity = 0.8;
+                }
+            }
+            
+            return { fillColor, weight, opacity: 1, color, fillOpacity };
+        }
+
+        function highlightFeature(e) {
+            const layer = e.target;
+            if (currentMode === 'quiz' && !isQuizActive) return;
+            if (currentMode === 'practice' && !practiceBank.includes(layer.feature.properties.name)) return;
+            
+            layer.setStyle({ weight: 3, color: '#004d40', dashArray: '', fillOpacity: 0.85 });
+            layer.bringToFront();
+        }
+
+        function resetHighlight(e) { geojson.resetStyle(e.target); }
+
+        function onMapClick(featureProps) {
+            const stateName = featureProps.name;
+            if (currentMode === 'explore' || currentMode === 'practice') {
+                const data = statesData[stateName];
+                if (data) {
+                    infoContent.innerHTML = `
+                        <h3>${data.name}</h3>
+                        <p><strong>Capital:</strong> ${data.capital?.[0] || 'N/A'}</p>
+                        <p><strong>Population:</strong> ${data.population?.toLocaleString() || 'N/A'}</p>
+                        <p><strong>Region:</strong> ${data.subregion || data.region}</p>
+                    `;
+                }
+            } else {
+                checkAnswer(stateName);
+            }
+        }
+
+        function onEachFeature(feature, layer) {
+            layer.on({
+                mouseover: highlightFeature,
+                mouseout: resetHighlight,
+                click: () => onMapClick(feature.properties)
+            });
+        }
+        
+        // --- Practice Mode ---
+        function updatePracticePanel() {
+            practiceList.innerHTML = '';
+            if (practiceBank.length === 0) {
+                practiceList.innerHTML = 'Your practice bank is empty.';
+                return;
+            }
+
+            practiceBank.sort().forEach(stateName => {
+                const item = document.createElement('div');
+                item.className = 'practice-item';
+                item.textContent = stateName;
+                item.addEventListener('click', () => {
+                    geojson.eachLayer(layer => {
+                        if (layer.feature.properties.name === stateName) {
+                            map.flyToBounds(layer.getBounds().pad(0.2));
+                            layer.setStyle({ fillColor: '#f59e0b', fillOpacity: 0.9 });
+                            setTimeout(() => geojson.resetStyle(layer), 2000);
+                        }
+                    });
+                });
+                practiceList.appendChild(item);
+            });
+        }
+
+        // --- Utility ---
+        function getStateNameByAbbr(abbr) {
+            for (const name in statesData) {
+                if (statesData[name].cca3 === abbr) return statesData[name].name;
+            }
+            return null;
+        }
+
+        // --- Data ---
+        const stateFacts = [{"name":{"common":"Alabama"},"cca3":"AL","capital":["Montgomery"],"region":"South","subregion":"East South Central","population":5024279,"borders":["FL","GA","MS","TN"]},{"name":{"common":"Alaska"},"cca3":"AK","capital":["Juneau"],"region":"West","subregion":"Pacific","population":733391,"borders":[]},{"name":{"common":"Arizona"},"cca3":"AZ","capital":["Phoenix"],"region":"West","subregion":"Mountain","population":7151502,"borders":["CA","CO","NV","NM","UT"]},{"name":{"common":"Arkansas"},"cca3":"AR","capital":["Little Rock"],"region":"South","subregion":"West South Central","population":3011524,"borders":["LA","MS","MO","OK","TN","TX"]},{"name":{"common":"California"},"cca3":"CA","capital":["Sacramento"],"region":"West","subregion":"Pacific","population":39538223,"borders":["AZ","NV","OR"]},{"name":{"common":"Colorado"},"cca3":"CO","capital":["Denver"],"region":"West","subregion":"Mountain","population":5773714,"borders":["AZ","KS","NE","NM","OK","UT","WY"]},{"name":{"common":"Connecticut"},"cca3":"CT","capital":["Hartford"],"region":"Northeast","subregion":"New England","population":3605944,"borders":["MA","NY","RI"]},{"name":{"common":"Delaware"},"cca3":"DE","capital":["Dover"],"region":"South","subregion":"South Atlantic","population":989948,"borders":["MD","NJ","PA"]},{"name":{"common":"Florida"},"cca3":"FL","capital":["Tallahassee"],"region":"South","subregion":"South Atlantic","population":21538187,"borders":["AL","GA"]},{"name":{"common":"Georgia"},"cca3":"GA","capital":["Atlanta"],"region":"South","subregion":"South Atlantic","population":10711908,"borders":["AL","FL","NC","SC","TN"]},{"name":{"common":"Hawaii"},"cca3":"HI","capital":["Honolulu"],"region":"West","subregion":"Pacific","population":1455271,"borders":[]},{"name":{"common":"Idaho"},"cca3":"ID","capital":["Boise"],"region":"West","subregion":"Mountain","population":1839106,"borders":["MT","NV","OR","UT","WA","WY"]},{"name":{"common":"Illinois"},"cca3":"IL","capital":["Springfield"],"region":"Midwest","subregion":"East North Central","population":12812508,"borders":["IN","IA","KY","MI","MO","WI"]},{"name":{"common":"Indiana"},"cca3":"IN","capital":["Indianapolis"],"region":"Midwest","subregion":"East North Central","population":6785528,"borders":["IL","KY","MI","OH"]},{"name":{"common":"Iowa"},"cca3":"IA","capital":["Des Moines"],"region":"Midwest","subregion":"West North Central","population":3190369,"borders":["IL","MN","MO","NE","SD","WI"]},{"name":{"common":"Kansas"},"cca3":"KS","capital":["Topeka"],"region":"Midwest","subregion":"West North Central","population":2937880,"borders":["CO","MO","NE","OK"]},{"name":{"common":"Kentucky"},"cca3":"KY","capital":["Frankfort"],"region":"South","subregion":"East South Central","population":4505836,"borders":["IL","IN","MO","OH","TN","VA","WV"]},{"name":{"common":"Louisiana"},"cca3":"LA","capital":["Baton Rouge"],"region":"South","subregion":"West South Central","population":4657757,"borders":["AR","MS","TX"]},{"name":{"common":"Maine"},"cca3":"ME","capital":["Augusta"],"region":"Northeast","subregion":"New England","population":1362359,"borders":["NH"]},{"name":{"common":"Maryland"},"cca3":"MD","capital":["Annapolis"],"region":"South","subregion":"South Atlantic","population":6177224,"borders":["DE","PA","VA","WV"]},{"name":{"common":"Massachusetts"},"cca3":"MA","capital":["Boston"],"region":"Northeast","subregion":"New England","population":7029917,"borders":["CT","NH","NY","RI","VT"]},{"name":{"common":"Michigan"},"cca3":"MI","capital":["Lansing"],"region":"Midwest","subregion":"East North Central","population":10077331,"borders":["IL","IN","OH","WI"]},{"name":{"common":"Minnesota"},"cca3":"MN","capital":["Saint Paul"],"region":"Midwest","subregion":"West North Central","population":5706494,"borders":["IA","ND","SD","WI"]},{"name":{"common":"Mississippi"},"cca3":"MS","capital":["Jackson"],"region":"South","subregion":"East South Central","population":2961279,"borders":["AL","AR","LA","TN"]},{"name":{"common":"Missouri"},"cca3":"MO","capital":["Jefferson City"],"region":"Midwest","subregion":"West North Central","population":6154913,"borders":["AR","IL","IA","KS","KY","NE","OK","TN"]},{"name":{"common":"Montana"},"cca3":"MT","capital":["Helena"],"region":"West","subregion":"Mountain","population":1084225,"borders":["ID","ND","SD","WY"]},{"name":{"common":"Nebraska"},"cca3":"NE","capital":["Lincoln"],"region":"Midwest","subregion":"West North Central","population":1961504,"borders":["CO","IA","KS","MO","SD","WY"]},{"name":{"common":"Nevada"},"cca3":"NV","capital":["Carson City"],"region":"West","subregion":"Mountain","population":3104614,"borders":["AZ","CA","ID","OR","UT"]},{"name":{"common":"New Hampshire"},"cca3":"NH","capital":["Concord"],"region":"Northeast","subregion":"New England","population":1377529,"borders":["ME","MA","VT"]},{"name":{"common":"New Jersey"},"cca3":"NJ","capital":["Trenton"],"region":"Northeast","subregion":"Mid-Atlantic","population":9288994,"borders":["DE","NY","PA"]},{"name":{"common":"New Mexico"},"cca3":"NM","capital":["Santa Fe"],"region":"West","subregion":"Mountain","population":2117522,"borders":["AZ","CO","OK","TX","UT"]},{"name":{"common":"New York"},"cca3":"NY","capital":["Albany"],"region":"Northeast","subregion":"Mid-Atlantic","population":20201249,"borders":["CT","MA","NJ","PA","VT"]},{"name":{"common":"North Carolina"},"cca3":"NC","capital":["Raleigh"],"region":"South","subregion":"South Atlantic","population":10439388,"borders":["GA","SC","TN","VA"]},{"name":{"common":"North Dakota"},"cca3":"ND","capital":["Bismarck"],"region":"Midwest","subregion":"West North Central","population":779094,"borders":["MN","MT","SD"]},{"name":{"common":"Ohio"},"cca3":"OH","capital":["Columbus"],"region":"Midwest","subregion":"East North Central","population":11799448,"borders":["IN","KY","MI","PA","WV"]},{"name":{"common":"Oklahoma"},"cca3":"OK","capital":["Oklahoma City"],"region":"South","subregion":"West South Central","population":3959353,"borders":["AR","CO","KS","MO","NM","TX"]},{"name":{"common":"Oregon"},"cca3":"OR","capital":["Salem"],"region":"West","subregion":"Pacific","population":4237256,"borders":["CA","ID","NV","WA"]},{"name":{"common":"Pennsylvania"},"cca3":"PA","capital":["Harrisburg"],"region":"Northeast","subregion":"Mid-Atlantic","population":13002700,"borders":["DE","MD","NJ","NY","OH","WV"]},{"name":{"common":"Rhode Island"},"cca3":"RI","capital":["Providence"],"region":"Northeast","subregion":"New England","population":1097379,"borders":["CT","MA"]},{"name":{"common":"South Carolina"},"cca3":"SC","capital":["Columbia"],"region":"South","subregion":"South Atlantic","population":5118425,"borders":["GA","NC"]},{"name":{"common":"South Dakota"},"cca3":"SD","capital":["Pierre"],"region":"Midwest","subregion":"West North Central","population":886667,"borders":["IA","MN","MT","NE","ND","WY"]},{"name":{"common":"Tennessee"},"cca3":"TN","capital":["Nashville"],"region":"South","subregion":"East South Central","population":6910840,"borders":["AL","AR","GA","KY","MS","MO","NC","VA"]},{"name":{"common":"Texas"},"cca3":"TX","capital":["Austin"],"region":"South","subregion":"West South Central","population":29145505,"borders":["AR","LA","NM","OK"]},{"name":{"common":"Utah"},"cca3":"UT","capital":["Salt Lake City"],"region":"West","subregion":"Mountain","population":3271616,"borders":["AZ","CO","ID","NV","NM","WY"]},{"name":{"common":"Vermont"},"cca3":"VT","capital":["Montpelier"],"region":"Northeast","subregion":"New England","population":643077,"borders":["MA","NH","NY"]},{"name":{"common":"Virginia"},"cca3":"VA","capital":["Richmond"],"region":"South","subregion":"South Atlantic","population":8631393,"borders":["KY","MD","NC","TN","WV"]},{"name":{"common":"Washington"},"cca3":"WA","capital":["Olympia"],"region":"West","subregion":"Pacific","population":7705281,"borders":["ID","OR"]},{"name":{"common":"West Virginia"},"cca3":"WV","capital":["Charleston"],"region":"South","subregion":"South Atlantic","population":1793716,"borders":["KY","MD","OH","PA","VA"]},{"name":{"common":"Wisconsin"},"cca3":"WI","capital":["Madison"],"region":"Midwest","subregion":"East North Central","population":5893718,"borders":["IL","IA","MI","MN"]},{"name":{"common":"Wyoming"},"cca3":"WY","capital":["Cheyenne"],"region":"West","subregion":"Mountain","population":576851,"borders":["CO","ID","MT","NE","SD","UT"]}];
+
+        // --- Initial Load ---
+        fetch('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json')
+            .then(res => res.json())
+            .then(data => initializeApp(data))
+            .catch(error => {
+                console.error('Failed to load US atlas data:', error);
+                infoContent.innerHTML = `<p class="loading-text">Error: Could not load map data. Please try refreshing the page.</p>`;
+            });
+    </script>
+</body>
+</html>
