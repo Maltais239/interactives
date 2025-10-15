@@ -28,97 +28,73 @@
     <div id="info-content"><p>Click a region on the map to learn more about it.</p></div>
   </div>
   
-  <!-- Leaflet and Turf.js libraries -->
+  <!-- Leaflet library -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src='https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js'></script>
 
   <script>
-    // Set up the map, centered on Alberta
-    const map = L.map('map', { zoomControl: true }).setView([55, -115], 5); // Zoom out a bit to see the whole province
+    // --- 1. MAP SETUP ---
+    const map = L.map('map', { zoomControl: true }).setView([55, -115], 5);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
       subdomains: 'abcd', maxZoom: 19
     }).addTo(map);
 
     const infoContent = document.getElementById('info-panel');
+    let geojsonLayer; // To hold the map layer
 
-    // Descriptions for each of Alberta's six main regions
+    // --- 2. REGION DATA & STYLING ---
     const regionData = {
-      'Boreal Forest': `The Boreal Forest covers the northern half of the province. It's a land of great rivers and lakes that drain northward to the Arctic Ocean. The forests here are rich with aspen and white birch in the south, and white spruce, larch, and black spruce farther north. Balsam fir and jack pine are also found in the eastern areas.`,
+      'Boreal Forest': `The Boreal Forest covers the northern half of the province. It's a land of great rivers and lakes that drain northward to the Arctic Ocean. The forests here are rich with aspen and white birch in the south, and white spruce, larch, and black spruce farther north.`,
       'Grassland': `The prairie region of southern Alberta is a gently rolling, dry, and mostly treeless grassland. The grasses here include blue grama and western wheat grass. It is part of the larger Interior Plains physiographic region.`,
       'Parkland': `The Parkland region is dominant in central Alberta. It varies from the flatlands of ancient lake bottoms to a rolling landscape with numerous lakes and depressions. It is characterized by tall grasses and beautiful aspen trees.`,
       'Foothills': `Located in Alberta's southwest corner, the Foothills are a series of ridges that rise up to meet the Rocky Mountains. Alpine fir and lodgepole pine grow in the western parts of this region.`,
-      'Rocky Mountains': `Forming part of Canada's great Cordillera region, the Rocky Mountains in Alberta feature stunning landscapes. At lower elevations, you'll find forests of Alpine fir, white spruce, and lodgepole pine. At higher elevations, there are scattered stands of black spruce and alpine larch mixed with lichens and alpine flowers in beautiful meadows.`,
-      'Canadian Shield': `A small portion of Alberta is part of the Canadian Shield, one of Canada's seven major physiographic regions. This area is characterized by ancient, exposed rock and a landscape shaped by glaciers.`
+      'Rocky Mountains': `Forming part of Canada's great Cordillera region, the Rocky Mountains in Alberta feature stunning landscapes. At lower elevations, you'll find forests of Alpine fir, white spruce, and lodgepole pine.`,
+      'Canadian Shield': `A small portion of Alberta is part of the Canadian Shield, characterized by ancient, exposed rock and a landscape shaped by glaciers.`
     };
     
-    // Function to get the main region name for a feature
-    function getRegionName(props) {
-      const name = props.NRNAME || props.NAME || 'Unknown';
-      // Standardize names for better matching
-      const lowerCaseName = name.toLowerCase();
-      if (lowerCaseName.includes('boreal')) return 'Boreal Forest';
-      if (lowerCaseName.includes('grassland')) return 'Grassland';
-      if (lowerCaseName.includes('parkland')) return 'Parkland';
-      if (lowerCaseName.includes('foothills')) return 'Foothills';
-      if (lowerCaseName.includes('mountain')) return 'Rocky Mountains';
-      if (lowerCaseName.includes('shield')) return 'Canadian Shield';
-      return name;
-    }
-
     const regionColors = {
-        'Boreal Forest': '#228B22', 
-        'Grassland': '#facc15',
-        'Parkland': '#fb923c',
-        'Foothills': '#93c5fd',
-        'Rocky Mountains': '#d8b4fe',
-        'Canadian Shield': '#8FBC8F' 
+        'Boreal Forest': '#228B22', 'Grassland': '#facc15', 'Parkland': '#fb923c',
+        'Foothills': '#93c5fd', 'Rocky Mountains': '#d8b4fe', 'Canadian Shield': '#8FBC8F' 
     };
 
-    // Color shade utility function (darkens a hex color)
-    const pSBC=(p,c0,c1,l)=>{let r,g,b,P,f,t,h,i=parseInt,m=Math.round,a=typeof(c1)=="string";if(typeof(p)!="number"||p<-1||p>1||typeof(c0)!="string"||(c0[0]!='r'&&c0[0]!='#')||(c1&&!a&&c1.length!=3&&c1.length!=4))return null;if(!this.pSBCr)this.pSBCr=(d)=>{let n=d.length,x={};if(n>9){[r,g,b,a]=d=d.split(","),n=d.length;if(n<3||n>4)return null;x.r=i(r[3]=="a"?r.slice(5):r.slice(4)),x.g=i(g),x.b=i(b),x.a=a?parseFloat(a):-1}else{if(n==8||n==6||n<4)return null;if(n<6)d="#"+d[1]+d[1]+d[2]+d[2]+d[3]+d[3]+(n>4?d[4]+d[4]:"");d=i(d.slice(1),16);if(n==9||n==5)x.r=d>>24&255,x.g=d>>16&255,x.b=d>>8&255,x.a=m((d&255)/0.255)/1000;else x.r=d>>16,x.g=d>>8&255,x.b=d&255,x.a=-1}return x};h=c0.length>9,h=a?c1.length>9?true:c1=="c"?!h:false:h,f=this.pSBCr(c0),P=p<0,t=c1&&c1!="c"?this.pSBCr(c1):P?{r:0,g:0,b:0,a:-1}:{r:255,g:255,b:255,a:-1},p=P?p*-1:p,P=1-p;if(!f||!t)return null;if(l)r=m(P*f.r+p*t.r),g=m(P*f.g+p*t.g),b=m(P*f.b+p*t.b);else r=m((P*f.r**2+p*t.r**2)**0.5),g=m((P*f.g**2+p*t.g**2)**0.5),b=m((P*f.b**2+p*t.b**2)**0.5);a=f.a,t=t.a,f=a>=0||t>=0,a=f?a<0?t:t<0?a:a*P+t*p:0;if(h)return"rgb"+(f?"a(":"(")+r+","+g+","+b+(f?","+m(a*1000)/1000:"")+")";else return"#"+(4294967296+r*16777216+g*65536+b*256+(f?m(a*255):0)).toString(16).slice(1,f?undefined:-2)}
-
-    function getColor(name, type = 'fill') { 
-        const baseColor = regionColors[name] || '#ccc';
-        if (type === 'border') {
-            return pSBC(-0.4, baseColor);
-        }
-        return baseColor;
-    }
+    // Color shade utility for borders
+    const pSBC=(p,c0)=>{let r,g,b,P,f,t,h,i=parseInt,m=Math.round;if(typeof p!="number"||p<-1||p>1||typeof c0!="string"||(c0[0]!='r'&&c0[0]!='#'))return null;if(!this.pSBCr)this.pSBCr=(d)=>{let n=d.length,x={};if(n>9){[r,g,b,a]=d=d.split(","),n=d.length;if(n<3||n>4)return null;x.r=i(r[3]=="a"?r.slice(5):r.slice(4)),x.g=i(g),x.b=i(b),x.a=a?parseFloat(a):-1}else{if(n==8||n==6||n<4)return null;if(n<6)d="#"+d[1]+d[1]+d[2]+d[2]+d[3]+d[3]+(n>4?d[4]+d[4]:"");d=i(d.slice(1),16);if(n==9||n==5)x.r=d>>24&255,x.g=d>>16&255,x.b=d>>8&255,x.a=m((d&255)/0.255)/1000;else x.r=d>>16,x.g=d>>8&255,x.b=d&255,x.a=-1}return x};h=c0.length>9,f=this.pSBCr(c0),P=p<0,t=P?{r:0,g:0,b:0,a:-1}:{r:255,g:255,b:255,a:-1},p=P?p*-1:p,P=1-p;if(!f)return null;r=m(P*f.r+p*t.r);g=m(P*f.g+p*t.g);b=m(P*f.b+p*t.b);return"#"+(4294967296+r*16777216+g*65536+b*256).toString(16).slice(1)};
 
     function style(feature) {
-      const regionName = getRegionName(feature.properties);
+      const regionName = feature.properties.name;
+      const baseColor = regionColors[regionName] || '#ccc';
       return { 
-        fillColor: getColor(regionName, 'fill'), 
+        fillColor: baseColor, 
         weight: 2,
-        color: getColor(regionName, 'border'),
+        color: pSBC(-0.4, baseColor), // Darken fill color for border
         fillOpacity: 0.8 
       };
     }
     
-    let geojson;
-    
+    // --- 3. MAP INTERACTIVITY ---
     function highlightFeature(e) {
       const layer = e.target;
-      const regionName = getRegionName(layer.feature.properties);
-      // Dynamically create a highlight style with a darker border
+      const regionName = layer.feature.properties.name;
       layer.setStyle({
         weight: 4,
-        color: pSBC(-0.6, getColor(regionName, 'fill')), // A darker version of the region's fill color
+        color: pSBC(-0.6, regionColors[regionName]), // Even darker for highlight
         fillOpacity: 1
       });
     }
-    function resetHighlight(e) { geojson.resetStyle(e.target); }
+
+    function resetHighlight(e) {
+      geojsonLayer.resetStyle(e.target);
+    }
 
     function clickFeature(e) {
       L.DomEvent.stopPropagation(e);
-      const regionName = getRegionName(e.target.feature.properties);
+      const regionName = e.target.feature.properties.name;
       infoContent.innerHTML = `<h3>${regionName}</h3><p>${regionData[regionName] || 'No data available.'}</p>`;
       e.target.bringToFront();
     }
 
     function onEachFeature(feature, layer) {
-      const regionName = getRegionName(feature.properties);
+      const regionName = feature.properties.name;
       layer.bindPopup(regionName);
 
       layer.on({ 
@@ -134,63 +110,31 @@
       });
     }
 
-    const url = 'https://geospatial.alberta.ca/titan/rest/services/biota/natural_subregions_alberta_2005/FeatureServer/0/query?where=1%3D1&outFields=*&f=geojson';
+    // --- 4. DATA FETCHING ---
+    // The new, simplified URL from your GitHub repository
+    const url = 'https://raw.githubusercontent.com/Maltais239/interactives/main/alberta_simplified_regions.geojson';
     
     fetch(url)
-      .then(res => res.json())
-      .then(data => { 
-        // ** MERGE LOGIC STARTS HERE **
-        
-        // 1. Group all sub-region features by their main region name.
-        const regions = {};
-        data.features.forEach(feature => {
-            const regionName = getRegionName(feature.properties);
-            if (!regions[regionName]) {
-                regions[regionName] = [];
-            }
-            regions[regionName].push(feature);
-        });
-
-        // 2. For each group, merge all its features into a single polygon using turf.union.
-        const mergedFeatures = [];
-        for (const regionName in regions) {
-            const featuresToMerge = regions[regionName];
-            if (featuresToMerge.length > 0) {
-                let merged = featuresToMerge[0];
-                for (let i = 1; i < featuresToMerge.length; i++) {
-                    try {
-                        merged = turf.union(merged, featuresToMerge[i]);
-                    } catch (e) {
-                        console.warn(`Could not merge a polygon for ${regionName}. Skipping.`, e);
-                    }
-                }
-                // Assign the correct name to the new, merged feature.
-                merged.properties = { NRNAME: regionName };
-                mergedFeatures.push(merged);
-            }
+      .then(res => {
+        if (!res.ok) {
+            throw new Error(`Could not fetch GeoJSON. Status: ${res.status}`);
         }
-
-        // 3. Create a new GeoJSON FeatureCollection with the merged features.
-        const mergedGeoJSON = {
-            type: "FeatureCollection",
-            features: mergedFeatures
-        };
-        
-        // 4. Add the new, simplified GeoJSON to the map.
-        geojson = L.geoJson(mergedGeoJSON, { 
+        return res.json();
+      })
+      .then(data => { 
+        // No merging logic needed! Just add the data directly to the map.
+        geojsonLayer = L.geoJson(data, { 
           style, 
           onEachFeature 
         }).addTo(map); 
-
-        // ** MERGE LOGIC ENDS HERE **
+        // Automatically adjust the map to fit the loaded regions
+        map.fitBounds(geojsonLayer.getBounds());
       })
       .catch((err) => { 
         console.error("Error fetching or processing GeoJSON:", err);
-        infoContent.innerHTML = '<p>Error loading Alberta regions data. Please check the console for details.</p>'; 
+        infoContent.innerHTML = `<p style="color: red;"><strong>Error:</strong> Could not load the map data from GitHub. Please check the URL and your internet connection.</p>`; 
       });
 
   </script>
 </body>
 </html>
-
-
