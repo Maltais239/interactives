@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alberta Regions Hub</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body, html { 
+      margin: 0; 
+      padding: 0; 
+      width: 100%; 
+      height: 100%; 
+      display: flex; 
+      font-family: 'Poppins', sans-serif; 
+      background-color: #f0f4f8; 
+      color: #334155; 
+      overflow: hidden;
+    }
+    .leaflet-container { background: #aadaff; }
+    #map { flex: 1; height: 100%; border-right: 1px solid #ddd; }
+    #info-panel { 
+      width: 380px; 
+      max-width: 40%; 
+      padding: 2rem; 
+      background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%); 
+      border-left: 5px solid #ffc107; 
+      overflow-y: auto; 
+      box-shadow: -5px 0 15px rgba(0,0,0,0.1); 
+      display: flex; 
+      flex-direction: column; 
+    }
+    #info-panel h2 { 
+      margin-top: 0; 
+      color: #854d0e; 
+      font-size: 1.75rem; 
+      font-weight: 700; 
+      border-bottom: 2px solid #fde68a; 
+      padding-bottom: 0.5rem; 
+      margin-bottom: 1rem; 
+    }
+    #info-content h4 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #854d0e;
+      margin-top: 1.25rem;
+      margin-bottom: 0.5rem;
+      border-bottom: 1px solid #fde68a;
+      padding-bottom: 0.25rem;
+    }
+    #info-content ul {
+      list-style-type: disc;
+      padding-left: 1.5rem;
+      margin: 0;
+      font-size: 0.9rem;
+    }
+    #info-content li {
+      margin-bottom: 0.25rem;
+    }
+    
+    .source-info {
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e2e8f0;
+        font-size: 0.8rem;
+    }
+    .source-info a {
+        color: #0d9488;
+        text-decoration: none;
+    }
+    .source-info a:hover {
+        text-decoration: underline;
+    }
+    .source-info p {
+        margin-bottom: 0.5rem;
+    }
+    .source-info ul {
+        padding-left: 1.25rem;
+        list-style-type: square;
+    }
+
+    /* --- Game Mode Styles --- */
+    .mode-switcher {
+        display: flex;
+        margin-bottom: 1.5rem;
+        border-radius: 8px;
+        background-color: #fffbeb;
+        padding: 0.25rem;
+    }
+    .mode-btn {
+        flex: 1 1 auto;
+        padding: 0.75rem 0.5rem;
+        border: none;
+        background-color: transparent;
+        color: #b45309;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        border-radius: 6px;
+        transition: background-color 0.3s, color 0.3s;
+        text-align: center;
+    }
+    .mode-btn.active {
+        background-color: #d97706;
+        color: white;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .mode-panel { display: none; }
+    .mode-panel.active { display: block; flex-grow: 1; display: flex; flex-direction: column; }
+    
+    /* Content & Quiz Box styles */
+    #info-content, #result-box { border-top: 1px solid #ddd; padding-top: 1.5rem; }
+    #info-content h3, #result-box h3 { margin-top: 0; margin-bottom: 1rem; color: #ca8a04; font-size: 1.5rem; font-weight: 600; }
+    #info-content p, #result-box p { font-size: 0.95rem; line-height: 1.6; margin: 0.5rem 0 1rem 0; color: #334155; }
+    
+    #question-box {
+        background-color: #fffbeb;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border: 1px solid #fde68a;
+        min-height: 120px;
+        font-size: 1.1rem;
+        color: #78350f;
+        line-height: 1.6;
+        font-weight: 500;
+    }
+    #result-box p.feedback-correct { color: #166534; font-weight: bold; }
+    #result-box p.feedback-incorrect { color: #991b1b; font-weight: bold; }
+    #result-box p strong { color: #854d0e; }
+    
+    /* Button styles */
+    #button-controls { margin-top: auto; display: flex; gap: 0.5rem; padding-top: 1rem; }
+    .game-btn {
+        flex: 1; padding: 0.75rem; color: white; border: none; border-radius: 8px; font-size: 1rem;
+        font-weight: 600; cursor: pointer; transition: background-color 0.2s, opacity 0.2s;
+    }
+    #next-question-btn { display: none; background-color: #d97706; }
+    #next-question-btn:hover { background-color: #b45309; }
+    #play-again-btn { display: none; background-color: #16a34a; }
+    #play-again-btn:hover { background-color: #15803d; }
+    #submit-answer-btn { display: none; background-color: #0e7490; }
+    #submit-answer-btn:hover { background-color: #155e75; }
+    
+    /* Practice Mode styles */
+    #practice-list { margin-top: 1rem; }
+    .practice-item {
+        padding: 0.75rem 1rem;
+        background-color: #fffbeb;
+        border: 1px solid #fef3c7;
+        border-radius: 6px;
+        margin-bottom: 0.5rem;
+        cursor: pointer;
+        transition: background-color 0.2s, box-shadow 0.2s;
+        font-weight: 500;
+        color: #78350f;
+    }
+    .practice-item:hover { background-color: #fef3c7; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
+    /* Pop-up styles */
+    .leaflet-popup-content-wrapper { background-color: #fffbeb; color: #713f12; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+    .leaflet-popup-content { font-weight: bold; }
+    .leaflet-popup-tip { background: #fffbeb; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="info-panel">
+    <h2>Alberta Regions Hub</h2>
+
+    <div class="mode-switcher">
+        <button id="explore-mode-btn" class="mode-btn active">Explore</button>
+        <button id="quiz-mode-btn" class="mode-btn">Quiz</button>
+        <button id="practice-mode-btn" class="mode-btn">Practice</button>
+    </div>
+
+    <div id="explore-panel" class="mode-panel active">
+        <div id="info-content"><p>Click a region on the map to learn more about it.</p></div>
+    </div>
+
+    <div id="quiz-panel" class="mode-panel">
+        <div id="question-box">Welcome to the Alberta Regions Quiz!</div>
+        <div id="result-box"></div>
+        <div id="button-controls">
+            <button id="next-question-btn" class="game-btn">Next Question &rarr;</button>
+            <button id="submit-answer-btn" class="game-btn">Submit Answer</button>
+            <button id="play-again-btn" class="game-btn">Play Again? ↻</button>
+        </div>
+    </div>
+
+    <div id="practice-panel" class="mode-panel">
+        <h3>Practice Bank</h3>
+        <p>Here are the regions you've missed. Click one to find it on the map!</p>
+        <div id="practice-list">Your practice bank is empty.</div>
+    </div>
+  </div>
+  
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script>
+    // --- 1. DOM & MAP SETUP ---
+    const map = L.map('map', { zoomControl: true }).setView([55, -115], 5);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      subdomains: 'abcd', maxZoom: 19
+    }).addTo(map);
+
+    const exploreModeBtn = document.getElementById('explore-mode-btn');
+    const quizModeBtn = document.getElementById('quiz-mode-btn');
+    const practiceModeBtn = document.getElementById('practice-mode-btn');
+    const explorePanel = document.getElementById('explore-panel');
+    const quizPanel = document.getElementById('quiz-panel');
+    const practicePanel = document.getElementById('practice-panel');
+    const infoContent = document.getElementById('info-content');
+    const questionBox = document.getElementById('question-box');
+    const resultBox = document.getElementById('result-box');
+    const nextQuestionBtn = document.getElementById('next-question-btn');
+    const playAgainBtn = document.getElementById('play-again-btn');
+    const submitAnswerBtn = document.getElementById('submit-answer-btn');
+    const practiceList = document.getElementById('practice-list');
+    
+    let geojsonLayer;
+    let currentMode = 'explore';
+
+    // --- 2. REGION & QUIZ DATA ---
+    const regionData = {
+      'Boreal Forest': {
+        description: `The Boreal Forest is Alberta's largest natural region, covering 58% of the province. It's a vast land of forests, wetlands, large rivers, and lakes, with longer winters and shorter, cooler summers.`,
+        landforms: `<ul><li>Low, flat lands and meadows mixed with hilly areas and moraines.</li><li>Features sinkholes from collapsed gypsum caves in the bedrock.</li><li>Extensive wetlands known as muskeg are common.</li></ul>`,
+        plants: `<ul><li>Mainly coniferous trees like jack pine, black spruce, and tamarack.</li><li>Deciduous trees like aspen and birch are also present.</li><li>Undergrowth includes Labrador tea, wild blueberry, and reindeer lichen (a favorite of caribou).</li></ul>`,
+        animals: `<ul><li>Large mammals like moose, wood bison, woodland caribou, and black bears.</li><li>Predators include lynx, wolves, and foxes.</li><li>Rich birdlife, including the endangered whooping crane and colonies of pelicans.</li></ul>`,
+        parksAndResources: `<ul><li><b>Parks:</b> Wood Buffalo National Park (Canada's largest).</li><li><b>Resources:</b> Forestry, commercial fishing (walleye), trapping, and vast oil sands (bitumen) deposits which are crucial to Alberta's economy.</li></ul>`,
+        funFacts: [
+            "The Peace-Athabasca Delta, one of the largest freshwater deltas in the world, is located here.",
+            "This region stores vast amounts of carbon in its soils and wetlands, making it globally important for climate regulation."
+        ],
+        sources: `<div class="source-info"><p><strong>Sources:</strong></p><ul><li><a href="http://www.learnalberta.ca/content/sngg/index.html" target="_blank" rel="noopener noreferrer">Learn Alberta - The Natural Regions of Alberta</a></li><li><a href="https://www.alberta.ca/albertas-natural-regions.aspx" target="_blank" rel="noopener noreferrer">Government of Alberta - Natural Regions</a></li></ul></div>`
+      },
+      'Grassland': {
+        description: `Located in the southeastern corner, this is Alberta's prairie region. It's the warmest and driest area, known for its flat to rolling, treeless plains and unique badlands where many dinosaur fossils are found.`,
+        landforms: `<ul><li>Mostly flat plains with some hilly areas.</li><li>The Badlands, featuring deep river valleys and canyons carved by erosion.</li><li>Unique rock formations called hoodoos.</li></ul>`,
+        plants: `<ul><li>Dominated by tall and short grasses, such as rough fescue.</li><li>Trees like poplars and cottonwoods are found only in river valleys and coulees.</li><li>Cacti and other drought-resistant plants thrive here.</li></ul>`,
+        animals: `<ul><li>Unique animals like the pronghorn antelope, prairie rattlesnake, and burrowing owl.</li><li>Once home to massive herds of buffalo.</li><li>The swift fox is an endangered species native to this region.</li></ul>`,
+        parksAndResources: `<ul><li><b>Parks:</b> Writing-On-Stone Provincial Park, Dinosaur Provincial Park (a UNESCO World Heritage Site).</li><li><b>Resources:</b> Rich soil for agriculture (wheat, canola), cattle ranching, and significant oil and gas deposits. Wind energy is also harnessed here.</li></ul>`,
+        funFacts: [
+            "The Grassland region contains the highest concentration of dinosaur fossils in the world.",
+            "Pronghorn are the fastest land animals in North America and can reach speeds of up to 88 km/h."
+        ],
+        sources: `<div class="source-info"><p><strong>Sources:</strong></p><ul><li><a href="http://www.learnalberta.ca/content/sngg/index.html" target="_blank" rel="noopener noreferrer">Learn Alberta - The Natural Regions of Alberta</a></li><li><a href="https://www.alberta.ca/albertas-natural-regions.aspx" target="_blank" rel="noopener noreferrer">Government of Alberta - Natural Regions</a></li></ul></div>`
+      },
+      'Parkland': {
+        description: `This arc-shaped region is a transition zone between the grasslands and the boreal forest. It features a mix of aspen groves and fertile grasslands, making it Alberta's primary agricultural zone where most of the population lives.`,
+        landforms: `<ul><li>A mix of flat and hilly areas shaped by glaciers.</li><li>Rolling hills called moraines are common.</li><li>Thousands of small, marshy lakes known as sloughs or potholes.</li></ul>`,
+        plants: `<ul><li>A mix of aspen groves (poplar trees) and grasslands.</li><li>Only about 5% remains in its natural state due to extensive agriculture.</li><li>Rich, fertile black soil is a key feature.</li></ul>`,
+        animals: `<ul><li>Provides shelter for elk, moose, and deer.</li><li>Rich habitat for waterfowl and shorebirds, especially around Beaverhill Lake.</li><li>Beavers are common in the region's many wetlands.</li></ul>`,
+        parksAndResources: `<ul><li><b>Parks:</b> Elk Island National Park (fenced to protect bison and elk), Beaverhill Lake Natural Area.</li><li><b>Resources:</b> Alberta's most important agricultural region. Rich deposits of oil and natural gas are found here, including the historic Leduc oilfield.</li></ul>`,
+        funFacts: [
+            "Most of Alberta's major cities, including Edmonton and Calgary, are located in this region.",
+            "Elk Island National Park played a key role in saving the Plains Bison from extinction."
+        ],
+        sources: `<div class="source-info"><p><strong>Sources:</strong></p><ul><li><a href="http://www.learnalberta.ca/content/sngg/index.html" target="_blank" rel="noopener noreferrer">Learn Alberta - The Natural Regions of Alberta</a></li><li><a href="https://www.alberta.ca/albertas-natural-regions.aspx" target="_blank" rel="noopener noreferrer">Government of Alberta - Natural Regions</a></li></ul></div>`
+      },
+      'Foothills': {
+        description: `A transition zone of rolling to rugged hills located between the Rocky Mountains and the parkland/boreal regions. It has very high biodiversity and is subject to warm, dry Chinook winds in winter.`,
+        landforms: `<ul><li>Rolling to rugged, tree-covered hills.</li><li>Broad river valleys are common.</li><li>Elevation is higher than the parkland but lower than the mountains.</li></ul>`,
+        plants: `<ul><li>Upper areas have coniferous forests (lodgepole pine, spruce).</li><li>Lower areas have a mix of grasses, shrubs, and deciduous trees (aspen, poplar).</li><li>A wide variety of wildflowers grow here.</li></ul>`,
+        animals: `<ul><li>Extremely high biodiversity.</li><li>Home to woodland caribou (an endangered species), grizzly bears, moose, and black bears.</li><li>Wolves and coyotes are the main predators.</li></ul>`,
+        parksAndResources: `<ul><li><b>Parks:</b> William A. Switzer Provincial Park, Goose Mountain Ecological Reserve.</li><li><b>Resources:</b> Rich in coal, natural gas, and forestry. Cattle ranching is also common in the southern portions.</li></ul>`,
+        funFacts: [
+            "The name 'Chinook' means 'snow-eater' in the language of the Indigenous peoples of the Pacific Northwest.",
+            "This region is a critical habitat for grizzly bears as they move between the mountains and other areas."
+        ],
+        sources: `<div class="source-info"><p><strong>Sources:</strong></p><ul><li><a href="http://www.learnalberta.ca/content/sngg/index.html" target="_blank" rel="noopener noreferrer">Learn Alberta - The Natural Regions of Alberta</a></li><li><a href="https://www.alberta.ca/albertas-natural-regions.aspx" target="_blank" rel="noopener noreferrer">Government of Alberta - Natural Regions</a></li></ul></div>`
+      },
+      'Rocky Mountains': {
+        description: `Forming Alberta's iconic western border, this region is characterized by high, rugged mountains, glaciers, and alpine meadows. It is a world-famous tourist destination.`,
+        landforms: `<ul><li>High, rugged mountain peaks.</li><li>Vast glaciers and icefields, including the Columbia Icefield, which feeds rivers flowing to three different oceans.</li><li>U-shaped valleys carved by glaciers.</li></ul>`,
+        plants: `<ul><li>Vegetation changes with elevation, creating three distinct zones: montane (lower valleys), subalpine (middle slopes), and alpine (above the treeline).</li><li>Hardy trees like lodgepole pine, fir, and spruce dominate.</li><li>Tiny, resilient wildflowers grow in the alpine meadows.</li></ul>`,
+        animals: `<ul><li>Iconic species include grizzly bears, bighorn sheep, mountain goats, elk, and hoary marmots.</li><li>Cougars are the top predator in the region.</li><li>Birds like the Golden Eagle can be seen soaring above the peaks.</li></ul>`,
+        parksAndResources: `<ul><li><b>Parks:</b> Home to Canada's most famous national parks, Banff and Jasper (both UNESCO World Heritage Sites).</li><li><b>Resources:</b> Historically, coal mining was a major industry. Today, tourism is the dominant economic driver.</li></ul>`,
+        funFacts: [
+            "The Columbia Icefield is the largest icefield in the Rocky Mountains of North America.",
+            "Banff National Park was Canada's first national park, established in 1885."
+        ],
+        sources: `<div class="source-info"><p><strong>Sources:</strong></p><ul><li><a href="http://www.learnalberta.ca/content/sngg/index.html" target="_blank" rel="noopener noreferrer">Learn Alberta - The Natural Regions of Alberta</a></li><li><a href="https://www.alberta.ca/albertas-natural-regions.aspx" target="_blank" rel="noopener noreferrer">Government of Alberta - Natural Regions</a></li></ul></div>`
+      },
+      'Canadian Shield': {
+        description: `The smallest natural region in Alberta, found in the far northeast corner. It features ancient, exposed bedrock, thin soils, and numerous small lakes carved by glaciers.`,
+        landforms: `<ul><li>Low, rolling hills of ancient, exposed granite rock (bedrock).</li><li>The landscape was scraped and shaped by glaciers, leaving behind thin soil.</li><li>Features sandy beaches and rocky shorelines along its many lakes.</li></ul>`,
+        plants: `<ul><li>Dominated by coniferous trees like jack pine and black spruce that can grow in thin soil.</li><li>Wetlands contain plants like Labrador tea, bog cranberries, and cattails.</li><li>Reindeer lichen is a common ground cover.</li></ul>`,
+        animals: `<ul><li>Home to barren-ground caribou, moose, black bears, wolves, and lynx.</li><li>The many lakes and rivers are rich with fish like northern pike and walleye.</li><li>Nesting site for birds like the Bald Eagle and numerous waterfowl.</li></ul>`,
+        parksAndResources: `<ul><li><b>Parks:</b> A portion of Wood Buffalo National Park extends into this region.</li><li><b>Resources:</b> Historically important for the fur trade (trapping). Commercial fishing and tourism (wilderness lodges) are key industries today. Potential for mineral mining (uranium, gold).</li></ul>`,
+        funFacts: [
+            "The rocks in this region are among the oldest in the world, over 2 billion years old.",
+            "This region covers a massive part of Canada, but only a tiny sliver is in Alberta."
+        ],
+        sources: `<div class="source-info"><p><strong>Sources:</strong></p><ul><li><a href="http://www.learnalberta.ca/content/sngg/index.html" target="_blank" rel="noopener noreferrer">Learn Alberta - The Natural Regions of Alberta</a></li><li><a href="https://www.alberta.ca/albertas-natural-regions.aspx" target="_blank" rel="noopener noreferrer">Government of Alberta - Natural Regions</a></li></ul></div>`
+      }
+    };
+    
+    // --- QUESTION BANK ---
+    const identificationQuestions = [
+        { question: "Find the Boreal Forest region.", answer: "Boreal Forest" },
+        { question: "Find the Grassland region.", answer: "Grassland" },
+        { question: "Find the Parkland region.", answer: "Parkland" },
+        { question: "Find the Foothills region.", answer: "Foothills" },
+        { question: "Find the Rocky Mountains region.", answer: "Rocky Mountains" },
+        { question: "Find the Canadian Shield region.", answer: "Canadian Shield" }
+    ];
+
+    const landformQuestions = [
+        { question: "The 'Badlands', famous for hoodoos and dinosaur fossils, are located in which region?", answer: "Grassland" },
+        { question: "The Columbia Icefield, a major source of fresh water, is a feature of which region?", answer: "Rocky Mountains" },
+        { question: "Extensive wetlands known as 'muskeg' are most common in which vast region?", answer: "Boreal Forest" },
+        { question: "Which region consists of ancient, exposed granite bedrock, some of the oldest rock in the world?", answer: "Canadian Shield" },
+        { question: "Rolling hills called moraines and thousands of small lakes known as 'potholes' are characteristic of which region?", answer: "Parkland" },
+        { question: "Which transition zone features rolling to rugged, tree-covered hills?", answer: "Foothills" }
+    ];
+
+    const plantAnimalQuestions = [
+        { question: "Pronghorn antelope and prairie rattlesnakes are uniquely adapted to which dry, open region?", answer: "Grassland"},
+        { question: "The endangered Whooping Crane has its nesting ground in Wood Buffalo National Park, located primarily in which region?", answer: "Boreal Forest"},
+        { question: "Iconic species like bighorn sheep and mountain goats are found in which region?", answer: "Rocky Mountains"},
+        { question: "Which region is a critical habitat for grizzly bears and has extremely high biodiversity?", answer: "Foothills"},
+        { question: "Aspen groves mixed with fertile grasslands define which region?", answer: "Parkland"},
+        { question: "Barren-ground caribou and an abundance of northern pike are found in which remote region?", answer: "Canadian Shield" }
+    ];
+
+    const resourceParkQuestions = [
+        { question: "Canada's most famous national parks, Banff and Jasper, are located in which region?", answer: "Rocky Mountains" },
+        { question: "The Athabasca Oil Sands, a massive economic resource, are found in which region?", answer: "Boreal Forest" },
+        { question: "Alberta's most important agricultural land, where most of the population lives and farms, is in which region?", answer: "Parkland" },
+        { question: "Dinosaur Provincial Park, a UNESCO World Heritage Site, is located in which region?", answer: "Grassland"},
+        { question: "Rich deposits of coal and natural gas, along with forestry, are key resources in which hilly transition zone?", answer: "Foothills"},
+        { question: "Historically important for the fur trade, this region now has potential for uranium mining. Which is it?", answer: "Canadian Shield" }
+    ];
+
+    const funFactQuestions = [
+        { question: "In which region would you find the highest concentration of dinosaur fossils in the world?", answer: "Grassland"},
+        { question: "Which region is home to Canada's first national park?", answer: "Rocky Mountains"},
+        { question: "The majority of Alberta's major cities, including Edmonton and Calgary, are in which region?", answer: "Parkland"},
+        { question: "Which region stores vast amounts of carbon in its soil, making it globally important for climate regulation?", answer: "Boreal Forest"},
+        { question: "Which region is made of rocks that are over 2 billion years old?", answer: "Canadian Shield"},
+        { question: "The name for the warm 'snow-eater' winds, Chinooks, is associated with which region?", answer: "Foothills" }
+    ];
+
+    const roadTripQuestions = [
+        { question: "You're driving from Calgary to Banff National Park. Based on the map, click the regions you'll pass through in order.", answer: ["Parkland", "Rocky Mountains"] },
+        { question: "On a road trip from Medicine Hat to Edmonton, you would travel through which two regions in order?", answer: ["Grassland", "Parkland"] },
+        { question: "A trip from Grande Prairie to Banff would cross through which three regions in order?", answer: ["Boreal Forest", "Foothills", "Rocky Mountains"]},
+        { question: "You start in Red Deer and drive west to the edge of the mountains. Which regions do you cross?", answer: ["Parkland", "Foothills"]},
+        { question: "To see Fort McMurray from Lethbridge, your long drive would take you through which regions in order?", answer: ["Grassland", "Parkland", "Boreal Forest"]},
+        { question: "To visit the remote ancient rocks of Alberta, you fly from Fort McMurray. Which region are you visiting?", answer: ["Canadian Shield"]}
+    ];
+    
+    const quizRounds = [
+        { title: "Round 1: Region Identification", questions: identificationQuestions, type: 'single-click' },
+        { title: "Round 2: Landforms & Geography", questions: landformQuestions, type: 'single-click' },
+        { title: "Round 3: Plants & Animals", questions: plantAnimalQuestions, type: 'single-click' },
+        { title: "Round 4: Resources & Parks", questions: resourceParkQuestions, type: 'single-click' },
+        { title: "Round 5: Fun Facts", questions: funFactQuestions, type: 'single-click' },
+        { title: "Round 6: Road Trip!", questions: roadTripQuestions, type: 'multi-click' }
+    ];
+
+    let quizState = {
+        availableQuestions: [],
+        currentQuestion: null,
+        isQuizActive: false,
+        practiceBank: [],
+        currentRoundIndex: 0,
+        currentAnswerSequence: []
+    };
+    
+    const regionColors = {
+        'Boreal Forest': '#228B22', 'Grassland': '#facc15', 'Parkland': '#fb923c',
+        'Foothills': '#93c5fd', 'Rocky Mountains': '#d8b4fe', 'Canadian Shield': '#8FBC8F' 
+    };
+    const pSBC=(p,c0)=>{let r,g,b,P,f,t,h,i=parseInt,m=Math.round;if(typeof p!="number"||p<-1||p>1||typeof c0!="string"||(c0[0]!='r'&&c0[0]!='#'))return null;if(!this.pSBCr)this.pSBCr=(d)=>{let n=d.length,x={};if(n>9){[r,g,b,a]=d=d.split(","),n=d.length;if(n<3||n>4)return null;x.r=i(r[3]=="a"?r.slice(5):r.slice(4)),x.g=i(g),x.b=i(b),x.a=a?parseFloat(a):-1}else{if(n==8||n==6||n<4)return null;if(n<6)d="#"+d[1]+d[1]+d[2]+d[2]+d[3]+d[3]+(n>4?d[4]+d[4]:"");d=i(d.slice(1),16);if(n==9||n==5)x.r=d>>24&255,x.g=d>>16&255,x.b=d>>8&255,x.a=m((d&255)/0.255)/1000;else x.r=d>>16,x.g=d>>8&255,x.b=d&255,x.a=-1}return x};h=c0.length>9,f=this.pSBCr(c0),P=p<0,t=P?{r:0,g:0,b:0,a:-1}:{r:255,g:255,b:255,a:-1},p=P?p*-1:p,P=1-p;if(!f)return null;r=m(P*f.r+p*t.r);g=m(P*f.g+p*t.g);b=m(P*f.b+p*t.b);return"#"+(4294967296+r*16777216+g*65536+b*256).toString(16).slice(1)};
+
+    // --- 3. GAME LOGIC & MODE SWITCHING ---
+
+    function setMode(mode) {
+        currentMode = mode;
+        [exploreModeBtn, quizModeBtn, practiceModeBtn].forEach(btn => btn.classList.remove('active'));
+        [explorePanel, quizPanel, practicePanel].forEach(panel => panel.classList.remove('active'));
+        
+        if (mode === 'explore') {
+            exploreModeBtn.classList.add('active');
+            explorePanel.classList.add('active');
+        } else if (mode === 'quiz') {
+            quizModeBtn.classList.add('active');
+            quizPanel.classList.add('active');
+            if (!quizState.isQuizActive && quizState.currentRoundIndex === 0 && quizState.availableQuestions.length === 0) {
+                startQuiz();
+            } else if (!quizState.isQuizActive) {
+                playAgainBtn.style.display = 'block';
+                nextQuestionBtn.style.display = 'none';
+                submitAnswerBtn.style.display = 'none';
+            }
+        } else if (mode === 'practice') {
+            practiceModeBtn.classList.add('active');
+            practicePanel.classList.add('active');
+            updatePracticePanel();
+        }
+        
+        if (geojsonLayer) geojsonLayer.resetStyle();
+    }
+
+    exploreModeBtn.addEventListener('click', () => setMode('explore'));
+    quizModeBtn.addEventListener('click', () => setMode('quiz'));
+    practiceModeBtn.addEventListener('click', () => setMode('practice'));
+    playAgainBtn.addEventListener('click', startQuiz);
+    nextQuestionBtn.addEventListener('click', loadNewQuestion);
+    submitAnswerBtn.addEventListener('click', checkMultiAnswer);
+
+    // --- Quiz Functions ---
+    function startQuiz() {
+        quizState.currentRoundIndex = 0;
+        quizState.practiceBank = [];
+        playAgainBtn.style.display = 'none';
+        submitAnswerBtn.style.display = 'none';
+        resultBox.innerHTML = '';
+        loadRound();
+    }
+
+    function loadRound() {
+        const round = quizRounds[quizState.currentRoundIndex];
+        quizState.availableQuestions = [...round.questions].sort(() => 0.5 - Math.random());
+        questionBox.textContent = round.title;
+        resultBox.innerHTML = `<p>Get ready for the next round! Click "Start Round" to begin.</p>`;
+        nextQuestionBtn.textContent = 'Start Round';
+        nextQuestionBtn.style.display = 'block';
+        submitAnswerBtn.style.display = 'none';
+        quizState.isQuizActive = false;
+        if (geojsonLayer) geojsonLayer.resetStyle();
+    }
+
+    function loadNewQuestion() {
+        nextQuestionBtn.textContent = 'Next Question →';
+        quizState.currentAnswerSequence = [];
+
+        if (quizState.availableQuestions.length === 0) {
+            quizState.currentRoundIndex++;
+            if (quizState.currentRoundIndex < quizRounds.length) {
+                loadRound();
+            } else {
+                quizState.isQuizActive = false;
+                questionBox.innerHTML = `Quiz Complete!`;
+                resultBox.innerHTML = `<p>Great job! You've finished all rounds of the Alberta Regions Quiz.</p>`;
+                playAgainBtn.style.display = 'block';
+                nextQuestionBtn.style.display = 'none';
+                submitAnswerBtn.style.display = 'none';
+                if (geojsonLayer) geojsonLayer.resetStyle();
+            }
+            return;
+        }
+
+        quizState.isQuizActive = true;
+        quizState.currentQuestion = quizState.availableQuestions.pop();
+        const currentRound = quizRounds[quizState.currentRoundIndex];
+        
+        questionBox.textContent = quizState.currentQuestion.question;
+        
+        if (currentRound.type === 'multi-click') {
+            resultBox.innerHTML = `<p>Click the regions in the correct order, then press Submit.</p>`;
+            submitAnswerBtn.style.display = 'block';
+            nextQuestionBtn.style.display = 'none';
+        } else {
+            resultBox.innerHTML = `<p>Click the correct region on the map!</p>`;
+            submitAnswerBtn.style.display = 'none';
+            nextQuestionBtn.style.display = 'none';
+        }
+
+        if (geojsonLayer) geojsonLayer.resetStyle();
+    }
+
+    function checkAnswer(regionName) {
+        if (!quizState.isQuizActive) return;
+        
+        const currentRound = quizRounds[quizState.currentRoundIndex];
+        if (currentRound.type === 'multi-click') return; // Handled by checkMultiAnswer
+
+        if (regionName === quizState.currentQuestion.answer) {
+            resultBox.innerHTML = `<p class="feedback-correct">Correct! It's the ${regionName}.</p>`;
+            quizState.isQuizActive = false;
+            setTimeout(loadNewQuestion, 1500); 
+        } else {
+            resultBox.innerHTML = `<p class="feedback-incorrect">Not quite! That's the ${regionName}. Please try again.</p>`;
+            if (!quizState.practiceBank.includes(quizState.currentQuestion.answer)) {
+                quizState.practiceBank.push(quizState.currentQuestion.answer);
+            }
+        }
+    }
+    
+    function checkMultiAnswer() {
+        if (!quizState.isQuizActive) return;
+        
+        const userAnswer = quizState.currentAnswerSequence;
+        const correctAnswer = quizState.currentQuestion.answer;
+        
+        const isCorrect = userAnswer.length === correctAnswer.length && 
+                          userAnswer.every((val, index) => val === correctAnswer[index]);
+
+        if (isCorrect) {
+            resultBox.innerHTML = `<p class="feedback-correct">Correct! The path was ${correctAnswer.join(' &rarr; ')}.</p>`;
+            quizState.isQuizActive = false;
+            submitAnswerBtn.style.display = 'none';
+            setTimeout(loadNewQuestion, 2500);
+        } else {
+            resultBox.innerHTML = `<p class="feedback-incorrect">That's not the right path. Your selections have been cleared, please try again.</p>`;
+            quizState.currentAnswerSequence = [];
+            if (geojsonLayer) geojsonLayer.resetStyle();
+            
+            const practiceText = `${quizState.currentQuestion.question} (${correctAnswer.join(' -> ')})`;
+            if (!quizState.practiceBank.includes(practiceText)) {
+                quizState.practiceBank.push(practiceText);
+            }
+        }
+    }
+    
+    // --- Practice Panel ---
+    function updatePracticePanel() {
+        practiceList.innerHTML = '';
+        if (quizState.practiceBank.length === 0) {
+            practiceList.innerHTML = 'Your practice bank is empty. Play the quiz to add regions!';
+            return;
+        }
+        quizState.practiceBank.forEach(itemText => {
+            const item = document.createElement('div');
+            item.className = 'practice-item';
+            item.textContent = itemText;
+            
+            if(regionData[itemText]) {
+                 item.addEventListener('click', () => {
+                    if (!geojsonLayer) return;
+                    geojsonLayer.eachLayer(layer => {
+                        if (layer.feature.properties.name === itemText) {
+                            map.flyToBounds(layer.getBounds(), {padding: [50, 50]});
+                            layer.setStyle({ weight: 4, color: '#b45309' });
+                            setTimeout(() => geojsonLayer.resetStyle(layer), 2000);
+                        }
+                    });
+                });
+            }
+            practiceList.appendChild(item);
+        });
+    }
+
+    // --- 4. MAP INTERACTIVITY ---
+    function style(feature) {
+      const regionName = feature.properties.name;
+      const baseColor = regionColors[regionName] || '#ccc';
+      
+      if (currentMode === 'practice') {
+          const isPracticeRegion = quizState.practiceBank.includes(regionName);
+          const practiceColor = isPracticeRegion ? '#ef4444' : '#d1d5db';
+          return { fillColor: practiceColor, weight: 2, color: pSBC(-0.4, practiceColor), fillOpacity: 0.8 };
+      }
+      
+      if (currentMode === 'quiz' && quizState.currentAnswerSequence.includes(regionName)) {
+           return { fillColor: baseColor, weight: 4, color: '#0e7490', fillOpacity: 0.9 };
+      }
+
+      return { fillColor: baseColor, weight: 1, color: baseColor, fillOpacity: 0.7 };
+    }
+    
+    function highlightFeature(e) {
+      const layer = e.target;
+      if(currentMode === 'practice' && !quizState.practiceBank.includes(layer.feature.properties.name)) return;
+
+      layer.setStyle({
+        weight: 4,
+        color: pSBC(-0.6, regionColors[layer.feature.properties.name]),
+        fillOpacity: 0.9
+      });
+    }
+
+    function resetHighlight(e) { 
+        if (geojsonLayer) {
+            geojsonLayer.resetStyle(e.target); 
+        }
+    }
+
+    function clickFeature(e) {
+      L.DomEvent.stopPropagation(e);
+      const regionName = e.target.feature.properties.name;
+      const currentRound = quizRounds[quizState.currentRoundIndex];
+      
+      if(currentMode === 'explore') {
+        const data = regionData[regionName];
+        
+        let funFactsHtml = '';
+        if (data.funFacts && data.funFacts.length > 0) {
+            funFactsHtml = `<h4>Fun Facts</h4><ul>${data.funFacts.map(fact => `<li>${fact}</li>`).join('')}</ul>`;
+        }
+
+        infoContent.innerHTML = `<h3>${regionName}</h3>
+                                 <p>${data.description || 'No data available.'}</p>
+                                 <h4>Landforms</h4>${data.landforms || 'N/A'}
+                                 <h4>Plants</h4>${data.plants || 'N/A'}
+                                 <h4>Animals</h4>${data.animals || 'N/A'}
+                                 <h4>Parks & Resources</h4>${data.parksAndResources || 'N/A'}
+                                 ${funFactsHtml}
+                                 ${data.sources || ''}`;
+      } else if (currentMode === 'quiz' && quizState.isQuizActive) {
+         if (currentRound.type === 'multi-click') {
+            const index = quizState.currentAnswerSequence.indexOf(regionName);
+            if (index > -1) {
+                quizState.currentAnswerSequence.splice(index, 1); // Allow deselecting
+            } else {
+                quizState.currentAnswerSequence.push(regionName);
+            }
+            geojsonLayer.resetStyle(); // Redraw all to show sequence
+         } else {
+            checkAnswer(regionName);
+         }
+      }
+      
+      e.target.bringToFront();
+    }
+
+    function onEachFeature(feature, layer) {
+      const regionName = feature.properties.name;
+      layer.bindPopup(regionName);
+
+      layer.on({ 
+        mouseover: (e) => {
+            if (currentMode !== 'quiz' || quizState.isQuizActive) {
+                highlightFeature(e);
+            }
+            if (currentMode !== 'quiz') {
+                layer.openPopup(e.latlng);
+            }
+        },
+        mouseout: (e) => {
+            resetHighlight(e);
+            layer.closePopup();
+        },
+        click: clickFeature 
+      });
+    }
+
+    // --- 5. DATA FETCHING ---
+    const url = 'https://raw.githubusercontent.com/Maltais239/interactives/main/alberta_simplified_regions.geojson';
+    
+    fetch(url)
+      .then(res => res.ok ? res.json() : Promise.reject(res.status))
+      .then(data => { 
+        geojsonLayer = L.geoJson(data, { style, onEachFeature }).addTo(map); 
+        map.fitBounds(geojsonLayer.getBounds());
+      })
+      .catch((err) => { 
+        console.error("Error fetching GeoJSON:", err);
+        infoContent.innerHTML = `<p style="color: red;"><strong>Error:</strong> Could not load map data.</p>`; 
+      });
+  </script>
+</body>
+</html>
+
