@@ -8,11 +8,11 @@
     :root { --bg:#ffffff; --ink:#212529; }
     html, body { height:100%; margin:0; }
     body { background:var(--bg); color:var(--ink); font:14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    #stage { position:fixed; inset:0; background:#f8f9fa; }
+    #stage { position:fixed; inset:0; background:#f7f9fa; } /* Refined light background */
     #boardWrap { position:absolute; inset:0; display:grid; place-items:center; }
     svg#board { width:100%; height:100%; max-width:1800px; aspect-ratio:1000/600; background:#ffffff; touch-action:none; box-shadow: 0 8px 30px rgba(0,0,0,.07); border-radius: 16px;}
-    #targets path { fill:#e9ecef; stroke:#dee2e6; stroke-width:1; transition: fill 0.3s, stroke 0.3s; }
-    #targets g.done path { fill:#d4edda; stroke:#c3e6cb; }
+    #targets path { fill:#e1e5ea; stroke:#d1d7de; stroke-width:1; transition: fill 0.3s, stroke 0.3s; }
+    #targets g.done path { fill:#b3d8d5; stroke:#a1c7c4; } /* Soft teal for completed */
     /* Style for difficult mode - hides the unsolved target outlines */
     body.difficult-mode #targets g:not(.done) path {
         fill: transparent;
@@ -23,8 +23,16 @@
     #pieces g.piece.dragging { cursor:grabbing; opacity:.9; filter:drop-shadow(0 8px 16px rgba(0,0,0,.25));}
     #pieces g.piece.placed { cursor:default; filter:none; }
     .controls { position:absolute; top:15px; left:50%; transform: translateX(-50%); display:flex; gap:8px; z-index:10; background: rgba(255,255,255,.7); padding: 8px; border-radius: 12px; backdrop-filter: blur(5px);}
-    .btn { background:#fff; color:#343a40; border:1px solid #ced4da; border-radius:8px; padding:8px 12px; font-weight:600; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,.05); }
-    .btn:hover { background:#f8f9fa; border-color: #adb5bd; }
+    .btn { background:#fff; color:#3d6e70; border:1px solid #d1d7de; border-radius:8px; padding:8px 12px; font-weight:600; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,.05); transition: all 0.2s; }
+    .btn:hover { background:#f7f9fa; border-color: #3d6e70; color: #2e4057; }
+
+    /* Modal styles */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 100; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
+    .modal-overlay.visible { opacity: 1; visibility: visible; }
+    .modal-content { background: white; padding: 30px; border-radius: 16px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3); transform: scale(0.9); transition: transform 0.3s; }
+    .modal-overlay.visible .modal-content { transform: scale(1); }
+    .modal-content h2 { margin-top: 0; color: #3a5078; }
+    .modal-content p { margin-bottom: 20px; }
   </style>
 </head>
 <body>
@@ -46,6 +54,15 @@
       <button class="btn" id="reset">Reset</button>
       <button class="btn" id="difficulty">Easy</button>
     </div>
+
+  <div id="winModal" class="modal-overlay">
+    <div class="modal-content">
+      <h2>Great Job!</h2>
+      <p>You've placed all the provinces and territories.</p>
+      <button class="btn" id="modal-close">Play Again</button>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/d3@7/dist/d3.min.js"></script>
   <script>
     const log=(...a)=>console.log('[puzzle]',...a);
@@ -74,19 +91,19 @@
     function normName(p){return p.name||p.province||p.NAME||p.admin||p.abbrev||'Unknown'}
     
     const provinceColors = {
-      'British Columbia': '#e09489',
-      'Alberta': '#e2ac91',
-      'Saskatchewan': '#eecb8a',
-      'Manitoba': '#9ed47a',
-      'Ontario': '#8cb7e0',
-      'Quebec': '#bac0e0',
-      'New Brunswick': '#6fd283',
-      'Nova Scotia': '#63c5b3',
-      'Prince Edward Island': '#20c997',
-      'Newfoundland and Labrador': '#a894d4',
-      'Yukon': '#a9c4a9',
-      'Northwest Territories': '#d3a492',
-      'Nunavut': '#c4d1ef',
+      'British Columbia': '#3d6e70',
+      'Alberta': '#6e9987',
+      'Saskatchewan': '#a3c1ad',
+      'Manitoba': '#a9cce3',
+      'Ontario': '#81a6c4',
+      'Quebec': '#2e4057',
+      'New Brunswick': '#5c6784',
+      'Nova Scotia': '#7b8ba0',
+      'Prince Edward Island': '#a1a8c3',
+      'Newfoundland and Labrador': '#3a506b',
+      'Yukon': '#7484a9',
+      'Northwest Territories': '#a9d9d9',
+      'Nunavut': '#9fddf2',
       'Unknown': '#c0c0c0'
     };
 
@@ -105,11 +122,17 @@
     function dragged(e){if(this.classList.contains('placed'))return;const x=this._t0.x+e.dx;const y=this._t0.y+e.dy;this.setAttribute('transform',`translate(${x},${y})`);this._t0={x,y}}
     function dragEnded(e){this.classList.remove('dragging');if(this.classList.contains('placed'))return;const name=this.getAttribute('data-name');const tgt=targetsByName[name];if(!tgt)return;const t=getTranslate(this);const cx=+this.getAttribute('data-cx');const cy=+this.getAttribute('data-cy');const cur={x:t.x+cx,y:t.y+cy};const dist=Math.hypot(cur.x-tgt.x,cur.y-tgt.y);const R=28;if(dist<R){const nx=t.x+(tgt.x-cur.x);const ny=t.y+(tgt.y-cur.y);d3.select(this).transition().duration(250).attr('transform',`translate(${nx},${ny})`).on('end', () => { this.classList.add('placed'); d3.select(tgt.node).classed('done', true); checkWin(); });}}
 
-    function checkWin(){const all=[...gPieces.querySelectorAll('g.piece')];if(all.length&&all.every(n=>n.classList.contains('placed'))){alert('Great job! All provinces and territories placed.')}}
+    function checkWin(){const all=[...gPieces.querySelectorAll('g.piece')];if(all.length&&all.every(n=>n.classList.contains('placed'))){document.getElementById('winModal').classList.add('visible');}}
 
     document.getElementById('shuffle').onclick=()=>spawnPieces({type:'FeatureCollection',features});
     document.getElementById('reset').onclick=()=>geoToPaths({type:'FeatureCollection',features});
     
+    document.getElementById('modal-close').onclick = () => {
+        document.getElementById('winModal').classList.remove('visible');
+        // Add a small delay before resetting to allow the modal to fade out
+        setTimeout(() => geoToPaths({type:'FeatureCollection',features}), 300);
+    };
+
     difficultyBtn.addEventListener('click', () => {
         isDifficult = !isDifficult;
         document.body.classList.toggle('difficult-mode', isDifficult);
@@ -124,5 +147,6 @@
   </script>
 </body>
 </html>
+
 
 
