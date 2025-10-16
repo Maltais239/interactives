@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Canada's Regions Hub</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body, html { 
+      margin: 0; 
+      padding: 0; 
+      width: 100%; 
+      height: 100%; 
+      display: flex; 
+      font-family: 'Poppins', sans-serif; 
+      background-color: #f0f4f8; 
+      color: #334155; 
+      overflow: hidden;
+    }
+    .leaflet-container { background: #e0f2fe; }
+    #map { flex: 1; height: 100%; border-right: 1px solid #ddd; }
+    #info-panel { 
+      width: 380px; 
+      max-width: 40%; 
+      padding: 2rem; 
+      background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%); 
+      border-left: 5px solid #047857; 
+      overflow-y: auto; 
+      box-shadow: -5px 0 15px rgba(0,0,0,0.1); 
+      display: flex; 
+      flex-direction: column; 
+    }
+    #info-panel h2 { 
+      margin-top: 0; 
+      color: #064e3b; 
+      font-size: 1.75rem; 
+      font-weight: 700; 
+      border-bottom: 2px solid #6ee7b7; 
+      padding-bottom: 0.5rem; 
+      margin-bottom: 1rem; 
+    }
+    #info-content h4 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #047857;
+      margin-top: 1.25rem;
+      margin-bottom: 0.5rem;
+      border-bottom: 1px solid #a7f3d0;
+      padding-bottom: 0.25rem;
+    }
+    #info-content ul {
+      list-style-type: '⛰️';
+      padding-left: 1.5rem;
+      margin: 0;
+      font-size: 0.9rem;
+    }
+    #info-content li {
+      margin-bottom: 0.5rem;
+       padding-left: 0.5rem;
+    }
+    
+    .source-info {
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e2e8f0;
+        font-size: 0.8rem;
+    }
+    .source-info a {
+        color: #0d9488;
+        text-decoration: none;
+    }
+    .source-info a:hover {
+        text-decoration: underline;
+    }
+    .source-info p {
+        margin-bottom: 0.5rem;
+    }
+    .source-info ul {
+        padding-left: 1.25rem;
+        list-style-type: square;
+    }
+
+    /* --- Game Mode Styles --- */
+    .mode-switcher {
+        display: flex;
+        margin-bottom: 1.5rem;
+        border-radius: 8px;
+        background-color: #e6fef7;
+        padding: 0.25rem;
+    }
+    .mode-btn {
+        flex: 1 1 auto;
+        padding: 0.75rem 0.5rem;
+        border: none;
+        background-color: transparent;
+        color: #065f46;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        border-radius: 6px;
+        transition: background-color 0.3s, color 0.3s;
+        text-align: center;
+    }
+    .mode-btn.active {
+        background-color: #059669;
+        color: white;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .mode-panel { display: none; }
+    .mode-panel.active { display: block; flex-grow: 1; display: flex; flex-direction: column; }
+    
+    /* Content & Quiz Box styles */
+    #info-content, #result-box { border-top: 1px solid #ddd; padding-top: 1.5rem; }
+    #info-content h3, #result-box h3 { margin-top: 0; margin-bottom: 1rem; color: #059669; font-size: 1.5rem; font-weight: 600; }
+    #info-content p, #result-box p { font-size: 0.95rem; line-height: 1.6; margin: 0.5rem 0 1rem 0; color: #334155; }
+    
+    #question-box {
+        background-color: #f0fdfa;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border: 1px solid #a7f3d0;
+        min-height: 120px;
+        font-size: 1.1rem;
+        color: #115e59;
+        line-height: 1.6;
+        font-weight: 500;
+    }
+    #result-box p.feedback-correct { color: #166534; font-weight: bold; }
+    #result-box p.feedback-incorrect { color: #991b1b; font-weight: bold; }
+    #result-box p strong { color: #064e3b; }
+    
+    /* Button styles */
+    #button-controls { margin-top: auto; display: flex; gap: 0.5rem; padding-top: 1rem; }
+    .game-btn {
+        flex: 1; padding: 0.75rem; color: white; border: none; border-radius: 8px; font-size: 1rem;
+        font-weight: 600; cursor: pointer; transition: background-color 0.2s, opacity 0.2s;
+    }
+    #next-question-btn { display: none; background-color: #0d9488; }
+    #next-question-btn:hover { background-color: #115e59; }
+    #play-again-btn { display: none; background-color: #16a34a; }
+    #play-again-btn:hover { background-color: #15803d; }
+    #submit-answer-btn { display: none; background-color: #0e7490; }
+    #submit-answer-btn:hover { background-color: #155e75; }
+    
+    /* Practice Mode styles */
+    #practice-list { margin-top: 1rem; }
+    .practice-item {
+        padding: 0.75rem 1rem;
+        background-color: #f0fdfa;
+        border: 1px solid #ccfbf1;
+        border-radius: 6px;
+        margin-bottom: 0.5rem;
+        cursor: pointer;
+        transition: background-color 0.2s, box-shadow 0.2s;
+        font-weight: 500;
+        color: #115e59;
+    }
+    .practice-item:hover { background-color: #ccfbf1; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
+    /* Pop-up styles */
+    .leaflet-popup-content-wrapper { background-color: #f0fdfa; color: #0f766e; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+    .leaflet-popup-content { font-weight: bold; }
+    .leaflet-popup-tip { background: #f0fdfa; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="info-panel">
+    <h2>Canada's Regions Hub</h2>
+
+    <div class="mode-switcher">
+        <button id="explore-mode-btn" class="mode-btn active">Explore</button>
+        <button id="quiz-mode-btn" class="mode-btn">Quiz</button>
+        <button id="practice-mode-btn" class="mode-btn">Practice</button>
+    </div>
+
+    <div id="explore-panel" class="mode-panel active">
+        <div id="info-content"><p>Click a region on the map to learn more about it.</p></div>
+    </div>
+
+    <div id="quiz-panel" class="mode-panel">
+        <div id="question-box">Welcome to the Canada Regions Quiz!</div>
+        <div id="result-box"></div>
+        <div id="button-controls">
+            <button id="next-question-btn" class="game-btn">Next Question &rarr;</button>
+            <button id="submit-answer-btn" class="game-btn">Submit Answer</button>
+            <button id="play-again-btn" class="game-btn">Play Again? ↻</button>
+        </div>
+    </div>
+
+    <div id="practice-panel" class="mode-panel">
+        <h3>Practice Bank</h3>
+        <p>Here are the regions you've missed. Click one to find it on the map!</p>
+        <div id="practice-list">Your practice bank is empty.</div>
+    </div>
+  </div>
+  
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script>
+    // --- 1. DOM & MAP SETUP ---
+    const map = L.map('map', { zoomControl: true }).setView([62, -96], 4);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      subdomains: 'abcd', maxZoom: 19
+    }).addTo(map);
+
+    const exploreModeBtn = document.getElementById('explore-mode-btn');
+    const quizModeBtn = document.getElementById('quiz-mode-btn');
+    const practiceModeBtn = document.getElementById('practice-mode-btn');
+    const explorePanel = document.getElementById('explore-panel');
+    const quizPanel = document.getElementById('quiz-panel');
+    const practicePanel = document.getElementById('practice-panel');
+    const infoContent = document.getElementById('info-content');
+    const questionBox = document.getElementById('question-box');
+    const resultBox = document.getElementById('result-box');
+    const nextQuestionBtn = document.getElementById('next-question-btn');
+    const playAgainBtn = document.getElementById('play-again-btn');
+    const submitAnswerBtn = document.getElementById('submit-answer-btn');
+    const practiceList = document.getElementById('practice-list');
+    
+    let geojsonLayer;
+    let currentMode = 'explore';
+
+    // --- 2. REGION & QUIZ DATA ---
+    const regionData = {
+      'Cordillera': {
+        description: `The Western Cordillera stretches along British Columbia and the Yukon, featuring the Rocky Mountains, Coast Mountains, and interior plateaus. It's a region of dramatic landscapes shaped by tectonic activity.`,
+        landforms: `<ul><li>High, rugged mountain ranges (e.g., Rockies).</li><li>Deep U-shaped valleys carved by ancient glaciers.</li><li>Active volcanoes like Mount Meager.</li></ul>`,
+        plants: `<ul><li>Forests of spruce, fir, and pine.</li><li>Alpine wildflowers in high elevation zones.</li></ul>`,
+        animals: `<ul><li>Mountain goats, grizzly bears, eagles, and salmon.</li></ul>`,
+        resources: `<ul><li>Forestry, mining (copper, gold), and hydroelectric power.</li><li>Tourism is a major industry (e.g., Banff, Jasper).</li></ul>`,
+        funFacts: [
+            "Banff National Park, located in this region, was Canada's first national park.",
+            "Mount Logan in the Yukon, Canada's highest peak, is found here."
+        ],
+        sources: `<div class="source-info"><p><strong>Source:</strong></p><ul><li><a href="https://natural-resources.canada.ca/our-natural-resources/geography-and-facts/physiographic-regions-canada/10985" target="_blank" rel="noopener noreferrer">Natural Resources Canada</a></li></ul></div>`
+      },
+      'Interior Plains': {
+        description: `Covering Alberta, Saskatchewan, and Manitoba, the Interior Plains are vast expanses of rolling grasslands and fertile farmlands, often called Canada's "breadbasket".`,
+        landforms: `<ul><li>Vast, flat to rolling plains.</li><li>Deep river valleys.</li><li>Badlands with unique eroded buttes and hoodoos.</li></ul>`,
+        plants: `<ul><li>Grasses like fescue, and grains like wheat and canola.</li><li>Cottonwood trees along river valleys.</li></ul>`,
+        animals: `<ul><li>Bison, pronghorn antelope, and burrowing owls.</li><li>Vast numbers of migratory birds in wetlands.</li></ul>`,
+        resources: `<ul><li>Agriculture (grains), cattle ranching.</li><li>Rich in oil, natural gas, and potash.</li></ul>`,
+        funFacts: [
+            "This region has one of the world's largest deposits of dinosaur fossils.",
+            "It is the source of most of the world's potash, a key ingredient in fertilizer."
+        ],
+        sources: `<div class="source-info"><p><strong>Source:</strong></p><ul><li><a href="https://www.thecanadianencyclopedia.ca/en/article/interior-plains" target="_blank" rel="noopener noreferrer">The Canadian Encyclopedia</a></li></ul></div>`
+      },
+      'Canadian Shield': {
+        description: `The Canadian Shield is the ancient, rocky core of the continent, covering half of Canada. It's a landscape of exposed Precambrian rock, countless lakes, and boreal forests.`,
+        landforms: `<ul><li>Ancient, exposed bedrock (granite).</li><li>Thousands of lakes and rivers scraped by glaciers.</li><li>Rolling hills and vast forests.</li></ul>`,
+        plants: `<ul><li>Boreal forests of pine, spruce, and birch.</li><li>Mosses and lichens covering the rock.</li></ul>`,
+        animals: `<ul><li>Moose, caribou, black bears, wolves, and beavers.</li></ul>`,
+        resources: `<ul><li>Rich mineral deposits: nickel, copper, gold, diamonds.</li><li>Hydroelectric power from numerous rivers.</li></ul>`,
+        funFacts: [
+            "The rocks in this region are among the oldest on Earth, over 2 billion years old.",
+            "It covers almost half of Canada's total land area."
+        ],
+        sources: `<div class="source-info"><p><strong>Source:</strong></p><ul><li><a href="https://www.thecanadianencyclopedia.ca/en/article/shield" target="_blank" rel="noopener noreferrer">The Canadian Encyclopedia</a></li></ul></div>`
+      },
+      'Hudson Bay Lowlands': {
+        description: `This marshy, flat region surrounds the southern part of Hudson Bay. It is one of the largest continuous wetlands in the world, characterized by permafrost and peatlands.`,
+        landforms: `<ul><li>Flat, marshy terrain with vast wetlands (muskeg).</li><li>Permafrost just below the surface.</li><li>Gravel beach ridges from ancient shorelines.</li></ul>`,
+        plants: `<ul><li>Sphagnum moss, peat, sedges, and lichen.</li><li>Stunted black spruce and tamarack trees.</li></ul>`,
+        animals: `<ul><li>Key habitat for polar bears.</li><li>Seals, walruses, and vast flocks of migratory birds (e.g., snow geese).</li></ul>`,
+        resources: `<ul><li>Potential for mining.</li><li>Ecotourism for wildlife viewing.</li><li>Globally significant carbon storage in its peatlands.</li></ul>`,
+        funFacts: [
+            "This region is one of the largest wetlands in the world.",
+            "It contains the most southerly extent of tundra in the world."
+        ],
+        sources: `<div class="source-info"><p><strong>Source:</strong></p><ul><li><a href="https://www.thecanadianencyclopedia.ca/en/article/hudson-bay-lowland" target="_blank" rel="noopener noreferrer">The Canadian Encyclopedia</a></li></ul></div>`
+      },
+      'Great Lakes-St. Lawrence Lowlands': {
+        description: `This is Canada's smallest but most populated region, featuring fertile plains that are home to major cities like Toronto, Montreal, and Ottawa.`,
+        landforms: `<ul><li>Fertile glacial plains.</li><li>The Great Lakes and St. Lawrence River.</li><li>Features like the Niagara Escarpment and Niagara Falls.</li></ul>`,
+        plants: `<ul><li>Historically Carolinian forests with maple, oak, and birch.</li><li>Now dominated by agriculture.</li></ul>`,
+        animals: `<ul><li>Rich biodiversity in remaining wetlands and forests.</li><li>White-tailed deer, raccoons, and various bird species.</li></ul>`,
+        resources: `<ul><li>Canada's industrial and manufacturing heartland.</li><li>Rich agricultural land for fruits, vegetables, and dairy.</li></ul>`,
+        funFacts: [
+            "Though it is Canada's smallest landform region, over half of Canada's population lives here.",
+            "The Great Lakes contain about 20% of the world's fresh surface water."
+        ],
+        sources: `<div class="source-info"><p><strong>Source:</strong></p><ul><li><a href="https://www.thecanadianencyclopedia.ca/en/article/great-lakes-st-lawrence-lowlands" target="_blank" rel="noopener noreferrer">The Canadian Encyclopedia</a></li></ul></div>`
+      },
+      'Appalachian Region': {
+        description: `Eastern Canada’s Appalachian belt extends from Quebec to Newfoundland. It consists of ancient, weathered mountains and rolling hills with a rugged coastline.`,
+        landforms: `<ul><li>Old, rolling mountains and hills.</li><li>Rugged coastlines with fjords and bays.</li><li>The Bay of Fundy, with the world's highest tides.</li></ul>`,
+        plants: `<ul><li>Mixed hardwood forests of maple, oak, and birch.</li><li>Coniferous forests in higher elevations.</li></ul>`,
+        animals: `<ul><li>Moose, black bears, and white-tailed deer.</li><li>Rich marine life offshore, including whales and seabirds.</li></ul>`,
+        resources: `<ul><li>Historically, coal mining and fishing.</li><li>Today, forestry, agriculture, and tourism.</li></ul>`,
+        funFacts: [
+            "The Appalachian Mountains are over 480 million years old, among the oldest on Earth.",
+            "The Bay of Fundy has the highest tides in the world, with a range of up to 16 meters."
+        ],
+        sources: `<div class="source-info"><p><strong>Source:</strong></p><ul><li><a href="https://www.thecanadianencyclopedia.ca/en/article/appalachian-region" target="_blank" rel="noopener noreferrer">The Canadian Encyclopedia</a></li></ul></div>`
+      },
+      'Arctic and Subarctic': {
+        description: `North of the treeline, this vast region covers Canada's north. It's a landscape of tundra, permafrost, and ice caps, with long, cold winters and short summers.`,
+        landforms: `<ul><li>Tundra plains with permafrost.</li><li>Pingos (ice-cored hills).</li><li>Large islands with ice caps and glaciers (e.g., Baffin Island).</li></ul>`,
+        plants: `<ul><li>Low-lying shrubs, mosses, and lichens.</li><li>No trees grow in the Arctic tundra.</li></ul>`,
+        animals: `<ul><li>Caribou, muskoxen, polar bears, and arctic foxes.</li><li>Marine mammals like seals, whales, and narwhals ('unicorns of the sea').</li></ul>`,
+        resources: `<ul><li>Significant deposits of diamonds, oil, and natural gas.</li><li>Traditional hunting and fishing are vital.</li></ul>`,
+        funFacts: [
+            "It's home to the world's northernmost permanently inhabited place: Alert, Nunavut.",
+            "The narwhal, a whale with a long tusk, lives in these waters."
+        ],
+        sources: `<div class="source-info"><p><strong>Source:</strong></p><ul><li><a href="https://www.thecanadianencyclopedia.ca/en/article/arctic-physiography" target="_blank" rel="noopener noreferrer">The Canadian Encyclopedia</a></li></ul></div>`
+      }
+    };
+    
+    // --- QUESTION BANK ---
+    const identificationQuestions = [
+        { question: "Find the Cordillera region.", answer: "Cordillera" },
+        { question: "Find the Interior Plains.", answer: "Interior Plains" },
+        { question: "Find the Canadian Shield.", answer: "Canadian Shield" },
+        { question: "Find the Hudson Bay Lowlands.", answer: "Hudson Bay Lowlands" },
+        { question: "Find the Great Lakes-St. Lawrence Lowlands.", answer: "Great Lakes-St. Lawrence Lowlands" },
+        { question: "Find the Appalachian Region.", answer: "Appalachian Region" },
+        { question: "Find the Arctic and Subarctic region.", answer: "Arctic and Subarctic" }
+    ];
+
+    const landformQuestions = [
+        { question: "High, rugged mountains like the Rockies are the main feature of which region?", answer: "Cordillera" },
+        { question: "The 'Badlands', famous for hoodoos and dinosaur fossils, are located in which region?", answer: "Interior Plains" },
+        { question: "Which region consists of ancient, exposed granite bedrock, some of the oldest rock in the world?", answer: "Canadian Shield" },
+        { question: "Vast wetlands known as 'muskeg' and permafrost characterize which low-lying region?", answer: "Hudson Bay Lowlands" },
+        { question: "The Niagara Escarpment and Niagara Falls are famous landmarks in which region?", answer: "Great Lakes-St. Lawrence Lowlands" },
+        { question: "Which eastern region is known for its old, rolling, weathered mountains?", answer: "Appalachian Region" },
+        { question: "Pingos, or ice-cored hills, are a unique landform found in which cold region?", answer: "Arctic and Subarctic" },
+        { question: "The five Great Lakes, a massive freshwater system, are a central feature of which region?", answer: "Great Lakes-St. Lawrence Lowlands" },
+        { question: "The Bay of Fundy, home to the world's highest tides, is found on the coast of which region?", answer: "Appalachian Region" },
+        { question: "Which vast region is dotted with thousands of lakes and rivers, carved out by ancient glaciers?", answer: "Canadian Shield" },
+        { question: "Canada's highest peak, Mount Logan, is located within which mountainous region?", answer: "Cordillera" },
+        { question: "Baffin Island, a massive island with ice caps, is part of which northern region?", answer: "Arctic and Subarctic" }
+    ];
+
+    const plantAnimalQuestions = [
+        { question: "Grizzly bears and mountain goats are iconic animals of which mountainous region?", answer: "Cordillera" },
+        { question: "Which region was once home to massive herds of bison on its grasslands?", answer: "Interior Plains" },
+        { question: "Moose and beavers are commonly found throughout the boreal forests of which vast, rocky region?", answer: "Canadian Shield" },
+        { question: "Which region is a critical habitat for polar bears as they hunt for seals on the sea ice?", answer: "Hudson Bay Lowlands" },
+        { question: "Carolinian forests with maple and oak trees are native to which highly populated region?", answer: "Great Lakes-St. Lawrence Lowlands" },
+        { question: "Rich marine life, including whales and many seabirds, is found off the coast of which region?", answer: "Appalachian Region" },
+        { question: "Narwhals, the 'unicorns of the sea', are found in the waters of which region?", answer: "Arctic and Subarctic" }
+    ];
+
+    const resourceQuestions = [
+        { question: "Forestry and hydroelectric power are major resources in which western region?", answer: "Cordillera" },
+        { question: "Often called Canada's 'breadbasket', which region is most important for agriculture?", answer: "Interior Plains" },
+        { question: "Which region is a massive source of minerals like nickel, gold, and diamonds?", answer: "Canadian Shield" },
+        { question: "This region's peatlands store vast amounts of carbon, making it globally important. Which is it?", answer: "Hudson Bay Lowlands" },
+        { question: "Canada's industrial and manufacturing heartland is located in which region?", answer: "Great Lakes-St. Lawrence Lowlands" },
+        { question: "Historically, fishing and coal mining were the most important industries in which region?", answer: "Appalachian Region" },
+        { question: "Diamond mines are a major modern resource in which northern region?", answer: "Arctic and Subarctic" }
+    ];
+
+    const funFactQuestions = [
+        { question: "Canada's first national park, Banff, is located in which region?", answer: "Cordillera" },
+        { question: "Which region has one of the world's largest deposits of dinosaur fossils?", answer: "Interior Plains" },
+        { question: "The rocks in this region are among the oldest on Earth. Which is it?", answer: "Canadian Shield" },
+        { question: "Which region contains the most southerly tundra in the world?", answer: "Hudson Bay Lowlands" },
+        { question: "Over half of Canada's population lives in which smallest landform region?", answer: "Great Lakes-St. Lawrence Lowlands" },
+        { question: "The world's highest tides can be found in the Bay of Fundy, in which region?", answer: "Appalachian Region" },
+        { question: "The world's northernmost permanently inhabited place, Alert, is in which region?", answer: "Arctic and Subarctic" }
+    ];
+    
+    const roadTripQuestions = [
+        { question: "On a trip from Winnipeg to Calgary, you'd travel through which two regions in order?", answer: ["Canadian Shield", "Interior Plains"] },
+        { question: "To see the Atlantic ocean from Montreal, your drive would take you through which regions in order?", answer: ["Great Lakes-St. Lawrence Lowlands", "Appalachian Region"] },
+        { question: "A trip from Vancouver to the Alberta border would cross through which region?", answer: "Cordillera"},
+        { question: "To get from the northern tip of Quebec to James Bay, you would travel through which two regions?", answer: ["Canadian Shield", "Hudson Bay Lowlands"]},
+        { question: "A ship travelling the Northwest Passage would be sailing through which region?", answer: "Arctic and Subarctic"}
+    ];
+    
+    const quizRounds = [
+        { title: "Round 1: Region Identification", questions: identificationQuestions, type: 'single-click' },
+        { title: "Round 2: Landforms & Geography", questions: landformQuestions, type: 'single-click' },
+        { title: "Round 3: Plants & Animals", questions: plantAnimalQuestions, type: 'single-click' },
+        { title: "Round 4: Resources & Industry", questions: resourceQuestions, type: 'single-click' },
+        { title: "Round 5: Fun Facts", questions: funFactQuestions, type: 'single-click' },
+        { title: "Round 6: Road Trip!", questions: roadTripQuestions, type: 'multi-click' }
+    ];
+
+    let quizState = {
+        availableQuestions: [],
+        currentQuestion: null,
+        isQuizActive: false,
+        practiceBank: [],
+        currentRoundIndex: 0,
+        currentAnswerSequence: []
+    };
+    
+    const regionColors = {
+      'Cordillera': '#3a538b', 'Interior Plains': '#88a7cf', 'Canadian Shield': '#99b3d6',
+      'Hudson Bay Lowlands': '#8fadc9', 'Great Lakes-St. Lawrence Lowlands': '#aabfdd', 
+      'Appalachian Region': '#3a4f78', 'Arctic and Subarctic': '#b7c7d9'
+    };
+    
+    const pSBC=(p,c0)=>{let r,g,b,P,f,t,h,i=parseInt,m=Math.round;if(typeof p!="number"||p<-1||p>1||typeof c0!="string"||(c0[0]!='r'&&c0[0]!='#'))return null;if(!this.pSBCr)this.pSBCr=(d)=>{let n=d.length,x={};if(n>9){[r,g,b,a]=d=d.split(","),n=d.length;if(n<3||n>4)return null;x.r=i(r[3]=="a"?r.slice(5):r.slice(4)),x.g=i(g),x.b=i(b),x.a=a?parseFloat(a):-1}else{if(n==8||n==6||n<4)return null;if(n<6)d="#"+d[1]+d[1]+d[2]+d[2]+d[3]+d[3]+(n>4?d[4]+d[4]:"");d=i(d.slice(1),16);if(n==9||n==5)x.r=d>>24&255,x.g=d>>16&255,x.b=d>>8&255,x.a=m((d&255)/0.255)/1000;else x.r=d>>16,x.g=d>>8&255,x.b=d&255,x.a=-1}return x};h=c0.length>9,f=this.pSBCr(c0),P=p<0,t=P?{r:0,g:0,b:0,a:-1}:{r:255,g:255,b:255,a:-1},p=P?p*-1:p,P=1-p;if(!f)return null;r=m(P*f.r+p*t.r);g=m(P*f.g+p*t.g);b=m(P*f.b+p*t.b);return"#"+(4294967296+r*16777216+g*65536+b*256).toString(16).slice(1)};
+
+    // --- 3. GAME LOGIC & MODE SWITCHING ---
+
+    function setMode(mode) {
+        currentMode = mode;
+        [exploreModeBtn, quizModeBtn, practiceModeBtn].forEach(btn => btn.classList.remove('active'));
+        [explorePanel, quizPanel, practicePanel].forEach(panel => panel.classList.remove('active'));
+        
+        if (mode === 'explore') {
+            exploreModeBtn.classList.add('active');
+            explorePanel.classList.add('active');
+        } else if (mode === 'quiz') {
+            quizModeBtn.classList.add('active');
+            quizPanel.classList.add('active');
+            if (!quizState.isQuizActive && quizState.currentRoundIndex === 0 && quizState.availableQuestions.length === 0) {
+                startQuiz();
+            } else if (!quizState.isQuizActive) {
+                playAgainBtn.style.display = 'block';
+                nextQuestionBtn.style.display = 'none';
+                submitAnswerBtn.style.display = 'none';
+            }
+        } else if (mode === 'practice') {
+            practiceModeBtn.classList.add('active');
+            practicePanel.classList.add('active');
+            updatePracticePanel();
+        }
+        
+        if (geojsonLayer) geojsonLayer.resetStyle();
+    }
+
+    exploreModeBtn.addEventListener('click', () => setMode('explore'));
+    quizModeBtn.addEventListener('click', () => setMode('quiz'));
+    practiceModeBtn.addEventListener('click', () => setMode('practice'));
+    playAgainBtn.addEventListener('click', startQuiz);
+    nextQuestionBtn.addEventListener('click', loadNewQuestion);
+    submitAnswerBtn.addEventListener('click', checkMultiAnswer);
+
+    // --- Quiz Functions ---
+    function startQuiz() {
+        quizState.currentRoundIndex = 0;
+        quizState.practiceBank = [];
+        playAgainBtn.style.display = 'none';
+        submitAnswerBtn.style.display = 'none';
+        resultBox.innerHTML = '';
+        loadRound();
+    }
+
+    function loadRound() {
+        const round = quizRounds[quizState.currentRoundIndex];
+        quizState.availableQuestions = [...round.questions].sort(() => 0.5 - Math.random());
+        questionBox.textContent = round.title;
+        resultBox.innerHTML = `<p>Get ready for the next round! Click "Start Round" to begin.</p>`;
+        nextQuestionBtn.textContent = 'Start Round';
+        nextQuestionBtn.style.display = 'block';
+        submitAnswerBtn.style.display = 'none';
+        quizState.isQuizActive = false;
+        if (geojsonLayer) geojsonLayer.resetStyle();
+    }
+
+    function loadNewQuestion() {
+        nextQuestionBtn.textContent = 'Next Question →';
+        quizState.currentAnswerSequence = [];
+
+        if (quizState.availableQuestions.length === 0) {
+            quizState.currentRoundIndex++;
+            if (quizState.currentRoundIndex < quizRounds.length) {
+                loadRound();
+            } else {
+                quizState.isQuizActive = false;
+                questionBox.innerHTML = `Quiz Complete!`;
+                resultBox.innerHTML = `<p>Great job! You've finished all rounds of the Canada Regions Quiz.</p>`;
+                playAgainBtn.style.display = 'block';
+                nextQuestionBtn.style.display = 'none';
+                submitAnswerBtn.style.display = 'none';
+                if (geojsonLayer) geojsonLayer.resetStyle();
+            }
+            return;
+        }
+
+        quizState.isQuizActive = true;
+        quizState.currentQuestion = quizState.availableQuestions.pop();
+        const currentRound = quizRounds[quizState.currentRoundIndex];
+        
+        questionBox.textContent = quizState.currentQuestion.question;
+        
+        if (currentRound.type === 'multi-click') {
+            resultBox.innerHTML = `<p>Click the region(s) in the correct order, then press Submit.</p>`;
+            submitAnswerBtn.style.display = 'block';
+            nextQuestionBtn.style.display = 'none';
+        } else {
+            resultBox.innerHTML = `<p>Click the correct region on the map!</p>`;
+            submitAnswerBtn.style.display = 'none';
+            nextQuestionBtn.style.display = 'none';
+        }
+
+        if (geojsonLayer) geojsonLayer.resetStyle();
+    }
+
+    function checkAnswer(regionName) {
+        if (!quizState.isQuizActive) return;
+        
+        const currentRound = quizRounds[quizState.currentRoundIndex];
+        if (currentRound.type === 'multi-click') return; // Handled by checkMultiAnswer
+
+        const correctAnswer = quizState.currentQuestion.answer;
+        const isCorrect = Array.isArray(correctAnswer) ? correctAnswer.includes(regionName) : regionName === correctAnswer;
+
+        if (isCorrect) {
+            resultBox.innerHTML = `<p class="feedback-correct">Correct! It's the ${regionName}.</p>`;
+            quizState.isQuizActive = false;
+            setTimeout(loadNewQuestion, 1500); // Automatically load next question
+        } else {
+            resultBox.innerHTML = `<p class="feedback-incorrect">Not quite! That's the ${regionName}. Please try again.</p>`;
+            const practiceItem = Array.isArray(correctAnswer) ? correctAnswer.join(' or ') : correctAnswer;
+            if (!quizState.practiceBank.includes(practiceItem)) {
+                quizState.practiceBank.push(practiceItem);
+            }
+        }
+    }
+    
+    function checkMultiAnswer() {
+        if (!quizState.isQuizActive) return;
+        
+        const userAnswer = quizState.currentAnswerSequence;
+        const correctAnswerRaw = quizState.currentQuestion.answer;
+        const correctAnswer = Array.isArray(correctAnswerRaw) ? correctAnswerRaw : [correctAnswerRaw];
+        
+        const isCorrect = userAnswer.length === correctAnswer.length && 
+                          userAnswer.every((val, index) => val === correctAnswer[index]);
+
+        if (isCorrect) {
+            resultBox.innerHTML = `<p class="feedback-correct">Correct! The path was ${correctAnswer.join(' &rarr; ')}.</p>`;
+            quizState.isQuizActive = false;
+            submitAnswerBtn.style.display = 'none';
+            setTimeout(loadNewQuestion, 2500); // Automatically load next question
+        } else {
+            resultBox.innerHTML = `<p class="feedback-incorrect">That's not the right path. Your selections have been cleared, please try again.</p>`;
+            quizState.currentAnswerSequence = [];
+            if (geojsonLayer) geojsonLayer.resetStyle();
+            
+            const practiceText = `${quizState.currentQuestion.question} (${correctAnswer.join(' -> ')})`;
+            if (!quizState.practiceBank.includes(practiceText)) {
+                quizState.practiceBank.push(practiceText);
+            }
+        }
+    }
+    
+    // --- Practice Panel ---
+    function updatePracticePanel() {
+        practiceList.innerHTML = '';
+        if (quizState.practiceBank.length === 0) {
+            practiceList.innerHTML = 'Your practice bank is empty. Play the quiz to add regions!';
+            return;
+        }
+        quizState.practiceBank.forEach(itemText => {
+            const item = document.createElement('div');
+            item.className = 'practice-item';
+            item.textContent = itemText;
+            
+            const regionName = itemText.split(' ')[0].replace('(', '');
+             item.addEventListener('click', () => {
+                if (!geojsonLayer) return;
+                geojsonLayer.eachLayer(layer => {
+                    const layerName = getRegionName(layer.feature.properties);
+                    if (regionName.includes(layerName)) {
+                        map.flyToBounds(layer.getBounds(), {padding: [50, 50]});
+                        layer.setStyle({ weight: 4, color: '#059669' });
+                        setTimeout(() => geojsonLayer.resetStyle(layer), 2000);
+                    }
+                });
+            });
+            practiceList.appendChild(item);
+        });
+    }
+
+     function getRegionName(props) {
+        return props.name || props.ENNAME || props.NAME || props.PHYSIO_NAME || Object.values(props).find(v => typeof v === 'string') || 'Unknown';
+    }
+
+
+    // --- 4. MAP INTERACTIVITY ---
+    function style(feature) {
+      const regionName = getRegionName(feature.properties);
+      const baseColor = regionColors[regionName] || '#ccc';
+      
+      if (currentMode === 'practice') {
+          const isPracticeRegion = quizState.practiceBank.some(item => item.includes(regionName));
+          const practiceColor = isPracticeRegion ? '#ef4444' : '#d1d5db';
+          return { fillColor: practiceColor, weight: 2, color: pSBC(-0.4, practiceColor), fillOpacity: 0.8 };
+      }
+      
+      if (currentMode === 'quiz' && quizState.currentAnswerSequence.includes(regionName)) {
+           return { fillColor: baseColor, weight: 4, color: '#0e7490', fillOpacity: 0.9 };
+      }
+
+      return { fillColor: baseColor, weight: 1, color: baseColor, fillOpacity: 0.7 };
+    }
+    
+    function highlightFeature(e) {
+      const layer = e.target;
+      const regionName = getRegionName(layer.feature.properties);
+      if(currentMode === 'practice' && !quizState.practiceBank.some(item => item.includes(regionName))) return;
+
+      layer.setStyle({
+        weight: 4,
+        color: pSBC(-0.6, regionColors[regionName]),
+        fillOpacity: 0.9
+      });
+    }
+
+    function resetHighlight(e) { 
+        if (geojsonLayer) {
+            geojsonLayer.resetStyle(e.target); 
+        }
+    }
+
+    function clickFeature(e) {
+      L.DomEvent.stopPropagation(e);
+      const regionName = getRegionName(e.target.feature.properties);
+      const currentRound = quizRounds[quizState.currentRoundIndex];
+      
+      if(currentMode === 'explore') {
+        const data = regionData[regionName];
+         let funFactsHtml = '';
+        if (data.funFacts && data.funFacts.length > 0) {
+            funFactsHtml = `<h4>Fun Facts</h4><ul>${data.funFacts.map(fact => `<li>${fact}</li>`).join('')}</ul>`;
+        }
+        
+        infoContent.innerHTML = `<h3>${regionName}</h3>
+                                 <p>${data.description || 'No data available.'}</p>
+                                 <h4>Landforms</h4>${data.landforms || 'N/A'}
+                                 <h4>Plants</h4>${data.plants || 'N/A'}
+                                 <h4>Animals</h4>${data.animals || 'N/A'}
+                                 <h4>Resources</h4>${data.resources || 'N/A'}
+                                 ${funFactsHtml}
+                                 ${data.sources || ''}`;
+      } else if (currentMode === 'quiz' && quizState.isQuizActive) {
+         if (currentRound.type === 'multi-click') {
+            const index = quizState.currentAnswerSequence.indexOf(regionName);
+            if (index > -1) {
+                quizState.currentAnswerSequence.splice(index, 1); // Allow deselecting
+            } else {
+                quizState.currentAnswerSequence.push(regionName);
+            }
+            geojsonLayer.resetStyle(); // Redraw all to show sequence
+         } else {
+            checkAnswer(regionName);
+         }
+      }
+      
+      e.target.bringToFront();
+    }
+
+    function onEachFeature(feature, layer) {
+      const regionName = getRegionName(feature.properties);
+      layer.bindPopup(regionName);
+
+      layer.on({ 
+        mouseover: (e) => {
+            if (currentMode !== 'quiz' || quizState.isQuizActive) {
+                highlightFeature(e);
+            }
+             if (currentMode !== 'quiz') {
+                layer.openPopup(e.latlng);
+            }
+        },
+        mouseout: (e) => {
+            resetHighlight(e);
+            layer.closePopup();
+        },
+        click: clickFeature 
+      });
+    }
+
+    // --- 5. DATA FETCHING ---
+    const url = 'https://raw.githubusercontent.com/Maltais239/interactives/main/canada_regions_quiz_ready%20(1).geojson';
+    
+    fetch(url)
+      .then(res => res.ok ? res.json() : Promise.reject(res.status))
+      .then(data => { 
+        geojsonLayer = L.geoJson(data, { 
+            style, 
+            onEachFeature,
+            filter: f => Object.keys(regionData).includes(getRegionName(f.properties)), 
+        }).addTo(map); 
+      })
+      .catch((err) => { 
+        console.error("Error fetching GeoJSON:", err);
+        infoContent.innerHTML = `<p style="color: red;"><strong>Error:</strong> Could not load map data.</p>`; 
+      });
+  </script>
+</body>
+</html>
+
+
+
