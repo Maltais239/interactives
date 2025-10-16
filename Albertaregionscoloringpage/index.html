@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alberta Regions Coloring Page</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&display=swap" rel="stylesheet">
+  <style>
+    body, html {
+      margin: 0;
+      padding: 20px;
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start; /* Changed from 'center' to 'flex-start' */
+      font-family: 'Poppins', sans-serif;
+      background-color: #e2e8f0;
+      color: #334155;
+    }
+    .main-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        max-width: 750px; /* Adjusted for portrait aspect ratio */
+    }
+    #controls {
+        margin-bottom: 1rem;
+    }
+    #print-btn {
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+        color: white;
+        background-color: #3b82f6;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: background-color 0.2s, transform 0.2s;
+    }
+    #print-btn:hover {
+        background-color: #2563eb;
+        transform: translateY(-2px);
+    }
+    #map {
+      width: 100%;
+      /* Set aspect ratio for 8.5x11 paper */
+      aspect-ratio: 8.5 / 11;
+      /* Adjust height to be controlled by aspect ratio and width */
+      height: auto; 
+      border: 3px solid #000;
+      background-color: #fff;
+    }
+    /* Print-specific styles */
+    @media print {
+      body, html {
+        background-color: #fff;
+        padding: 0;
+        margin: 0;
+      }
+      #controls {
+        display: none; /* Hide the button when printing */
+      }
+      #map {
+        width: 100%;
+        height: 100%;
+        border: none;
+        box-shadow: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        page-break-inside: avoid; /* Try to keep map on one page */
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="main-container">
+    <div id="controls">
+      <button id="print-btn">Print Coloring Page</button>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <!-- Leaflet library -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- Turf.js library for simplification -->
+  <script src='https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js'></script>
+
+  <script>
+    // --- 1. MAP SETUP ---
+    // Create a static map with no user interaction
+    const map = L.map('map', {
+      zoomControl: false,
+      attributionControl: false,
+      scrollWheelZoom: false,
+      dragging: false,
+      doubleClickZoom: false,
+      boxZoom: false,
+      touchZoom: false,
+    }).setView([55, -115], 5);
+
+    // No base tile layer, leaving the background white.
+
+    let geojsonLayer; // To hold the map layer
+
+    // --- 2. REGION STYLING ---
+    // Style for a black and white coloring page
+    function style(feature) {
+      return {
+        fillColor: '#FFFFFF', // White fill
+        weight: 3,            // "Just right" line thickness
+        color: '#000000',     // Black border
+        fillOpacity: 1.0
+      };
+    }
+
+    // --- 3. INTERACTIVITY REMOVED ---
+    // No popups, highlights, or clicks are needed.
+    function onEachFeature(feature, layer) {
+      // This function is intentionally left empty.
+    }
+
+    // --- 4. DATA FETCHING ---
+    const url = 'https://raw.githubusercontent.com/Maltais239/interactives/main/alberta_simplified_regions.geojson';
+
+    fetch(url)
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`Could not fetch GeoJSON. Status: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then(data => {
+        // --- DATA SIMPLIFICATION ---
+        // Clean up the shapes for better vectorization using Turf.js
+        // Keep going... even more simplification.
+        const options = { tolerance: 0.02, highQuality: false };
+        const simplifiedData = turf.simplify(data, options);
+
+        geojsonLayer = L.geoJson(simplifiedData, {
+          style,
+          onEachFeature
+        }).addTo(map);
+
+        // Automatically adjust the map view to fit the loaded regions
+        map.fitBounds(geojsonLayer.getBounds());
+      })
+      .catch((err) => {
+        console.error("Error fetching or processing GeoJSON:", err);
+        const mapDiv = document.getElementById('map');
+        mapDiv.innerHTML = `<p style="color: red; padding: 20px;"><strong>Error:</strong> Could not load the map data.</p>`;
+      });
+
+    // --- 5. PRINT FUNCTIONALITY ---
+    document.getElementById('print-btn').addEventListener('click', () => {
+      window.print();
+    });
+
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
