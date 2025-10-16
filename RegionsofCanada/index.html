@@ -40,6 +40,8 @@
 
     const infoContent = document.getElementById('info-content');
     const generalInfoDiv = document.getElementById('general-info');
+    const defaultInfoHTML = '<p>Click a region on the map to learn more about it.</p>';
+    infoContent.innerHTML = defaultInfoHTML;
 
     // Region descriptions
     const regionData = {
@@ -68,27 +70,59 @@
 
     // Utility to extract region name
     function getRegionName(props) {
-      return props.ENNAME || props.NAME || props.PHYSIO_NAME || Object.values(props).find(v => typeof v === 'string') || 'Unknown';
+      return props.name || props.ENNAME || props.NAME || props.PHYSIO_NAME || Object.values(props).find(v => typeof v === 'string') || 'Unknown';
     }
 
-    // Color palette
-    const colors = ['#8c715a','#f5dd90','#a690a4','#6495ed','#90ee90','#d2b48c','#b0c4de'];
+    // New, more varied color palette
+    const colors = ['#3a538b', '#88a7cf', '#99b3d6', '#8fadc9', '#aabfdd', '#3a4f78', '#b7c7d9'];
     function getColor(name) { return colors[Object.keys(regionData).indexOf(name)] || '#aaa'; }
 
     // Style features
     function style(feature) {
-      return { fillColor: getColor(getRegionName(feature.properties)), weight: 1.5, color: '#fff', fillOpacity: 0.8 };
+      const regionName = getRegionName(feature.properties);
+      const regionColor = getColor(regionName);
+      let featureWeight = 1.5;
+
+      // For the fragmented Appalachian region, make the borders thinner
+      if (regionName === 'Appalachian Region') {
+        featureWeight = 0.5;
+      }
+
+      return { fillColor: regionColor, weight: featureWeight, color: regionColor, fillOpacity: 0.8 };
     }
 
     // Interaction handlers
-    function highlight(e) { e.target.setStyle({ weight: 3, color: '#333', fillOpacity: 1 }); }
-    function reset(e) { geojson.resetStyle(e.target); }
+    let selectedLayer = null; // Keep track of the clicked layer
+
+    function highlight(e) {
+      // On hover, highlight with a white border
+      e.target.setStyle({ weight: 3, color: '#ffffff', fillOpacity: 1 });
+    }
+    
+    function reset(e) {
+      // On mouseout, reset the style only if it's not the selected layer
+      if (e.target !== selectedLayer) {
+        geojson.resetStyle(e.target);
+      }
+    }
+
     function clickFeature(e) {
+      // If a layer was already selected, reset its style
+      if (selectedLayer) {
+        geojson.resetStyle(selectedLayer);
+      }
+      
+      // Store the clicked layer and apply the selected style
+      selectedLayer = e.target;
+      selectedLayer.setStyle({ weight: 3, color: '#ffffff', fillOpacity: 1 });
+
       const props = e.target.feature.properties;
       const name = getRegionName(props);
       infoContent.innerHTML = `<h3>${name}</h3><p>${regionData[name] || 'No data available.'}</p>`;
       const bounds = e.target.getBounds();
       map.panTo(bounds.getCenter(), { animate: true });
+
+      L.DomEvent.stopPropagation(e); // Prevent map click event from firing
     }
 
     // Apply to each feature
@@ -96,12 +130,49 @@
       layer.on({ mouseover: highlight, mouseout: reset, click: clickFeature });
     }
 
+    // When clicking off a region, reset the view
+    map.on('click', function() {
+      if (selectedLayer) {
+        geojson.resetStyle(selectedLayer);
+        selectedLayer = null;
+        infoContent.innerHTML = defaultInfoHTML;
+      }
+    });
+
     // Load GeoJSON
     let geojson;
-    fetch('https://services.arcgis.com/As5CFN3ThbQpy8Ph/arcgis/rest/services/1Physiographic_Regions/FeatureServer/0/query?f=geojson&where=1=1&outFields=*')
-      .then(res=>res.json())
-      .then(data=>{ geojson = L.geoJson(data, { filter: f=>Object.keys(regionData).includes(getRegionName(f.properties)), style, onEachFeature: onEach }).addTo(map); })
-      .catch(()=>{ infoContent.innerHTML = '<p>Error loading regions.</p>'; });
+    // Updated the URL to point to the new raw GeoJSON file.
+    const geoJsonUrl = 'https://raw.githubusercontent.com/Maltais239/interactives/main/canada_regions_quiz_ready%20(1).geojson';
+
+    fetch(geoJsonUrl)
+      .then(res => {
+        if (!res.ok) {
+          // If the server response is not OK (e.g., 404 Not Found), throw an error.
+          throw new Error(`Network response was not ok: ${res.statusText}`);
+        }
+        return res.json();
+      })
+      .then(data => { 
+        geojson = L.geoJson(data, { 
+          filter: f => Object.keys(regionData).includes(getRegionName(f.properties)), 
+          style, 
+          onEachFeature: onEach 
+        }).addTo(map); 
+      })
+      .catch((err) => { 
+        console.error("Failed to load or process GeoJSON:", err);
+        infoContent.innerHTML = '<p style="color: #dc2626; font-weight: 600;">Error loading regions.</p><p>There was a problem fetching the map data. Please check the console (F12) for more details.</p>'; 
+      });
   </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
