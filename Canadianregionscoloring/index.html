@@ -60,30 +60,28 @@
       background-color: #fff;
     }
 
-    /* Styles applied by JavaScript right before printing */
-    body.printing .main-container {
-      display: none;
-    }
-    body.printing #map {
-      width: 100vw;
-      height: 100vh;
+    /* This container is moved OFF-SCREEN to reliably render the print map. */
+    #print-map-container {
       position: absolute;
+      left: -9999px;
       top: 0;
-      left: 0;
-      border: none;
+      width: 11in; /* Standard landscape paper width */
+      height: 8.5in; /* Standard landscape paper height */
     }
 
-    /* Fallback styles for the print dialog itself */
     @media print {
-      body, html { padding: 0; margin: 0; }
-      .main-container { display: none; }
-      #map {
-        width: 100vw;
-        height: 100vh;
-        border: none;
+      /* Hide everything EXCEPT the print container */
+      body > *:not(#print-map-container) {
+        display: none;
+      }
+      /* Position the print container perfectly for the printout */
+      #print-map-container {
+        display: block;
         position: absolute;
         top: 0;
         left: 0;
+        width: 100%;
+        height: 100%;
       }
     }
   </style>
@@ -96,16 +94,20 @@
     <div id="map"></div>
   </div>
 
+  <!-- This container is for the print-perfect map -->
+  <div id="print-map-container"></div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src='https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js'></script>
 
   <script>
-    const map = L.map('map', {
+    const screenMap = L.map('map', {
       zoomControl: false, attributionControl: false, scrollWheelZoom: false,
       dragging: false, doubleClickZoom: false, boxZoom: false, touchZoom: false,
     }).setView([62, -95], 4);
 
-    let geojsonLayer; // Moved to a higher scope to be accessible later
+    let simplifiedGeoJsonData;
+    let printMap = null;
 
     function style(feature) {
       return {
@@ -113,7 +115,7 @@
       };
     }
 
-    // CORRECTED URL: Pointing to your specific file on GitHub.
+    // CORRECTED URL: Pointing back to your specific regions file on GitHub.
     const url = 'https://raw.githubusercontent.com/Maltais239/interactives/main/canada_regions_quiz_ready%20(1).geojson';
 
     fetch(url)
@@ -123,9 +125,9 @@
       })
       .then(data => {
         const options = { tolerance: 0.01, highQuality: false };
-        const simplifiedGeoJsonData = turf.simplify(data, options);
-        geojsonLayer = L.geoJson(simplifiedGeoJsonData, { style }).addTo(map);
-        map.fitBounds(geojsonLayer.getBounds());
+        simplifiedGeoJsonData = turf.simplify(data, options);
+        const geojsonLayer = L.geoJson(simplifiedGeoJsonData, { style }).addTo(screenMap);
+        screenMap.fitBounds(geojsonLayer.getBounds());
       })
       .catch((err) => {
         console.error("Error fetching or processing GeoJSON:", err);
@@ -134,26 +136,36 @@
 
     // --- FINAL, BULLETPROOF PRINTING LOGIC ---
     document.getElementById('print-btn').addEventListener('click', () => {
-      if (!geojsonLayer) return; // Don't print if the map hasn't loaded
+      if (!simplifiedGeoJsonData) {
+        alert("Map data is still loading. Please wait a moment and try again.");
+        return;
+      }
+      // Clean up any previous print map instance
+      if (printMap) {
+          printMap.remove();
+      }
 
-      document.body.classList.add('printing');
-      
-      map.invalidateSize();
+      // Create a new map instance in the off-screen container
+      printMap = L.map('print-map-container', {
+          zoomControl: false, attributionControl: false, preferCanvas: true
+      });
 
-      // *** THE DEFINITIVE FIX ***
-      // This forces the map to re-zoom its content to fit the new, larger frame.
-      map.fitBounds(geojsonLayer.getBounds());
+      // Add the map data and fit it perfectly to the container
+      const printLayer = L.geoJson(simplifiedGeoJsonData, { style }).addTo(printMap);
+      printMap.fitBounds(printLayer.getBounds());
 
+      // Wait for the browser to finish drawing the new map, THEN print.
       requestAnimationFrame(() => {
         window.print();
       });
     });
 
-    // After printing (or cancelling), remove the class to restore the view
+    // After printing, clean up the print map to save resources.
     window.addEventListener('afterprint', () => {
-      document.body.classList.remove('printing');
-      map.invalidateSize(); // Tell the map to resize back
-      map.fitBounds(geojsonLayer.getBounds()); // Re-zoom back to original container
+        if (printMap) {
+            printMap.remove();
+            printMap = null;
+        }
     });
   </script>
 </body>
