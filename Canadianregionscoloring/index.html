@@ -6,7 +6,7 @@
   <title>Canada Regions Coloring Page</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&display=swap" rel="stylesheet">
   <style>
     @page {
@@ -105,14 +105,16 @@
       dragging: false, doubleClickZoom: false, boxZoom: false, touchZoom: false,
     }).setView([62, -95], 4);
 
+    let geojsonLayer; // Moved to a higher scope to be accessible later
+
     function style(feature) {
       return {
         fillColor: '#FFFFFF', weight: 2, color: '#000000', fillOpacity: 1.0
       };
     }
 
-    // CORRECTED URL: Switched to a reliable public GeoJSON file for Canada.
-    const url = 'https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@master/public/data/canada.geojson';
+    // CORRECTED URL: Pointing to your specific file on GitHub.
+    const url = 'https://raw.githubusercontent.com/Maltais239/interactives/main/canada_regions_quiz_ready%20(1).geojson';
 
     fetch(url)
       .then(res => {
@@ -122,7 +124,7 @@
       .then(data => {
         const options = { tolerance: 0.01, highQuality: false };
         const simplifiedGeoJsonData = turf.simplify(data, options);
-        const geojsonLayer = L.geoJson(simplifiedGeoJsonData, { style }).addTo(map);
+        geojsonLayer = L.geoJson(simplifiedGeoJsonData, { style }).addTo(map);
         map.fitBounds(geojsonLayer.getBounds());
       })
       .catch((err) => {
@@ -130,15 +132,18 @@
         document.getElementById('map').innerHTML = `<p style="color: red; padding: 20px;"><strong>Error:</strong> Could not load map data.</p>`;
       });
 
-    // --- NEW, MORE ROBUST PRINTING LOGIC ---
+    // --- FINAL, BULLETPROOF PRINTING LOGIC ---
     document.getElementById('print-btn').addEventListener('click', () => {
-      // 1. Add 'printing' class to body to apply full-screen styles
+      if (!geojsonLayer) return; // Don't print if the map hasn't loaded
+
       document.body.classList.add('printing');
       
-      // 2. Tell the map to update its size to fill the new space
       map.invalidateSize();
 
-      // 3. Wait for the browser to repaint the map at its new size, THEN print.
+      // *** THE DEFINITIVE FIX ***
+      // This forces the map to re-zoom its content to fit the new, larger frame.
+      map.fitBounds(geojsonLayer.getBounds());
+
       requestAnimationFrame(() => {
         window.print();
       });
@@ -147,7 +152,8 @@
     // After printing (or cancelling), remove the class to restore the view
     window.addEventListener('afterprint', () => {
       document.body.classList.remove('printing');
-      map.invalidateSize(); // Tell the map to resize back to its original container
+      map.invalidateSize(); // Tell the map to resize back
+      map.fitBounds(geojsonLayer.getBounds()); // Re-zoom back to original container
     });
   </script>
 </body>
