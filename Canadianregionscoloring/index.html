@@ -60,21 +60,32 @@
       background-color: #fff;
     }
 
-    /* This container is hidden on screen and only used for printing */
-    #print-map-container {
-      display: none;
-    }
-
     @media print {
-      /* Hide the on-screen elements when printing */
-      body > .main-container {
+      body, html {
+        padding: 0;
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      .main-container {
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        padding: 0;
+        margin: 0;
+      }
+      #controls {
         display: none;
       }
-      /* Show the print-only map container and make it fill the page */
-      #print-map-container {
-        display: block;
+      #map {
         width: 100vw;
         height: 100vh;
+        border: none;
+        box-shadow: none;
+        position: absolute;
+        top: 0;
+        left: 0;
       }
     }
   </style>
@@ -87,21 +98,14 @@
     <div id="map"></div>
   </div>
 
-  <!-- This is a new, hidden container just for the print map -->
-  <div id="print-map-container"></div>
-
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src='https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js'></script>
 
   <script>
-    // Initialize the visible map
-    const screenMap = L.map('map', {
+    const map = L.map('map', {
       zoomControl: false, attributionControl: false, scrollWheelZoom: false,
       dragging: false, doubleClickZoom: false, boxZoom: false, touchZoom: false,
     }).setView([62, -95], 4);
-
-    let simplifiedGeoJsonData; // Store map data here to reuse it
-    let printMap = null; // Keep a reference to the print map for cleanup
 
     function style(feature) {
       return {
@@ -118,50 +122,26 @@
       })
       .then(data => {
         const options = { tolerance: 0.01, highQuality: false };
-        simplifiedGeoJsonData = turf.simplify(data, options); // Store the data
-
-        // Add the data to the visible screen map
-        const geojsonLayer = L.geoJson(simplifiedGeoJsonData, { style }).addTo(screenMap);
-        screenMap.fitBounds(geojsonLayer.getBounds());
+        const simplifiedGeoJsonData = turf.simplify(data, options);
+        const geojsonLayer = L.geoJson(simplifiedGeoJsonData, { style }).addTo(map);
+        map.fitBounds(geojsonLayer.getBounds());
       })
       .catch((err) => {
         console.error("Error fetching or processing GeoJSON:", err);
         document.getElementById('map').innerHTML = `<p style="color: red; padding: 20px;"><strong>Error:</strong> Could not load map data.</p>`;
       });
 
-    // --- REVISED AND SIMPLIFIED PRINTING LOGIC ---
+    // --- CLEANED AND RELIABLE PRINTING LOGIC ---
     document.getElementById('print-btn').addEventListener('click', () => {
-      if (!simplifiedGeoJsonData) {
-        console.error("Map data has not loaded yet. Please wait a moment and try again.");
-        return;
-      }
+      // Tell the map to check its size.
+      map.invalidateSize();
 
-      // If a print map already exists from a previous attempt, remove it.
-      if (printMap) {
-          printMap.remove();
-      }
-
-      // 1. Create a new map in the hidden print container
-      printMap = L.map('print-map-container', {
-          zoomControl: false, attributionControl: false, preferCanvas: true
+      // This is the crucial part: it waits for the browser to be ready
+      // to draw the newly-sized map before opening the print dialog.
+      // This should finally solve the race condition.
+      requestAnimationFrame(() => {
+        window.print();
       });
-
-      // 2. Add the map data to it
-      const printLayer = L.geoJson(simplifiedGeoJsonData, { style }).addTo(printMap);
-      
-      // 3. Size it perfectly
-      printMap.fitBounds(printLayer.getBounds());
-
-      // 4. Call print immediately. The @media print CSS will handle showing the correct map.
-      window.print();
-    });
-
-    // Use afterprint to clean up the hidden map, which is more reliable.
-    window.addEventListener('afterprint', () => {
-        if (printMap) {
-            printMap.remove();
-            printMap = null; // Clear the reference
-        }
     });
   </script>
 </body>
