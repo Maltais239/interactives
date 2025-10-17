@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -60,29 +61,27 @@
       background-color: #fff;
     }
 
+    /* Styles applied by JavaScript right before printing */
+    body.printing .main-container {
+      display: none;
+    }
+    body.printing #map {
+      width: 100vw;
+      height: 100vh;
+      position: absolute;
+      top: 0;
+      left: 0;
+      border: none;
+    }
+
+    /* Fallback styles for the print dialog itself */
     @media print {
-      body, html {
-        padding: 0;
-        margin: 0;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-      }
-      .main-container {
-        width: 100%;
-        height: 100%;
-        max-width: none;
-        padding: 0;
-        margin: 0;
-      }
-      #controls {
-        display: none;
-      }
+      body, html { padding: 0; margin: 0; }
+      .main-container { display: none; }
       #map {
         width: 100vw;
         height: 100vh;
         border: none;
-        box-shadow: none;
         position: absolute;
         top: 0;
         left: 0;
@@ -131,17 +130,24 @@
         document.getElementById('map').innerHTML = `<p style="color: red; padding: 20px;"><strong>Error:</strong> Could not load map data.</p>`;
       });
 
-    // --- CLEANED AND RELIABLE PRINTING LOGIC ---
+    // --- NEW, MORE ROBUST PRINTING LOGIC ---
     document.getElementById('print-btn').addEventListener('click', () => {
-      // Tell the map to check its size.
+      // 1. Add 'printing' class to body to apply full-screen styles
+      document.body.classList.add('printing');
+      
+      // 2. Tell the map to update its size to fill the new space
       map.invalidateSize();
 
-      // This is the crucial part: it waits for the browser to be ready
-      // to draw the newly-sized map before opening the print dialog.
-      // This should finally solve the race condition.
+      // 3. Wait for the browser to repaint the map at its new size, THEN print.
       requestAnimationFrame(() => {
         window.print();
       });
+    });
+
+    // After printing (or cancelling), remove the class to restore the view
+    window.addEventListener('afterprint', () => {
+      document.body.classList.remove('printing');
+      map.invalidateSize(); // Tell the map to resize back to its original container
     });
   </script>
 </body>
