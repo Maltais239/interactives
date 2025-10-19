@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Flashcard Illustrator</title>
+    <title>Openmoji and AI Flashcard Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- JSZip for creating zip files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
@@ -48,13 +50,17 @@
             </button>
         </div>
         <div class="border-t pt-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h2 class="text-lg font-bold text-gray-800">Printing Instructions</h2>
-                    <p class="text-sm text-gray-600">Once the images are generated, click "Save for Printing" to get a clean, print-ready file.</p>
-                </div>
-                <button id="save-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition transform hover:scale-105">
+            <h2 class="text-lg font-bold text-gray-800">Printing & Exporting</h2>
+            <p class="text-sm text-gray-600 mb-4">Once images are generated, you can save a print-ready file or export the images and data for other projects.</p>
+            <div class="flex items-center justify-between gap-4">
+                <button id="save-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition transform hover:scale-105">
                     Save for Printing
+                </button>
+                 <button id="download-zip-btn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition transform hover:scale-105">
+                    Download All Images (.zip)
+                </button>
+                 <button id="export-json-btn" class="flex-1 bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-lg shadow-md transition transform hover:scale-105">
+                    Export Card Data (.json)
                 </button>
             </div>
         </div>
@@ -326,10 +332,63 @@
 
         // --- Event Listeners ---
         document.getElementById('generate-btn').addEventListener('click', handleCardGeneration);
-        document.getElementById('save-btn').addEventListener('click', saveForPrinting);
+        
+        function triggerDownload(blob, filename) {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        }
+
+        document.getElementById('download-zip-btn').addEventListener('click', () => {
+            if (allCardsData.length === 0 || allCardsData.some(c => !c.image)) {
+                alert('Please generate all flashcard images first!');
+                return;
+            }
+
+            const zip = new JSZip();
+            const promises = allCardsData.map(card => {
+                if (card.image && card.image !== 'ERROR' && !card.image.startsWith('data:')) {
+                    // Fetch SVG content for OpenMoji
+                    return fetch(card.image)
+                        .then(response => response.text())
+                        .then(svgText => {
+                            const safeFilename = card.term.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                            zip.file(`${safeFilename}.svg`, svgText);
+                        });
+                } else if (card.image && card.image.startsWith('data:image/png')) {
+                    // Handle base64 PNGs from AI
+                    const base64Data = card.image.split(',')[1];
+                    const safeFilename = card.term.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                    zip.file(`${safeFilename}.png`, base64Data, { base64: true });
+                }
+                return Promise.resolve();
+            });
+
+            Promise.all(promises).then(() => {
+                zip.generateAsync({ type: 'blob' }).then(content => {
+                    triggerDownload(content, 'flashcard-images.zip');
+                });
+            });
+        });
+
+        document.getElementById('export-json-btn').addEventListener('click', () => {
+            if (allCardsData.length === 0 || allCardsData.some(c => !c.image)) {
+                alert('Please generate all flashcard images first!');
+                return;
+            }
+            
+            const exportData = allCardsData.map(({ term, definition, image }) => ({ term, definition, imageSrc: image }));
+            const jsonString = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            triggerDownload(blob, 'flashcard-data.json');
+        });
 
         function saveForPrinting() {
-            const printableHtml = `
+             const printableHtml = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -344,7 +403,7 @@
         body { font-family: 'Poppins', sans-serif; }
         @media print {
             body { background-color: #ffffff; padding: 0; margin: 0; }
-            #instructions { display: none !important; }
+            #instructions, .regenerate-btn { display: none !important; }
             .page-container {
                 box-shadow: none; width: 100%; height: 100%;
                 padding: 0; margin: 0; border-radius: 0;
@@ -362,87 +421,14 @@
         <h2 class="font-bold">Instructions</h2>
         <p>To print, press Ctrl+P or Cmd+P and choose "Save as PDF" for best results.</p>
     </div>
-    <div id="main-container" class="w-full flex flex-col items-center space-y-8"></div>
-    <script>
-        let allCardsData = ${JSON.stringify(allCardsData)};
-        const colors = ['green-500', 'blue-500', 'orange-500', 'red-500', 'purple-500', 'cyan-500', 'yellow-500', 'lime-500', 'pink-500', 'teal-500', 'indigo-500', 'gray-500'];
-
-        function createCardFront(card, index) {
-            const color = colors[index % colors.length];
-            const cardEl = document.createElement('div');
-            cardEl.className = \`card h-full bg-white rounded-2xl border-8 border-\${color} shadow-lg overflow-hidden flex flex-col\`;
-            cardEl.innerHTML = \`
-                <div class="image-container flex-1 min-h-0 flex items-center justify-center p-4 overflow-hidden">
-                    <img src="\${card.image}" alt="\${card.term}" class="max-h-full max-w-full object-contain">
-                </div>
-                <div class="card-label text-center text-white flex items-center justify-center px-2 bg-\${color}" style="flex-basis: 4.5rem;">
-                    <h2 class="text-xl font-bold">\${card.term}</h2>
-                </div>\`;
-            return cardEl;
-        }
-
-        function createCardBack(card, index) {
-            const color = colors[index % colors.length];
-            const cardEl = document.createElement('div');
-            cardEl.className = \`card-back h-full bg-white rounded-2xl border-8 border-\${color} shadow-lg overflow-hidden flex flex-col items-center justify-center p-6\`;
-            cardEl.innerHTML = \`<h3 class="text-xl font-bold text-gray-800 mb-2">\${card.term}</h3><p class="text-center text-gray-600 text-lg">\${card.definition}</p>\`;
-            return cardEl;
-        }
-        
-        function populatePage(grid, cards, isBack) {
-            let cardsToRender = [...cards];
-            if (isBack) {
-                const reordered = [];
-                for (let i = 0; i < cardsToRender.length; i += 3) {
-                    reordered.push(...cardsToRender.slice(i, i + 3).reverse());
-                }
-                cardsToRender = reordered;
-            }
-            cardsToRender.forEach((cardData) => {
-                const originalIndex = allCardsData.findIndex(c => c.term === cardData.term);
-                const element = isBack ? createCardBack(cardData, originalIndex) : createCardFront(cardData, originalIndex);
-                grid.appendChild(element);
-            });
-        }
-        
-        function generateAllPages() {
-            const mainContainer = document.getElementById('main-container');
-            mainContainer.innerHTML = '';
-            const cardsPerPage = 6;
-            const numPages = Math.ceil(allCardsData.length / cardsPerPage);
-
-            for (let i = 0; i < numPages; i++) {
-                const pageCards = allCardsData.slice(i * cardsPerPage, (i * cardsPerPage) + cardsPerPage);
-                const frontPageContainer = document.createElement('div');
-                frontPageContainer.className = "page-container w-full max-w-5xl aspect-[11/8.5] bg-white p-8 rounded-lg shadow-lg";
-                const frontGrid = document.createElement('div');
-                frontGrid.className = "grid grid-cols-3 grid-rows-2 gap-6 h-full";
-                frontPageContainer.appendChild(frontGrid);
-                mainContainer.appendChild(frontPageContainer);
-                populatePage(frontGrid, pageCards, false);
-
-                const backPageContainer = document.createElement('div');
-                backPageContainer.className = "page-container w-full max-w-5xl aspect-[11/8.5] bg-white p-8 rounded-lg shadow-lg";
-                const backGrid = document.createElement('div');
-                backGrid.className = "grid grid-cols-3 grid-rows-2 gap-6 h-full";
-                backPageContainer.appendChild(backGrid);
-                mainContainer.appendChild(backPageContainer);
-                populatePage(backGrid, pageCards, true);
-            }
-        }
-        window.onload = generateAllPages;
-    <\/script>
+    <div id="main-container" class="w-full flex flex-col items-center space-y-8">${document.getElementById('main-container').innerHTML}</div>
 </body>
 </html>`;
             const blob = new Blob([printableHtml.trim()], { type: 'text/html' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'flashcards-for-printing.html';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(a.href);
+            triggerDownload(blob, 'flashcards-for-printing.html');
         }
+
+        document.getElementById('save-btn').addEventListener('click', saveForPrinting);
     </script>
 </body>
 </html>
