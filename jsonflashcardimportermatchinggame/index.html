@@ -49,9 +49,10 @@
 
         <section id="start-screen" class="mb-4 p-4 rounded-xl flex-grow flex flex-col justify-center items-center">
             <h2 id="start-title" class="text-xl font-semibold text-gray-700 mb-3">Import a custom set or play with the default!</h2>
-            <div class="flex justify-center items-center gap-4">
+            <div class="flex flex-wrap justify-center items-center gap-4">
                  <button id="import-json-btn" class="action-button bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 text-lg rounded-lg shadow-md">Import Custom Set (.json)</button>
                 <button id="start-game-button" class="action-button bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 text-lg rounded-lg shadow-md">Start Game</button>
+                <button id="download-html-btn" class="action-button bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 text-lg rounded-lg shadow-md">Download Game (.html)</button>
             </div>
             <input type="file" id="json-importer" class="hidden" accept=".json">
         </section>
@@ -70,6 +71,7 @@
         const startScreen = document.getElementById('start-screen');
         const startGameButton = document.getElementById('start-game-button');
         const importJsonButton = document.getElementById('import-json-btn');
+        const downloadHtmlButton = document.getElementById('download-html-btn');
         const jsonImporter = document.getElementById('json-importer');
         const startTitle = document.getElementById('start-title');
         const gameContainer = document.getElementById('game-container');
@@ -85,8 +87,25 @@
             { term: 'Landmark', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F5FC.svg', definition: 'An important place or building that is easy to recognize.' },
             { term: 'Settlement', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F3E0.svg', definition: 'A community or place where people build homes and live.' },
             { term: 'Territory', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F3DD.svg', definition: 'An area of land that belongs to a group of people.' },
+            { term: 'Continent', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F30D.svg', definition: 'One of the seven main landmasses on Earth.' },
+            { term: 'Ocean', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F30A.svg', definition: 'A very large expanse of sea, in particular one of Earth\'s major divisions.' },
+            { term: 'River', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F3DE.svg', definition: 'A large natural stream of water flowing in a channel to the sea, a lake, or another river.' },
+            { term: 'Mountain', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/26F0.svg', definition: 'A large natural elevation of the earth\'s surface rising abruptly from the surrounding level.' }
         ];
-        let ROUND_SIZES = [4];
+        let ROUND_SIZES = [];
+
+        function calculateRoundSizes(vocabList) {
+            const sizes = [];
+            let remaining = vocabList.length;
+            while (remaining > 0) {
+                const roundSize = Math.min(6, remaining); // Max 6 pairs per round
+                sizes.push(roundSize);
+                remaining -= roundSize;
+            }
+            return sizes;
+        }
+
+        ROUND_SIZES = calculateRoundSizes(MASTER_VOCABULARY);
 
         let workingVocabulary = [];
         let gameObjects = [];
@@ -121,13 +140,7 @@
                     MASTER_VOCABULARY = importedData;
                     
                     // Dynamically calculate round sizes
-                    ROUND_SIZES = [];
-                    let remaining = MASTER_VOCABULARY.length;
-                    while (remaining > 0) {
-                        const roundSize = Math.min(4, remaining);
-                        ROUND_SIZES.push(roundSize);
-                        remaining -= roundSize;
-                    }
+                    ROUND_SIZES = calculateRoundSizes(MASTER_VOCABULARY);
                     
                     startTitle.textContent = `✅ ${MASTER_VOCABULARY.length} cards loaded! Ready to play!`;
                     startGameButton.disabled = false;
@@ -138,8 +151,37 @@
             };
             reader.readAsText(file);
         });
+
+        function downloadGame() {
+            // Get the current vocabulary list as a nicely formatted string
+            const currentVocabString = JSON.stringify(MASTER_VOCABULARY, null, 4);
+            
+            // Get the entire HTML of the current page
+            const fullHtml = document.documentElement.outerHTML;
+            
+            // Define the new content for the MASTER_VOCABULARY variable
+            const newMasterVocabLine = `let MASTER_VOCABULARY = ${currentVocabString};`;
+
+            // Use a regular expression to find and replace the original MASTER_VOCABULARY array
+            const regex = /let MASTER_VOCABULARY = \[[\s\S]*?\];/;
+            const modifiedHtml = fullHtml.replace(regex, newMasterVocabLine);
+
+            // Create a Blob from the modified HTML
+            const blob = new Blob([modifiedHtml], { type: 'text/html' });
+            
+            // Create a temporary link to trigger the download
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'flashcard-match-game.html';
+            document.body.appendChild(link);
+            link.click();
+            
+            // Clean up by removing the link and revoking the URL
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+        }
         
-        // --- Game Logic (mostly unchanged) ---
+        // --- Game Logic ---
         function preloadImages(vocabulary, callback) {
             let loadedCount = 0;
             const totalImages = vocabulary.length;
@@ -302,8 +344,14 @@
                 setTimeout(startNextRound, 2000);
             }
         }
-              startScreen.querySelector('h2').textContent = "🎉 You completed the game! Well done! 🎉";
-             startGameButton.textContent = "Play Again";
+        
+        function showFinalWinScreen() {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            gameContainer.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+            startTitle.textContent = "🎉 You completed the game! Well done! 🎉";
+            startGameButton.textContent = "Play Again";
         }
         
         function initGame() {
@@ -367,6 +415,7 @@
         }
         
         startGameButton.addEventListener('click', initGame);
+        downloadHtmlButton.addEventListener('click', downloadGame);
         canvas.addEventListener('mousedown', onDown);
         canvas.addEventListener('mousemove', onMove);
         canvas.addEventListener('mouseup', onUp);
@@ -377,4 +426,6 @@
     </script>
 </body>
 </html>
+
+
 
