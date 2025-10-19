@@ -43,19 +43,29 @@
     <div id="controls" class="w-full max-w-5xl p-6 bg-white rounded-lg shadow-md space-y-4">
         <div>
             <h2 class="text-xl font-bold text-gray-800">Create Your Own Flashcards</h2>
-            <p class="text-sm text-gray-600">Enter terms and definitions below, one per line, separated by a colon ":". To make an image more specific, add a hint in parenthesis. <br>Example: <code class="bg-gray-200 p-1 rounded">Delta (geography): A landform created by deposition of sediment...</code> or <code class="bg-gray-200 p-1 rounded">Sun (in the style of a Picasso painting): ...</code></p>
-            <textarea id="custom-vocab-input" class="w-full h-32 p-2 mt-2 border border-gray-300 rounded-md" placeholder="Canyon: A deep valley with very steep sides...">Archipelago: A group or chain of islands.
+            
+            <div class="mt-4">
+                <label for="general-prompt-input" class="block text-sm font-medium text-gray-700">Overall Style (Optional)</label>
+                <input type="text" id="general-prompt-input" class="w-full p-2 mt-1 border border-gray-300 rounded-md" placeholder="e.g., in the style of a children's book, as minimalist logos...">
+                <p class="text-xs text-gray-500 mt-1">Apply a consistent theme to all images. If left blank, the app will choose the best style for each word automatically.</p>
+            </div>
+
+            <div class="mt-4">
+                 <label for="custom-vocab-input" class="block text-sm font-medium text-gray-700">Terms and Definitions</label>
+                <p class="text-sm text-gray-600">Enter terms and definitions below, one per line, separated by a colon ":". You can also add a specific hint in parenthesis. <br>Example: <code class="bg-gray-200 p-1 rounded">Delta (geography): ...</code> or <code class="bg-gray-200 p-1 rounded">Sun (Picasso painting): ...</code></p>
+                <textarea id="custom-vocab-input" class="w-full h-32 p-2 mt-2 border border-gray-300 rounded-md" placeholder="Canyon: A deep valley with very steep sides...">Matter: Anything that has mass and takes up space.
+Energy: The ability to do work or cause change.
+Force: A push or a pull on an object.
+Vibration: A rapid back-and-forth movement.
+Gravity: The force that attracts a body toward the center of the earth.
+Magnet: An object that produces a magnetic field.
+Archipelago: A group or chain of islands.
 Bay: A broad inlet of the sea where the land curves inwards.
 Canyon: A deep gorge, typically one with a river flowing through it.
-Delta (geography): A landform created by deposition of sediment at the mouth of a river.
-Isthmus: A narrow strip of land connecting two larger landmasses.
-River: A large natural stream of water flowing in a channel to the sea, a lake, or another river.
-Mountain: A large natural elevation of the earth's surface rising abruptly from the surrounding level.
-Valley: A low area between hills or mountains, typically with a river or stream flowing through it.
-Peninsula: A piece of land almost surrounded by water or projecting out into a body of water.
-City: A large place where many people live and work.
-Country: A big area of land with its own people and government.
-Compass: A tool that shows directions like north, south, east, and west.</textarea>
+Add: To join two or more numbers to get one larger number.
+Subtract: To take one number away from another.
+Equal: Having the same amount or value.</textarea>
+            </div>
             <button id="generate-custom-btn" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition transform hover:scale-105">
                 Generate Flashcards
             </button>
@@ -87,19 +97,55 @@ Compass: A tool that shows directions like north, south, east, and west.</textar
         // --- AI Image Generation ---
 
         const math_keywords = ['add', 'subtract', 'equal', 'sum', 'difference', 'even', 'odd', 'number', 'fraction', 'decimal', 'percent', 'geometry', 'algebra', 'calculate', 'equation', 'graph', 'integer', 'multiply', 'divide', 'plus', 'minus'];
-        const geography_keywords = ['archipelago', 'bay', 'canyon', 'delta', 'isthmus', 'river', 'mountain', 'valley', 'peninsula', 'city', 'country', 'compass', 'continent', 'ocean', 'map', 'longitude', 'latitude', 'tributary', 'topography', 'hemisphere', 'cartography'];
-        const science_keywords = ['cell', 'atom', 'molecule', 'organism', 'photosynthesis', 'dna', 'force', 'energy', 'gravity', 'chemistry', 'biology', 'physics', 'planet', 'star', 'galaxy', 'ecosystem', 'fossil', 'mitochondria'];
-
+        const science_keywords = ['matter', 'energy', 'force', 'vibration', 'gravity', 'magnet', 'cell', 'atom', 'molecule', 'organism', 'photosynthesis', 'dna', 'force', 'energy', 'gravity', 'chemistry', 'biology', 'physics', 'planet', 'star', 'galaxy', 'ecosystem', 'fossil', 'mitochondria'];
+        
         function getCategory(term) {
             const lowerTerm = term.toLowerCase();
             if (math_keywords.some(k => lowerTerm.includes(k))) return 'math';
-            if (geography_keywords.some(k => lowerTerm.includes(k))) return 'geography';
             if (science_keywords.some(k => lowerTerm.includes(k))) return 'science';
             return 'default';
         }
 
         async function generateImageWithRetry(card, maxRetries = 3) {
             const apiKey = ""; // Canvas will provide the key
+            const generalPrompt = document.getElementById('general-prompt-input').value.trim();
+            
+            // --- NEW: General Prompt Override ---
+            if (generalPrompt) {
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+                const prompt = `A clear, simple, artistic vector illustration for the term '${card.term}', with the overarching theme or style of: '${generalPrompt}'. The image must be completely free of any text, letters, or numbers.`;
+                const negativePrompt = "text, words, letters, numbers, characters, labels, writing, fonts, equations, formulas, textboxes, alphanumeric, typography, captions, annotations, watermark, logo";
+                
+                const payload = { 
+                    instances: [{ prompt, negativePrompt }], 
+                    parameters: { "sampleCount": 1 } 
+                };
+
+                for (let i = 0; i < maxRetries; i++) {
+                     try {
+                        const response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                        const result = await response.json();
+                        if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                            return `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                        } else {
+                            throw new Error('Invalid response structure from illustration API.');
+                        }
+                    } catch (error) {
+                        console.error(`Attempt ${i + 1} for "${card.term}" (general prompt) failed:`, error);
+                        if (i === maxRetries - 1) { return 'ERROR'; } 
+                        await new Promise(res => setTimeout(res, 1000 * (i + 1))); 
+                    }
+                }
+                return 'ERROR';
+            }
+
+
+            // --- Default Category-Based Logic ---
             const category = getCategory(card.term);
 
             if (category === 'math') {
@@ -143,18 +189,17 @@ Compass: A tool that shows directions like north, south, east, and west.</textar
                 const hasIncompatibleStyle = card.hint && incompatibleStyleKeywords.some(keyword => card.hint.toLowerCase().includes(keyword));
 
                 if (hasIncompatibleStyle) {
-                    prompt = `ABSOLUTELY NO TEXT. A high-quality, artistic image of '${card.term}', visually represented in the style of: ${card.hint}. The image must be a clear depiction of the concept without any accompanying text, letters, numbers, or characters.`;
+                    prompt = `A high-quality, artistic image of '${card.term}', in the style of: ${card.hint}. The image must be a clear, artistic depiction completely free of any text, letters, numbers, or characters.`;
                 } else {
-                    switch(category) {
+                    switch (category) {
                         case 'science':
-                             prompt = `ABSOLUTELY NO TEXT. A clear and simple scientific, artistic depiction for the concept: '${card.term}'. Style: educational illustration, clean lines, accurate representation, on a plain white background. The image must be 100% free of any text, letters, or numbers.`;
+                            prompt = `A clear and simple visual metaphor representing the scientific concept of '${card.term}'. The image should be an iconic, modern vector illustration with clean lines and vibrant colors, on a plain white background. It must be intuitive and completely free of any text, letters, or numbers.`;
                             break;
-                        case 'geography':
                         case 'default':
                         default:
-                            const basePrompt = `ABSOLUTELY NO TEXT. A beautiful, scenic, minimalist vector illustration that is an artistic depiction of the concept: '${card.term}'. Style: modern, flat design, clean lines, vibrant colors, on a plain white background. The image must be intuitive and understandable without any text. The image must be 100% free of any text, letters, or numbers.`;
-                            prompt = card.hint ? `${basePrompt} User hint for context: '${card.hint}'.` : basePrompt;
-                            break;
+                             const basePrompt = `A beautiful, scenic, minimalist vector illustration representing the concept of '${card.term}'. Style: modern, flat design, clean lines, vibrant colors, on a plain white background. The image must be intuitive and artistic, completely free of any text, letters, or numbers.`;
+                             prompt = card.hint ? `${basePrompt} User hint for context: '${card.hint}'.` : basePrompt;
+                             break;
                     }
                 }
 
