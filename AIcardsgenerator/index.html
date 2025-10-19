@@ -72,57 +72,110 @@ Compass: A tool that shows directions like north, south, east, and west.</textar
         </div>
     </div>
 
-    <!-- Container for dynamically generated pages -->
-    <div id="main-container" class="w-full flex flex-col items-center space-y-8"></div>
+    <!-- Container for dynamically generated pages --><div id="main-container" class="w-full flex flex-col items-center space-y-8"></div>
     
     <script>
         let allCardsData = [];
         const colors = ['green-500', 'blue-500', 'orange-500', 'red-500', 'purple-500', 'cyan-500', 'yellow-500', 'lime-500', 'pink-500', 'teal-500', 'indigo-500', 'gray-500'];
 
         // --- AI Image Generation ---
+
+        const math_keywords = ['add', 'subtract', 'equal', 'sum', 'difference', 'even', 'odd', 'number', 'fraction', 'decimal', 'percent', 'geometry', 'algebra', 'calculate', 'equation', 'graph', 'integer', 'multiply', 'divide', 'plus', 'minus'];
+        const geography_keywords = ['archipelago', 'bay', 'canyon', 'delta', 'isthmus', 'river', 'mountain', 'valley', 'peninsula', 'city', 'country', 'compass', 'continent', 'ocean', 'map', 'longitude', 'latitude', 'tributary', 'topography', 'hemisphere', 'cartography'];
+        const science_keywords = ['cell', 'atom', 'molecule', 'organism', 'photosynthesis', 'dna', 'force', 'energy', 'gravity', 'chemistry', 'biology', 'physics', 'planet', 'star', 'galaxy', 'ecosystem', 'fossil', 'mitochondria'];
+
+        function getCategory(term) {
+            const lowerTerm = term.toLowerCase();
+            if (math_keywords.some(k => lowerTerm.includes(k))) return 'math';
+            if (geography_keywords.some(k => lowerTerm.includes(k))) return 'geography';
+            if (science_keywords.some(k => lowerTerm.includes(k))) return 'science';
+            return 'default';
+        }
+
         async function generateImageWithRetry(card, maxRetries = 3) {
             const apiKey = ""; // Canvas will provide the key
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
-            
-            let prompt;
-            // Define keywords for styles that are fundamentally incompatible with "flat design".
-            const incompatibleStyleKeywords = ['photo', 'photograph', 'painting', 'realistic', '3d render'];
-            const hasIncompatibleStyle = card.hint && incompatibleStyleKeywords.some(keyword => card.hint.toLowerCase().includes(keyword));
+            const category = getCategory(card.term);
 
-            if (hasIncompatibleStyle) {
-                // If the user asks for a photo or painting, we create a prompt without the "flat design" constraint.
-                prompt = `An image of a '${card.term}', ${card.hint}. No words, no letters, no numbers, or text.`;
-            } else {
-                // For all other cases, we use the robust "flat design" prompt as a baseline to ensure consistency.
-                if (card.hint) {
-                    prompt = `A modern vector illustration of a '${card.term}' (${card.hint}). Clean lines, vibrant colors, flat design, on a white background. No words, no letters, no numbers, no text whatsoever.`;
-                } else {
-                    prompt = `A modern vector illustration of a '${card.term}'. Clean lines, vibrant colors, flat design, on a white background. No words, no letters, no numbers, no text whatsoever.`;
-                }
-            }
+            if (category === 'math') {
+                // --- Use the specialized ICON model for Math ---
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
+                const prompt = `A pure, non-representational icon for the mathematical concept of '${card.term}'. The output must be a simple, geometric, monochrome symbol on a white background. It should look like a universal icon from a sign system. ABSOLUTELY FORBIDDEN: any letters, numbers, words, or text of any kind. The image must be purely symbolic and contain no written language.`;
+                
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { responseModalities: ['IMAGE'] },
+                };
 
-            const payload = { instances: [{ prompt: prompt }], parameters: { "sampleCount": 1 } };
-
-            for (let i = 0; i < maxRetries; i++) {
-                try {
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-                    const result = await response.json();
-                    if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
-                        return `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
-                    } else {
-                        throw new Error('Invalid response structure from API.');
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        const response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                        const result = await response.json();
+                        const base64Data = result?.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+                        if (base64Data) {
+                            return `data:image/png;base64,${base64Data}`;
+                        } else {
+                            throw new Error('Invalid response structure from icon API.');
+                        }
+                    } catch (error) {
+                        console.error(`Attempt ${i + 1} for "${card.term}" (icon model) failed:`, error);
+                        if (i === maxRetries - 1) { return 'ERROR'; }
+                        await new Promise(res => setTimeout(res, 1000 * (i + 1)));
                     }
-                } catch (error) {
-                    console.error(`Attempt ${i + 1} for "${card.term}" failed:`, error);
-                    if (i === maxRetries - 1) { return 'ERROR'; } 
-                    await new Promise(res => setTimeout(res, 1000 * (i + 1))); 
+                }
+
+            } else {
+                // --- Use the ILLUSTRATION model for everything else ---
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+                let prompt;
+                const negativePrompt = "text, words, letters, numbers, characters, labels, writing, fonts, equations, formulas, textboxes, alphanumeric, typography, captions, annotations, watermark, logo";
+                const incompatibleStyleKeywords = ['photo', 'photograph', 'painting', 'realistic', '3d render'];
+                const hasIncompatibleStyle = card.hint && incompatibleStyleKeywords.some(keyword => card.hint.toLowerCase().includes(keyword));
+
+                if (hasIncompatibleStyle) {
+                    prompt = `ABSOLUTELY NO TEXT. A high-quality, artistic image of '${card.term}', visually represented in the style of: ${card.hint}. The image must be a clear depiction of the concept without any accompanying text, letters, numbers, or characters.`;
+                } else {
+                    switch(category) {
+                        case 'science':
+                             prompt = `ABSOLUTELY NO TEXT. A clear and simple scientific, artistic depiction for the concept: '${card.term}'. Style: educational illustration, clean lines, accurate representation, on a plain white background. The image must be 100% free of any text, letters, or numbers.`;
+                            break;
+                        case 'geography':
+                        case 'default':
+                        default:
+                            const basePrompt = `ABSOLUTELY NO TEXT. A beautiful, scenic, minimalist vector illustration that is an artistic depiction of the concept: '${card.term}'. Style: modern, flat design, clean lines, vibrant colors, on a plain white background. The image must be intuitive and understandable without any text. The image must be 100% free of any text, letters, or numbers.`;
+                            prompt = card.hint ? `${basePrompt} User hint for context: '${card.hint}'.` : basePrompt;
+                            break;
+                    }
+                }
+
+                const payload = { 
+                    instances: [{ prompt, negativePrompt }], 
+                    parameters: { "sampleCount": 1 } 
+                };
+
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        const response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                        const result = await response.json();
+                        if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                            return `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                        } else {
+                            throw new Error('Invalid response structure from illustration API.');
+                        }
+                    } catch (error) {
+                        console.error(`Attempt ${i + 1} for "${card.term}" (illustration model) failed:`, error);
+                        if (i === maxRetries - 1) { return 'ERROR'; } 
+                        await new Promise(res => setTimeout(res, 1000 * (i + 1))); 
+                    }
                 }
             }
             return 'ERROR';
