@@ -43,7 +43,7 @@
     <div id="controls" class="w-full max-w-5xl p-6 bg-white rounded-lg shadow-md space-y-4">
         <div>
             <h2 class="text-xl font-bold text-gray-800">Create Your Own Flashcards</h2>
-            <p class="text-sm text-gray-600">Enter your terms and definitions below, one per line. Use a colon ":" to separate them. To customize an AI image, add details in parenthesis. For example: <br> <code class="bg-gray-200 p-1 rounded">Car (red sports car): A vehicle for driving.</code><br>For math or science, keep the custom prompt super simple (e.g., <code class="bg-gray-200 p-1 rounded">Addition (plus sign)</code>).</p>
+            <p class="text-sm text-gray-600">Enter your terms and definitions below, one per line. Use a colon ":" to separate them. To customize an AI image, add details in parenthesis. For example: <br> <code class="bg-gray-200 p-1 rounded">Car (red sports car): A vehicle for driving.</code><br>For an artistic style, try: <code class="bg-gray-200 p-1 rounded">Planet (in the style of Van Gogh): ...</code>).</p>
             <textarea id="custom-vocab-input" class="w-full h-32 p-2 mt-2 border border-gray-300 rounded-md" placeholder="Canyon: A deep valley with very steep sides...&#10;Planet (blue and green marble): A celestial body orbiting a star..."></textarea>
              <button id="generate-btn" class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition transform hover:scale-105">
                 Generate Flashcards
@@ -123,10 +123,20 @@
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
             
             let newPrompt;
-            if (card.customPrompt) {
-                newPrompt = `A clean and simple clipart illustration of a '${card.term}' described as '${card.customPrompt}'. Flat design, vibrant colors, bold outlines, on a white background. No words, no letters, no numbers, no text whatsoever.`;
+            const promptText = card.customPrompt || '';
+            const styleKeywords = ['style', 'painting', 'drawing', 'photo', 'realistic', 'art', 'gogh', 'picasso', 'monet', 'dali'];
+            const isArtisticStyle = styleKeywords.some(keyword => promptText.toLowerCase().includes(keyword));
+
+            if (isArtisticStyle) {
+                // If an artistic style is requested, prioritize it.
+                newPrompt = `An image of a '${card.term}', ${promptText}. No words, no letters, no numbers, or text.`;
             } else {
-                newPrompt = `A clean and simple clipart illustration of a '${card.term}'. Flat design, vibrant colors, bold outlines, on a white background. No words, no letters, no numbers, no text whatsoever.`;
+                // Otherwise, stick to the effective clipart style.
+                if (promptText) {
+                    newPrompt = `A clean and simple clipart illustration of a '${card.term}' described as '${promptText}'. Flat design, vibrant colors, bold outlines, on a white background. No words, no letters, no numbers, no text whatsoever.`;
+                } else {
+                    newPrompt = `A clean and simple clipart illustration of a '${card.term}'. Flat design, vibrant colors, bold outlines, on a white background. No words, no letters, no numbers, no text whatsoever.`;
+                }
             }
 
             const payload = { instances: [{ prompt: newPrompt }], parameters: { "sampleCount": 1 } };
@@ -406,7 +416,7 @@
             .card-label { color-adjust: exact; -webkit-print-color-adjust: exact; }
             @page { size: landscape; margin: 0.5in; }
         }
-    <\/style>
+    </style>
 </head>
 <body class="p-8 flex flex-col items-center space-y-8">
     <div id="instructions" class="w-full max-w-5xl p-4 bg-blue-100 border-l-4 border-blue-500 text-blue-700 rounded-lg shadow-md">
