@@ -25,7 +25,7 @@
         /* --- Print Styles --- */
         @media print {
             body { background-color: #ffffff; padding: 0; margin: 0; }
-            #controls, .regenerate-btn { display: none !important; }
+            #controls, .regenerate-btn, .hint-input { display: none !important; }
             .page-container {
                 box-shadow: none; width: 100%; height: 100%;
                 padding: 0; margin: 0; border-radius: 0;
@@ -170,17 +170,22 @@
                 <div class="card-label text-center text-white flex items-center justify-center px-2 bg-${color}" style="flex-basis: 4.5rem;">
                     <h2 class="text-xl font-bold">${card.term}</h2>
                 </div>
-                <button class="regenerate-btn absolute top-2 right-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 text-xs font-semibold rounded-md shadow-md transition transform hover:scale-105">
-                    New AI Image
-                </button>
+                <div class="absolute top-2 right-2 flex flex-col items-end space-y-1">
+                    <button class="regenerate-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 text-xs font-semibold rounded-md shadow-md transition transform hover:scale-105">
+                        New AI Image
+                    </button>
+                    <input type="text" class="hint-input bg-white w-32 text-xs p-1 rounded border border-gray-300 shadow-sm" placeholder="Add/edit hint..." value="${card.customPrompt || ''}">
+                </div>
             `;
 
             const regenerateBtn = cardEl.querySelector('.regenerate-btn');
             const imageContainer = cardEl.querySelector('.image-container');
+            const hintInput = cardEl.querySelector('.hint-input');
 
             regenerateBtn.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 regenerateBtn.disabled = true;
+                hintInput.disabled = true;
                 regenerateBtn.textContent = '...';
                 imageContainer.innerHTML = '<div class="loader"></div>';
 
@@ -188,29 +193,15 @@
                 if (!cardData) {
                     console.error("Card data not found for term:", card.term);
                     regenerateBtn.disabled = false;
+                    hintInput.disabled = false;
                     regenerateBtn.textContent = 'New AI Image';
                     imageContainer.innerHTML = 'Error';
                     return;
                 }
 
-                const input = document.getElementById('custom-vocab-input').value;
-                const lines = input.split('\n');
-                const line = lines.find(l => l.trim().startsWith(card.term));
-
-                if (line) {
-                    const lineParts = line.split(':');
-                    const termAndPrompt = lineParts[0].trim();
-                    const definition = lineParts.slice(1).join(':').trim();
-                    let term = termAndPrompt;
-                    let customPrompt = null;
-                    const promptMatch = termAndPrompt.match(/(.*?)\s*\((.*?)\)/);
-                    if (promptMatch && promptMatch.length === 3) {
-                        term = promptMatch[1].trim();
-                        customPrompt = promptMatch[2].trim();
-                    }
-                    cardData.definition = definition;
-                    cardData.customPrompt = customPrompt;
-                }
+                // Get the current hint from this card's input field
+                const currentHint = hintInput.value.trim();
+                cardData.customPrompt = currentHint;
                 
                 const newImageUrl = await generateImageWithRetry(cardData);
                 
@@ -219,10 +210,11 @@
                 if (newImageUrl) {
                      imageContainer.innerHTML = `<img src="${newImageUrl}" alt="${cardData.term}" class="max-h-full max-w-full object-contain">`;
                 } else {
-                     imageContainer.innerHTML = '';
+                     imageContainer.innerHTML = '<p class="text-red-500">Failed</p>';
                 }
                
                 regenerateBtn.disabled = false;
+                hintInput.disabled = false;
                 regenerateBtn.textContent = 'New AI Image';
             });
 
@@ -403,7 +395,7 @@
         body { font-family: 'Poppins', sans-serif; }
         @media print {
             body { background-color: #ffffff; padding: 0; margin: 0; }
-            #instructions, .regenerate-btn { display: none !important; }
+            #instructions, .regenerate-btn, .hint-input { display: none !important; }
             .page-container {
                 box-shadow: none; width: 100%; height: 100%;
                 padding: 0; margin: 0; border-radius: 0;
