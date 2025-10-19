@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flashcard Match Importer</title>
+    <title>Vocabulary Game Creator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,19 +11,18 @@
     <style>
         html, body {
             height: 100%;
-            overflow: hidden; /* Prevent scrollbars from the full-screen layout */
+            overflow: hidden;
         }
         body {
             font-family: 'Poppins', sans-serif;
-            /* Flexbox layout is now handled by Tailwind classes */
             touch-action: none;
         }
         canvas {
-            background-color: #f0f9ff; /* sky-blue-50 */
+            background-color: #f0f9ff;
             border-radius: 0.75rem;
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
             cursor: grab;
-            display: block; /* Ensures proper layout */
+            display: block;
         }
         .action-button {
             transition: all 0.2s ease-in-out;
@@ -36,53 +35,103 @@
             cursor: not-allowed;
             opacity: 0.6;
         }
+        /* Styles for Quiz Game */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        .shake {
+            animation: shake 0.3s ease-in-out;
+        }
     </style>
 </head>
 <body class="bg-gray-100 p-4 h-full w-full flex justify-center items-center">
 
-    <div class="w-full h-full max-w-7xl mx-auto flex flex-col text-center">
-        <header class="mb-4 flex-shrink-0">
+    <div id="app-container" class="w-full h-full max-w-7xl mx-auto flex flex-col text-center">
+        <!-- App Header -->
+        <header id="app-header" class="mb-4 flex-shrink-0">
             <div class="bg-teal-600 text-white inline-block px-6 py-2 rounded-xl shadow-lg">
-                <h1 class="text-2xl font-bold">Flashcard Match Importer</h1>
+                <h1 class="text-2xl font-bold">Vocabulary Game Creator</h1>
             </div>
         </header>
 
-        <section id="start-screen" class="mb-4 p-4 rounded-xl flex-grow flex flex-col justify-center items-center">
-            <h2 id="start-title" class="text-xl font-semibold text-gray-700 mb-3">Import a custom set or play with the default!</h2>
-            <div class="flex flex-wrap justify-center items-center gap-4">
+        <!-- Start Screen -->
+        <section id="start-screen" class="p-4 rounded-xl flex-grow flex flex-col justify-center items-center">
+            <h2 id="start-title" class="text-xl font-semibold text-gray-700 mb-6">Import a custom set or play a sample game!</h2>
+            
+            <div class="flex flex-wrap justify-center items-center gap-4 mb-8">
                  <button id="import-json-btn" class="action-button bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 text-lg rounded-lg shadow-md">Import Custom Set (.json)</button>
-                <button id="start-game-button" class="action-button bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 text-lg rounded-lg shadow-md">Start Game</button>
                 <button id="download-html-btn" class="action-button bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 text-lg rounded-lg shadow-md">Download Game (.html)</button>
             </div>
             <input type="file" id="json-importer" class="hidden" accept=".json">
+
+            <div class="grid md:grid-cols-2 gap-8 w-full max-w-4xl">
+                <!-- Game 1: Flashcard Match -->
+                <div class="bg-white p-6 rounded-lg shadow-md flex flex-col items-center">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">Flashcard Match</h3>
+                    <p class="text-gray-600 mb-6">Drag the definition card onto its matching term card.</p>
+                    <button id="start-match-game-btn" class="action-button bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 text-lg rounded-lg shadow-md">Start Sample Game</button>
+                </div>
+                <!-- Game 2: Vocabulary Quiz -->
+                <div class="bg-white p-6 rounded-lg shadow-md flex flex-col items-center">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">Vocabulary Quiz</h3>
+                    <p class="text-gray-600 mb-6">Read the definition at the top and click the matching term.</p>
+                    <button id="start-quiz-game-btn" class="action-button bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 text-lg rounded-lg shadow-md">Start Sample Game</button>
+                </div>
+            </div>
         </section>
         
-        <main id="game-container" class="hidden w-full flex-grow flex flex-col items-center">
-            <div id="hud" class="flex justify-between items-center mb-2 text-gray-800 font-semibold text-lg w-full flex-shrink-0">
+        <!-- Game 1: Match Game Container -->
+        <main id="match-game-container" class="hidden w-full flex-grow flex flex-col items-center">
+            <div id="match-hud" class="flex justify-between items-center mb-2 text-gray-800 font-semibold text-lg w-full flex-shrink-0">
                 <div id="round-display">Round: 1</div>
                 <div id="timer-display">Time: 0s</div>
                 <div id="best-time-display">Best: N/A</div>
             </div>
-             <canvas id="game-canvas" class="w-full h-full"></canvas>
+            <canvas id="game-canvas" class="w-full h-full mb-2"></canvas>
+            <button class="main-menu-btn action-button bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-5 rounded-lg shadow-md">Main Menu</button>
         </main>
+        
+        <!-- Game 2: Quiz Game Container -->
+        <main id="quiz-game-container" class="hidden w-full h-full flex-grow flex flex-col items-center">
+            <section id="hint-section" class="text-center mb-4 bg-white p-3 rounded-xl shadow-md w-full min-h-[60px] flex items-center justify-center">
+                 <p id="hint-text" class="text-lg font-semibold text-gray-700">Click start to play!</p>
+            </section>
+            <div id="card-container" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 w-full flex-grow overflow-y-auto p-2">
+                <!-- Quiz cards will be dynamically inserted here -->
+            </div>
+            <footer id="footer-section" class="text-center mt-4 flex-shrink-0">
+                 <button class="main-menu-btn action-button bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-5 rounded-lg shadow-md">Main Menu</button>
+            </footer>
+        </main>
+
     </div>
 
     <script>
+        // --- General UI Elements ---
+        const appContainer = document.getElementById('app-container');
+        const appHeader = document.getElementById('app-header');
         const startScreen = document.getElementById('start-screen');
-        const startGameButton = document.getElementById('start-game-button');
+        const startTitle = document.getElementById('start-title');
+        
         const importJsonButton = document.getElementById('import-json-btn');
         const downloadHtmlButton = document.getElementById('download-html-btn');
         const jsonImporter = document.getElementById('json-importer');
-        const startTitle = document.getElementById('start-title');
-        const gameContainer = document.getElementById('game-container');
-        const roundDisplay = document.getElementById('round-display');
-        const timerDisplay = document.getElementById('timer-display');
-        const bestTimeDisplay = document.getElementById('best-time-display');
-        const canvas = document.getElementById('game-canvas');
-        const ctx = canvas.getContext('2d');
+        
+        const startMatchGameBtn = document.getElementById('start-match-game-btn');
+        const startQuizGameBtn = document.getElementById('start-quiz-game-btn');
 
-        // Master list of all vocabulary. Will be populated by import or default.
-        let MASTER_VOCABULARY = [
+        // --- Game Containers ---
+        const matchGameContainer = document.getElementById('match-game-container');
+        const quizGameContainer = document.getElementById('quiz-game-container');
+        
+        document.querySelectorAll('.main-menu-btn').forEach(btn => btn.addEventListener('click', showStartScreen));
+
+        // --- Master Vocabulary Store ---
+        let MASTER_VOCABULARY = [];
+        let IS_CUSTOM_SET_LOADED = false;
+        const DEFAULT_MATCH_VOCAB = [
             { term: 'Map', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F5FA.svg', definition: 'A drawing that shows where places are on Earth.' },
             { term: 'Landmark', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F5FC.svg', definition: 'An important place or building that is easy to recognize.' },
             { term: 'Settlement', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F3E0.svg', definition: 'A community or place where people build homes and live.' },
@@ -92,103 +141,153 @@
             { term: 'River', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F3DE.svg', definition: 'A large natural stream of water flowing in a channel to the sea, a lake, or another river.' },
             { term: 'Mountain', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/26F0.svg', definition: 'A large natural elevation of the earth\'s surface rising abruptly from the surrounding level.' }
         ];
-        let ROUND_SIZES = [];
+        const DEFAULT_QUIZ_VOCAB = [
+            { term: 'Historical Site', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F3DB.svg', definition: 'A special place that is important to our past.' },
+            { term: 'Landforms', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F3DE.svg', definition: 'The natural shapes of the land, like mountains, hills, or flat prairies.' },
+            { term: 'Natural Resources', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F333.svg', definition: 'Things from nature that people use, like water, trees, and oil.' },
+            { term: 'Political Boundaries', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F5FA.svg', definition: 'The lines on a map that show where a province or country begins and ends.' },
+            { term: 'Treaty', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F4DC.svg', definition: 'A special promise or agreement made between groups of people.' },
+            { term: 'Landmark', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F5FC.svg', definition: 'An important place or building that is easy to recognize.' }
+        ];
 
-        function calculateRoundSizes(vocabList) {
-            const sizes = [];
-            let remaining = vocabList.length;
-            while (remaining > 0) {
-                const roundSize = Math.min(6, remaining); // Max 6 pairs per round
-                sizes.push(roundSize);
-                remaining -= roundSize;
-            }
-            return sizes;
-        }
-
-        ROUND_SIZES = calculateRoundSizes(MASTER_VOCABULARY);
-
-        let workingVocabulary = [];
-        let gameObjects = [];
-        let images = {};
-        let draggedObject = null;
-        let offsetX, offsetY;
-        let timerInterval = null;
-        let secondsElapsed = 0;
-        let currentRound = 0;
-
-        const CARD_WIDTH = 180;
-        const CARD_HEIGHT = 140;
-        const PADDING = 20;
-        // The canvas size is now set dynamically when the game starts.
-
-        // --- Import Logic ---
-        importJsonButton.addEventListener('click', () => {
-            jsonImporter.click();
-        });
+        // --- Import / Download Logic ---
+        importJsonButton.addEventListener('click', () => jsonImporter.click());
+        downloadHtmlButton.addEventListener('click', downloadGame);
 
         jsonImporter.addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
                     const importedData = JSON.parse(e.target.result);
-                    if (!Array.isArray(importedData) || importedData.some(item => !item.term || !item.definition || !item.imageSrc)) {
-                       throw new Error("Invalid JSON format.");
+                    // Standardize image key to 'imageSrc'
+                    const standardizedData = importedData.map(item => ({...item, imageSrc: item.imageSrc || item.image }));
+
+                    if (!Array.isArray(standardizedData) || standardizedData.some(item => !item.term || !item.definition || !item.imageSrc)) {
+                       throw new Error("Invalid JSON format. Each item must have term, definition, and imageSrc.");
                     }
-                    MASTER_VOCABULARY = importedData;
-                    
-                    // Dynamically calculate round sizes
-                    ROUND_SIZES = calculateRoundSizes(MASTER_VOCABULARY);
-                    
+                    MASTER_VOCABULARY = standardizedData;
+                    IS_CUSTOM_SET_LOADED = true;
                     startTitle.textContent = `✅ ${MASTER_VOCABULARY.length} cards loaded! Ready to play!`;
-                    startGameButton.disabled = false;
+                    startMatchGameBtn.textContent = "Start Custom Game";
+                    startQuizGameBtn.textContent = "Start Custom Game";
                 } catch (error) {
                     console.error("Failed to parse JSON:", error);
-                    startTitle.textContent = "❌ Error: Could not load the file. Please check the format.";
+                    startTitle.textContent = `❌ Error: ${error.message}`;
                 }
             };
             reader.readAsText(file);
         });
 
         function downloadGame() {
-            // Get the current vocabulary list as a nicely formatted string
-            const currentVocabString = JSON.stringify(MASTER_VOCABULARY, null, 4);
-            
-            // Get the entire HTML of the current page
+            const vocabToSave = IS_CUSTOM_SET_LOADED ? MASTER_VOCABULARY : DEFAULT_MATCH_VOCAB.concat(DEFAULT_QUIZ_VOCAB);
+            const currentVocabString = JSON.stringify(vocabToSave, null, 4);
             const fullHtml = document.documentElement.outerHTML;
             
-            // Define the new content for the MASTER_VOCABULARY variable
-            const newMasterVocabLine = `let MASTER_VOCABULARY = ${currentVocabString};`;
-
-            // Use a regular expression to find and replace the original MASTER_VOCABULARY array
-            const regex = /let MASTER_VOCABULARY = \[[\s\S]*?\];/;
-            const modifiedHtml = fullHtml.replace(regex, newMasterVocabLine);
-
-            // Create a Blob from the modified HTML
-            const blob = new Blob([modifiedHtml], { type: 'text/html' });
+            // This replacement is tricky. We'll replace the default assignments.
+            const vocabScriptSegment = `const DEFAULT_MATCH_VOCAB = ${currentVocabString};\n        const DEFAULT_QUIZ_VOCAB = [];\n        MASTER_VOCABULARY = DEFAULT_MATCH_VOCAB; IS_CUSTOM_SET_LOADED = true;`;
+            const regex = /const DEFAULT_MATCH_VOCAB = \[[\s\S]*?\];\s*const DEFAULT_QUIZ_VOCAB = \[[\s\S]*?\];/;
             
-            // Create a temporary link to trigger the download
+            let modifiedHtml = fullHtml.replace(regex, vocabScriptSegment);
+            modifiedHtml = modifiedHtml.replace(/<title>.*<\/title>/, `<title>Flashcard Game</title>`);
+
+
+            const blob = new Blob([modifiedHtml], { type: 'text/html' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = 'flashcard-match-game.html';
+            link.download = 'vocabulary-game.html';
             document.body.appendChild(link);
             link.click();
-            
-            // Clean up by removing the link and revoking the URL
             document.body.removeChild(link);
             URL.revokeObjectURL(link.href);
         }
+
+        function showStartScreen() {
+            startScreen.classList.remove('hidden');
+            appHeader.classList.remove('hidden');
+            matchGameContainer.classList.add('hidden');
+            quizGameContainer.classList.add('hidden');
+            if(matchGame.timerInterval) clearInterval(matchGame.timerInterval);
+        }
+
+        /******************************************/
+        /********* FLASHCARD MATCH GAME JS ********/
+        /******************************************/
+        const matchGame = {
+            roundDisplay: document.getElementById('round-display'),
+            timerDisplay: document.getElementById('timer-display'),
+            bestTimeDisplay: document.getElementById('best-time-display'),
+            canvas: document.getElementById('game-canvas'),
+            ctx: document.getElementById('game-canvas').getContext('2d'),
+            gameObjects: [],
+            images: {},
+            draggedObject: null,
+            offsetX: 0,
+            offsetY: 0,
+            timerInterval: null,
+            secondsElapsed: 0,
+            currentRound: 0,
+            workingVocabulary: [],
+            ROUND_SIZES: [],
+            CARD_WIDTH: 180,
+            CARD_HEIGHT: 140,
+            PADDING: 20
+        };
+
+        function initMatchGame() {
+            if (!IS_CUSTOM_SET_LOADED) {
+                MASTER_VOCABULARY = DEFAULT_MATCH_VOCAB;
+            }
+            startScreen.classList.add('hidden');
+            appHeader.classList.add('hidden');
+            matchGameContainer.classList.remove('hidden');
+            
+            matchGame.workingVocabulary = JSON.parse(JSON.stringify(MASTER_VOCABULARY));
+            matchGame.currentRound = 0;
+            matchGame.ROUND_SIZES = [];
+            let remaining = matchGame.workingVocabulary.length;
+            while(remaining > 0) {
+                const roundSize = Math.min(6, remaining);
+                matchGame.ROUND_SIZES.push(roundSize);
+                remaining -= roundSize;
+            }
+
+            matchGame.canvas.width = matchGame.canvas.offsetWidth;
+            matchGame.canvas.height = matchGame.canvas.offsetHeight;
+            startNextMatchRound();
+        }
+
+        function startNextMatchRound() {
+            matchGame.currentRound++;
+            if (matchGame.currentRound > matchGame.ROUND_SIZES.length) {
+                showFinalWinScreen();
+                return;
+            }
+            matchGame.roundDisplay.textContent = `Round: ${matchGame.currentRound}`;
+            matchGame.timerDisplay.textContent = `Time: 0s`;
+            const bestTime = localStorage.getItem(`bestTime_round_${matchGame.currentRound}`) || 'N/A';
+            matchGame.bestTimeDisplay.textContent = `Best: ${bestTime === 'N/A' ? 'N/A' : bestTime + 's'}`;
+            
+            const vocabularyForRound = matchGame.workingVocabulary.splice(0, matchGame.ROUND_SIZES[matchGame.currentRound - 1]);
+            preloadImages(vocabularyForRound, () => {
+                setupMatchGameObjects(vocabularyForRound);
+                matchGame.secondsElapsed = 0;
+                if (matchGame.timerInterval) clearInterval(matchGame.timerInterval);
+                matchGame.timerInterval = setInterval(() => {
+                    matchGame.secondsElapsed++;
+                    matchGame.timerDisplay.textContent = `Time: ${matchGame.secondsElapsed}s`;
+                }, 1000);
+                drawMatchGame();
+            });
+        }
         
-        // --- Game Logic ---
         function preloadImages(vocabulary, callback) {
             let loadedCount = 0;
             const totalImages = vocabulary.length;
             if (totalImages === 0) { callback(); return; }
             vocabulary.forEach(item => {
                 const img = new Image();
-                // Base64 images don't need crossOrigin, but doesn't hurt.
                 if (!item.imageSrc.startsWith('data:')) {
                     img.crossOrigin = "Anonymous";
                 }
@@ -197,29 +296,24 @@
                     loadedCount++;
                     if (loadedCount === totalImages) callback();
                 };
-                img.onload = () => { images[item.term] = img; onImageLoad(); };
+                img.onload = () => { matchGame.images[item.term] = img; onImageLoad(); };
                 img.onerror = () => { console.error(`Failed to load image for ${item.term}`); onImageLoad(); }
             });
         }
         
-        function isOverlapping(rect1, rect2) {
-            return rect1.x < rect2.x + rect2.width && rect1.x + rect1.width > rect2.x &&
-                   rect1.y < rect2.y + rect2.height && rect1.y + rect1.height > rect2.y;
-        }
-
-        function setupGameObjects(vocabulary) {
-            gameObjects = [];
+        function setupMatchGameObjects(vocabulary) {
+            matchGame.gameObjects = [];
             let placedObjects = [];
             const createObject = (item, type) => {
                 let newObj, overlapping;
                 do {
                     overlapping = false;
-                    const x = PADDING + Math.random() * (canvas.width - CARD_WIDTH - PADDING * 2);
-                    const y = PADDING + Math.random() * (canvas.height - CARD_HEIGHT - PADDING * 2);
+                    const x = matchGame.PADDING + Math.random() * (matchGame.canvas.width - matchGame.CARD_WIDTH - matchGame.PADDING * 2);
+                    const y = matchGame.PADDING + Math.random() * (matchGame.canvas.height - matchGame.CARD_HEIGHT - matchGame.PADDING * 2);
                     newObj = {
                         id: `${item.term}-${type}`, term: item.term, type: type,
                         content: type === 'term' ? item.term : item.definition,
-                        x, y, width: CARD_WIDTH, height: CARD_HEIGHT, isMatched: false,
+                        x, y, width: matchGame.CARD_WIDTH, height: matchGame.CARD_HEIGHT, isMatched: false,
                     };
                     for (const placed of placedObjects) {
                         if (isOverlapping(newObj, placed)) { overlapping = true; break; }
@@ -229,91 +323,37 @@
                 return newObj;
             };
             vocabulary.forEach(item => {
-                gameObjects.push(createObject(item, 'term'));
-                gameObjects.push(createObject(item, 'definition'));
+                matchGame.gameObjects.push(createObject(item, 'term'));
+                matchGame.gameObjects.push(createObject(item, 'definition'));
             });
         }
 
-        function startRound() {
-            const vocabularyForRound = workingVocabulary.splice(0, ROUND_SIZES[currentRound - 1]);
-            preloadImages(vocabularyForRound, () => {
-                setupGameObjects(vocabularyForRound);
-                secondsElapsed = 0;
-                if (timerInterval) clearInterval(timerInterval);
-                timerInterval = setInterval(() => {
-                    secondsElapsed++;
-                    timerDisplay.textContent = `Time: ${secondsElapsed}s`;
-                }, 1000);
-                draw();
-            });
-        }
-
-        function startNextRound() {
-            currentRound++;
-            if (currentRound > ROUND_SIZES.length) {
-                showFinalWinScreen();
-                return;
-            }
-            roundDisplay.textContent = `Round: ${currentRound}`;
-            timerDisplay.textContent = `Time: 0s`;
-            const bestTime = localStorage.getItem(`bestTime_round_${currentRound}`) || 'N/A';
-            bestTimeDisplay.textContent = `Best: ${bestTime === 'N/A' ? 'N/A' : bestTime + 's'}`;
-            startRound();
-        }
-        
-        function wrapText(context, text, x, y, maxWidth, lineHeight) {
-            const words = text.split(' ');
-            let line = '';
-            let lines = [];
-            for (let n = 0; n < words.length; n++) {
-                let testLine = line + words[n] + ' ';
-                if (context.measureText(testLine).width > maxWidth && n > 0) {
-                    lines.push(line);
-                    line = words[n] + ' ';
-                } else {
-                    line = testLine;
-                }
-            }
-            lines.push(line);
-            
-            context.textBaseline = 'middle';
-            const totalHeight = lines.length * lineHeight;
-            let startY = y - totalHeight / 2 + lineHeight / 2;
-
-            for(let i = 0; i < lines.length; i++) {
-                context.fillText(lines[i].trim(), x, startY + i * lineHeight);
-            }
-        }
-        
-        function draw() {
+        function drawMatchGame() {
+            const { ctx, canvas, gameObjects, draggedObject } = matchGame;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             gameObjects.forEach(obj => { if (!obj.isMatched && obj !== draggedObject) drawCard(obj); });
             if (draggedObject) drawCard(draggedObject);
         }
 
         function drawCard(obj) {
+            const { ctx, images } = matchGame;
             ctx.lineWidth = 3;
             ctx.fillStyle = obj.type === 'term' ? '#f3f4f6' : '#eef2ff';
             ctx.strokeStyle = obj.type === 'term' ? '#4b5563' : '#6366f1';
-            
             ctx.beginPath();
             ctx.roundRect(obj.x, obj.y, obj.width, obj.height, [12]);
             ctx.stroke();
             ctx.fill();
-
             ctx.fillStyle = '#1f2937';
             ctx.textAlign = 'center';
 
             if (obj.type === 'term') {
                 const img = images[obj.term];
                 if (img) {
-                    const maxImgHeight = obj.height - 60; // Reserve space for text and padding
-                    const maxImgWidth = obj.width - 20;   // Reserve space for side padding
+                    const maxImgHeight = obj.height - 60;
+                    const maxImgWidth = obj.width - 20;
                     const scale = Math.min(maxImgWidth / img.width, maxImgHeight / img.height);
-                    const scaledWidth = img.width * scale;
-                    const scaledHeight = img.height * scale;
-                    // Center the image in the allocated space at the top of the card
-                    ctx.drawImage(img, obj.x + (obj.width - scaledWidth) / 2, obj.y + 10 + (maxImgHeight - scaledHeight) / 2, scaledWidth, scaledHeight);
+                    ctx.drawImage(img, obj.x + (obj.width - img.width*scale) / 2, obj.y + 10, img.width*scale, img.height*scale);
                 }
                 ctx.font = 'bold 18px Poppins';
                 wrapText(ctx, obj.content, obj.x + obj.width / 2, obj.y + obj.height - 30, obj.width - 20, 20);
@@ -322,110 +362,193 @@
                 wrapText(ctx, obj.content, obj.x + obj.width / 2, obj.y + obj.height / 2, obj.width - 20, 20);
             }
         }
-
-        function checkRoundWinCondition() {
-            if (gameObjects.length === 0) return;
-            if (gameObjects.every(obj => obj.isMatched)) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-                
-                const bestTime = localStorage.getItem(`bestTime_round_${currentRound}`);
-                if (!bestTime || secondsElapsed < parseInt(bestTime)) {
-                    localStorage.setItem(`bestTime_round_${currentRound}`, secondsElapsed);
+        
+        function onMatchDown(evt) {
+            if (!matchGame.timerInterval) return;
+            const pos = getMousePos(matchGame.canvas, evt);
+            for (let i = matchGame.gameObjects.length - 1; i >= 0; i--) {
+                const obj = matchGame.gameObjects[i];
+                if (!obj.isMatched && pos.x > obj.x && pos.x < obj.x + obj.width && pos.y > obj.y && pos.y < obj.y + obj.height) {
+                    matchGame.draggedObject = obj;
+                    matchGame.offsetX = pos.x - obj.x;
+                    matchGame.offsetY = pos.y - obj.y;
+                    matchGame.canvas.style.cursor = 'grabbing';
+                    break;
                 }
+            }
+        }
+        function onMatchMove(evt) {
+            if (matchGame.draggedObject) {
+                const pos = getMousePos(matchGame.canvas, evt);
+                matchGame.draggedObject.x = pos.x - matchGame.offsetX;
+                matchGame.draggedObject.y = pos.y - matchGame.offsetY;
+                drawMatchGame();
+            }
+        }
+        function onMatchUp() {
+            matchGame.canvas.style.cursor = 'grab';
+            if (matchGame.draggedObject) {
+                const dropTarget = matchGame.gameObjects.find(obj => obj !== matchGame.draggedObject && !obj.isMatched &&
+                    obj.term === matchGame.draggedObject.term && isOverlapping(matchGame.draggedObject, obj));
 
+                if (dropTarget) {
+                    matchGame.draggedObject.isMatched = true;
+                    dropTarget.isMatched = true;
+                }
+                matchGame.draggedObject = null;
+                drawMatchGame();
+                checkRoundWinCondition();
+            }
+        }
+        
+        function checkRoundWinCondition() {
+            if (matchGame.gameObjects.length === 0) return;
+            if (matchGame.gameObjects.every(obj => obj.isMatched)) {
+                clearInterval(matchGame.timerInterval);
+                matchGame.timerInterval = null;
+                const { ctx, canvas } = matchGame;
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = 'white';
                 ctx.font = 'bold 40px Poppins';
                 ctx.textAlign = 'center';
-                ctx.fillText(`Round ${currentRound} Complete!`, canvas.width / 2, canvas.height / 2);
-                
-                setTimeout(startNextRound, 2000);
+                ctx.fillText(`Round ${matchGame.currentRound} Complete!`, canvas.width / 2, canvas.height / 2);
+                setTimeout(startNextMatchRound, 2000);
             }
         }
         
         function showFinalWinScreen() {
-            clearInterval(timerInterval);
-            timerInterval = null;
-            gameContainer.classList.add('hidden');
-            startScreen.classList.remove('hidden');
+            clearInterval(matchGame.timerInterval);
+            matchGame.timerInterval = null;
+            showStartScreen();
             startTitle.textContent = "🎉 You completed the game! Well done! 🎉";
-            startGameButton.textContent = "Play Again";
+            startMatchGameBtn.textContent = "Play Again";
+            startQuizGameBtn.textContent = "Play Again";
         }
         
-        function initGame() {
-            workingVocabulary = JSON.parse(JSON.stringify(MASTER_VOCABULARY));
-            currentRound = 0;
-            startScreen.classList.add('hidden');
-            gameContainer.classList.remove('hidden');
-            
-            // Set the canvas rendering size to match its displayed size for crisp graphics
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
-
-            startNextRound();
+        // --- Shared Helper Functions ---
+        function wrapText(context, text, x, y, maxWidth, lineHeight) {
+            const words = text.split(' ');
+            let line = ''; let lines = [];
+            for (let n = 0; n < words.length; n++) {
+                let testLine = line + words[n] + ' ';
+                if (context.measureText(testLine).width > maxWidth && n > 0) {
+                    lines.push(line); line = words[n] + ' ';
+                } else { line = testLine; }
+            }
+            lines.push(line);
+            context.textBaseline = 'middle';
+            const totalHeight = lines.length * lineHeight;
+            let startY = y - totalHeight / 2 + lineHeight / 2;
+            for(let i = 0; i < lines.length; i++) {
+                context.fillText(lines[i].trim(), x, startY + i * lineHeight);
+            }
         }
-
-        function getMousePos(evt) {
+        function isOverlapping(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width && rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height && rect1.y + rect1.height > rect2.y;
+        }
+        function getMousePos(canvas, evt) {
             const rect = canvas.getBoundingClientRect();
             const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
             const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
             return { x: clientX - rect.left, y: clientY - rect.top };
         }
 
-        function onDown(evt) {
-            if (!timerInterval) return;
-            const pos = getMousePos(evt);
-            for (let i = gameObjects.length - 1; i >= 0; i--) {
-                const obj = gameObjects[i];
-                if (!obj.isMatched && pos.x > obj.x && pos.x < obj.x + obj.width && pos.y > obj.y && pos.y < obj.y + obj.height) {
-                    draggedObject = obj;
-                    offsetX = pos.x - obj.x;
-                    offsetY = pos.y - obj.y;
-                    canvas.style.cursor = 'grabbing';
-                    break;
-                }
+        /******************************************/
+        /********** VOCABULARY QUIZ JS ************/
+        /******************************************/
+        const quizGame = {
+            cardContainer: document.getElementById('card-container'),
+            hintText: document.getElementById('hint-text'),
+            footerSection: document.getElementById('footer-section'),
+            shuffledCards: [],
+            currentCardIndex: 0,
+            lockBoard: false,
+            borderColors: ['border-green-500', 'border-blue-500', 'border-orange-500', 'border-red-500', 'border-purple-500', 'border-cyan-500', 'border-yellow-500', 'border-lime-500']
+        };
+
+        function initQuizGame() {
+            if (!IS_CUSTOM_SET_LOADED) {
+                MASTER_VOCABULARY = DEFAULT_QUIZ_VOCAB;
+            }
+            startScreen.classList.add('hidden');
+            appHeader.classList.add('hidden');
+            quizGameContainer.classList.remove('hidden');
+
+            quizGame.shuffledCards = [...MASTER_VOCABULARY].sort(() => Math.random() - 0.5);
+            quizGame.currentCardIndex = 0;
+            quizGame.lockBoard = false;
+            
+            displayQuizCards();
+            displayNextQuizHint();
+        }
+
+        function displayNextQuizHint() {
+            if (quizGame.currentCardIndex < quizGame.shuffledCards.length) {
+                quizGame.hintText.textContent = quizGame.shuffledCards[quizGame.currentCardIndex].definition;
+            } else {
+                quizGame.hintText.textContent = "🎉 You found them all! 🎉";
+                quizGame.lockBoard = true;
             }
         }
 
-        function onMove(evt) {
-            if (draggedObject) {
-                const pos = getMousePos(evt);
-                draggedObject.x = pos.x - offsetX;
-                draggedObject.y = pos.y - offsetY;
-                draw();
-            }
+        function displayQuizCards() {
+            quizGame.cardContainer.innerHTML = '';
+            const displayOrderCards = [...quizGame.shuffledCards].sort(() => Math.random() - 0.5);
+
+            displayOrderCards.forEach((card, index) => {
+                const colorClass = quizGame.borderColors[index % quizGame.borderColors.length];
+                const cardElement = document.createElement('div');
+                cardElement.classList.add('card', 'h-40', 'bg-white', 'rounded-xl', 'border-4', colorClass, 'shadow-md', 'overflow-hidden', 'cursor-pointer', 'relative');
+                cardElement.dataset.term = card.term;
+                cardElement.innerHTML = `
+                    <div class="flex items-center justify-center h-2/3 p-1"><img src="${card.imageSrc}" alt="${card.term}" class="max-h-full max-w-full"></div>
+                    <div class="text-center bg-gray-50 py-1 h-1/3 flex items-center justify-center px-1"><h2 class="text-sm font-semibold text-gray-800">${card.term}</h2></div>
+                    <div class="absolute inset-0 bg-green-500 bg-opacity-75 flex items-center justify-center hidden is-correct-overlay">
+                        <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                    </div>`;
+                cardElement.addEventListener('click', handleQuizCardClick);
+                quizGame.cardContainer.appendChild(cardElement);
+            });
         }
+        
+        function handleQuizCardClick(e) {
+            if (quizGame.lockBoard) return;
+            const clickedCard = e.currentTarget;
+            if (clickedCard.classList.contains('is-correct')) return;
 
-        function onUp() {
-            canvas.style.cursor = 'grab';
-            if (draggedObject) {
-                const dropTarget = gameObjects.find(obj => obj !== draggedObject && !obj.isMatched &&
-                    obj.term === draggedObject.term && isOverlapping(draggedObject, obj));
+            const correctTerm = quizGame.shuffledCards[quizGame.currentCardIndex].term;
 
-                if (dropTarget) {
-                    draggedObject.isMatched = true;
-                    dropTarget.isMatched = true;
-                }
-                draggedObject = null;
-                draw();
-                checkRoundWinCondition();
+            if (clickedCard.dataset.term === correctTerm) {
+                clickedCard.classList.add('is-correct', 'pointer-events-none');
+                clickedCard.querySelector('.is-correct-overlay').classList.remove('hidden');
+                quizGame.currentCardIndex++;
+                setTimeout(displayNextQuizHint, 700);
+            } else {
+                quizGame.lockBoard = true;
+                clickedCard.classList.add('shake');
+                setTimeout(() => {
+                    clickedCard.classList.remove('shake');
+                    quizGame.lockBoard = false;
+                }, 300);
             }
         }
         
-        startGameButton.addEventListener('click', initGame);
-        downloadHtmlButton.addEventListener('click', downloadGame);
-        canvas.addEventListener('mousedown', onDown);
-        canvas.addEventListener('mousemove', onMove);
-        canvas.addEventListener('mouseup', onUp);
-        canvas.addEventListener('mouseleave', onUp);
-        canvas.addEventListener('touchstart', onDown);
-        canvas.addEventListener('touchmove', onMove);
-        canvas.addEventListener('touchend', onUp);
+        // --- Initial Event Listeners ---
+        startMatchGameBtn.addEventListener('click', initMatchGame);
+        startQuizGameBtn.addEventListener('click', initQuizGame);
+        
+        matchGame.canvas.addEventListener('mousedown', onMatchDown);
+        matchGame.canvas.addEventListener('mousemove', onMatchMove);
+        matchGame.canvas.addEventListener('mouseup', onMatchUp);
+        matchGame.canvas.addEventListener('mouseleave', onMatchUp);
+        matchGame.canvas.addEventListener('touchstart', onMatchDown, {passive: false});
+        matchGame.canvas.addEventListener('touchmove', onMatchMove, {passive: false});
+        matchGame.canvas.addEventListener('touchend', onMatchUp);
+
     </script>
 </body>
 </html>
-
 
 
