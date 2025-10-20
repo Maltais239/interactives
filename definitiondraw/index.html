@@ -3,45 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Definition Draw AI</title>
+    <title>Definition Draw</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Prevents the whole page from scrolling when drawing on mobile */
-        html, body {
-            overflow: hidden;
-            height: 100%;
-        }
         body {
             font-family: 'Poppins', sans-serif;
-        }
-        .color-swatch {
-            transition: transform 0.2s;
-        }
-        .color-swatch:hover {
-            transform: scale(1.1);
-        }
-        .color-swatch.selected {
-            transform: scale(1.2);
-            outline: 3px solid #3b82f6; /* blue-500 */
+            background-color: #f1f5f9;
         }
         #drawing-canvas {
+            background: #fff;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            touch-action: none;
             cursor: crosshair;
-            touch-action: none; /* Critical for preventing browser interference on touch */
         }
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
+        .color-btn.active {
+            outline: 3px solid black;
+            transform: scale(1.1);
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        #drawing-canvas.fill-cursor {
+            cursor: copy;
         }
     </style>
 </head>
@@ -50,8 +34,8 @@
     <!-- Start Screen -->
     <div id="start-screen" class="w-full max-w-2xl text-center">
         <div class="bg-white p-8 rounded-2xl shadow-lg">
-            <h1 id="start-title" class="text-4xl font-bold text-teal-600 mb-4">Definition Draw AI</h1>
-            <p class="text-slate-600 mb-8">Read the definition, draw the word, and get instant AI feedback on your creation!</p>
+            <h1 id="start-title" class="text-4xl font-bold text-teal-600 mb-4">Definition Draw</h1>
+            <p class="text-slate-600 mb-8">A simple game to help you visualize vocabulary. Draw the term based on its definition.</p>
             <div id="error-message" class="text-red-500 font-semibold my-4 hidden"></div>
             <div class="flex flex-col sm:flex-row gap-4 justify-center">
                 <button id="start-sample-btn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105">
@@ -66,68 +50,65 @@
     </div>
 
     <!-- Game Screen -->
-    <main id="game-screen" class="w-full h-[90vh] max-w-6xl hidden">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
-            <!-- Left Panel: Definition & Controls -->
-            <div class="bg-white rounded-2xl shadow-lg p-6 flex flex-col">
-                <div class="flex-grow">
-                    <h2 id="word-term" class="text-3xl font-bold mb-2">Word</h2>
-                    <p id="word-definition" class="text-slate-600 text-lg">This is the definition of the word. Read it carefully and prepare to draw what you visualize.</p>
-                </div>
-                <div class="mt-auto">
-                    <h3 class="text-lg font-semibold mb-3">Drawing Tools</h3>
-                    <div class="flex items-center gap-4">
-                        <div id="color-palette" class="flex gap-2">
-                            <div class="color-swatch w-8 h-8 rounded-full bg-black cursor-pointer selected" data-color="black"></div>
-                            <div class="color-swatch w-8 h-8 rounded-full bg-red-500 cursor-pointer" data-color="#ef4444"></div>
-                            <div class="color-swatch w-8 h-8 rounded-full bg-green-500 cursor-pointer" data-color="#22c55e"></div>
-                            <div class="color-swatch w-8 h-8 rounded-full bg-blue-500 cursor-pointer" data-color="#3b82f6"></div>
-                            <div class="color-swatch w-8 h-8 rounded-full bg-yellow-400 cursor-pointer" data-color="#facc15"></div>
-                        </div>
-                        <button id="clear-canvas-btn" class="ml-auto bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg transition">Clear</button>
-                    </div>
-                </div>
+    <main id="game-screen" class="w-full max-w-3xl bg-white rounded-2xl shadow-lg p-4 flex-col gap-4 hidden">
+        <!-- Header -->
+        <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+                 <button id="main-menu-btn" class="text-sm bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1 rounded">Main Menu</button>
+                <h1 id="term" class="text-2xl font-bold text-teal-600">Term</h1>
+                <button id="hint-btn" class="text-sm bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1 rounded">Hint</button>
             </div>
-
-            <!-- Right Panel: Canvas -->
-            <div class="bg-white rounded-2xl shadow-lg p-4 flex flex-col">
-                 <div id="canvas-container" class="w-full h-full aspect-square flex items-center justify-center flex-grow">
-                    <canvas id="drawing-canvas" class="bg-slate-50 rounded-lg shadow-inner"></canvas>
-                </div>
-                <button id="submit-btn" class="w-full mt-4 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center justify-center gap-2">
-                    I'm Done! Get AI Feedback
-                </button>
+            <div id="color-palette" class="flex items-center gap-2">
+                <button class="color-btn w-6 h-6 rounded-full bg-black active" data-color="black"></button>
+                <button class="color-btn w-6 h-6 rounded-full bg-red-500" data-color="#ef4444"></button>
+                <button class="color-btn w-6 h-6 rounded-full bg-green-500" data-color="#22c55e"></button>
+                <button class="color-btn w-6 h-6 rounded-full bg-blue-500" data-color="#3b82f6"></button>
+                <button class="color-btn w-6 h-6 rounded-full bg-yellow-400" data-color="#facc15"></button>
             </div>
         </div>
-    </main>
+         <!-- Drawing Tools -->
+        <div class="flex items-center justify-center gap-4 my-2">
+            <label for="brush-size" class="text-sm">Brush Size:</label>
+            <input type="range" id="brush-size" min="1" max="50" value="3" class="w-32">
+            <button id="fill-btn" class="flex items-center gap-1 bg-violet-500 hover:bg-violet-600 text-white text-sm px-3 py-1 rounded" title="Fill">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M2.522 8.357A.5.5 0 0 0 3 8.5v5a.5.5 0 0 0 .5.5h9a.5.5 0 0 0 .5-.5v-5a.5.5 0 0 0-.478-.495l-9.5-2a.5.5 0 0 0-.022.002zm-.54-1.111a1.5 1.5 0 0 1 1.523-.69L8 8.443l4.05-1.928a1.5 1.5 0 0 1 1.523.69l.3 1.285a.5.5 0 1 1-.948.222l-.3-1.285a.5.5 0 0 0-.508-.23L8.35 7.64a.5.5 0 0 1-.399.034L3.89 5.86a.5.5 0 0 0-.508.23l-.3 1.285a.5.5 0 1 1-.948-.222l.3-1.285z"/>
+                    <path d="M12.5 3a2.5 2.5 0 0 0-5 0h-1a3.5 3.5 0 0 1 7 0h-1z"/>
+                </svg>
+            </button>
+            <button id="undo-btn" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm px-3 py-1 rounded">Undo</button>
+            <button id="clear-canvas-btn" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm px-3 py-1 rounded">Clear</button>
+        </div>
 
+
+        <!-- Definition -->
+        <p id="definition" class="text-slate-600 hidden my-2 bg-slate-50 p-3 rounded-md"></p>
+
+        <!-- Drawing Area -->
+        <canvas id="drawing-canvas" width="700" height="400" class="w-full"></canvas>
+
+        <!-- Footer -->
+        <button id="done-btn" class="w-full mt-4 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 rounded">I'm Done!</button>
+    </main>
+    
     <!-- Result Modal -->
     <div id="result-modal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-4xl text-center overflow-y-auto max-h-[90vh]">
-            <h2 class="text-3xl font-bold mb-6">Let's See!</h2>
-            <div id="feedback-loading" class="hidden flex-col items-center justify-center min-h-[300px]">
-                <div class="loader"></div>
-                <p class="mt-4 text-slate-600">Our AI art teacher is analyzing your work...</p>
-            </div>
-            <div id="feedback-content" class="hidden">
-                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div>
-                        <h3 class="text-xl font-semibold mb-2">Your Masterpiece</h3>
-                        <img id="user-drawing" src="" alt="Your drawing" class="w-full h-auto rounded-lg bg-slate-50 border">
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-semibold mb-2">Sample Image</h3>
-                        <img id="correct-image" src="" alt="Correct image" class="w-full h-auto rounded-lg bg-slate-50 border">
-                    </div>
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-4xl text-center">
+            <h2 class="text-3xl font-bold mb-6">How did you do?</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <h3 class="text-xl font-semibold mb-2">Your Drawing</h3>
+                    <img id="user-drawing" src="" alt="Your drawing" class="w-full h-auto rounded-lg bg-slate-50 border">
                 </div>
-                <div class="bg-sky-50 border-2 border-sky-200 rounded-lg p-4 text-left">
-                    <h3 class="text-xl font-semibold mb-2 text-sky-800">🤖 AI Teacher Feedback:</h3>
-                    <p id="ai-feedback-text" class="text-slate-700">Here's the feedback.</p>
+                <div>
+                    <h3 class="text-xl font-semibold mb-2">Sample Image</h3>
+                    <img id="correct-image" src="" alt="Correct image" class="w-full h-auto rounded-lg bg-slate-50 border">
                 </div>
-                 <button id="next-word-btn" class="mt-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-transform transform hover:scale-105">Next Word</button>
             </div>
+            <button id="next-word-btn" class="mt-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-transform transform hover:scale-105">Next Word</button>
         </div>
     </div>
+
 
     <script>
         // --- DOM Elements ---
@@ -137,36 +118,48 @@
         const importJsonBtn = document.getElementById('import-json-btn');
         const jsonImporter = document.getElementById('json-importer');
         const errorMessage = document.getElementById('error-message');
-        const wordTerm = document.getElementById('word-term');
-        const wordDefinition = document.getElementById('word-definition');
+        
+        // Game screen elements
+        const termEl = document.getElementById('term');
+        const defEl = document.getElementById('definition');
+        const hintBtn = document.getElementById('hint-btn');
         const canvas = document.getElementById('drawing-canvas');
         const ctx = canvas.getContext('2d');
+        const clearBtn = document.getElementById('clear-canvas-btn');
+        const doneBtn = document.getElementById('done-btn');
         const colorPalette = document.getElementById('color-palette');
-        const clearCanvasBtn = document.getElementById('clear-canvas-btn');
-        const submitBtn = document.getElementById('submit-btn');
+        const mainMenuBtn = document.getElementById('main-menu-btn');
+        const brushSizeSlider = document.getElementById('brush-size');
+        const fillBtn = document.getElementById('fill-btn');
+        const undoBtn = document.getElementById('undo-btn');
+        
+        // Modal elements
         const resultModal = document.getElementById('result-modal');
         const userDrawingImg = document.getElementById('user-drawing');
         const correctImage = document.getElementById('correct-image');
         const nextWordBtn = document.getElementById('next-word-btn');
-        const feedbackLoading = document.getElementById('feedback-loading');
-        const feedbackContent = document.getElementById('feedback-content');
-        const aiFeedbackText = document.getElementById('ai-feedback-text');
+
 
         // --- Game State ---
         let vocabulary = [];
         let currentWordIndex = 0;
         let isDrawing = false;
         let penColor = 'black';
+        let penWidth = 3;
+        let isFillMode = false;
+        let historyStack = [];
+        let historyIndex = -1;
 
         // --- Default Data ---
         const DEFAULT_VOCABULARY = [
-            { "term": "Archipelago", "definition": "A group or chain of islands clustered together in a sea or ocean.", "imageSrc": "https://placehold.co/400x400/a7f3d0/14532d?text=Archipelago" },
-            { "term": "Peninsula", "definition": "A piece of land almost surrounded by water or projecting out into a body of water.", "imageSrc": "https://placehold.co/400x400/bae6fd/0c4a6e?text=Peninsula" },
-            { "term": "Isthmus", "definition": "A narrow strip of land with sea on either side, forming a link between two larger areas of land.", "imageSrc": "https://placehold.co/400x400/fef08a/854d0e?text=Isthmus" }
+            { term: 'Volcano', definition: 'A mountain or hill, typically conical, having a crater or vent through which lava and gas are or have been erupted.', imageSrc: 'https://placehold.co/400x400/f87171/7f1d1d?text=Volcano' },
+            { term: 'Peninsula', definition: 'A piece of land almost surrounded by water or projecting out into a body of water.', imageSrc: 'https://placehold.co/400x400/60a5fa/1e3a8a?text=Peninsula' },
+            { term: 'Canyon', definition: 'A deep gorge with steep sides, often carved by a river.', imageSrc: 'https://placehold.co/400x400/fcd34d/b45309?text=Canyon' }
         ];
 
         // --- Initialization ---
         function init() {
+            // Start screen listeners
             startSampleBtn.addEventListener('click', () => {
                 hideErrorMessage();
                 startGame(DEFAULT_VOCABULARY);
@@ -176,24 +169,6 @@
                 jsonImporter.click();
             });
             jsonImporter.addEventListener('change', handleFileUpload);
-            
-            canvas.addEventListener('mousedown', startPosition);
-            canvas.addEventListener('mouseup', endPosition);
-            canvas.addEventListener('mouseleave', endPosition);
-            canvas.addEventListener('mousemove', draw);
-
-            canvas.addEventListener('touchstart', startPosition, { passive: false });
-            canvas.addEventListener('touchend', endPosition);
-            canvas.addEventListener('touchcancel', endPosition);
-            canvas.addEventListener('touchmove', draw, { passive: false });
-            
-            colorPalette.addEventListener('click', changeColor);
-            clearCanvasBtn.addEventListener('click', clearCanvas);
-            submitBtn.addEventListener('click', handleSubmit);
-            nextWordBtn.addEventListener('click', nextWord);
-
-            window.addEventListener('resize', resizeCanvas);
-            resizeCanvas();
         }
         
         // --- UI Helpers ---
@@ -208,7 +183,7 @@
             }
         }
 
-        // --- Game Flow ---
+        // --- File Handling ---
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -216,7 +191,6 @@
             reader.onload = (e) => {
                 try {
                     const customVocab = JSON.parse(e.target.result);
-                    // Standardize the image key to 'imageSrc' for compatibility
                     const standardizedVocab = customVocab.map(item => ({
                         ...item,
                         imageSrc: item.imageSrc || item.image 
@@ -225,7 +199,7 @@
                     if (Array.isArray(standardizedVocab) && standardizedVocab.length > 0 && standardizedVocab.every(item => item.term && item.definition && item.imageSrc)) {
                         startGame(standardizedVocab);
                     } else {
-                        showErrorMessage('Invalid JSON. Must be an array of objects with "term", "definition", and "imageSrc" (or "image") keys.');
+                        showErrorMessage('Invalid JSON. Must have "term", "definition", and "imageSrc" (or "image").');
                     }
                 } catch (error) {
                     console.error("JSON Parse Error:", error);
@@ -233,166 +207,231 @@
                 }
             };
             reader.readAsText(file);
-            event.target.value = null; // Reset input to allow re-uploading the same file
+            event.target.value = null;
         }
 
+        // --- Game Flow ---
         function startGame(vocabSet) {
-            vocabulary = [...vocabSet].sort(() => Math.random() - 0.5);
+            vocabulary = vocabSet;
             currentWordIndex = 0;
+            
             startScreen.classList.add('hidden');
             gameScreen.classList.remove('hidden');
+            gameScreen.classList.add('flex');
+            
+            setupGameListeners();
             loadWord();
         }
 
-        function loadWord() {
-            clearCanvas();
-            const word = vocabulary[currentWordIndex];
-            wordTerm.textContent = word.term;
-            wordDefinition.textContent = word.definition;
+        function returnToMenu() {
+            gameScreen.classList.add('hidden');
+            gameScreen.classList.remove('flex');
+            startScreen.classList.remove('hidden');
+            isFillMode = false;
+            canvas.classList.remove('fill-cursor');
+        }
+        
+        function setupGameListeners() {
+            canvas.addEventListener('mousedown', handleCanvasClick);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+            canvas.addEventListener('touchstart', handleCanvasClick, { passive: false });
+            canvas.addEventListener('touchmove', draw, { passive: false });
+            canvas.addEventListener('touchend', stopDrawing);
+            
+            hintBtn.onclick = () => defEl.classList.toggle('hidden');
+            clearBtn.onclick = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                saveState();
+            };
+            
+            doneBtn.onclick = showResult;
+            nextWordBtn.onclick = nextWord;
+
+            mainMenuBtn.onclick = returnToMenu;
+
+            colorPalette.addEventListener('click', (e) => {
+                if (e.target.classList.contains('color-btn')) {
+                    penColor = e.target.dataset.color;
+                    colorPalette.querySelector('.active').classList.remove('active');
+                    e.target.classList.add('active');
+                }
+            });
+
+            brushSizeSlider.oninput = (e) => {
+                penWidth = e.target.value;
+            };
+
+            fillBtn.onclick = () => {
+                isFillMode = true;
+                canvas.classList.add('fill-cursor');
+            };
+            
+            undoBtn.onclick = undo;
         }
 
-        async function handleSubmit() {
+        function loadWord() {
+            termEl.textContent = vocabulary[currentWordIndex].term;
+            defEl.textContent = vocabulary[currentWordIndex].definition;
+            defEl.classList.add('hidden');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            historyStack = [];
+            historyIndex = -1;
+            saveState();
+        }
+        
+        function showResult() {
             const drawingUrl = canvas.toDataURL('image/png');
             userDrawingImg.src = drawingUrl;
             correctImage.src = vocabulary[currentWordIndex].imageSrc;
-            
-            resultModal.style.display = 'flex';
-            feedbackContent.classList.add('hidden');
-            feedbackLoading.classList.remove('hidden');
-
-            try {
-                const base64Data = drawingUrl.split(',')[1];
-                const definition = vocabulary[currentWordIndex].definition;
-                const feedback = await getAIFeedback(base64Data, definition);
-                aiFeedbackText.textContent = feedback;
-            } catch (error) {
-                console.error("AI Feedback Error:", error);
-                aiFeedbackText.textContent = "Sorry, the AI teacher is taking a quick break. Please try again in a moment!";
-            } finally {
-                feedbackLoading.classList.add('hidden');
-                feedbackContent.classList.remove('hidden');
-            }
+            resultModal.classList.remove('hidden');
+            resultModal.classList.add('flex');
         }
 
         function nextWord() {
-            currentWordIndex++;
-            if (currentWordIndex >= vocabulary.length) {
-                endGame();
-            } else {
-                resultModal.style.display = 'none';
-                loadWord();
-            }
-        }
-        
-        function endGame() {
-            resultModal.style.display = 'none';
-            gameScreen.classList.add('hidden');
-            startScreen.classList.remove('hidden');
-            document.getElementById('start-title').textContent = "🎉 Great job! Play again?";
+            resultModal.classList.add('hidden');
+            resultModal.classList.remove('flex');
+            currentWordIndex = (currentWordIndex + 1) % vocabulary.length;
+            loadWord();
         }
 
-        // --- AI Feedback API Call ---
-        async function getAIFeedback(imageData, definition) {
-            const apiKey = ""; // API key is handled by the environment
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-
-            const systemPrompt = `You are a helpful and encouraging art teacher. The user was given the definition: '${definition}'. They drew the following image. Based on their drawing, provide one or two sentences of positive feedback and gentle suggestions for what they could add or change to better represent the definition. Don't be harsh. Focus on concepts, not artistic skill. Keep the feedback concise and easy to understand.`;
-            
-            const payload = {
-                contents: [
-                    {
-                        role: "user",
-                        parts: [
-                            { text: systemPrompt },
-                            {
-                                inlineData: {
-                                    mimeType: "image/png",
-                                    data: imageData
-                                }
-                            }
-                        ]
-                    }
-                ],
-            };
-
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                throw new Error(`API request failed with status ${response.status}`);
-            }
-
-            const result = await response.json();
-            if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts[0].text) {
-                return result.candidates[0].content.parts[0].text;
-            } else {
-                 return "I'm not sure what to say about this, but it's a creative start!";
-            }
-        }
-
-
-        // --- Canvas Logic ---
-        function resizeCanvas() {
-            const container = canvas.parentElement;
-            const size = Math.min(container.clientWidth, container.clientHeight, 500); // Max size
-            canvas.width = size;
-            canvas.height = size;
-            // Set drawing properties that might be reset on resize
-            ctx.lineJoin = 'round';
-            ctx.lineCap = 'round';
-            ctx.lineWidth = 5;
-            ctx.strokeStyle = penColor;
-        }
-        
-        function getEventCoordinates(event) {
+        // --- Canvas Drawing Functions ---
+        function getPos(e) {
             const rect = canvas.getBoundingClientRect();
-            if (event.touches && event.touches.length > 0) {
-                return {
-                    x: event.touches[0].clientX - rect.left,
-                    y: event.touches[0].clientY - rect.top
-                };
-            }
-            return {
-                x: event.clientX - rect.left,
-                y: event.clientY - rect.top
-            };
+            const x = Math.round((e.touches ? e.touches[0].clientX : e.clientX) - rect.left);
+            const y = Math.round((e.touches ? e.touches[0].clientY : e.clientY) - rect.top);
+            return { x, y };
         }
 
-        function startPosition(e) {
-            e.preventDefault();
+        function handleCanvasClick(e) {
+            if (isFillMode) {
+                const { x, y } = getPos(e);
+                floodFill(x, y, hexToRgb(penColor));
+                isFillMode = false;
+                canvas.classList.remove('fill-cursor');
+                saveState();
+            } else {
+                startDrawing(e);
+            }
+        }
+
+        function startDrawing(e) {
             isDrawing = true;
-            const { x, y } = getEventCoordinates(e);
+            const { x, y } = getPos(e);
             ctx.beginPath();
             ctx.moveTo(x, y);
-        }
-
-        function endPosition() {
-            isDrawing = false;
-            ctx.beginPath(); // Reset the path to start a new line
         }
 
         function draw(e) {
             if (!isDrawing) return;
             e.preventDefault();
-            const { x, y } = getEventCoordinates(e);
+            const { x, y } = getPos(e);
             ctx.lineTo(x, y);
+            ctx.strokeStyle = penColor;
+            ctx.lineWidth = penWidth;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
             ctx.stroke();
         }
 
-        function clearCanvas() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        function stopDrawing() {
+            if (!isDrawing) return;
+            isDrawing = false;
+            ctx.closePath();
+            saveState();
         }
-        
-        function changeColor(e) {
-            if (e.target.classList.contains('color-swatch')) {
-                document.querySelector('.color-swatch.selected').classList.remove('selected');
-                e.target.classList.add('selected');
-                penColor = e.target.dataset.color;
-                ctx.strokeStyle = penColor;
+
+        // --- Undo Logic ---
+        function saveState() {
+            historyIndex++;
+            if (historyIndex < historyStack.length) {
+                historyStack.length = historyIndex;
             }
+            historyStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+        }
+
+        function undo() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                ctx.putImageData(historyStack[historyIndex], 0, 0);
+            }
+        }
+
+        // --- Fill Logic ---
+        function hexToRgb(hex) {
+            if (hex === 'black') return { r: 0, g: 0, b: 0, a: 255 };
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16),
+                a: 255
+            } : null;
+        }
+
+        function floodFill(startX, startY, fillColor) {
+            if (!fillColor) return;
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            const startPos = (startY * canvas.width + startX) * 4;
+            const startR = data[startPos];
+            const startG = data[startPos + 1];
+            const startB = data[startPos + 2];
+            const startA = data[startPos + 3];
+
+            if (fillColor.r === startR && fillColor.g === startG && fillColor.b === startB && fillColor.a === startA) {
+                return; // Clicked on same color
+            }
+
+            const pixelStack = [[startX, startY]];
+            while (pixelStack.length) {
+                let [x, y] = pixelStack.pop();
+                let currentPos = (y * canvas.width + x) * 4;
+
+                // Go up as long as we're in the right color
+                while (y >= 0 && (data[currentPos] === startR && data[currentPos + 1] === startG && data[currentPos + 2] === startB && data[currentPos + 3] === startA)) {
+                    y--;
+                    currentPos -= canvas.width * 4;
+                }
+                currentPos += canvas.width * 4;
+                y++;
+                
+                let reachLeft = false;
+                let reachRight = false;
+                
+                while (y < canvas.height -1 && (data[currentPos] === startR && data[currentPos + 1] === startG && data[currentPos + 2] === startB && data[currentPos + 3] === startA)) {
+                    data[currentPos] = fillColor.r;
+                    data[currentPos + 1] = fillColor.g;
+                    data[currentPos + 2] = fillColor.b;
+                    data[currentPos + 3] = fillColor.a;
+
+                    if (x > 0) {
+                        if (data[currentPos - 4] === startR && data[currentPos - 3] === startG && data[currentPos - 2] === startB && data[currentPos - 1] === startA) {
+                            if (!reachLeft) {
+                                pixelStack.push([x - 1, y]);
+                                reachLeft = true;
+                            }
+                        } else if (reachLeft) {
+                            reachLeft = false;
+                        }
+                    }
+
+                    if (x < canvas.width - 1) {
+                         if (data[currentPos + 4] === startR && data[currentPos + 5] === startG && data[currentPos + 6] === startB && data[currentPos + 7] === startA) {
+                            if (!reachRight) {
+                                pixelStack.push([x + 1, y]);
+                                reachRight = true;
+                            }
+                        } else if (reachRight) {
+                            reachRight = false;
+                        }
+                    }
+                    y++;
+                    currentPos += canvas.width * 4;
+                }
+            }
+            ctx.putImageData(imageData, 0, 0);
         }
         
         // --- Start the app ---
@@ -401,6 +440,4 @@
 
 </body>
 </html>
-
-
 
