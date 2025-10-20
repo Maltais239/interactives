@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Definition Draw AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Prevents the whole page from scrolling when drawing on mobile */
+        html, body {
+            overflow: hidden;
+            height: 100%;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+        .color-swatch {
+            transition: transform 0.2s;
+        }
+        .color-swatch:hover {
+            transform: scale(1.1);
+        }
+        .color-swatch.selected {
+            transform: scale(1.2);
+            outline: 3px solid #3b82f6; /* blue-500 */
+        }
+        #drawing-canvas {
+            cursor: crosshair;
+            touch-action: none; /* Critical for preventing browser interference on touch */
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="w-full max-w-2xl text-center">
+        <div class="bg-white p-8 rounded-2xl shadow-lg">
+            <h1 id="start-title" class="text-4xl font-bold text-teal-600 mb-4">Definition Draw AI</h1>
+            <p class="text-slate-600 mb-8">Read the definition, draw the word, and get instant AI feedback on your creation!</p>
+            <div id="error-message" class="text-red-500 font-semibold my-4 hidden"></div>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <button id="start-sample-btn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105">
+                    Start Sample Game
+                </button>
+                <button id="import-json-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105">
+                    Import Custom Set (.json)
+                </button>
+                <input type="file" id="json-importer" class="hidden" accept=".json">
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <main id="game-screen" class="w-full h-[90vh] max-w-6xl hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
+            <!-- Left Panel: Definition & Controls -->
+            <div class="bg-white rounded-2xl shadow-lg p-6 flex flex-col">
+                <div class="flex-grow">
+                    <h2 id="word-term" class="text-3xl font-bold mb-2">Word</h2>
+                    <p id="word-definition" class="text-slate-600 text-lg">This is the definition of the word. Read it carefully and prepare to draw what you visualize.</p>
+                </div>
+                <div class="mt-auto">
+                    <h3 class="text-lg font-semibold mb-3">Drawing Tools</h3>
+                    <div class="flex items-center gap-4">
+                        <div id="color-palette" class="flex gap-2">
+                            <div class="color-swatch w-8 h-8 rounded-full bg-black cursor-pointer selected" data-color="black"></div>
+                            <div class="color-swatch w-8 h-8 rounded-full bg-red-500 cursor-pointer" data-color="#ef4444"></div>
+                            <div class="color-swatch w-8 h-8 rounded-full bg-green-500 cursor-pointer" data-color="#22c55e"></div>
+                            <div class="color-swatch w-8 h-8 rounded-full bg-blue-500 cursor-pointer" data-color="#3b82f6"></div>
+                            <div class="color-swatch w-8 h-8 rounded-full bg-yellow-400 cursor-pointer" data-color="#facc15"></div>
+                        </div>
+                        <button id="clear-canvas-btn" class="ml-auto bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg transition">Clear</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Canvas -->
+            <div class="bg-white rounded-2xl shadow-lg p-4 flex flex-col">
+                 <div id="canvas-container" class="w-full h-full aspect-square flex items-center justify-center flex-grow">
+                    <canvas id="drawing-canvas" class="bg-slate-50 rounded-lg shadow-inner"></canvas>
+                </div>
+                <button id="submit-btn" class="w-full mt-4 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center justify-center gap-2">
+                    I'm Done! Get AI Feedback
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Result Modal -->
+    <div id="result-modal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-4xl text-center overflow-y-auto max-h-[90vh]">
+            <h2 class="text-3xl font-bold mb-6">Let's See!</h2>
+            <div id="feedback-loading" class="hidden flex-col items-center justify-center min-h-[300px]">
+                <div class="loader"></div>
+                <p class="mt-4 text-slate-600">Our AI art teacher is analyzing your work...</p>
+            </div>
+            <div id="feedback-content" class="hidden">
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <h3 class="text-xl font-semibold mb-2">Your Masterpiece</h3>
+                        <img id="user-drawing" src="" alt="Your drawing" class="w-full h-auto rounded-lg bg-slate-50 border">
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold mb-2">Sample Image</h3>
+                        <img id="correct-image" src="" alt="Correct image" class="w-full h-auto rounded-lg bg-slate-50 border">
+                    </div>
+                </div>
+                <div class="bg-sky-50 border-2 border-sky-200 rounded-lg p-4 text-left">
+                    <h3 class="text-xl font-semibold mb-2 text-sky-800">🤖 AI Teacher Feedback:</h3>
+                    <p id="ai-feedback-text" class="text-slate-700">Here's the feedback.</p>
+                </div>
+                 <button id="next-word-btn" class="mt-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-transform transform hover:scale-105">Next Word</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const startScreen = document.getElementById('start-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const startSampleBtn = document.getElementById('start-sample-btn');
+        const importJsonBtn = document.getElementById('import-json-btn');
+        const jsonImporter = document.getElementById('json-importer');
+        const errorMessage = document.getElementById('error-message');
+        const wordTerm = document.getElementById('word-term');
+        const wordDefinition = document.getElementById('word-definition');
+        const canvas = document.getElementById('drawing-canvas');
+        const ctx = canvas.getContext('2d');
+        const colorPalette = document.getElementById('color-palette');
+        const clearCanvasBtn = document.getElementById('clear-canvas-btn');
+        const submitBtn = document.getElementById('submit-btn');
+        const resultModal = document.getElementById('result-modal');
+        const userDrawingImg = document.getElementById('user-drawing');
+        const correctImage = document.getElementById('correct-image');
+        const nextWordBtn = document.getElementById('next-word-btn');
+        const feedbackLoading = document.getElementById('feedback-loading');
+        const feedbackContent = document.getElementById('feedback-content');
+        const aiFeedbackText = document.getElementById('ai-feedback-text');
+
+        // --- Game State ---
+        let vocabulary = [];
+        let currentWordIndex = 0;
+        let isDrawing = false;
+        let penColor = 'black';
+
+        // --- Default Data ---
+        const DEFAULT_VOCABULARY = [
+            { "term": "Archipelago", "definition": "A group or chain of islands clustered together in a sea or ocean.", "imageSrc": "https://placehold.co/400x400/a7f3d0/14532d?text=Archipelago" },
+            { "term": "Peninsula", "definition": "A piece of land almost surrounded by water or projecting out into a body of water.", "imageSrc": "https://placehold.co/400x400/bae6fd/0c4a6e?text=Peninsula" },
+            { "term": "Isthmus", "definition": "A narrow strip of land with sea on either side, forming a link between two larger areas of land.", "imageSrc": "https://placehold.co/400x400/fef08a/854d0e?text=Isthmus" }
+        ];
+
+        // --- Initialization ---
+        function init() {
+            startSampleBtn.addEventListener('click', () => {
+                hideErrorMessage();
+                startGame(DEFAULT_VOCABULARY);
+            });
+            importJsonBtn.addEventListener('click', () => {
+                hideErrorMessage();
+                jsonImporter.click();
+            });
+            jsonImporter.addEventListener('change', handleFileUpload);
+            
+            canvas.addEventListener('mousedown', startPosition);
+            canvas.addEventListener('mouseup', endPosition);
+            canvas.addEventListener('mouseleave', endPosition);
+            canvas.addEventListener('mousemove', draw);
+
+            canvas.addEventListener('touchstart', startPosition, { passive: false });
+            canvas.addEventListener('touchend', endPosition);
+            canvas.addEventListener('touchcancel', endPosition);
+            canvas.addEventListener('touchmove', draw, { passive: false });
+            
+            colorPalette.addEventListener('click', changeColor);
+            clearCanvasBtn.addEventListener('click', clearCanvas);
+            submitBtn.addEventListener('click', handleSubmit);
+            nextWordBtn.addEventListener('click', nextWord);
+
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+        }
+        
+        // --- UI Helpers ---
+        function showErrorMessage(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        function hideErrorMessage() {
+            if (!errorMessage.classList.contains('hidden')) {
+                errorMessage.classList.add('hidden');
+            }
+        }
+
+        // --- Game Flow ---
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const customVocab = JSON.parse(e.target.result);
+                    // Standardize the image key to 'imageSrc' for compatibility
+                    const standardizedVocab = customVocab.map(item => ({
+                        ...item,
+                        imageSrc: item.imageSrc || item.image 
+                    }));
+
+                    if (Array.isArray(standardizedVocab) && standardizedVocab.length > 0 && standardizedVocab.every(item => item.term && item.definition && item.imageSrc)) {
+                        startGame(standardizedVocab);
+                    } else {
+                        showErrorMessage('Invalid JSON. Must be an array of objects with "term", "definition", and "imageSrc" (or "image") keys.');
+                    }
+                } catch (error) {
+                    console.error("JSON Parse Error:", error);
+                    showErrorMessage('Error reading the JSON file. It might be malformed.');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = null; // Reset input to allow re-uploading the same file
+        }
+
+        function startGame(vocabSet) {
+            vocabulary = [...vocabSet].sort(() => Math.random() - 0.5);
+            currentWordIndex = 0;
+            startScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+            loadWord();
+        }
+
+        function loadWord() {
+            clearCanvas();
+            const word = vocabulary[currentWordIndex];
+            wordTerm.textContent = word.term;
+            wordDefinition.textContent = word.definition;
+        }
+
+        async function handleSubmit() {
+            const drawingUrl = canvas.toDataURL('image/png');
+            userDrawingImg.src = drawingUrl;
+            correctImage.src = vocabulary[currentWordIndex].imageSrc;
+            
+            resultModal.style.display = 'flex';
+            feedbackContent.classList.add('hidden');
+            feedbackLoading.classList.remove('hidden');
+
+            try {
+                const base64Data = drawingUrl.split(',')[1];
+                const definition = vocabulary[currentWordIndex].definition;
+                const feedback = await getAIFeedback(base64Data, definition);
+                aiFeedbackText.textContent = feedback;
+            } catch (error) {
+                console.error("AI Feedback Error:", error);
+                aiFeedbackText.textContent = "Sorry, the AI teacher is taking a quick break. Please try again in a moment!";
+            } finally {
+                feedbackLoading.classList.add('hidden');
+                feedbackContent.classList.remove('hidden');
+            }
+        }
+
+        function nextWord() {
+            currentWordIndex++;
+            if (currentWordIndex >= vocabulary.length) {
+                endGame();
+            } else {
+                resultModal.style.display = 'none';
+                loadWord();
+            }
+        }
+        
+        function endGame() {
+            resultModal.style.display = 'none';
+            gameScreen.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+            document.getElementById('start-title').textContent = "🎉 Great job! Play again?";
+        }
+
+        // --- AI Feedback API Call ---
+        async function getAIFeedback(imageData, definition) {
+            const apiKey = ""; // API key is handled by the environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            const systemPrompt = `You are a helpful and encouraging art teacher. The user was given the definition: '${definition}'. They drew the following image. Based on their drawing, provide one or two sentences of positive feedback and gentle suggestions for what they could add or change to better represent the definition. Don't be harsh. Focus on concepts, not artistic skill. Keep the feedback concise and easy to understand.`;
+            
+            const payload = {
+                contents: [
+                    {
+                        role: "user",
+                        parts: [
+                            { text: systemPrompt },
+                            {
+                                inlineData: {
+                                    mimeType: "image/png",
+                                    data: imageData
+                                }
+                            }
+                        ]
+                    }
+                ],
+            };
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`API request failed with status ${response.status}`);
+            }
+
+            const result = await response.json();
+            if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts[0].text) {
+                return result.candidates[0].content.parts[0].text;
+            } else {
+                 return "I'm not sure what to say about this, but it's a creative start!";
+            }
+        }
+
+
+        // --- Canvas Logic ---
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            const size = Math.min(container.clientWidth, container.clientHeight, 500); // Max size
+            canvas.width = size;
+            canvas.height = size;
+            // Set drawing properties that might be reset on resize
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = penColor;
+        }
+        
+        function getEventCoordinates(event) {
+            const rect = canvas.getBoundingClientRect();
+            if (event.touches && event.touches.length > 0) {
+                return {
+                    x: event.touches[0].clientX - rect.left,
+                    y: event.touches[0].clientY - rect.top
+                };
+            }
+            return {
+                x: event.clientX - rect.left,
+                y: event.clientY - rect.top
+            };
+        }
+
+        function startPosition(e) {
+            e.preventDefault();
+            isDrawing = true;
+            const { x, y } = getEventCoordinates(e);
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        }
+
+        function endPosition() {
+            isDrawing = false;
+            ctx.beginPath(); // Reset the path to start a new line
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const { x, y } = getEventCoordinates(e);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        
+        function changeColor(e) {
+            if (e.target.classList.contains('color-swatch')) {
+                document.querySelector('.color-swatch.selected').classList.remove('selected');
+                e.target.classList.add('selected');
+                penColor = e.target.dataset.color;
+                ctx.strokeStyle = penColor;
+            }
+        }
+        
+        // --- Start the app ---
+        init();
+    </script>
+
+</body>
+</html>
+
+
+
