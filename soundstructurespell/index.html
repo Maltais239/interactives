@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sound, Structure, Spell</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Define custom properties based on the PDF */
+        :root {
+            --font-heading: 'Fredoka One', cursive;
+            --font-body: 'Nunito', sans-serif;
+            --color-banner-blue: #479fbd;
+            --color-ribbon-orange: #e65936;
+            --color-ribbon-yellow: #fdde83;
+            --color-vce-yellow: #fdd470;
+            --color-not-vce-red: #e65936;
+            --color-text-dark: #3a3a3a;
+        }
+
+        /* Apply base fonts */
+        body {
+            font-family: var(--font-body);
+            background-color: #f7f9fc;
+        }
+
+        /* Re-create the banner style from the PDF */
+        .lesson-banner {
+            font-family: var(--font-heading);
+            font-size: 3rem; /* 48px */
+            color: white;
+            background-color: var(--color-banner-blue);
+            padding: 1.5rem 3rem;
+            position: relative;
+            text-align: center;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        /* Create the ribbon ends */
+        .lesson-banner::before,
+        .lesson-banner::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            width: 4rem; /* 64px */
+            height: 100%;
+            background-color: var(--color-ribbon-orange);
+            z-index: -1;
+        }
+        
+        .lesson-banner::before {
+            left: -3rem; /* 48px */
+            clip-path: polygon(100% 0%, 75% 50%, 100% 100%, 25% 100%, 0% 50%, 25% 0%);
+        }
+        
+        .lesson-banner::after {
+            right: -3rem; /* 48px */
+            clip-path: polygon(75% 0%, 100% 50%, 75% 100%, 0% 100%, 25% 50%, 0% 0%);
+        }
+
+        /* Create the yellow fold triangles */
+        .lesson-banner-fold::before,
+        .lesson-banner-fold::after {
+            content: '';
+            position: absolute;
+            bottom: -1rem; /* 16px - to appear "under" */
+            width: 0;
+            height: 0;
+            border-top: 1rem solid var(--color-ribbon-yellow);
+            z-index: -2;
+        }
+        
+        .lesson-banner-fold::before {
+            left: 1rem; /* 16px */
+            border-left: 1rem solid transparent;
+            border-right: 1rem solid transparent;
+        }
+        
+        .lesson-banner-fold::after {
+            right: 1rem; /* 16px */
+            border-left: 1rem solid transparent;
+            border-right: 1rem solid transparent;
+        }
+
+        /* Styling for draggable cards */
+        .word-card {
+            font-family: var(--font-body);
+            font-weight: 700;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            cursor: grab;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            user-select: none;
+            touch-action: none;
+        }
+        
+        .word-card.vce-yes {
+            background-color: var(--color-vce-yellow);
+            color: var(--color-text-dark);
+        }
+        
+        .word-card.vce-no {
+            background-color: var(--color-not-vce-red);
+            color: white;
+        }
+
+        .word-card.dragging {
+            opacity: 0.5;
+            transform: scale(1.05);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            cursor: grabbing;
+        }
+
+        /* Styling for drop zones */
+        .drop-zone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            min-height: 150px;
+            transition: all 0.2s ease;
+        }
+        
+        .drop-zone.drag-over {
+            background-color: #e2e8f0;
+            border-color: #94a3b8;
+        }
+
+        /* Correct/Incorrect feedback styles */
+        .word-card.correct {
+            outline: 3px solid #22c55e;
+        }
+        
+        .word-card.incorrect {
+             outline: 3px solid #ef4444;
+        }
+
+        .feedback-box {
+            font-size: 1.125rem;
+            font-weight: 600;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .feedback-box.show {
+            opacity: 1;
+        }
+
+        /* Styles for new expandable section */
+        .expandable-header {
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .expandable-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .expandable-content.expanded {
+            max-height: 1000px; /* Set to a large value */
+            transition: max-height 0.5s ease-in;
+        }
+
+        .chevron-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .chevron-icon.rotated {
+            transform: rotate(180deg);
+        }
+
+        /* Elkonin boxes for Speech-to-Spelling */
+        .elkonin-boxes {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .elkonin-box {
+            width: 50px;
+            height: 50px;
+            border: 2px solid #cbd5e1;
+            border-radius: 0.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--color-text-dark);
+        }
+        
+        /* Input that looks like Elkonin boxes */
+        .spelling-input-elkonin {
+            font-family: var(--font-body);
+            font-size: 1.5rem;
+            font-weight: 700;
+            padding: 0.75rem 1rem;
+            border: 2px solid #cbd5e1;
+            border-radius: 0.5rem;
+            text-align: center;
+            width: 100%;
+            max-width: 300px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+            letter-spacing: 0.5em; /* Spreads letters out */
+            text-transform: lowercase;
+        }
+        
+        .spelling-input-elkonin:focus {
+            outline: none;
+            border-color: var(--color-banner-blue);
+            box-shadow: 0 0 0 3px rgba(71, 159, 189, 0.3);
+        }
+
+
+        .spelling-feedback {
+            font-size: 1.125rem;
+            font-weight: 600;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            min-height: 60px; /* Prevent layout shift */
+        }
+        
+        .spelling-feedback.correct {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+        
+        .spelling-feedback.incorrect {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Styles for Day Navigation */
+        .day-nav-btn {
+            font-family: var(--font-heading);
+            font-size: 1.25rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            border: 2px solid var(--color-banner-blue);
+            color: var(--color-banner-blue);
+            background-color: #ffffff;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .day-nav-btn:hover {
+            background-color: #f0f9ff;
+            transform: translateY(-2px);
+        }
+        
+        .day-nav-btn.active {
+            background-color: var(--color-banner-blue);
+            color: #ffffff;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        /* Review Pattern Styles */
+        .review-pattern-box {
+            background-color: #f0f9ff;
+            border: 2px solid var(--color-banner-blue);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            font-size: 1.25rem;
+            color: #0c4a6e;
+        }
+        .review-pattern-box .blank {
+            display: inline-block;
+            border-bottom: 2px solid #0c4a6e;
+            width: 100px;
+            margin: 0 4px;
+        }
+
+        /* Analogy Activity Styles */
+        .analogy-item {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+        }
+        .analogy-item input {
+            font-family: var(--font-body);
+            font-weight: 600;
+            width: 120px;
+            padding: 0.5rem;
+            border: 2px solid #cbd5e1;
+            border-radius: 0.5rem;
+            text-align: center;
+        }
+        .analogy-feedback {
+            font-weight: 700;
+            margin-left: 0.5rem;
+        }
+        .analogy-feedback.correct { color: #22c55e; }
+        .analogy-feedback.incorrect { color: #ef4444; }
+
+        /* Word Writing Grid */
+        .word-writing-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            max-w-xl mx-auto;
+        }
+        .word-writing-grid input {
+            font-family: var(--font-body);
+            font-size: 1.25rem;
+            font-weight: 600;
+            padding: 0.75rem 1rem;
+            border: 2px solid #cbd5e1;
+            border-radius: 0.5rem;
+            text-align: center;
+            width: 100%;
+        }
+
+        /* Sentence Writing */
+        .sentence-input {
+            width: 100%;
+            padding: 1rem;
+            font-size: 1.125rem;
+            border: 2px solid #cbd5e1;
+            border-radius: 0.5rem;
+            min-height: 80px;
+        }
+
+        /* Helper class to hide content */
+        .hidden {
+            display: none;
+        }
+
+
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        
+        <!-- Header Section -->
+        <header class="my-12 flex justify-center">
+            <div class="lesson-banner">
+                VOWEL CONSONANT E
+                <div class="lesson-banner-fold"></div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="bg-white p-6 md:p-8 rounded-xl shadow-lg">
+
+            <!-- Instructional Guide Info -->
+            <section class="mb-8 p-4 bg-blue-50 border-l-4 border-blue-400 rounded-r-lg">
+                <button id="expand-teaching-btn" class="expandable-header w-full">
+                    <h2 class="text-xl font-bold text-blue-800">Teaching the Pattern</h2>
+                    <svg id="teaching-chevron" class="chevron-icon w-6 h-6 text-blue-800" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </button>
+                
+                <div id="teaching-content" class="expandable-content">
+                    <p class="mt-4 text-lg text-blue-700">"The vowel says its name when it's followed by one consonant and an <strong>&lt;e&gt;</strong>."</p>
+                    <ul class="list-disc list-inside mt-4 space-y-2 text-blue-700">
+                        <li><strong>Say the Pattern:</strong> Have students chorally repeat the pattern.</li>
+                        <li><strong>Word Detectives:</strong> Show students VCE and non-VCE words. Have them give a "thumbs up" if it follows the pattern.</li>
+                        <li><strong>Sky Writing:</strong> Have students write VCE words in the air, saying each letter sound and then blending the word.</li>
+                        <li><strong>Word Ladders:</strong> Start with a CVC word (e.g., "cap") and add an "e" to make a VCE word ("cape"). Discuss the change in sound.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Day Navigation -->
+            <nav class="my-8 flex flex-wrap justify-center gap-4">
+                <button id="nav-day-1" class="day-nav-btn active">Day 1</button>
+                <button id="nav-day-2" class="day-nav-btn">Day 2</button>
+                <button id="nav-day-3" class="day-nav-btn">Day 3</button>
+            </nav>
+
+            <!-- Horizontal Divider -->
+            <hr class="my-12 border-t-2 border-gray-200">
+
+            <!-- Activity Content Area -->
+            <div id="activity-content">
+
+                <!-- ======== DAY 1 ACTIVITIES ======== -->
+                <div id="day-1-activities" class="day-container">
+                    
+                    <!-- Activity: Identify the Pattern -->
+                    <section id="activity-identify-pattern-day1" class="mb-12">
+                        <h2 style="font-family: var(--font-heading); color: var(--color-banner-blue);" class="text-4xl font-bold mb-6 text-center">
+                            Activity: Identify the Pattern
+                        </h2>
+        
+                        <!-- Layout for Drop Zones and Bank -->
+                        <div class="flex flex-col md:flex-row gap-6">
+                            <!-- 2. VCE Drop Zone -->
+                            <div class="flex-1 flex flex-col">
+                                <h3 class="text-xl font-bold text-center mb-2" style="color: var(--color-text-dark);">VCE Words</h3>
+                                <div id="vce-zone-day1-identify" class="drop-zone bg-green-50 flex-1 flex flex-wrap gap-3 content-start">
+                                    <!-- Dropped cards appear here -->
+                                </div>
+                            </div>
+        
+                            <!-- 1. Word Card Bank -->
+                            <div class="flex-1 flex flex-col">
+                                <h3 class="text-xl font-bold text-center mb-2" style="color: var(--color-text-dark);">Word Bank</h3>
+                                <div id="card-bank-day1-identify" class="drop-zone bg-gray-100 flex-1 flex flex-wrap gap-3 content-start">
+                                    <!-- Initial cards are generated here -->
+                                </div>
+                            </div>
+        
+                            <!-- 3. Not VCE Drop Zone -->
+                            <div class="flex-1 flex flex-col">
+                                <h3 class="text-xl font-bold text-center mb-2" style="color: var(--color-text-dark);">Not VCE Words</h3>
+                                <div id="not-vce-zone-day1-identify" class="drop-zone bg-red-50 flex-1 flex flex-wrap gap-3 content-start">
+                                    <!-- Dropped cards appear here -->
+                                </div>
+                            </div>
+                        </div>
+        
+                        <!-- 4. Control Buttons -->
+                        <div class="flex justify-center gap-4 mt-6">
+                            <button id="check-answers-btn-day1-identify" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow transition-transform hover:scale-105">
+                                Check Answers
+                            </button>
+                            <button id="reset-btn-day1-identify" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg shadow transition-transform hover:scale-105">
+                                Reset
+                            </button>
+                        </div>
+        
+                        <!-- 5. Feedback Box -->
+                        <div id="feedback-box-day1-identify" class="feedback-box mt-6 w-full max-w-2xl mx-auto">
+                            <!-- Feedback appears here -->
+                        </div>
+        
+                    </section>
+
+                    <!-- Horizontal Divider -->
+                    <hr class="my-12 border-t-2 border-gray-200">
+                    
+                    <!-- Activity: Word Sort (Day 1) -->
+                    <section id="activity-word-sort-day1" class="mb-12">
+                        <h2 style="font-family: var(--font-heading); color: var(--color-banner-blue);" class="text-4xl font-bold mb-6 text-center">
+                            Activity: Word Sort
+                        </h2>
+        
+                        <!-- Layout for Drop Zones and Bank -->
+                        <div class="flex flex-col md:flex-row gap-6">
+                            <!-- 2. VCE Drop Zone -->
+                            <div class="flex-1 flex flex-col">
+                                <h3 class="text-xl font-bold text-center mb-2" style="color: var(--color-text-dark);">VCE Words</h3>
+                                <div id="vce-zone-day1-sort" class="drop-zone bg-green-50 flex-1 flex flex-wrap gap-3 content-start">
+                                    <!-- Dropped cards appear here -->
+                                </div>
+                            </div>
+        
+                            <!-- 1. Word Card Bank -->
+                            <div class="flex-1 flex flex-col">
+                                <h3 class="text-xl font-bold text-center mb-2" style="color: var(--color-text-dark);">Word Bank</h3>
+                                <div id="card-bank-day1-sort" class="drop-zone bg-gray-100 flex-1 flex flex-wrap gap-3 content-start">
+                                    <!-- Initial cards are generated here -->
+                                </div>
+                            </div>
+        
+                            <!-- 3. Not VCE Drop Zone -->
+                            <div class="flex-1 flex flex-col">
+                                <h3 class="text-xl font-bold text-center mb-2" style="color: var(--color-text-dark);">Not VCE Words</h3>
+                                <div id="not-vce-zone-day1-sort" class="drop-zone bg-red-50 flex-1 flex flex-wrap gap-3 content-start">
+                                    <!-- Dropped cards appear here -->
+                                </div>
+                            </div>
+                        </div>
+        
+                        <!-- 4. Control Buttons -->
+                        <div class="flex justify-center gap-4 mt-6">
+                            <button id="check-answers-btn-day1-sort" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow transition-transform hover:scale-105">
+                                Check Answers
+                            </button>
+                            <button id="reset-btn-day1-sort" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg shadow transition-transform hover:scale-105">
+                                Reset
+                            </button>
+                        </div>
+        
+                        <!-- 5. Feedback Box -->
+                        <div id="feedback-box-day1-sort" class="feedback-box mt-6 w-full max-w-2xl mx-auto">
+                            <!-- Feedback appears here -->
+                        </div>
+        
+                    </section>
+        
+                    <!-- Horizontal Divider -->
+                    <hr class="my-12 border-t-2 border-gray-200">
+        
+                    <!-- Day 1: Speech to Spelling -->
+                    <section id="activity-speech-to-spelling-day1" class="mb-12">
+                        <h2 style="font-family: var(--font-heading); color: var(--color-banner-blue);" class="text-4xl font-bold mb-6 text-center">
+                            Activity: Speech to Spelling
+                        </h2>
+                        <p class="text-center text-gray-600 mb-6 text-lg">Listen to the word, then type it in the box.</p>
+        
+                        <div class="flex flex-col items-center gap-6">
+                            <!-- Play Button -->
+                            <button id="play-word-btn-day1" class="bg-yellow-400 hover:bg-yellow-500 text-gray-800 p-4 rounded-full shadow-lg transition-transform hover:scale-110">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-10 h-10">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 11.633a1 1 0 0 0-1.618-.823l-7.36 4.792a1 1 0 0 1-1.618-.823V8.22a1 1 0 0 1 1.618-.823l7.36 4.792ZM4 11.633a1 1 0 0 0-1 1v.002a1 1 0 0 0 1 1h.008a1 1 0 0 0 1-1v-.002a1 1 0 0 0-1-1H4Z" />
+                                </svg>
+                                <span class="sr-only">Play Word</span>
+                            </button>
+                            
+                            <!-- Elkonin Boxes (Visual) -->
+                            <div class="elkonin-boxes my-4">
+                                <div class="elkonin-box"></div>
+                                <div class="elkonin-box"></div>
+                                <div class="elkonin-box"></div>
+                                <div class="elkonin-box"></div>
+                                <div class="elkonin-box"></div>
+                            </div>
+        
+                            <!-- Spelling Input -->
+                            <input type="text" id="spelling-input-day1" class="spelling-input-elkonin" placeholder="Type..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        
+                            <!-- Feedback Box -->
+                            <div id="spelling-feedback-box-day1" class="spelling-feedback w-full max-w-md">
+                                <!-- Feedback will appear here -->
+                            </div>
+        
+                            <!-- Control Buttons -->
+                            <div class="flex gap-4">
+                                <button id="check-spelling-btn-day1" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow transition-transform hover:scale-105">
+                                    Check
+                                </button>
+                                <button id="reset-spelling-btn-day1" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg shadow transition-transform hover:scale-105">
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                </div> <!-- End Day 1 Activities -->
+
+
+                <!-- ======== DAY 2 ACTIVITIES ======== -->
+                <div id="day-2-activities" class="day-container hidden">
+                    
+                    <!-- Day 2: Review Pattern -->
+                    <section id="activity-review-pattern-day2" class="mb-12">
+                        <h2 style="font-family: var(--font-heading); color: var(--color-banner-blue);" class="text-4xl font-bold mb-6 text-center">
+                            Day 2: Review Pattern
+                        </h2>
+                        <div class="review-pattern-box max-w-2xl mx-auto">
+                            <p>When the vowel is followed by a<span class="blank"></span>and then the letter &lt;<span class="blank"></span>&gt;, the vowel says its<span class="blank"></span>.</p>
+                        </div>
+                    </section>
+
+                    <!-- Horizontal Divider -->
+                    <hr class="my-12 border-t-2 border-gray-200">
+
+                    <!-- Day 2: Word Sort -->
+                    <section id="activity-word-sort-day2" class="mb-12">
+                        <h2 style="font-family: var(--font-heading); color: var(--color-banner-blue);" class="text-4xl font-bold mb-6 text-center">
+                            Day 2: Word Sort
+                        </h2>
+                        
+                        <!-- Layout for Drop Zones and Bank -->
+                        <div class="flex flex-col md:flex-row gap-6">
+                            <!-- 2. VCE Drop Zone -->
+                            <div class="flex-1 flex flex-col">
+                                <h3 class="text-xl font-bold text-center mb-2" style="color: var(--color-text-dark);">VCE Words</h3>
+                                <div id="vce-zone-day2-sort" class="drop-zone bg-green-50 flex-1 flex flex-wrap gap-3 content-start">
+                                    <!-- Dropped cards appear here -->
+                                </div>
+                            </div>
+        
+                            <!-- 1. Word Card Bank -->
+                            <div class="flex-1 flex flex-col">
+                                <h3 class="text-xl font-bold text-center mb-2" style="color: var(--color-text-dark);">Word Bank</h3>
+                                <div id="card-bank-day2-sort" class="drop-zone bg-gray-100 flex-1 flex flex-wrap gap-3 content-start">
+                                    <!-- Initial cards are generated here -->
+                                </div>
+                            </div>
+        
+                            <!-- 3. Not VCE Drop Zone -->
+                            <div class="flex-1 flex flex-col">
+                                <h3 class="text-xl font-bold text-center mb-2" style="color: var(--color-text-dark);">Not VCE Words</h3>
+                                <div id="not-vce-zone-day2-sort" class="drop-zone bg-red-50 flex-1 flex flex-wrap gap-3 content-start">
+                                    <!-- Dropped cards appear here -->
+                                </div>
+                            </div>
+                        </div>
+        
+                        <!-- 4. Control Buttons -->
+                        <div class="flex justify-center gap-4 mt-6">
+                            <button id="check-answers-btn-day2-sort" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow transition-transform hover:scale-105">
+                                Check Answers
+                            </button>
+                            <button id="reset-btn-day2-sort" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg shadow transition-transform hover:scale-105">
+                                Reset
+                            </button>
+                        </div>
+        
+                        <!-- 5. Feedback Box -->
+                        <div id="feedback-box-day2-sort" class="feedback-box mt-6 w-full max-w-2xl mx-auto">
+                            <!-- Feedback appears here -->
+                        </div>
+                    </section>
+
+                    <!-- Horizontal Divider -->
+                    <hr class="my-12 border-t-2 border-gray-200">
+                    
+                    <!-- Day 2: Speech to Spelling -->
+                    <section id="activity-speech-to-spelling-day2" class="mb-12">
+                        <h2 style="font-family: var(--font-heading); color: var(--color-banner-blue);" class="text-4xl font-bold mb-6 text-center">
+                            Activity: Speech to Spelling (Day 2)
+                        </h2>
+                        <p class="text-center text-gray-600 mb-6 text-lg">Listen to the word, then type it in the box.</p>
+        
+                        <div class="flex flex-col items-center gap-6">
+                            <!-- Play Button -->
+                            <button id="play-word-btn-day2" class="bg-yellow-400 hover:bg-yellow-500 text-gray-800 p-4 rounded-full shadow-lg transition-transform hover:scale-110">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-10 h-10">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 11.633a1 1 0 0 0-1.618-.823l-7.36 4.792a1 1 0 0 1-1.618-.823V8.22a1 1 0 0 1 1.618-.823l7.36 4.792ZM4 11.633a1 1 0 0 0-1 1v.002a1 1 0 0 0 1 1h.008a1 1 0 0 0 1-1v-.002a1 1 0 0 0-1-1H4Z" />
+                                </svg>
+                                <span class="sr-only">Play Word</span>
+                            </button>
+        
+                            <!-- Elkonin Boxes (Visual) -->
+                            <div class="elkonin-boxes my-4">
+                                <div class="elkonin-box"></div>
+                                <div class="elkonin-box"></div>
+                                <div class="elkonin-box"></div>
+                                <div class="elkonin-box"></div>
+                                <div class="elkonin-box"></div>
+                            </div>
+
+                            <!-- Spelling Input -->
+                            <input type="text" id="spelling-input-day2" class="spelling-input-elkonin" placeholder="Type..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        
+                            <!-- Feedback Box -->
+                            <div id="spelling-feedback-box-day2" class="spelling-feedback w-full max-w-md">
+                                <!-- Feedback will appear here -->
+                            </div>
+        
+                            <!-- Control Buttons -->
+                            <div class="flex gap-4">
+                                <button id="check-spelling-btn-day2" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow transition-transform hover:scale-105">
+                                    Check
+                                </button>
+                                <button id="reset-spelling-btn-day2" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg shadow transition-transform hover:scale-105">
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Horizontal Divider -->
+                    <hr class="my-12 border-t-2 border-gray-200">
+
+                    <!-- Day 2: Analogies -->
+                    <section id="activity-analogies-day2" class="mb-12">
+                        <h2 style="font-family: var(--font-heading); color: var(--color-banner-blue);" class="text-4xl font-bold mb-6 text-center">
+                            Day 2: Analogies
+                        </h2>
+                        <div class="max-w-lg mx-auto">
+                            <!-- Analogy 1 -->
+                            <div class="analogy-item">
+                                <span>tack : take :: back :</span>
+                                <input type="text" id="analogy-input-1" data-answer="bake">
+                                <button class="analogy-check-btn bg-gray-200 p-2 rounded-md hover:bg-gray-300" data-target="1">Check</button>
+                                <span id="analogy-feedback-1" class="analogy-feedback"></span>
+                            </div>
+                            <!-- Analogy 2 -->
+                            <div class="analogy-item">
+                                <span>same : cope :: sam :</span>
+                                <input type="text" id="analogy-input-2" data-answer="cop">
+                                <button class="analogy-check-btn bg-gray-200 p-2 rounded-md hover:bg-gray-300" data-target="2">Check</button>
+                                <span id="analogy-feedback-2" class="analogy-feedback"></span>
+                            </div>
+                            <!-- Analogy 3 -->
+                            <div class="analogy-item">
+                                <span>mitt : mite :: rid :</span>
+                                <input type="text" id="analogy-input-3" data-answer="ride">
+                                <button class="analogy-check-btn bg-gray-200 p-2 rounded-md hover:bg-gray-300" data-target="3">Check</button>
+                                <span id="analogy-feedback-3" class="analogy-feedback"></span>
+                            </div>
+                            <!-- Analogy 4 -->
+                            <div class="analogy-item">
+                                <span>cut : cute :: hop :</span>
+                                <input type="text" id="analogy-input-4" data-answer="hope">
+                                <button class="analogy-check-btn bg-gray-200 p-2 rounded-md hover:bg-gray-300" data-target="4">Check</button>
+                                <span id="analogy-feedback-4" class="analogy-feedback"></span>
+                            </div>
+                            <!-- Analogy 5 -->
+                            <div class="analogy-item">
+                                <span>chat : chide :: van :</span>
+                                <input type="text" id="analogy-input-5" data-answer="vane">
+                                <button class="analogy-check-btn bg-gray-200 p-2 rounded-md hover:bg-gray-300" data-target="5">Check</button>
+                                <span id="analogy-feedback-5" class="analogy-feedback"></span>
+                            </div>
+                        </div>
+                    </section>
+
+                </div> <!-- End Day 2 Activities -->
+
+                <!-- ======== DAY 3 ACTIVITIES ======== -->
+                <div id="day-3-activities" class="day-container hidden">
+                    
+                    <!-- Day 3: Review Pattern -->
+                    <section id="activity-review-pattern-day3" class="mb-12">
+                        <h2 style="font-family: var(--font-heading); color: var(--color-banner-blue);" class="text-4xl font-bold mb-6 text-center">
+                            Day 3: Review Pattern
+                        </h2>
+                        <div class="review-pattern-box max-w-2xl mx-auto">
+                            <p>When the vowel is followed by a<span class="blank"></span>and then the letter &lt;<span class="blank"></span>&gt;, the vowel says its<span class="blank"></span>.</p>
+                        </div>
+                    </section>
+
+                    <!-- Horizontal Divider -->
+                    <hr class="my-12 border-t-2 border-gray-200">
+
+                    <!-- Day 3: Speech to Spelling -->
+                    <section id="activity-speech-to-spelling-day3" class="mb-12">
+                        <h2 style="font-family: var(--font-heading); color: var(--color-banner-blue);" class="text-4xl font-bold mb-6 text-center">
+                            Activity: Speech to Spelling (Day 3)
+                        </h2>
+                        <p class="text-center text-gray-600 mb-6 text-lg">Listen to the word, then type it in the box.</p>
+        
+                        <div class="flex flex-col items-center gap-6">
+                            <!-- Play Button -->
+                            <button id="play-word-btn-day3" class="bg-yellow-400 hover:bg-yellow-500 text-gray-800 p-4 rounded-full shadow-lg transition-transform hover:scale-110">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-10 h-10">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 11.633a1 1 0 0 0-1.618-.823l-7.36 4.792a1 1 0 0 1-1.618-.823V8.22a1 1 0 0 1 1.618-.823l7.36 4.792ZM4 11.633a1 1 0 0 0-1 1v.002a1 1 0 0 0 1 1h.008a1 1 0 0 0 1-1v-.002a1 1 0 0 0-1-1H4Z" />
+                                </svg>
+                                <span class="sr-only">Play Word</span>
+                            </button>
+        
+                            <!-- Elkonin Boxes (Visual) -->
+                            <div class="elkonin-boxes my-4">
+                                <div class="elkonin-box"></div>
+                                <div class="elkonin-box"></div>
+                                <div class="elkonin-box"></div>
+                                <div class="elkonin-box"></div>
+                                <div class="elkonin-box"></div>
+                            </div>
+
+                            <!-- Spelling Input -->
+                            <input type="text" id="spelling-input-day3" class="spelling-input-elkonin" placeholder="Type..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        
+                            <!-- Feedback Box -->
+                            <div id="spelling-feedback-box-day3" class="spelling-feedback w-full max-w-md">
+                                <!-- Feedback will appear here -->
+                            </div>
+        
+                            <!-- Control Buttons -->
+                            <div class="flex gap-4">
+                                <button id="check-spelling-btn-day3" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow transition-transform hover:scale-105">
+                                    Check
+                                </button>
+                                <button id="reset-spelling-btn-day3" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg shadow transition-transform hover:scale-105">
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Horizontal Divider -->
+                    <hr class="my-12 border-t-2 border-gray-200">
+
+                    <!-- Day 3: Word Writing -->
+                    <section id="activity-word-writing-day3" class="mb-12">
+                        <h2 style="font-family: var(--font-heading); color: var(--color-banner-blue);" class="text-4xl font-bold mb-6 text-center">
+                            Day 3: Word Writing
+                        </h2>
+                        <div class="word-writing-grid">
+                            <input type="text" aria-label="Word 1">
+                            <input type="text" aria-label="Word 2">
+                            <input type="text" aria-label="Word 3">
+                            <input type="text" aria-label="Word 4">
+                            <input type="text" aria-label="Word 5">
+                            <input type="text" aria-label="Word 6">
+                            <input type="text" aria-label="Word 7">
+                            <input type="text" aria-label="Word 8">
+                            <input type="text" aria-label="Word 9">
+                        </div>
+                    </section>
+                    
+                    <!-- Horizontal Divider -->
+                    <hr class="my-12 border-t-2 border-gray-200">
+
+                    <!-- Day 3: Sentence Writing -->
+                    <section id="activity-sentence-writing-day3" class="mb-12">
+                        <h2 style="font-family: var(--font-heading); color: var(--color-banner-blue);" class="text-4xl font-bold mb-6 text-center">
+                            Day 3: Sentence Writing
+                        </h2>
+                        <div class="max-w-2xl mx-auto space-y-4">
+                            <div>
+                                <label for="sentence-1" class="font-bold text-lg text-gray-700">1.</label>
+                                <textarea id="sentence-1" class="sentence-input" rows="2"></textarea>
+                            </div>
+                            <div>
+                                <label for="sentence-2" class="font-bold text-lg text-gray-700">2.</label>
+                                <textarea id="sentence-2" class="sentence-input" rows="2"></textarea>
+                            </div>
+                            <div>
+                                <label for="sentence-3" class="font-bold text-lg text-gray-700">3.</label>
+                                <textarea id="sentence-3" class="sentence-input" rows="2"></textarea>
+                            </div>
+                            <div class="text-center pt-4">
+                                <button id="show-sentences-btn-day3" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg shadow transition-transform hover:scale-105">
+                                    Show Model Sentences
+                                </button>
+                                <div id="model-sentences-day3" class="hidden mt-6 p-4 bg-gray-50 rounded-lg text-left text-gray-700 space-y-2">
+                                    <p><strong>1.</strong> Jake will hop on the bike and ride to the shop.</p>
+                                    <p><strong>2.</strong> I will cut the cake and pack it in a box.</p>
+                                    <p><strong>3.</strong> The cat sat near the gate and watched the mule.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+
+                </div> <!-- End Day 3 Activities -->
+
+            </div> <!-- End Activity Content Area -->
+
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // ===================================================
+            // === GENERIC DRAG/DROP LOGIC
+            // ===================================================
+            
+            /**
+             * Creates a generic drag-and-drop handler for a set of cards.
+             * @param {string} activityId - A unique ID for the activity (e.g., 'day1-identify')
+             * @param {Array<Object>} wordData - The array of word objects for this activity.
+             */
+            function createDragAndDropActivity(activityId, wordData) {
+                const cardBank = document.getElementById(`card-bank-${activityId}`);
+                const vceZone = document.getElementById(`vce-zone-${activityId}`);
+                const notVceZone = document.getElementById(`not-vce-zone-${activityId}`);
+                const checkBtn = document.getElementById(`check-answers-btn-${activityId}`);
+                const resetBtn = document.getElementById(`reset-btn-${activityId}`);
+                const feedbackBox = document.getElementById(`feedback-box-${activityId}`);
+                const dropZones = [vceZone, notVceZone, cardBank];
+
+                let draggedCard = null;
+
+                function init() {
+                    cardBank.innerHTML = '';
+                    vceZone.innerHTML = '';
+                    notVceZone.innerHTML = '';
+                    clearFeedback();
+
+                    const shuffledWords = [...wordData].sort(() => Math.random() - 0.5);
+
+                    shuffledWords.forEach((word, index) => {
+                        const card = document.createElement('div');
+                        card.id = `card-${activityId}-${index}`;
+                        card.className = `word-card ${word.colorClass}`;
+                        card.textContent = word.word;
+                        card.draggable = true;
+                        card.dataset.vce = word.isVCE;
+                        card.dataset.activity = activityId; // Tag card with its activity
+                        cardBank.appendChild(card);
+                    });
+                }
+
+                function clearFeedback() {
+                    document.querySelectorAll(`#activity-${activityId} .word-card`).forEach(c => {
+                        c.classList.remove('correct', 'incorrect');
+                    });
+                    feedbackBox.classList.remove('show', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'bg-yellow-100', 'text-yellow-800');
+                    feedbackBox.textContent = '';
+                }
+
+                function checkAnswers() {
+                    clearFeedback();
+                    let correctCount = 0;
+                    let totalCount = 0;
+
+                    Array.from(vceZone.children).forEach(card => {
+                        totalCount++;
+                        if (card.dataset.vce === 'true') {
+                            card.classList.add('correct');
+                            correctCount++;
+                        } else {
+                            card.classList.add('incorrect');
+                        }
+                    });
+
+                    Array.from(notVceZone.children).forEach(card => {
+                        totalCount++;
+                        if (card.dataset.vce === 'false') {
+                            card.classList.add('correct');
+                            correctCount++;
+                        } else {
+                            card.classList.add('incorrect');
+                        }
+                    });
+
+                    Array.from(cardBank.children).forEach(card => {
+                        totalCount++;
+                        card.classList.add('incorrect');
+                    });
+
+                    if (totalCount === 0) {
+                        feedbackBox.textContent = 'Drag some cards into the boxes first!';
+                        feedbackBox.classList.add('bg-yellow-100', 'text-yellow-800', 'show');
+                        return;
+                    }
+
+                    if (correctCount === totalCount) {
+                        feedbackBox.textContent = 'Great job! You got them all right!';
+                        feedbackBox.classList.add('bg-green-100', 'text-green-800', 'show');
+                    } else {
+                        feedbackBox.textContent = `You got ${correctCount} out of ${totalCount} correct. Try again!`;
+                        feedbackBox.classList.add('bg-red-100', 'text-red-800', 'show');
+                    }
+                }
+
+                // --- Drag/Drop Listeners (Mouse) ---
+                // We add these to the document to handle all drag events centrally.
+                document.addEventListener('dragstart', (e) => {
+                    if (e.target.classList.contains('word-card') && e.target.dataset.activity === activityId) {
+                        draggedCard = e.target;
+                        setTimeout(() => e.target.classList.add('dragging'), 0);
+                        clearFeedback();
+                    }
+                });
+
+                document.addEventListener('dragend', (e) => {
+                    if (draggedCard && draggedCard.dataset.activity === activityId) {
+                        draggedCard.classList.remove('dragging');
+                        draggedCard = null;
+                    }
+                });
+
+                dropZones.forEach(zone => {
+                    zone.addEventListener('dragover', (e) => {
+                        // Check if the dragged card is part of *this* activity
+                        if (draggedCard && draggedCard.dataset.activity === activityId) {
+                            e.preventDefault(); 
+                            zone.classList.add('drag-over');
+                        }
+                    });
+
+                    zone.addEventListener('dragleave', () => {
+                        zone.classList.remove('drag-over');
+                    });
+
+                    zone.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        zone.classList.remove('drag-over');
+                        if (draggedCard && draggedCard.dataset.activity === activityId) {
+                            zone.appendChild(draggedCard);
+                        }
+                    });
+                });
+
+                // --- Touch Listeners ---
+                // These are more complex and are also attached to the document.
+                // We'll use a single set of listeners and check the activity ID.
+                
+                // Note: The global touch listeners are defined *outside* this function
+                // to avoid adding multiple listeners. We'll add a check inside them.
+
+                // --- Button Listeners ---
+                checkBtn.addEventListener('click', checkAnswers);
+                resetBtn.addEventListener('click', init);
+
+                // --- Initial Load ---
+                init();
+            }
+
+            // --- Global Touch Handlers ---
+            // These handlers manage dragging for *all* drag-and-drop activities.
+            let globalDraggedCard = null;
+            let touchStartX, touchStartY;
+            let clone = null;
+            let latestTouch = null;
+            let rafPending = false;
+
+            function onDragUpdate() {
+                if (!clone || !latestTouch) {
+                    rafPending = false;
+                    return;
+                }
+                clone.style.left = `${latestTouch.pageX - touchStartX}px`;
+                clone.style.top = `${latestTouch.pageY - touchStartY}px`;
+
+                // Highlight drop zones *only* for the active activity
+                const activityId = globalDraggedCard.dataset.activity;
+                document.querySelectorAll(`[id$="-${activityId}"].drop-zone`).forEach(zone => {
+                    const rect = zone.getBoundingClientRect();
+                    if (latestTouch.clientX > rect.left && latestTouch.clientX < rect.right &&
+                        latestTouch.clientY > rect.top && latestTouch.clientY < rect.bottom) {
+                        zone.classList.add('drag-over');
+                    } else {
+                        zone.classList.remove('drag-over');
+                    }
+                });
+                rafPending = false;
+            }
+
+            document.addEventListener('touchstart', (e) => {
+                if (e.target.classList.contains('word-card')) {
+                    globalDraggedCard = e.target;
+                    
+                    clone = globalDraggedCard.cloneNode(true);
+                    clone.classList.add('dragging');
+                    clone.style.position = 'absolute';
+                    clone.style.pointerEvents = 'none'; 
+                    clone.style.zIndex = '1000';
+                    document.body.appendChild(clone);
+                    
+                    const touch = e.touches[0];
+                    const rect = globalDraggedCard.getBoundingClientRect();
+                    touchStartX = touch.pageX - (rect.left + window.scrollX);
+                    touchStartY = touch.pageY - (rect.top + window.scrollY);
+                    clone.style.left = `${rect.left + window.scrollX}px`;
+                    clone.style.top = `${rect.top + window.scrollY}px`;
+                    
+                    globalDraggedCard.style.opacity = '0.3';
+                    
+                    // Clear feedback for its specific activity
+                    const feedbackBox = document.getElementById(`feedback-box-${globalDraggedCard.dataset.activity}`);
+                    if (feedbackBox) {
+                        feedbackBox.classList.remove('show', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'bg-yellow-100', 'text-yellow-800');
+                        feedbackBox.textContent = '';
+                    }
+
+                    latestTouch = null;
+                    rafPending = false;
+                }
+            }, { passive: false });
+
+            document.addEventListener('touchmove', (e) => {
+                if (!globalDraggedCard || !clone) return;
+                e.preventDefault(); 
+                latestTouch = e.touches[0];
+                if (!rafPending) {
+                    rafPending = true;
+                    requestAnimationFrame(onDragUpdate);
+                }
+            }, { passive: false });
+
+            document.addEventListener('touchend', (e) => {
+                if (!globalDraggedCard || !clone) return;
+
+                const touch = e.changedTouches[0];
+                const activityId = globalDraggedCard.dataset.activity;
+
+                document.querySelectorAll(`[id$="-${activityId}"].drop-zone`).forEach(zone => {
+                    zone.classList.remove('drag-over');
+                    const rect = zone.getBoundingClientRect();
+                    if (touch.clientX > rect.left && touch.clientX < rect.right &&
+                        touch.clientY > rect.top && touch.clientY < rect.bottom) {
+                        zone.appendChild(globalDraggedCard);
+                    }
+                });
+
+                globalDraggedCard.style.opacity = '1'; 
+                document.body.removeChild(clone);
+                globalDraggedCard = null;
+                clone = null;
+                latestTouch = null;
+                rafPending = false;
+            });
+
+
+            // ===================================================
+            // === GENERIC SPEECH-TO-SPELLING LOGIC
+            // ===================================================
+
+            /**
+             * Creates a generic speech-to-spelling handler.
+             * @param {string} dayId - A unique ID for the activity (e.g., 'day1')
+             * @param {Array<string>} wordList - The array of word strings.
+             */
+            function createSpeechToSpelling(dayId, wordList) {
+                let currentWordIndex = 0;
+                let isWordChecked = false;
+
+                const playWordBtn = document.getElementById(`play-word-btn-${dayId}`);
+                const spellingInput = document.getElementById(`spelling-input-${dayId}`);
+                const checkSpellingBtn = document.getElementById(`check-spelling-btn-${dayId}`);
+                const resetSpellingBtn = document.getElementById(`reset-spelling-btn-${dayId}`);
+                const spellingFeedbackBox = document.getElementById(`spelling-feedback-box-${dayId}`);
+
+                function playCurrentWord() {
+                    if (currentWordIndex >= wordList.length) return;
+                    const word = wordList[currentWordIndex];
+                    const utterance = new SpeechSynthesisUtterance(word);
+                    utterance.lang = 'en-US';
+                    speechSynthesis.speak(utterance);
+                }
+
+                function checkSpelling() {
+                    if (isWordChecked) {
+                        currentWordIndex++;
+                        if (currentWordIndex >= wordList.length) {
+                            spellingFeedbackBox.textContent = "Great job! You've spelled all the words!";
+                            spellingFeedbackBox.className = 'spelling-feedback correct';
+                            checkSpellingBtn.textContent = 'Done';
+                            checkSpellingBtn.disabled = true;
+                            playWordBtn.disabled = true;
+                            spellingInput.value = '';
+                            spellingInput.disabled = true;
+                        } else {
+                            resetFeedback();
+                            checkSpellingBtn.textContent = 'Check';
+                            isWordChecked = false;
+                            setTimeout(playCurrentWord, 300);
+                        }
+                    } else {
+                        const userInput = spellingInput.value.trim().toLowerCase();
+                        const correctWord = wordList[currentWordIndex];
+                        if (userInput === correctWord) {
+                            spellingFeedbackBox.textContent = "That's correct!";
+                            spellingFeedbackBox.className = 'spelling-feedback correct';
+                            checkSpellingBtn.textContent = 'Next Word';
+                            isWordChecked = true;
+                        } else {
+                            spellingFeedbackBox.textContent = 'Not quite. Try again!';
+                            spellingFeedbackBox.className = 'spelling-feedback incorrect';
+                        }
+                    }
+                }
+                
+                function resetFeedback() {
+                    spellingInput.value = '';
+                    spellingFeedbackBox.textContent = '';
+                    spellingFeedbackBox.className = 'spelling-feedback';
+                }
+
+                function init() {
+                    currentWordIndex = 0;
+                    isWordChecked = false;
+                    resetFeedback();
+                    checkSpellingBtn.textContent = 'Check';
+                    checkSpellingBtn.disabled = false;
+                    playWordBtn.disabled = false;
+                    spellingInput.disabled = false;
+                    // Don't auto-play; wait for button click or tab navigation
+                }
+
+                playWordBtn.addEventListener('click', playCurrentWord);
+                checkSpellingBtn.addEventListener('click', checkSpelling);
+                resetSpellingBtn.addEventListener('click', init);
+                spellingInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') checkSpelling();
+                });
+
+                // Return the init and play functions so they can be called by nav
+                return { init, playCurrentWord };
+            }
+
+
+            // ===================================================
+            // === ACTIVITY DATA
+            // ===================================================
+
+            // --- Day 1: Identify the Pattern ---
+            const day1IdentifyWords = [
+                { word: 'brave', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'flute', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'pouch', isVCE: false, colorClass: 'vce-no' },
+                { word: 'gorge', isVCE: false, colorClass: 'vce-no' },
+                { word: 'tone', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'cake', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'bet', isVCE: false, colorClass: 'vce-no' },
+                { word: 'stay', isVCE: false, colorClass: 'vce-no' },
+                { word: 'mine', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'kite', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'flood', isVCE: false, colorClass: 'vce-no' },
+                { word: 'lock', isVCE: false, colorClass: 'vce-no' },
+                { word: 'cute', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'drone', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'itch', isVCE: false, colorClass: 'vce-no' },
+                { word: 'bent', isVCE: false, colorClass: 'vce-no' }
+            ];
+
+            // --- Day 1: Word Sort ---
+            const day1SortWords = [
+                { word: 'gripe', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'charge', isVCE: false, colorClass: 'vce-no' }, // Ends in e, but not VCE pattern
+                { word: 'grip', isVCE: false, colorClass: 'vce-no' },
+                { word: 'stem', isVCE: false, colorClass: 'vce-no' },
+                { word: 'stack', isVCE: false, colorClass: 'vce-no' },
+                { word: 'cut', isVCE: false, colorClass: 'vce-no' },
+                { word: 'stake', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'cute', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'stripe', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'plate', isVCE: true, colorClass: 'vce-yes' }
+            ];
+
+            // --- Day 1: Speech to Spelling ---
+            const day1SpellingWords = ['spike', 'flame', 'kite', 'bride', 'grime'];
+            
+            // --- Day 2: Word Sort ---
+            const day2SortWords = [
+                { word: 'pack', isVCE: false, colorClass: 'vce-no' },
+                { word: 'tote', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'clutch', isVCE: false, colorClass: 'vce-no' },
+                { word: 'sprite', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'stake', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'bent', isVCE: false, colorClass: 'vce-no' },
+                { word: 'nice', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'time', isVCE: true, colorClass: 'vce-yes' },
+                { word: 'slick', isVCE: false, colorClass: 'vce-no' },
+                { word: 'fast', isVCE: false, colorClass: 'vce-no' }
+            ];
+
+            // --- Day 2: Speech to Spelling ---
+            const day2SpellingWords = ['split', 'drive', 'crane', 'marks', 'trade'];
+
+            // --- Day 3: Speech to Spelling ---
+            const day3SpellingWords = ['date', 'size', 'mope', 'flint', 'cube'];
+
+
+            // ===================================================
+            // === INITIALIZE ALL ACTIVITIES
+            // ===================================================
+            
+            // --- Init Day 1 ---
+            createDragAndDropActivity('day1-identify', day1IdentifyWords);
+            createDragAndDropActivity('day1-sort', day1SortWords);
+            const speechDay1 = createSpeechToSpelling('day1', day1SpellingWords);
+            speechDay1.init();
+            setTimeout(speechDay1.playCurrentWord, 500); // Auto-play first word
+
+            // --- Init Day 2 ---
+            createDragAndDropActivity('day2-sort', day2SortWords);
+            const speechDay2 = createSpeechToSpelling('day2', day2SpellingWords);
+            speechDay2.init();
+            
+            // --- Init Day 3 ---
+            const speechDay3 = createSpeechToSpelling('day3', day3SpellingWords);
+            speechDay3.init();
+
+
+            // ===================================================
+            // === SCRIPTING FOR PAGE NAVIGATION
+            // ===================================================
+            const navButtons = [
+                document.getElementById('nav-day-1'),
+                document.getElementById('nav-day-2'),
+                document.getElementById('nav-day-3')
+            ];
+            const dayContainers = [
+                document.getElementById('day-1-activities'),
+                document.getElementById('day-2-activities'),
+                document.getElementById('day-3-activities')
+            ];
+
+            navButtons.forEach((button, index) => {
+                button.addEventListener('click', () => {
+                    navButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    dayContainers.forEach(container => container.classList.add('hidden'));
+                    dayContainers[index].classList.remove('hidden');
+
+                    // Auto-play first word of speech activity when tab is clicked
+                    if (index === 0) { // Day 1
+                        speechDay1.playCurrentWord();
+                    } else if (index === 1) { // Day 2
+                        speechDay2.playCurrentWord();
+                    } else if (index === 2) { // Day 3
+                        speechDay3.playCurrentWord();
+                    }
+                });
+            });
+
+
+            // ===================================================
+            // === SCRIPTING FOR EXPANDABLE SECTION
+            // ===================================================
+            const expandBtn = document.getElementById('expand-teaching-btn');
+            const teachingContent = document.getElementById('teaching-content');
+            const teachingChevron = document.getElementById('teaching-chevron');
+
+            expandBtn.addEventListener('click', () => {
+                teachingContent.classList.toggle('expanded');
+                teachingChevron.classList.toggle('rotated');
+            });
+
+
+            // ===================================================
+            // === SCRIPTING FOR DAY 2 ANALOGIES
+            // ===================================================
+            document.querySelectorAll('.analogy-check-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetId = button.dataset.target;
+                    const input = document.getElementById(`analogy-input-${targetId}`);
+                    const feedback = document.getElementById(`analogy-feedback-${targetId}`);
+                    const userAnswer = input.value.trim().toLowerCase();
+                    const correctAnswer = input.dataset.answer;
+
+                    if (userAnswer === correctAnswer) {
+                        feedback.textContent = '✔';
+                        feedback.className = 'analogy-feedback correct';
+                    } else {
+                        feedback.textContent = '✖';
+                        feedback.className = 'analogy-feedback incorrect';
+                    }
+                });
+            });
+
+            // =G==================================================
+            // === SCRIPTING FOR DAY 3 SENTENCES
+            // ===================================================
+            const showSentencesBtn = document.getElementById('show-sentences-btn-day3');
+            const modelSentences = document.getElementById('model-sentences-day3');
+            
+            showSentencesBtn.addEventListener('click', () => {
+                modelSentences.classList.toggle('hidden');
+                if (modelSentences.classList.contains('hidden')) {
+                    showSentencesBtn.textContent = 'Show Model Sentences';
+                } else {
+                    showSentencesBtn.textContent = 'Hide Model Sentences';
+                }
+            });
+
+        });
+    </script>
+</body>
+</html>
+
