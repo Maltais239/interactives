@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Ensure proper rendering on mobile devices -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Numbered Treaties of Canada (Alberta Focus)</title>
+  
+  <!-- Load Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <!-- Load Google Font 'Inter' -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    /* Basic layout styles */
+    body, html { 
+      margin: 0; 
+      padding: 0; 
+      width: 100%; 
+      height: 100%; 
+      display: flex; 
+      font-family: 'Inter', sans-serif; 
+      background-color: #f8fafc; /* Light grey background */
+      color: #334155; /* Slate text */
+      overflow: hidden; /* Prevent scrolling on the body */
+    }
+    
+    /* Responsive layout for mobile */
+    @media (max-width: 768px) {
+      body, html {
+        flex-direction: column;
+      }
+      #map {
+        height: 60%; /* Map takes 60% of vertical height */
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #cbd5e1;
+      }
+      #info-panel {
+        width: 100%;
+        max-width: 100%;
+        height: 40%; /* Panel takes 40% */
+        border-left: none;
+        border-top: 4px solid #0ea5e9; /* Move accent border to top */
+        padding: 1rem; /* Reduce padding on mobile */
+      }
+      #info-panel h2 {
+        font-size: 1.5rem; /* Smaller title */
+      }
+      #info-content h3 {
+        font-size: 1.25rem; /* Smaller heading */
+      }
+    }
+
+    /* Use a light blue for the map background */
+    .leaflet-container { background: #e0f2fe; }
+    
+    /* Map container styles */
+    #map { 
+      flex: 1; /* Map takes up remaining space */
+      height: 100%; 
+      border-right: 1px solid #cbd5e1; /* Slate border */
+    }
+    
+    /* Info panel styles */
+    #info-panel { 
+      width: 400px; 
+      max-width: 40%; /* Max width for large screens */
+      min-width: 300px; /* Min width to prevent squishing */
+      padding: 2rem; 
+      background: #ffffff; 
+      border-left: 4px solid #0ea5e9; /* Blue accent */
+      overflow-y: auto; /* Allow panel to scroll */
+      box-shadow: -5px 0 15px rgba(0,0,0,0.05); 
+      display: flex; 
+      flex-direction: column; 
+    }
+    
+    /* Panel content styling */
+    #info-panel h2 { 
+      margin-top: 0; 
+      color: #0c4a6e; /* Dark blue title */
+      font-size: 1.75rem; 
+      font-weight: 700; 
+      border-bottom: 2px solid #e0f2fe; 
+      padding-bottom: 0.5rem; 
+      margin-bottom: 1rem; 
+    }
+    #info-content h3 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #0ea5e9; /* Blue heading */
+      margin-top: 0;
+      margin-bottom: 0.75rem;
+    }
+    #info-content h4 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #0c4a6e;
+      margin-top: 1.25rem;
+      margin-bottom: 0.5rem;
+      border-bottom: 1px solid #e0f2fe;
+      padding-bottom: 0.25rem;
+    }
+    #info-content p {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      margin-bottom: 1rem;
+    }
+    #info-content ul {
+      list-style-type: disc;
+      padding-left: 1.5rem;
+      margin: 0 0 1rem 0;
+      font-size: 0.9rem;
+    }
+    #info-content li {
+      margin-bottom: 0.5rem;
+    }
+    
+    /* Footer/source info in panel */
+    .source-info {
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e2e8f0;
+        font-size: 0.8rem;
+    }
+    .source-info a {
+        color: #0ea5e9;
+        text-decoration: none;
+    }
+    .source-info a:hover {
+        text-decoration: underline;
+    }
+    .source-info p {
+        margin-bottom: 0.5rem;
+    }
+
+    /* Leaflet Popup Styles */
+    .leaflet-popup-content-wrapper { 
+      background-color: #ffffff; 
+      color: #0c4a6e; 
+      border-radius: 8px; 
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+    }
+    .leaflet-popup-content { 
+      font-weight: 600; 
+      font-family: 'Inter', sans-serif;
+      font-size: 1rem;
+      margin: 10px 15px;
+    }
+    .leaflet-popup-tip { background: #ffffff; }
+  </style>
+</head>
+<body>
+
+  <!-- The map container div -->
+  <div id="map"></div>
+  
+  <!-- The info panel container div -->
+  <div id="info-panel">
+    <h2>Numbered Treaties of Canada</h2>
+    <div id="info-content">
+      <!-- This content is the default. It gets replaced on click. -->
+      <p>Click a treaty area on the map to learn more about it.</p>
+      
+      <!-- *** NEW SIMPLIFIED TEXT *** -->
+      <h4>About the Numbered Treaties</h4>
+      <p>In Canada, treaties are special agreements made between the Crown (the government) and First Nations. Between 1871 and 1921, eleven "Numbered Treaties" were signed.</p>
+      <p>For First Nations, these were sacred, oral (spoken) agreements about sharing the land and living in peace. Their spoken promises were seen as more important than writing. The government wanted to get land for new settlers. They wrote the agreements down, but sometimes the written words were different from the spoken promises made.</p>
+
+      <div class="source-info">
+        <p><strong>General Resources:</strong></p>
+        <ul>
+            <li><a href="https://thecanadianencyclopedia.ca/en/article/numbered-treaties" target="_blank" rel="noopener noreferrer">The Canadian Encyclopedia - Numbered Treaties</a></li>
+            <li><a href="https://www.rcaanc-cirnac.gc.ca/eng/1100100032297/1544716489360" target="_blank" rel="noopener noreferrer">Crown-Indigenous Relations - Historic Treaties</a></li>
+            <li><a href="https://www.rcaanc-cirnac.gc.ca/eng/1360948213124/1544620003549" target="_blank" rel="noopener noreferrer">RCAANC - A map of the Numbered Treaties</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  
+  
+  <!-- Load Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script>
+    // --- 1. DOM & MAP SETUP ---
+    
+    // This new view is centered on Alberta [lat, long] with a closer zoom level.
+    const map = L.map('map', { zoomControl: true }).setView([55.0, -115.0], 6);
+    
+    // Add the base map tile layer from CARTO
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      subdomains: 'abcd', 
+      maxZoom: 19
+    }).addTo(map);
+
+    // Get reference to info panel and store its default content
+    const infoContent = document.getElementById('info-content');
+    const defaultInfoPanelHTML = infoContent.innerHTML; 
+    let geojsonLayer; // To hold the treaty shapes
+    
+    /**
+     * Resets the info panel to its default introductory content.
+     */
+    function resetInfoPanel() {
+      infoContent.innerHTML = defaultInfoPanelHTML;
+    }
+
+    // Add a click listener to the map itself to reset the panel.
+    map.on('click', resetInfoPanel);
+
+    // --- 2. DATA ---
+    
+    // pSBC function (unchanged) - used for lightening/darkening colors on hover
+    const pSBC=(p,c0)=>{let r,g,b,P,f,t,h,i=parseInt,m=Math.round;if(typeof p!="number"||p<-1||p>1||typeof c0!="string"||(c0[0]!='r'&&c0[0]!='#'))return null;if(!this.pSBCr)this.pSBCr=(d)=>{let n=d.length,x={};if(n>9){[r,g,b,a]=d=d.split(","),n=d.length;if(n<3||n>4)return null;x.r=i(r[3]=="a"?r.slice(5):r.slice(4)),x.g=i(g),x.b=i(b),x.a=a?parseFloat(a):-1}else{if(n==8||n==6||n<4)return null;if(n<6)d="#"+d[1]+d[1]+d[2]+d[2]+d[3]+d[3]+(n>4?d[4]+d[4]:"");d=i(d.slice(1),16);if(n==9||n==5)x.r=d>>24&255,x.g=d>>16&255,x.b=d>>8&255,x.a=m((d&255)/0.255)/1000;else x.r=d>>16,x.g=d>>8&255,x.b=d&255,x.a=-1}return x};h=c0.length>9,f=this.pSBCr(c0),P=p<0,t=P?{r:0,g:0,b:0,a:-1}:{r:255,g:255,b:255,a:-1},p=P?p*-1:p,P=1-p;if(!f)return null;r=m(P*f.r+p*t.r);g=m(P*f.g+p*t.g);b=m(P*f.b+p*t.b);return"#"+(4294967296+r*16777216+g*65536+b*256).toString(16).slice(1)};
+
+    // Color scheme for treaties, matching the static image legend
+    const treatyColors = {
+      '1': '#c9af96', // Parchment
+      '2': '#a8b6bf', // Faded Blue
+      '3': '#d1bfa7', // Light Tan
+      '4': '#F2B990', // Treaty 4 (Orange)
+      '5': '#e6d9b1', // Cream
+      '6': '#F0E4A3', // Treaty 6 (Yellow)
+      '7': '#E68686', // Treaty 7 (Red)
+      '8': '#A2B8D4', // Treaty 8 (Blue)
+      '9': '#c7d6d9', // Light Grey-Blue
+      '10': '#ADC9A1', // Treaty 10 (Green)
+      '11': '#d1b399'  // Muted Orange
+    };
+
+    // --- *** NEW STUDENT-FRIENDLY TREATY DATA *** ---
+    // This data is rewritten based on the PDFs you provided.
+    const treatyData = {
+      '4': {
+        summary: "Signed in 1874, this treaty covers a part of southern Alberta and Saskatchewan.",
+        context: "First Nations who signed, including Cree and Saulteaux, agreed to share the land. In return, the Crown promised things like help with farming, hunting and fishing rights, and small yearly payments."
+      },
+      '6': {
+        summary: "Signed in 1876, this treaty covers central Alberta and Saskatchewan. 50 First Nations, including Cree, Saulteaux, and Nakota Peoples, were part of this agreement.",
+        context: "This treaty is unique! Besides promises for land and education, it includes a 'medicine chest' clause (for health care) and a 'famine and pestilence' clause (for help in times of sickness or starvation)."
+      },
+      '7': {
+        summary: "Signed in 1877 at Blackfoot Crossing by five First Nations, including the Siksika (Blackfoot), Piikani, Kainai, Stoney Nakoda, and Tsuu T'ina.",
+        context: "At this time, the buffalo were disappearing. These Nations were skilled ranchers, so instead of farming tools, they asked for cattle. This treaty also promised the Crown would pay for teachers' salaries."
+      },
+      '8': {
+        summary: "Signed in 1899, this is the largest treaty in Canada, covering a huge part of northern Alberta, B.C., and Saskatchewan. It was signed after the Klondike Gold Rush started.",
+        context: "Because many people in the north lived far apart, this treaty had a special promise: families could choose to get 160 acres of land to live on their own, instead of being part of the main reserve."
+      },
+      '10': {
+        summary: "Signed in 1906, this treaty covers parts of northern Saskatchewan and east-central Alberta.",
+        context: "The Heart Lake First Nation is part of this treaty. Like Treaty 8, it also included the choice for families to have their own 160-acre piece of land."
+      },
+      // Kept other treaty data for completeness
+      '1': {
+        summary: "Signed in 1871, this was the first Numbered Treaty.",
+        context: "It was an agreement between the Crown and the Anishinaabe (Ojibway) and Swampy Cree peoples in southern Manitoba."
+      },
+      '2': {
+        summary: "Signed in 1871, this treaty covers a large area of south-central Manitoba and part of Saskatchewan.",
+        context: "It was seen as an extension of Treaty 1, with similar promises."
+      },
+      '3': {
+        summary: "Signed in 1873 at Lake of the Woods with the Saulteaux (Ojibway) peoples.",
+        context: "This treaty was important for Canada to get a travel route to the west. The First Nations negotiators made sure to get larger reserve lands than in Treaties 1 and 2."
+      },
+      '5': {
+        summary: "Signed in 1875, this treaty covers a huge area of central and northern Manitoba.",
+        context: "This agreement was made to secure travel routes on Lake Winnipeg and get access to natural resources."
+      },
+      '9': {
+        summary: "Signed in 1905, this is also called the James Bay Treaty and covers a large part of northern Ontario.",
+        context: "The province of Ontario and the Government of Canada worked together on this treaty to get access to timber and minerals."
+      },
+      '11': {
+        summary: "Signed in 1921, this is the last of the Numbered Treaties, covering a large area of the Northwest Territories.",
+        context: "This treaty was made after oil was discovered at Norman Wells. The Dene and Gwich'in peoples who signed have long said they understood it as a treaty of peace and friendship, not for giving up their land."
+      }
+    };
+
+    // --- 3. MAP INTERACTIVITY ---
+
+    /**
+     * Robustly gets the treaty number from feature properties.
+     * Uses ENAME as the primary source, as seen in the GeoJSON data.
+     */
+    function getTreatyNumber(props) {
+      if (!props) return null;
+      const label = props.ENAME || ""; // e.g., "Treaty #8 (1899)"
+      const match = label.match(/Treaty\s*#?(\d+)/); // Extracts the number
+      if (match && match[1]) {
+        return match[1]; // Returns "8"
+      }
+      return null; // Failed
+    }
+
+    /**
+     * Robustly gets the treaty label from feature properties.
+     */
+    function getTreatyLabel(props) {
+      if (!props) return "Numbered Treaty";
+      return props.ENAME || props.name || props.NAME || "Numbered Treaty";
+    }
+
+    /**
+     * Styles the map features based on their treaty number.
+     */
+    function style(feature) {
+      const treatyNum = getTreatyNumber(feature.properties);
+      const baseColor = treatyColors[treatyNum] || '#ccc'; // Default to grey
+      
+      return { 
+        fillColor: baseColor, 
+        weight: 1, // Thin border
+        color: pSBC(-0.2, baseColor), // Slightly darker border
+        fillOpacity: 0.7 
+      };
+    }
+
+    /**
+     * Highlights the feature on mouseover.
+     */
+    function highlightFeature(e) {
+      const layer = e.target;
+      const treatyNum = getTreatyNumber(layer.feature.properties);
+      const baseColor = treatyColors[treatyNum] || '#ccc';
+
+      layer.setStyle({
+        weight: 3, // Thicker border on hover
+        color: pSBC(-0.5, baseColor), // Darker border for highlight
+        fillOpacity: 0.85 // Slightly less transparent
+      });
+      layer.bringToFront();
+    }
+
+    /**
+     * Resets the highlight on mouseout.
+     */
+    function resetHighlight(e) { 
+        if (geojsonLayer) {
+            geojsonLayer.resetStyle(e.target); 
+        }
+    }
+
+    /**
+     * Handles clicks on a feature: updates the info panel.
+     */
+    function clickFeature(e) {
+      L.DomEvent.stopPropagation(e); // Stop click from bubbling to map
+      const props = e.target.feature.properties;
+      
+      const treatyNum = getTreatyNumber(props);
+      const treatyLabel = getTreatyLabel(props);
+      const data = treatyData[treatyNum]; // Get researched data
+
+      let content = `<h3>${treatyLabel}</h3>`;
+
+      if (data) {
+        // Use the new, student-friendly data
+        content += `<h4>What is this Treaty?</h4><p>${data.summary}</p>`;
+        content += `<h4>What makes it special?</h4><p>${data.context}</p>`;
+      } else {
+        // Fallback if no researched data
+        content += `<p>No detailed information available for this treaty in our database.</p>`;
+      }
+      
+      // Add a link back to the source you provided
+      content += `<div class="source-info" style="margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #e2e8f0; font-size: 0.8rem;">
+                    <p>Source: <a href="https://www.rcaanc-cirnac.gc.ca/eng/1360948213124/1544620003549" target="_blank" rel="noopener noreferrer">Gov. of Canada - About the Numbered Treaties</a></p>
+                  </div>`;
+
+      infoContent.innerHTML = content;
+      e.target.bringToFront();
+    }
+
+    /**
+     * Attaches events to each map layer.
+     */
+    function onEachFeature(feature, layer) {
+      const treatyLabel = getTreatyLabel(feature.properties);
+      layer.bindPopup(treatyLabel); // Simple popup on hover/click
+
+      layer.on({ 
+        mouseover: highlightFeature, 
+        mouseout: resetHighlight,
+        click: clickFeature 
+      });
+    }
+
+    // --- 4. DATA FETCHING (TREATIES) ---
+    // URL for the GeoJSON data
+    const url = 'https://raw.githubusercontent.com/Maltais239/interactives/main/numbered_treaties.geojson';
+    
+    fetch(url)
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then(data => { 
+        geojsonLayer = L.geoJson(data, { style, onEachFeature }).addTo(map); 
+        
+        // This line ensures the view is set to Alberta *after* the data loads.
+        map.setView([55.0, -115.0], 6); 
+      })
+      .catch((err) => { 
+        console.error("Error fetching GeoJSON:", err);
+        infoContent.innerHTML = `<p style="color: red;"><strong>Error:</strong> Could not load map data. ${err.message}</p>`; 
+      });
+
+    // --- 5. ADD ALBERTA OUTLINE ---
+    // This URL points to a valid GeoJSON file with all Canadian provinces
+    const provincesUrl = 'https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/canada.geojson';
+
+    fetch(provincesUrl)
+      .then(res => res.ok ? res.json() : Promise.reject(res.status))
+      .then(data => {
+        L.geoJson(data, {
+          style: {
+            fillOpacity: 0,     // No fill
+            color: '#334155',  // Dark slate border
+            weight: 3,          // Thicker line
+            dashArray: '5, 5',  // Dashed line
+            opacity: 0.8        // Slightly transparent
+          },
+          filter: function(feature) {
+            // This function filters to only show 'Alberta'.
+            // Note: The property name in this file is 'name'.
+            return feature.properties.name === 'Alberta';
+          },
+          interactive: false // Makes the outline non-clickable
+        }).addTo(map);
+      })
+      .catch(err => {
+        // Log an error but don't stop the map from working
+        console.error("Error fetching province outline:", err);
+      });
+      
+    // --- 6. ADD METIS SETTLEMENTS ---
+    // This URL points to the data you provided.
+    // We must use the 'raw' version of the file.
+    const metisDataUrl = 'https://raw.githubusercontent.com/Maltais239/interactives/main/alberta_map_data.geojson';
+
+    fetch(metisDataUrl)
+      .then(res => res.ok ? res.json() : Promise.reject(res.status))
+      .then(data => {
+        L.geoJson(data, {
+          style: {
+            fillColor: '#d946ef', // Magenta color (like the image)
+            color: '#c026d3',     // Darker magenta border
+            weight: 1,
+            fillOpacity: 0.65
+          },
+          filter: function(feature) {
+            // This function FILTERS the data.
+            // It only includes features where the name is 'METIS SETTLEMENTS',
+            // thus excluding "FIRST NATION (INDIAN RESERVE)".
+            return feature.properties.ENAME === 'METIS SETTLEMENTS';
+          },
+          onEachFeature: function(feature, layer) {
+            // Add a simple popup
+            layer.bindPopup(feature.properties.ENAME);
+          }
+        }).addTo(map);
+      })
+      .catch(err => {
+        // Log an error if this file fails to load
+        console.error("Error fetching Metis/Reserve data:", err);
+      });
+      
+  </script>
+</body>
+</html>
+
