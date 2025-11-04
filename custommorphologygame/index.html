@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Can I Have a Word?</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nunito Sans', sans-serif;
+            background-color: #F0F4F8;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, .8), rgba(255, 255, 255, .8)),
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.1'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        .glass-container {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .morpheme-tile {
+            display: flex;
+            flex-direction: column; /* Stack text and label */
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 0.75rem;
+            border-radius: 10px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
+        }
+        .morpheme-tile-text {
+            font-size: 1.125rem;
+            line-height: 1.75rem;
+            font-weight: 700;
+        }
+        .morpheme-tile-label {
+            font-size: 0.75rem;
+            font-weight: 400;
+            opacity: 0.6;
+            margin-top: 1px;
+        }
+        .morpheme-tile:hover { transform: translateY(-3px); box-shadow: 0 8px 12px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 2px 4px rgba(0,0,0,0.06); }
+        .morpheme-tile:active { transform: translateY(1px) scale(0.98); box-shadow: inset 0 3px 5px rgba(0,0,0,0.1); }
+        .prefix-tile { background: linear-gradient(145deg, #89f7fe 0%, #66a6ff 100%); color: #0039cb; }
+        .suffix-tile { background: linear-gradient(145deg, #d4fc79 0%, #96e6a1 100%); color: #205c00; }
+        .root-word-tile {
+            height: 100%;
+            justify-content: center;
+        }
+        .root-word-tile .morpheme-tile-text {
+            font-size: 2.25rem;
+            font-weight: 900;
+        }
+         .root-word-tile .morpheme-tile-label {
+            font-size: 0.875rem;
+        }
+        .root-word-tile { background: linear-gradient(145deg, #f8cdda 0%, #b5a8f0 100%); color: #582a72;}
+
+        .found-word {
+            background-color: rgba(255, 255, 255, 0.8);
+            color: #3b82f6;
+            font-weight: 700;
+            padding: 0.375rem 0.875rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border: 1px solid rgba(255,255,255,1);
+        }
+        .progress-bar-container { background-color: #e0e7ff; border-radius: 9999px; overflow: hidden; height: 16px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
+        .progress-bar {
+            background: linear-gradient(90deg, #a78bfa 0%, #c4b5fd 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease-out;
+            box-shadow: 0 0 10px rgba(167, 139, 250, 0.8);
+        }
+        @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
+        .shake-anim { animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both; }
+        .confetti-piece { position: fixed; width: 8px; height: 16px; background: #f00; top: -20px; opacity: 0; z-index: 9999; }
+        
+        .flex-1 { flex: 1 1 0%; }
+        .flex-1-5 { flex: 1.5 1 0%; }
+        .flex-2 { flex: 2 1 0%; }
+        
+        /* Builder Styles */
+        .builder-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+            color: #4a5568;
+        }
+        .builder-input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border: 1px solid #cbd5e0;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+            transition: border-color 0.2s;
+        }
+        .builder-input:focus {
+            outline: none;
+            border-color: #a78bfa;
+            box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.3);
+        }
+        .builder-note {
+            font-size: 0.875rem;
+            color: #718096;
+            margin-top: 0.25rem;
+        }
+    </style>
+</head>
+<body class="p-2 sm:p-4 flex items-center justify-center min-h-screen">
+    
+    <!-- Game Container -->
+    <div id="gameContainer" class="glass-container max-w-4xl w-full mx-auto p-4 sm:p-6 rounded-3xl shadow-2xl transition-opacity duration-500">
+        <div class="text-center mb-4">
+            <h1 class="text-4xl font-black text-indigo-800 mb-1 tracking-tight">Can I Have a Word?</h1>
+            <p class="text-base text-gray-700">Click the tiles to build words from the root.</p>
+        </div>
+        
+        <div class="game-board mb-4 flex flex-col md:flex-row gap-4 min-h-[180px]">
+            <div id="prefixes" class="flex-1 bg-black/5 p-3 rounded-xl flex flex-wrap gap-2 justify-center content-center"></div>
+            <div id="root" class="flex-1-5 h-full"></div>
+            <div id="suffixes" class="flex-2 bg-black/5 p-3 rounded-xl flex flex-wrap gap-2 justify-center content-center"></div>
+        </div>
+
+        <div class="bg-white/70 p-3 rounded-xl mb-3 border shadow-inner">
+            <div class="flex items-center justify-between">
+                <h2 class="text-2xl font-bold text-gray-800 tracking-wider" id="currentWordDisplay">&nbsp;</h2>
+                <button id="clearBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg transition-colors shadow-sm">Clear</button>
+            </div>
+        </div>
+        <div class="mb-4">
+            <div class="progress-bar-container"><div id="progressBar" class="progress-bar"></div></div>
+        </div>
+        <div class="flex flex-col sm:flex-row justify-center items-center gap-3 mb-2">
+            <button id="checkBtn" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-6 rounded-full shadow-lg transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">Check Word</button>
+            <button id="newGameBtn" class="w-full sm:w-auto bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-5 rounded-full shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed">Next Level</button>
+            <button id="showBuilderBtn" class="w-full sm:w-auto bg-purple-600 hover:bg-purple-500 text-white font-semibold py-2 px-5 rounded-full shadow-md transition-all">Create Your Own</button>
+        </div>
+        <div id="feedback" class="text-center text-lg font-semibold min-h-[1.5em] mb-2">&nbsp;</div>
+        <div class="bg-indigo-100/50 p-4 rounded-2xl border">
+            <h3 class="font-bold text-lg text-indigo-900 text-center mb-3">Found Words: <span id="wordCounter">0/0</span></h3>
+            <div id="foundWords" class="flex flex-wrap justify-center gap-2 min-h-[40px]"></div>
+        </div>
+    </div>
+    
+    <!-- Builder Container -->
+    <div id="builderContainer" class="glass-container max-w-2xl w-full mx-auto p-4 sm:p-8 rounded-3xl shadow-2xl transition-opacity duration-500 hidden">
+        <h2 class="text-3xl font-black text-center text-purple-800 mb-6 tracking-tight">Morpheme Game Builder</h2>
+        
+        <div class="space-y-4">
+            <div>
+                <label for="customRoot" class="builder-label">Root Word (Required)</label>
+                <input type="text" id="customRoot" class="builder-input" placeholder="e.g., 'port'">
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="customPrefixes" class="builder-label">Prefixes</label>
+                    <input type="text" id="customPrefixes" class="builder-input" placeholder="e.g., 'im, ex, re'">
+                    <p class="builder-note">Separate with commas.</p>
+                </div>
+                <div>
+                    <label for="customSuffixes" class="builder-label">Suffixes</label>
+                    <input type="text" id="customSuffixes" class="builder-input" placeholder="e.g., 's, ed, er'">
+                    <p class="builder-note">Separate with commas.</p>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="customPrefixHerrings" class="builder-label">Prefix Red Herrings</label>
+                    <input type="text" id="customPrefixHerrings" class="builder-input" placeholder="e.g., 'un, pre'">
+                    <p class="builder-note">Decoys. Separate with commas.</p>
+                </div>
+                <div>
+                    <label for="customSuffixHerrings" class="builder-label">Suffix Red Herrings</label>
+                    <input type="text" id="customSuffixHerrings" class="builder-input" placeholder="e.g., 'ing, ly'">
+                    <p class="builder-note">Decoys. Separate with commas.</p>
+                </div>
+            </div>
+
+            <div>
+                <label for="customValidWords" class="builder-label">List of All Valid Words (Required)</label>
+                <textarea id="customValidWords" class="builder-input" rows="4" placeholder="e.g., 'port, ports, importer, export, reported'"></textarea>
+                <p class="builder-note">Separate with commas. Include the root word if it's valid by itself!</p>
+            </div>
+            
+            <div id="builderFeedback" class="text-center text-red-600 font-semibold min-h-[1.5em]">&nbsp;</div>
+
+            <div class="flex flex-col sm:flex-row justify-center items-center gap-3 pt-4">
+                <button id="startCustomBtn" class="w-full sm:w-auto bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-all transform hover:scale-105">Start Custom Game</button>
+                <button id="backToGameBtn" class="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-5 rounded-full shadow-md transition-all">Back to Game</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    const wordSets = [
+            { root: 'kind', prefixes: ['un'], suffixes: ['ly', 'ness'], prefixRedHerrings: ['re'], suffixRedHerrings: ['er', 's'], validWords: ['kind', 'kindly', 'kindness', 'unkind', 'unkindly'] },
+            { root: 'lock', prefixes: ['un'], suffixes: ['s', 'ed'], prefixRedHerrings: ['re'], suffixRedHerrings: ['ing', 'ful'], validWords: ['lock', 'locks', 'locked', 'unlock', 'unlocks', 'unlocked'] },
+            { root: 'pack', prefixes: ['un'], suffixes: ['s', 'ed', 'ing'], prefixRedHerrings: ['re', 'in'], suffixRedHerrings: ['er', 'ly'], validWords: ['pack', 'packs', 'packed', 'packing', 'unpack', 'unpacks', 'unpacked', 'unpacking'] },
+            { root: 'help', prefixes: ['un'], suffixes: ['s', 'ed', 'ing', 'er', 'ful', 'less'], prefixRedHerrings: ['re', 'dis'], suffixRedHerrings: ['ly', 'ness', 'ion'], validWords: ['help', 'helps', 'helped', 'helping', 'helper', 'helpers', 'helpful', 'helpless', 'unhelpful'] },
+            { root: 'act', prefixes: ['re', 'en', 'inter'], suffixes: ['s', 'ed', 'ing', 'or', 'ion', 'ive'], prefixRedHerrings: ['un', 'pre'], suffixRedHerrings: ['ly', 'ment'], validWords: ['act', 'acts', 'acted', 'acting', 'actor', 'actors', 'action', 'actions', 'active', 'react', 'reacts', 'reacted', 'reacting', 'reaction', 'reactions', 'enact', 'enacts', 'enacted', 'enacting', 'interact', 'interacts', 'interacted', 'interacting', 'interaction', 'interactions'] },
+            { root: 'port', prefixes: ['im', 'ex', 're', 'sup', 'trans'], suffixes: ['s', 'ed', 'ing', 'er', 'able'], prefixRedHerrings: ['un', 'de'], suffixRedHerrings: ['ion', 'ive', 'ly'], validWords: ['port', 'ports', 'ported', 'porting', 'porter', 'porters', 'portable', 'import', 'imports', 'importer', 'importers', 'imported', 'importing', 'export', 'exports', 'exporter', 'exporters', 'exported', 'exporting', 'report', 'reports', 'reporter', 'reporters', 'reported', 'reporting', 'support', 'supports', 'supporter', 'supporters', 'supported', 'supporting', 'transport', 'transports', 'transported', 'transporting', 'transporter'] }
+        ];
+
+    let currentWordSet, currentWord = [], foundWords = [], gameIndex = 0;
+    
+    const gameContainer = document.getElementById('gameContainer');
+    const builderContainer = document.getElementById('builderContainer');
+    const prefixesContainer = document.getElementById('prefixes');
+    const rootContainer = document.getElementById('root');
+    const suffixesContainer = document.getElementById('suffixes');
+    const currentWordDisplay = document.getElementById('currentWordDisplay');
+    const checkBtn = document.getElementById('checkBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const newGameBtn = document.getElementById('newGameBtn');
+    const feedbackEl = document.getElementById('feedback');
+    const foundWordsContainer = document.getElementById('foundWords');
+    const wordCounter = document.getElementById('wordCounter');
+    const progressBar = document.getElementById('progressBar');
+    
+    // Builder elements
+    const showBuilderBtn = document.getElementById('showBuilderBtn');
+    const backToGameBtn = document.getElementById('backToGameBtn');
+    const startCustomBtn = document.getElementById('startCustomBtn');
+    const builderFeedback = document.getElementById('builderFeedback');
+
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+
+    function createMorphemeButton(text, type) {
+        const btn = document.createElement('div');
+        btn.className = 'morpheme-tile';
+        
+        const textSpan = document.createElement('span');
+        textSpan.className = 'morpheme-tile-text';
+        textSpan.textContent = text;
+        
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'morpheme-tile-label';
+
+        if (type === 'prefix') { 
+            btn.classList.add('prefix-tile'); 
+            labelSpan.textContent = 'prefix';
+        } 
+        else if (type === 'suffix') { 
+            btn.classList.add('suffix-tile');
+            labelSpan.textContent = 'suffix';
+        }
+         else if (type === 'root') { 
+            btn.classList.add('root-word-tile');
+            labelSpan.textContent = 'root';
+        }
+        
+        btn.appendChild(textSpan);
+        btn.appendChild(labelSpan);
+        btn.dataset.type = type;
+        btn.addEventListener('click', () => addMorpheme(text, type));
+        return btn;
+    }
+
+    function addMorpheme(text, type) {
+        const lastPart = currentWord.length > 0 ? currentWord[currentWord.length - 1].type : null;
+        if (type === 'prefix' && currentWord.length === 0) { currentWord.push({ type, text }); } 
+        else if (type === 'root' && (lastPart === 'prefix' || lastPart === null)) { currentWord.push({ type, text }); } 
+        else if (type === 'suffix' && (lastPart === 'root' || lastPart === 'suffix')) { currentWord.push({ type, text }); }
+        updateCurrentWordDisplay();
+    }
+    
+    function updateCurrentWordDisplay() { currentWordDisplay.textContent = currentWord.length > 0 ? currentWord.map(p => p.text).join('') : '\u00A0'; }
+    
+    function clearCurrentWord() { currentWord = []; updateCurrentWordDisplay(); feedbackEl.innerHTML = '&nbsp;'; }
+    
+    function checkWord() {
+        const wordToCheck = currentWord.map(part => part.text).join('').toLowerCase();
+        if (wordToCheck === '') return;
+        feedbackEl.classList.remove('shake-anim');
+        void feedbackEl.offsetWidth;
+        if (currentWordSet.validWords.includes(wordToCheck)) {
+            if (foundWords.includes(wordToCheck)) {
+                feedbackEl.textContent = "Already found!";
+                feedbackEl.className = 'text-center text-lg font-semibold text-amber-600';
+            } else {
+                feedbackEl.textContent = "Excellent!";
+                feedbackEl.className = 'text-center text-lg font-semibold text-green-600';
+                foundWords.push(wordToCheck);
+                renderFoundWords();
+            }
+        } else {
+            feedbackEl.textContent = "Not a valid word.";
+            feedbackEl.className = 'text-center text-lg font-semibold text-red-600 shake-anim';
+        }
+        clearCurrentWord();
+    }
+    
+    function renderFoundWords() {
+        foundWordsContainer.innerHTML = '';
+        foundWords.sort().forEach(word => {
+            const wordEl = document.createElement('span');
+            wordEl.className = 'found-word';
+            wordEl.textContent = word;
+            foundWordsContainer.appendChild(wordEl);
+        });
+        const progress = (foundWords.length / currentWordSet.validWords.length) * 100;
+        progressBar.style.width = `${progress}%`;
+        wordCounter.textContent = `${foundWords.length}/${currentWordSet.validWords.length}`;
+        if (foundWords.length === currentWordSet.validWords.length && currentWordSet.validWords.length > 0) { moveToNextLevel(); }
+    }
+    
+    function moveToNextLevel() {
+        // Don't auto-advance if it's a custom game (gameIndex === -1)
+        if (gameIndex === -1) {
+            feedbackEl.textContent = "You found all the words!";
+            feedbackEl.className = 'text-center text-lg font-semibold text-purple-700';
+            checkBtn.disabled = true;
+            triggerConfetti();
+            return;
+        }
+
+        if (gameIndex === wordSets.length - 1) {
+            feedbackEl.textContent = "You've completed all the levels!";
+            feedbackEl.className = 'text-center text-lg font-semibold text-purple-700';
+            checkBtn.disabled = true; newGameBtn.disabled = true;
+            triggerConfetti();
+            return;
+        }
+        
+        feedbackEl.textContent = "Level Complete!";
+        feedbackEl.className = 'text-center text-lg font-semibold text-purple-700';
+        checkBtn.disabled = true; newGameBtn.disabled = true;
+        triggerConfetti();
+        
+        setTimeout(() => {
+            gameContainer.style.opacity = '0';
+            setTimeout(() => {
+                initGame(gameIndex + 1);
+                gameContainer.style.opacity = '1';
+                checkBtn.disabled = false; newGameBtn.disabled = false;
+            }, 500);
+        }, 2500);
+    }
+    
+    /**
+     * Initializes a game level.
+     * @param {number | object} levelData - Either an index (number) for a pre-built level or a wordSet (object) for a custom level.
+     */
+    function initGame(levelData) {
+        if (typeof levelData === 'number') {
+            gameIndex = levelData;
+            currentWordSet = wordSets[gameIndex];
+            newGameBtn.disabled = false;
+        } else if (typeof levelData === 'object') {
+            gameIndex = -1; // Flag for custom level
+            currentWordSet = levelData;
+            newGameBtn.disabled = true; // Disable "Next Level" for custom games
+        } else {
+            return; // Invalid data
+        }
+
+        clearCurrentWord();
+        foundWords = [];
+        prefixesContainer.innerHTML = ''; rootContainer.innerHTML = ''; suffixesContainer.innerHTML = '';
+        
+        // Combine real prefixes and red herrings, then shuffle
+        const allPrefixes = (currentWordSet.prefixes || []).concat(currentWordSet.prefixRedHerrings || []);
+        shuffleArray(allPrefixes);
+        allPrefixes.forEach(p => prefixesContainer.appendChild(createMorphemeButton(p, 'prefix')));
+        
+        const rootDiv = createMorphemeButton(currentWordSet.root, 'root');
+        rootContainer.appendChild(rootDiv);
+
+        // Combine real suffixes and red herrings, then shuffle
+        const allSuffixes = (currentWordSet.suffixes || []).concat(currentWordSet.suffixRedHerrings || []);
+        shuffleArray(allSuffixes);
+        allSuffixes.forEach(s => suffixesContainer.appendChild(createMorphemeButton(s, 'suffix')));
+
+        // Reset UI
+        checkBtn.disabled = false;
+        feedbackEl.innerHTML = '&nbsp;';
+        gameContainer.style.opacity = '1';
+        
+        renderFoundWords();
+    }
+    
+    function triggerConfetti() {
+        for (let i = 0; i < 100; i++) {
+            const confetti = document.createElement('div');
+            confetti.className = 'confetti-piece';
+            const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800'];
+            confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+            confetti.style.left = Math.random() * 100 + 'vw';
+            confetti.style.animation = `fall ${Math.random() * 2 + 3}s linear ${Math.random() * 2}s forwards`;
+            document.body.appendChild(confetti);
+            setTimeout(() => { confetti.remove(); }, 5000);
+        }
+    }
+    
+    const style = document.createElement('style');
+    style.innerHTML = `@keyframes fall { to { transform: translateY(110vh) rotateZ(${Math.random() * 720}deg); opacity: 1; } }`;
+    document.head.appendChild(style);
+    
+    // --- Helper function to parse CSV input ---
+    function parseCsvInput(str) {
+        if (!str) return [];
+        return str.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+    }
+    
+    // --- Event Listeners ---
+    
+    checkBtn.addEventListener('click', checkWord);
+    clearBtn.addEventListener('click', clearCurrentWord);
+    newGameBtn.addEventListener('click', () => initGame((gameIndex + 1) % wordSets.length));
+    
+    showBuilderBtn.addEventListener('click', () => {
+        gameContainer.classList.add('hidden');
+        builderContainer.classList.remove('hidden');
+        builderFeedback.innerHTML = '&nbsp;';
+    });
+    
+    backToGameBtn.addEventListener('click', () => {
+        builderContainer.classList.add('hidden');
+        gameContainer.classList.remove('hidden');
+    });
+    
+    startCustomBtn.addEventListener('click', () => {
+        builderFeedback.innerHTML = '&nbsp;';
+        const root = document.getElementById('customRoot').value.trim().toLowerCase();
+        const validWordsInput = document.getElementById('customValidWords').value;
+
+        if (!root || !validWordsInput) {
+            builderFeedback.textContent = "'Root Word' and 'Valid Words' are required.";
+            return;
+        }
+
+        const customWordSet = {
+            root: root,
+            prefixes: parseCsvInput(document.getElementById('customPrefixes').value),
+            suffixes: parseCsvInput(document.getElementById('customSuffixes').value),
+            prefixRedHerrings: parseCsvInput(document.getElementById('customPrefixHerrings').value),
+            suffixRedHerrings: parseCsvInput(document.getElementById('customSuffixHerrings').value),
+            validWords: parseCsvInput(validWordsInput)
+        };
+        
+        // Validation: Ensure root is in valid words if it's meant to be
+        if (customWordSet.validWords.length > 0 && !customWordSet.validWords.includes(root)) {
+            // Check if root is intended to be a word
+            const rootAsWord = customWordSet.prefixes.length === 0 && customWordSet.suffixes.length === 0;
+            if (customWordSet.validWords.length === 1 && customWordSet.validWords[0] === root) {
+                // This is fine
+            } else if (!confirm("The root word you entered is not in your 'Valid Words' list. Is the root word itself not a valid word? (Click OK to continue, Cancel to go back and edit.)")) {
+                return;
+            }
+        }
+        
+        initGame(customWordSet);
+        
+        // Hide builder, show game
+        builderContainer.classList.add('hidden');
+        gameContainer.classList.remove('hidden');
+    });
+    
+    // Start the first pre-built level
+    initGame(0);
+    </script>
+</body>
+</html>
+
