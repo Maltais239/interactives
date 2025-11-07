@@ -98,14 +98,37 @@
             if (match) return `https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${match.hexcode}.svg`;
 
             // Priority 2: The search term is one of the emoji's tags
-            match = mojiData.find(emoji => emoji.tags && emoji.tags.toLowerCase().split(', ').includes(searchTerm));
-            if (match) return `https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${match.hexcode}.svg`;
+            // OLD BUGGY LOGIC:
+            // match = mojiData.find(emoji => emoji.tags && emoji.tags.toLowerCase().split(', ').includes(searchTerm));
+            // if (match) return `https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${match.hexcode}.svg`;
             
+            // --- NEW, "SMARTER" FUZZY SEARCH LOGIC ---
+            // This logic is much closer to what your PDF implies.
+            // It checks if ANY word from your term matches ANY tag on an emoji.
+
+            const searchWords = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
+
+            // Priority 2 (NEW): Check if any search word is an exact tag
+            match = mojiData.find(emoji => {
+                if (!emoji.tags) return false;
+                const tagList = emoji.tags.toLowerCase().split(', ');
+                return searchWords.some(word => tagList.includes(word));
+            });
+            if (match) return `https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${match.hexcode}.svg`;
+
             // Priority 3: A broader search if no exact matches are found
-            const potentialMatches = mojiData.filter(emoji => 
-                emoji.annotation.toLowerCase().includes(searchTerm) ||
-                (emoji.tags && emoji.tags.toLowerCase().includes(searchTerm))
-            );
+            const potentialMatches = mojiData.filter(emoji => {
+                // OLD LOGIC:
+                // emoji.annotation.toLowerCase().includes(searchTerm) ||
+                // (emoji.tags && emoji.tags.toLowerCase().includes(searchTerm))
+
+                // NEW LOGIC: Check if any search word is *included* in the annotation or tags
+                const annotation = emoji.annotation.toLowerCase();
+                const tags = (emoji.tags || '').toLowerCase();
+                // Check if any word from our search term (e.g., "historical") is part of the emoji's text
+                return searchWords.some(word => annotation.includes(word) || tags.includes(word));
+            });
+            // --- END NEW LOGIC ---
 
             if (potentialMatches.length > 0) {
                 // Prefer matches with shorter names, as they are often more specific
@@ -434,4 +457,3 @@
     </script>
 </body>
 </html>
-
