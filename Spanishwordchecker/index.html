@@ -114,7 +114,25 @@
     <!-- Hidden text area for clipboard functionality -->
     <textarea id="copy-buffer" class="absolute" style="left: -9999px; top: 0;"></textarea>
 
-    <script>
+    <script type="module">
+        // --- Firebase Imports ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Firebase Setup ---
+        // These variables are provided by the environment
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-spanish-checker';
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        // setLogLevel('Debug'); // Uncomment for detailed logs
+
+        let userId = null;
+        let progressDocRef = null;
+
         // --- 1. DATA: Master Word List ---
         // List will be loaded from the external JSON file.
         let masterWordList = [];
@@ -257,6 +275,9 @@
             // Update banks UI
             updateBanksUI();
 
+            // --- NEW: Save progress to Firestore ---
+            saveProgress();
+
             // Automatically load the next word after a short delay
             setTimeout(loadNextWord, 1200);
         }
@@ -274,7 +295,10 @@
                 badge.textContent = `${word.spanish} / ${word.english}`;
                 knownListEl.appendChild(badge);
             });
-            knownCountEl.textContent = `${knownWords.length} / ${masterWordList.length}`; // Update count
+            // Update count (only if master list has loaded)
+            if (masterWordList.length > 0) {
+                knownCountEl.textContent = `${knownWords.length} / ${masterWordList.length}`;
+            }
 
             // Update Practice Bank
             practiceListEl.innerHTML = '';
@@ -334,16 +358,91 @@
         copyKnownBtn.addEventListener('click', () => copyBank('known', copyKnownBtn));
         copyPracticeBtn.addEventListener('click', () => copyBank('practice', copyPracticeBtn));
 
-        // --- 6. INITIALIZE GAME ---
+        // --- 6. NEW FIRESTORE FUNCTIONS ---
+
+        /**
+         * Saves the current knownWords and practiceWords to Firestore.
+         */
+        async function saveProgress() {
+            if (!progressDocRef) {
+                console.warn("Firestore not ready, skipping save.");
+                return; 
+            }
+
+            try {
+                const progressData = {
+                    knownWords: knownWords,
+                    practiceWords: practiceWords
+                };
+                // Use setDoc to save the entire progress object
+                await setDoc(progressDocRef, progressData); 
+                console.log("Progress saved.");
+            } catch (error) {
+                console.error("Error saving progress: ", error);
+            }
+        }
+
+        /**
+         * Loads progress from Firestore.
+         */
+        async function loadProgress() {
+            if (!progressDocRef) return;
+
+            try {
+                const docSnap = await getDoc(progressDocRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    knownWords = data.knownWords || [];
+                    practiceWords = data.practiceWords || [];
+                    console.log("Progress loaded:", data);
+                } else {
+                    console.log("No previous progress found.");
+                    // Initialize with empty arrays if no doc exists
+                    knownWords = [];
+                    practiceWords = [];
+                }
+            } catch (error) {
+                console.error("Error loading progress: ", error);
+                knownWords = [];
+                practiceWords = [];
+            }
+        }
+
+        // --- 7. INITIALIZE GAME (Modified) ---
         
         /**
-         * Fetches the word list from a URL and starts the game.
+         * Authenticates, loads progress, fetches words, and starts the game.
          */
         async function initializeGame() {
-            // This is the raw URL for the file you linked, with cache-busting.
-            const wordListUrl = 'https://raw.githubusercontent.com/Maltais239/interactives/main/spanish_words_1000.json?v=' + new Date().getTime();
-            
             try {
+                // --- NEW: Authenticate with Firebase ---
+                console.log("Authenticating...");
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                userId = auth.currentUser?.uid;
+
+                if (!userId) {
+                    throw new Error("Authentication failed, user ID not found.");
+                }
+                console.log("Authenticated with user ID:", userId);
+
+                // Set up the Firestore document reference (private to the user)
+                progressDocRef = doc(db, 'artifacts', appId, 'users', userId, 'spanishChecker', 'progress');
+                // --- END NEW ---
+
+                // --- NEW: Load progress from Firestore ---
+                console.log("Loading progress...");
+                await loadProgress();
+                // Update UI immediately with loaded data
+                updateBanksUI(); 
+                // --- END NEW ---
+
+                // This is the raw URL for the file you linked, with cache-busting.
+                const wordListUrl = 'https://raw.githubusercontent.com/Maltais239/interactives/main/spanish_words_1000.json?v=' + new Date().getTime();
+            
                 // Show loading state
                 spanishWordEl.textContent = 'Loading...';
                 
@@ -358,6 +457,7 @@
                 if (!masterWordList || masterWordList.length === 0) {
                     throw new Error('Word list is empty or invalid.');
                 }
+                console.log(`Loaded ${masterWordList.length} words from JSON.`);
 
                 // Initialize state variables that depend on the list
                 availableWords = [...masterWordList];
@@ -366,13 +466,12 @@
                 // Start the game
                 loadNextWord();
                 
-                // Set initial count
-                knownCountEl.textContent = `0 / ${masterWordList.length}`;
-                practiceCountEl.textContent = '0';
+                // Set/Update counts now that master list is loaded
+                updateBanksUI();
 
 
             } catch (error) {
-                console.error('Failed to load word list:', error);
+                console.error('Failed to initialize game:', error);
                 // Show error state to the user
                 spanishWordEl.textContent = 'Failed to load words.';
                 feedbackEl.textContent = 'Please check the file URL and try refreshing.';
