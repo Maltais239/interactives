@@ -83,7 +83,10 @@
             
             <!-- Known Words -->
             <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 w-full">
-                <h3 class="text-2xl font-bold text-green-700 mb-3">Known Words</h3>
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-2xl font-bold text-green-700">Known Words</h3>
+                    <span id="known-words-count" class="text-lg font-semibold text-gray-600 bg-gray-200 px-3 py-1 rounded-full">0 / 0</span>
+                </div>
                 <div id="known-words-list" class="flex flex-wrap gap-2 h-32 overflow-y-auto bg-gray-50 p-3 rounded-lg">
                     <!-- Badges will be generated here -->
                 </div>
@@ -94,7 +97,10 @@
 
             <!-- Practice Bank -->
             <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 w-full">
-                <h3 class="text-2xl font-bold text-red-700 mb-3">Practice Bank</h3>
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-2xl font-bold text-red-700">Practice Bank</h3>
+                    <span id="practice-words-count" class="text-lg font-semibold text-gray-600 bg-gray-200 px-3 py-1 rounded-full">0</span>
+                </div>
                 <div id="practice-words-list" class="flex flex-wrap gap-2 h-32 overflow-y-auto bg-gray-50 p-3 rounded-lg">
                     <!-- Badges will be generated here -->
                 </div>
@@ -109,12 +115,11 @@
     <textarea id="copy-buffer" class="absolute" style="left: -9999px; top: 0;"></textarea>
 
     <script>
-        // --- 1. DATA: Expanded Word List ---
-        // This list is now ~200 words. You can continue to add more in this format.
-        // const wordList = [ ... ]; // <-- This giant list is now REMOVED
+        // --- 1. DATA: Master Word List ---
+        // List will be loaded from the external JSON file.
+        let masterWordList = [];
 
         // --- 2. STATE VARIABLES ---
-        let masterWordList = []; // Will be loaded from JSON
         let availableWords = [];
         let allEnglishWords = [];
         let knownWords = [];
@@ -128,6 +133,8 @@
         const feedbackEl = document.getElementById('feedback-message');
         const knownListEl = document.getElementById('known-words-list');
         const practiceListEl = document.getElementById('practice-words-list');
+        const knownCountEl = document.getElementById('known-words-count');
+        const practiceCountEl = document.getElementById('practice-words-count');
         const copyKnownBtn = document.getElementById('copy-known-btn');
         const copyPracticeBtn = document.getElementById('copy-practice-btn');
         const copyBuffer = document.getElementById('copy-buffer');
@@ -267,6 +274,7 @@
                 badge.textContent = `${word.spanish} / ${word.english}`;
                 knownListEl.appendChild(badge);
             });
+            knownCountEl.textContent = `${knownWords.length} / ${masterWordList.length}`; // Update count
 
             // Update Practice Bank
             practiceListEl.innerHTML = '';
@@ -277,6 +285,7 @@
                 badge.textContent = `${word.spanish} / ${word.english}`;
                 practiceListEl.appendChild(badge);
             });
+            practiceCountEl.textContent = practiceWords.length; // Update count
         }
 
         /**
@@ -331,8 +340,8 @@
          * Fetches the word list from a URL and starts the game.
          */
         async function initializeGame() {
-            // This is the raw URL for the file you linked.
-            const wordListUrl = 'https://raw.githubusercontent.com/Maltais239/interactives/main/spanish_words_1000%20(1).json';
+            // This is the raw URL for the file you linked, with cache-busting.
+            const wordListUrl = 'https://raw.githubusercontent.com/Maltais239/interactives/main/spanish_words_1000.json?v=' + new Date().getTime();
             
             try {
                 // Show loading state
@@ -356,6 +365,11 @@
 
                 // Start the game
                 loadNextWord();
+                
+                // Set initial count
+                knownCountEl.textContent = `0 / ${masterWordList.length}`;
+                practiceCountEl.textContent = '0';
+
 
             } catch (error) {
                 console.error('Failed to load word list:', error);
