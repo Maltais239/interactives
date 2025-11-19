@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forces Sorting Game</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root{--bg:#f0f9ff;--panel:#ffffff;--text-dark:#333333;--applied-bg:#eff6ff;--applied-border:#3b82f6;--friction-bg:#fef2f2;--friction-border:#ef4444;--tension-bg:#faf5ff;--tension-border:#a855f7;--elastic-bg:#f0fdf4;--elastic-border:#22c55e}
+body{margin:0;font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text-dark);display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:20px}
+.game-container{background:var(--panel);width:100%;max-width:1000px;padding:20px;border-radius:15px;box-shadow:0 10px 25px rgba(0,0,0,0.1)}
+h1{text-align:center;color:#1e293b;margin:0 0 10px 0;font-size:1.8rem}
+p.instructions{text-align:center;color:#64748b;margin-bottom:20px}
+#items-pool{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;min-height:120px;padding:15px;background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;margin-bottom:30px}
+.item{width:90px;height:90px;background:white;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;border:2px solid #cbd5e1;box-shadow:0 2px 4px rgba(0,0,0,0.05);cursor:grab;touch-action:none;user-select:none;padding:4px;transition:transform 0.2s}
+.item:active{cursor:grabbing}
+.item img{width:100%;height:55%;object-fit:contain;pointer-events:none;margin-bottom:4px}
+.item span{font-size:0.6rem;text-align:center;line-height:1.1;font-weight:600;color:#475569;width:100%;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.item.dragging{opacity:0.8;position:fixed;z-index:9999;pointer-events:none;transform:scale(1.1);box-shadow:0 10px 20px rgba(0,0,0,0.2)}
+.item.correct{border-color:#22c55e;background-color:#f0fdf4}
+.item.incorrect{border-color:#ef4444;background-color:#fef2f2}
+.zones-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.zone-column{display:flex;flex-direction:column;gap:8px}
+.zone-header{text-align:center;font-weight:bold;padding:8px;border-radius:6px;color:white;text-transform:uppercase;font-size:0.8rem;letter-spacing:0.05em}
+.drop-zone{flex-grow:1;min-height:250px;border:2px dashed;border-radius:8px;padding:8px;display:flex;flex-wrap:wrap;align-content:flex-start;gap:6px;transition:background 0.2s}
+.zone-applied .zone-header{background:var(--applied-border)}.zone-applied .drop-zone{border-color:var(--applied-border);background:var(--applied-bg)}
+.zone-friction .zone-header{background:var(--friction-border)}.zone-friction .drop-zone{border-color:var(--friction-border);background:var(--friction-bg)}
+.zone-tension .zone-header{background:var(--tension-border)}.zone-tension .drop-zone{border-color:var(--tension-border);background:var(--tension-bg)}
+.zone-elastic .zone-header{background:var(--elastic-border)}.zone-elastic .drop-zone{border-color:var(--elastic-border);background:var(--elastic-bg)}
+.drop-zone.over{background-color:rgba(0,0,0,0.1);border-style:solid}
+.game-controls{margin-top:20px;display:flex;justify-content:center;gap:15px}
+.btn{padding:10px 20px;border-radius:8px;font-weight:bold;cursor:pointer;border:none;font-family:inherit}
+.btn-check{background:#3b82f6;color:white}.btn-reset{background:#e2e8f0;color:#475569}
+@media (max-width:768px){.zones-grid{grid-template-columns:1fr 1fr}}@media (max-width:480px){.zones-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="game-container">
+<h1>Forces Sorting Game</h1>
+<p class="instructions">Drag the examples to the correct Force category.</p>
+
+<!-- THIS SECTION LOADS YOUR DATA FROM GITHUB JSON -->
+<div id="loading-msg" class="text-center py-10 text-blue-600 font-bold">Loading Game Data...</div>
+<div id="items-pool" class="hidden"></div>
+
+<div class="zones-grid">
+<div class="zone-column zone-applied"><div class="zone-header">Applied Force</div><div class="drop-zone" data-category="Applied Force"></div></div>
+<div class="zone-column zone-friction"><div class="zone-header">Friction</div><div class="drop-zone" data-category="Friction"></div></div>
+<div class="zone-column zone-tension"><div class="zone-header">Tension</div><div class="drop-zone" data-category="Tension"></div></div>
+<div class="zone-column zone-elastic"><div class="zone-header">Elastic Force</div><div class="drop-zone" data-category="Elastic Force"></div></div>
+</div>
+<div class="game-controls"><button class="btn btn-check" id="check-btn">Check Answers</button><button class="btn btn-reset" id="reset-btn">Reset Game</button></div>
+</div>
+
+<script>
+// --- GAME CONFIGURATION ---
+// This tells the game where to find your image data on GitHub
+const GITHUB_DATA_URL = 'https://raw.githubusercontent.com/Maltais239/interactives/main/game-data.json';
+
+// --- LOGIC ---
+const itemsPool = document.getElementById('items-pool');
+const loadingMsg = document.getElementById('loading-msg');
+const zones = document.querySelectorAll('.drop-zone');
+let draggedItem = null;
+let touchGhost = null;
+let touchOffset = {x:0, y:0};
+
+// Load Data
+async function loadGame() {
+    try {
+        const response = await fetch(GITHUB_DATA_URL);
+        if (!response.ok) throw new Error("Failed to load game data");
+        const data = await response.json();
+        
+        // Build Items
+        data.forEach((itemData, index) => {
+            const el = document.createElement('div');
+            el.className = 'item';
+            el.draggable = true;
+            el.id = `item-${index}`;
+            el.dataset.category = itemData.category;
+            el.innerHTML = `<img src="${itemData.src}" alt="${itemData.label}"><span class="pointer-events-none">${itemData.label}</span>`;
+            attachDragEvents(el);
+            itemsPool.appendChild(el);
+        });
+
+        loadingMsg.classList.add('hidden');
+        itemsPool.classList.remove('hidden');
+    } catch (err) {
+        loadingMsg.innerHTML = `<span class="text-red-500">Error: Could not load game data.<br>Please ensure 'game-data.json' is in your main GitHub branch.</span>`;
+        console.error(err);
+    }
+}
+
+function attachDragEvents(item){
+    item.addEventListener('dragstart',e=>{draggedItem=item;e.dataTransfer.effectAllowed='move';requestAnimationFrame(()=>item.style.opacity='0.4')});
+    item.addEventListener('dragend',()=>{item.style.opacity='1';draggedItem=null;zones.forEach(z=>z.classList.remove('over'))});
+    item.addEventListener('touchstart',handleTouchStart,{passive:false});item.addEventListener('touchmove',handleTouchMove,{passive:false});item.addEventListener('touchend',handleTouchEnd);
+}
+
+zones.forEach(zone=>{zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('over')});zone.addEventListener('dragleave',()=>zone.classList.remove('over'));zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('over');if(draggedItem){draggedItem.classList.remove('correct','incorrect');zone.appendChild(draggedItem)}})});
+
+function handleTouchStart(e){e.preventDefault();const touch=e.touches[0];const item=e.currentTarget;const rect=item.getBoundingClientRect();touchGhost=item.cloneNode(true);touchGhost.classList.add('dragging');touchGhost.style.width=rect.width+'px';touchGhost.style.height=rect.height+'px';document.body.appendChild(touchGhost);touchOffset.x=touch.clientX-rect.left;touchOffset.y=touch.clientY-rect.top;moveGhost(touch.clientX,touch.clientY)}
+function handleTouchMove(e){e.preventDefault();if(!touchGhost)return;const touch=e.touches[0];moveGhost(touch.clientX,touch.clientY);const elem=document.elementFromPoint(touch.clientX,touch.clientY);const zone=elem?elem.closest('.drop-zone'):null;zones.forEach(z=>z.classList.remove('over'));if(zone)zone.classList.add('over')}
+function handleTouchEnd(e){if(!touchGhost)return;const touch=e.changedTouches[0];const elem=document.elementFromPoint(touch.clientX,touch.clientY);const zone=elem?elem.closest('.drop-zone'):null;const original=e.currentTarget;if(zone){original.classList.remove('correct','incorrect');zone.appendChild(original)}touchGhost.remove();touchGhost=null;zones.forEach(z=>z.classList.remove('over'))}
+function moveGhost(x,y){touchGhost.style.left=(x-touchOffset.x)+'px';touchGhost.style.top=(y-touchOffset.y)+'px'}
+
+document.getElementById('check-btn').addEventListener('click',()=>{zones.forEach(zone=>{const cat=zone.dataset.category;Array.from(zone.children).forEach(item=>{if(item.dataset.category===cat){item.classList.add('correct');item.classList.remove('incorrect')}else{item.classList.add('incorrect');item.classList.remove('correct')}})})});
+document.getElementById('reset-btn').addEventListener('click',()=>{
+    const items = Array.from(document.querySelectorAll('.item'));
+    items.sort(()=>Math.random()-0.5);
+    items.forEach(item=>{item.classList.remove('correct','incorrect');itemsPool.appendChild(item)});
+});
+
+loadGame();
+</script>
+</body>
+</html>
