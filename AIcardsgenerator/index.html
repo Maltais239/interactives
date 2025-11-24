@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Flashcard Generator (No Emojis)</title>
+    <title>AI Flashcard Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- JSZip for creating zip files -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -382,7 +382,8 @@
 
         document.getElementById('download-zip-btn').addEventListener('click', () => {
             if (allCardsData.length === 0 || allCardsData.some(c => !c.image)) {
-                alert('Please generate all flashcard images first!');
+                // IMPORTANT: Replacing alert() with console.error as per instructions
+                console.error('Please generate all flashcard images first!');
                 return;
             }
 
@@ -406,7 +407,8 @@
 
         document.getElementById('export-json-btn').addEventListener('click', () => {
             if (allCardsData.length === 0 || allCardsData.some(c => !c.image)) {
-                alert('Please generate all flashcard images first!');
+                // IMPORTANT: Replacing alert() with console.error as per instructions
+                console.error('Please generate all flashcard images first!');
                 return;
             }
             
@@ -416,7 +418,13 @@
             triggerDownload(blob, 'flashcard-data.json');
         });
 
+        // --- STOLEN CODE: Print function from index (39).html ---
         function saveForPrinting() {
+             if (allCardsData.length === 0) {
+                console.warn('Cannot print: No flashcards have been generated yet.');
+                return;
+            }
+            // EXACT copy of your desired print template logic, just ensuring font ref matches main doc
              const printableHtml = `
 <!DOCTYPE html>
 <html lang="en">
@@ -431,26 +439,33 @@
     <style>
         body { font-family: 'Outfit', sans-serif; }
         @media print {
+            /* --- FIX: --- */
+            /* Reset body layout and hide all direct children EXCEPT the main card container */
             body { 
                 background-color: #ffffff; 
                 padding: 0 !important; 
                 margin: 0 !important; 
-                display: block; 
+                display: block; /* Turn off body flex layout */
             }
             body > *:not(#main-container) {
                 display: none !important;
             }
             #main-container {
+                /* Reset spacing on the container itself */
                 padding: 0;
                 margin: 0;
-                display: block; 
+                display: block; /* Override flex */
             }
+            /* --- THIS IS THE REAL FIX --- */
             #main-container > .page-container {
                 margin-top: 0 !important; 
                 box-shadow: none !important;
                 border: none !important;
             }
-            #instructions, .regenerate-btn, .hint-input { display: none !important; }
+            /* --- End Fix --- */
+
+            /* Note: #instructions is replaced by #controls in the main app, hiding controls works the same */
+            #controls, .regenerate-btn, .hint-input { display: none !important; } 
             .page-container {
                 box-shadow: none; width: 100%; height: 100%;
                 padding: 0; margin: 0; border-radius: 0;
@@ -464,16 +479,18 @@
     </style>
 </head>
 <body class="p-8 flex flex-col items-center space-y-8">
-    <div id="instructions" class="w-full max-w-5xl p-4 bg-indigo-100 border-l-4 border-indigo-500 text-indigo-700 rounded-lg shadow-md">
+    <!-- NOTE: Instructions div from original template is omitted, but you can see how it was written below -->
+    <!-- <div id="instructions" class="w-full max-w-5xl p-4 bg-indigo-100 border-l-4 border-indigo-500 text-indigo-700 rounded-lg shadow-md">
         <h2 class="font-bold">Instructions</h2>
         <p>To print, press Ctrl+P or Cmd+P and choose "Save as PDF" for best results.</p>
-    </div>
-    <div id="main-container" class="w-full flex flex-col items-center space-y-8">\${document.getElementById('main-container').innerHTML}</div>
+    </div> -->
+    <div id="main-container" class="w-full flex flex-col items-center space-y-8">${document.getElementById('main-container').innerHTML}</div>
 </body>
 </html>`;
             const blob = new Blob([printableHtml.trim()], { type: 'text/html' });
             triggerDownload(blob, 'flashcards-for-printing.html');
         }
+        // --- END STOLEN CODE ---
 
         document.getElementById('save-btn').addEventListener('click', saveForPrinting);
     </script>
