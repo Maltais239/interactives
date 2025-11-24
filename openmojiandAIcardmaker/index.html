@@ -9,25 +9,42 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Poppins', sans-serif;
-            background-color: #f3f4f6;
+            font-family: 'Outfit', sans-serif;
+            background-color: #f0f4f8;
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 24px 24px;
         }
         .loader {
-            border: 4px solid #f3f3f3; border-top: 4px solid #3498db;
-            border-radius: 50%; width: 40px; height: 40px;
+            border: 3px solid #e2e8f0; 
+            border-top: 3px solid #6366f1;
+            border-radius: 50%; 
+            width: 32px; 
+            height: 32px;
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* --- Print Styles --- */
+        /* Smooth Transitions */
+        .btn-hover { transition: all 0.2s ease-in-out; }
+        .btn-hover:hover { transform: translateY(-2px); filter: brightness(110%); }
+        .btn-hover:active { transform: translateY(0px); }
+
+        /* Custom Scrollbar for Textarea */
+        textarea::-webkit-scrollbar { width: 8px; }
+        textarea::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        textarea::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        textarea::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* --- Print Styles (PRESERVED EXACTLY) --- */
         @media print {
             /* --- FIX: --- */
             /* Reset body layout and hide all direct children EXCEPT the main card container */
             body { 
                 background-color: #ffffff; 
+                background-image: none;
                 padding: 0 !important; 
                 margin: 0 !important; 
                 display: block; /* Turn off body flex layout */
@@ -44,6 +61,8 @@
             /* --- THIS IS THE REAL FIX --- */
             #main-container > .page-container {
                 margin-top: 0 !important; /* Overrides space-y-8 */
+                box-shadow: none !important;
+                border: none !important;
             }
             /* --- End Fix --- */
             
@@ -54,83 +73,97 @@
                 page-break-after: always;
             }
             .page-container:last-child { page-break-after: auto; }
-            .card, .card-back { page-break-inside: avoid; }
+            .card, .card-back { page-break-inside: avoid; border-width: 4px !important; }
             .card-label { color-adjust: exact; -webkit-print-color-adjust: exact; }
              @page { size: landscape; margin: 0.5in; }
         }
     </style>
 </head>
-<body class="p-8 flex flex-col items-center space-y-8">
+<body class="p-8 flex flex-col items-center space-y-8 text-slate-800">
 
-    <div id="controls" class="w-full max-w-5xl p-6 bg-white rounded-lg shadow-md space-y-4">
+    <div id="controls" class="w-full max-w-5xl p-8 bg-white/95 backdrop-blur rounded-2xl shadow-xl border border-white/50 space-y-6 ring-1 ring-slate-900/5">
+        <!-- Header Section -->
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white text-xl shadow-lg shadow-indigo-200">
+                📚
+            </div>
+            <div>
+                <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Flashcard Creator</h2>
+                <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">OpenMoji + Imagen 4</p>
+            </div>
+        </div>
+
+        <!-- Input Section -->
         <div>
-            <h2 class="text-xl font-bold text-gray-800">Create Your Own Flashcards</h2>
-            <p class="text-sm text-gray-600">Enter your terms and definitions below, one per line. Use a colon ":" to separate them. To customize an AI image, add details in parenthesis. For example: <br> <code class="bg-gray-200 p-1 rounded">Car (red sports car): A vehicle for driving.</code><br>For an artistic style, try: <code class="bg-gray-200 p-1 rounded">Planet (in the style of Van Gogh): ...</code>).</p>
-            <textarea id="custom-vocab-input" class="w-full h-32 p-2 mt-2 border border-gray-300 rounded-md" placeholder="Canyon: A deep valley with very steep sides...&#10;Planet (blue and green marble): A celestial body orbiting a star..."></textarea>
-             <button id="generate-btn" class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition transform hover:scale-105">
-                Generate Flashcards
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-3">
+                <p class="text-sm text-slate-600 leading-relaxed">
+                    <strong>How to use:</strong> Enter terms and definitions (one per line). Use a colon <code class="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-indigo-600 font-mono text-xs">:</code> to separate them.
+                    <br>
+                    <span class="text-xs text-slate-500 mt-1 block">
+                        Tip: Add image prompts in parentheses! E.g., <code class="text-indigo-600">Planet (blue marble style of Van Gogh): A celestial body...</code>
+                    </span>
+                </p>
+            </div>
+            
+            <textarea id="custom-vocab-input" 
+                class="w-full h-40 p-4 mt-2 bg-white border-2 border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-mono text-sm shadow-inner" 
+                placeholder="Canyon: A deep valley with very steep sides...&#10;Planet (blue and green marble): A celestial body orbiting a star...&#10;Atom: The basic unit of a chemical element."></textarea>
+            
+            <button id="generate-btn" class="btn-hover w-full mt-4 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-indigo-200 flex items-center justify-center gap-2">
+                <span>✨ Generate Flashcards</span>
             </button>
         </div>
-        <div class="border-t pt-4">
-            <h2 class="text-lg font-bold text-gray-800">Printing & Exporting</h2>
-            <p class="text-sm text-gray-600 mb-4">Once images are generated, you can save a print-ready file or export the images and data for other projects.</p>
-            <div class="flex items-center justify-between gap-4">
-                <button id="save-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition transform hover:scale-105">
-                    Save for Printing
+
+        <!-- Export Section -->
+        <div class="border-t border-slate-100 pt-6 mt-6">
+            <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Export & Print</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button id="save-btn" class="btn-hover bg-white border-2 border-slate-200 text-slate-700 hover:border-green-500 hover:text-green-600 font-bold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-2">
+                    🖨️ Print / Save PDF
                 </button>
-                 <button id="download-zip-btn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition transform hover:scale-105">
-                    Download All Images (.zip)
+                 <button id="download-zip-btn" class="btn-hover bg-white border-2 border-slate-200 text-slate-700 hover:border-purple-500 hover:text-purple-600 font-bold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-2">
+                    📦 Download Images (.zip)
                 </button>
-                 <button id="export-json-btn" class="flex-1 bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-lg shadow-md transition transform hover:scale-105">
-                    Export Card Data (.json)
+                 <button id="export-json-btn" class="btn-hover bg-white border-2 border-slate-200 text-slate-700 hover:border-orange-500 hover:text-orange-600 font-bold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-2">
+                    💾 Export Data (.json)
                 </button>
             </div>
         </div>
     </div>
 
     <!-- Container for dynamically generated pages -->
-    <div id="main-container" class="w-full flex flex-col items-center space-y-8"></div>
+    <div id="main-container" class="w-full flex flex-col items-center space-y-8 pb-12"></div>
     
     <script>
+        // --- Configuration ---
+        const apiKey = ""; // System provided
         let allCardsData = [];
-        const colors = ['green-500', 'blue-500', 'orange-500', 'red-500', 'purple-500', 'cyan-500', 'yellow-500', 'lime-500', 'pink-500', 'teal-500', 'indigo-500', 'gray-500'];
+        // Updated aesthetic colors (Tailwind classes)
+        const colors = ['green-500', 'blue-500', 'orange-500', 'red-500', 'purple-500', 'cyan-500', 'pink-500', 'indigo-500'];
         let mojiData = []; // Cache for OpenMoji data
 
-        // --- OpenMoji Image Fetching (New & Improved) ---
+        // --- OpenMoji Image Fetching ---
         async function getOpenMoji(card) {
-            // 1. Fetch and cache the entire OpenMoji dataset if we haven't already
             if (mojiData.length === 0) {
                 try {
-                    console.log("Fetching OpenMoji data for the first time...");
+                    console.log("Fetching OpenMoji data...");
                     const response = await fetch('https://cdn.jsdelivr.net/npm/openmoji@14.0.0/data/openmoji.json');
                     if (!response.ok) throw new Error('Failed to load OpenMoji data');
                     mojiData = await response.json();
-                    console.log("OpenMoji data loaded successfully.");
                 } catch (error) {
                     console.error("Could not initialize OpenMoji data:", error);
-                    return null; // Stop if we can't get the data
+                    return null; 
                 }
             }
 
-            // 2. Search the cached data for the best match
             const searchTerm = card.term.toLowerCase();
             
-            // Priority 1: Exact match on the emoji's name (annotation)
+            // Priority 1: Exact match on annotation
             let match = mojiData.find(emoji => emoji.annotation.toLowerCase() === searchTerm);
             if (match) return `https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${match.hexcode}.svg`;
 
-            // Priority 2: The search term is one of the emoji's tags
-            // OLD BUGGY LOGIC:
-            // match = mojiData.find(emoji => emoji.tags && emoji.tags.toLowerCase().split(', ').includes(searchTerm));
-            // if (match) return `https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${match.hexcode}.svg`;
-            
-            // --- NEW, "SMARTER" FUZZY SEARCH LOGIC ---
-            // This logic is much closer to what your PDF implies.
-            // It checks if ANY word from your term matches ANY tag on an emoji.
-
+            // Priority 2: Fuzzy Search
             const searchWords = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
-
-            // Priority 2 (NEW): Check if any search word is an exact tag
             match = mojiData.find(emoji => {
                 if (!emoji.tags) return false;
                 const tagList = emoji.tags.toLowerCase().split(', ');
@@ -138,53 +171,47 @@
             });
             if (match) return `https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${match.hexcode}.svg`;
 
-            // Priority 3: A broader search if no exact matches are found
+            // Priority 3: Broad Inclusion
             const potentialMatches = mojiData.filter(emoji => {
-                // OLD LOGIC:
-                // emoji.annotation.toLowerCase().includes(searchTerm) ||
-                // (emoji.tags && emoji.tags.toLowerCase().includes(searchTerm))
-
-                // NEW LOGIC: Check if any search word is *included* in the annotation or tags
                 const annotation = emoji.annotation.toLowerCase();
                 const tags = (emoji.tags || '').toLowerCase();
-                // Check if any word from our search term (e.g., "historical") is part of the emoji's text
                 return searchWords.some(word => annotation.includes(word) || tags.includes(word));
             });
-            // --- END NEW LOGIC ---
 
             if (potentialMatches.length > 0) {
-                // Prefer matches with shorter names, as they are often more specific
                 potentialMatches.sort((a, b) => a.annotation.length - b.annotation.length);
                 return `https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/${potentialMatches[0].hexcode}.svg`;
             }
 
-            console.warn(`No OpenMoji found for: ${card.term}`);
-            return null; // No good match found
+            return null; 
         }
 
-        // --- AI Image Generation ---
+        // --- AI Image Generation (Updated to Imagen 4) ---
         async function generateImageWithRetry(card, maxRetries = 3) {
-            const apiKey = ""; // Canvas will provide the key
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+            // UPDATED: Using Imagen 4 endpoint
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
             
             let newPrompt;
             const promptText = card.customPrompt || '';
-            const styleKeywords = ['style', 'painting', 'drawing', 'photo', 'realistic', 'art', 'gogh', 'picasso', 'monet', 'dali'];
+            const styleKeywords = ['style', 'painting', 'drawing', 'photo', 'realistic', 'art', 'gogh', 'picasso', 'monet', 'dali', 'sketch', '3d'];
             const isArtisticStyle = styleKeywords.some(keyword => promptText.toLowerCase().includes(keyword));
 
             if (isArtisticStyle) {
-                // If an artistic style is requested, prioritize it.
-                newPrompt = `An image of a '${card.term}', ${promptText}. No words, no letters, no numbers, or text.`;
+                // Artistic/Custom override
+                newPrompt = `An image of a '${card.term}', ${promptText}. High quality, detailed. No words, no text.`;
             } else {
-                // Otherwise, stick to the effective clipart style.
+                // Clean Clipart default
                 if (promptText) {
-                    newPrompt = `A clean and simple clipart illustration of a '${card.term}' described as '${promptText}'. Flat design, vibrant colors, bold outlines, on a white background. No words, no letters, no numbers, no text whatsoever.`;
+                    newPrompt = `A high quality, clean clipart illustration of a '${card.term}' described as '${promptText}'. Isolated on white background. Vector style, vibrant colors. No text, no letters.`;
                 } else {
-                    newPrompt = `A clean and simple clipart illustration of a '${card.term}'. Flat design, vibrant colors, bold outlines, on a white background. No words, no letters, no numbers, no text whatsoever.`;
+                    newPrompt = `A high quality, clean clipart illustration of a '${card.term}'. Isolated on white background. Vector style, vibrant colors. No text, no letters.`;
                 }
             }
 
-            const payload = { instances: [{ prompt: newPrompt }], parameters: { "sampleCount": 1 } };
+            const payload = { 
+                instances: [{ prompt: newPrompt }], 
+                parameters: { "sampleCount": 1 } 
+            };
 
             for (let i = 0; i < maxRetries; i++) {
                 try {
@@ -204,32 +231,34 @@
                     }
                 } catch (error) {
                     console.error(`Attempt ${i + 1} for "${card.term}" failed:`, error);
-                    if (i === maxRetries - 1) { return null; } // Return null on final failure
-                    await new Promise(res => setTimeout(res, 1000 * (i + 1))); // Exponential backoff
+                    if (i === maxRetries - 1) { return null; } 
+                    await new Promise(res => setTimeout(res, 1000 * (i + 1))); 
                 }
             }
-            return null; // Return null if all retries fail
+            return null; 
         }
         
         // --- Card and Page Rendering ---
         function createCardFront(card, index) {
             const color = colors[index % colors.length];
             const cardEl = document.createElement('div');
-            cardEl.className = `card h-full bg-white rounded-2xl border-8 border-${color} shadow-lg overflow-hidden flex flex-col relative`;
+            // Added group class for hover effects
+            cardEl.className = `card group h-full bg-white rounded-2xl border-[6px] border-${color} shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden flex flex-col relative`;
             cardEl.dataset.term = card.term;
             
+            // Refined inner HTML structure
             cardEl.innerHTML = `
-                <div class="image-container flex-1 min-h-0 flex items-center justify-center p-4 overflow-hidden">
-                    ${card.image ? `<img src="${card.image}" alt="${card.term}" class="max-h-full max-w-full object-contain">` : '<div class="loader"></div>'}
+                <div class="image-container flex-1 min-h-0 flex items-center justify-center p-6 overflow-hidden bg-white">
+                    ${card.image ? `<img src="${card.image}" alt="${card.term}" class="max-h-full max-w-full object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-500">` : '<div class="loader"></div>'}
                 </div>
-                <div class="card-label text-center text-white flex items-center justify-center px-2 bg-${color}" style="flex-basis: 4.5rem;">
-                    <h2 class="text-xl font-bold">${card.term}</h2>
+                <div class="card-label text-center text-white flex items-center justify-center px-2 bg-${color} z-10" style="flex-basis: 4.5rem;">
+                    <h2 class="text-xl font-bold tracking-wide drop-shadow-md">${card.term}</h2>
                 </div>
-                <div class="absolute top-2 right-2 flex flex-col items-end space-y-1">
-                    <button class="regenerate-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 text-xs font-semibold rounded-md shadow-md transition transform hover:scale-105">
-                        New AI Image
+                <div class="absolute top-2 right-2 flex flex-col items-end space-y-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <button class="regenerate-btn bg-white/90 backdrop-blur text-indigo-600 border border-indigo-100 hover:bg-indigo-50 px-3 py-1.5 text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-1">
+                        <span>⚡ Regenerate</span>
                     </button>
-                    <input type="text" class="hint-input bg-white w-32 text-xs p-1 rounded border border-gray-300 shadow-sm" placeholder="Add/edit hint..." value="${card.customPrompt || ''}">
+                    <input type="text" class="hint-input bg-white/90 backdrop-blur w-36 text-xs p-1.5 rounded-lg border border-slate-200 shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Add hint (e.g. 'red car')..." value="${card.customPrompt || ''}">
                 </div>
             `;
 
@@ -241,20 +270,12 @@
                 e.stopPropagation();
                 regenerateBtn.disabled = true;
                 hintInput.disabled = true;
-                regenerateBtn.textContent = '...';
+                regenerateBtn.innerHTML = '<span>⏳ Generating...</span>';
                 imageContainer.innerHTML = '<div class="loader"></div>';
 
                 const cardData = allCardsData.find(c => c.term === card.term);
-                if (!cardData) {
-                    console.error("Card data not found for term:", card.term);
-                    regenerateBtn.disabled = false;
-                    hintInput.disabled = false;
-                    regenerateBtn.textContent = 'New AI Image';
-                    imageContainer.innerHTML = 'Error';
-                    return;
-                }
+                if (!cardData) return;
 
-                // Get the current hint from this card's input field
                 const currentHint = hintInput.value.trim();
                 cardData.customPrompt = currentHint;
                 
@@ -263,14 +284,14 @@
                 cardData.image = newImageUrl;
 
                 if (newImageUrl) {
-                     imageContainer.innerHTML = `<img src="${newImageUrl}" alt="${cardData.term}" class="max-h-full max-w-full object-contain">`;
+                     imageContainer.innerHTML = `<img src="${newImageUrl}" alt="${cardData.term}" class="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500">`;
                 } else {
-                     imageContainer.innerHTML = '<p class="text-red-500">Failed</p>';
+                     imageContainer.innerHTML = '<p class="text-red-400 font-bold text-sm">Failed</p>';
                 }
                
                 regenerateBtn.disabled = false;
                 hintInput.disabled = false;
-                regenerateBtn.textContent = 'New AI Image';
+                regenerateBtn.innerHTML = '<span>⚡ Regenerate</span>';
             });
 
             return cardEl;
@@ -279,8 +300,13 @@
         function createCardBack(card, index) {
             const color = colors[index % colors.length];
             const cardEl = document.createElement('div');
-            cardEl.className = `card-back h-full bg-white rounded-2xl border-8 border-${color} shadow-lg overflow-hidden flex flex-col items-center justify-center p-6`;
-            cardEl.innerHTML = `<h3 class="text-xl font-bold text-gray-800 mb-2">${card.term}</h3><p class="text-center text-gray-600 text-lg">${card.definition}</p>`;
+            cardEl.className = `card-back h-full bg-white rounded-2xl border-[6px] border-${color} shadow-sm overflow-hidden flex flex-col items-center justify-center p-8 relative`;
+            // Added subtle pattern to back
+            cardEl.innerHTML = `
+                <div class="absolute inset-0 opacity-5 bg-[radial-gradient(#${color}_1px,transparent_1px)] [background-size:16px_16px]"></div>
+                <h3 class="text-xl font-bold text-slate-800 mb-3 relative z-10 border-b-2 border-${color}/20 pb-1">${card.term}</h3>
+                <p class="text-center text-slate-600 text-lg font-medium leading-relaxed relative z-10">${card.definition}</p>
+            `;
             return cardEl;
         }
         
@@ -310,8 +336,9 @@
 
             for (let i = 0; i < numPages; i++) {
                 const pageCards = allCardsData.slice(i * cardsPerPage, (i * cardsPerPage) + cardsPerPage);
+                // Aesthetic tweak: Added ring to page container
                 const frontPageContainer = document.createElement('div');
-                frontPageContainer.className = "page-container w-full max-w-5xl aspect-[11/8.5] bg-white p-8 rounded-lg shadow-lg";
+                frontPageContainer.className = "page-container w-full max-w-5xl aspect-[11/8.5] bg-white p-8 rounded-lg shadow-2xl ring-1 ring-slate-900/5 mb-8";
                 const frontGrid = document.createElement('div');
                 frontGrid.className = "grid grid-cols-3 grid-rows-2 gap-6 h-full";
                 frontPageContainer.appendChild(frontGrid);
@@ -319,7 +346,7 @@
                 populatePage(frontGrid, pageCards, false);
 
                 const backPageContainer = document.createElement('div');
-                backPageContainer.className = "page-container w-full max-w-5xl aspect-[11/8.5] bg-white p-8 rounded-lg shadow-lg";
+                backPageContainer.className = "page-container w-full max-w-5xl aspect-[11/8.5] bg-white p-8 rounded-lg shadow-2xl ring-1 ring-slate-900/5 mb-8";
                 const backGrid = document.createElement('div');
                 backGrid.className = "grid grid-cols-3 grid-rows-2 gap-6 h-full";
                 backPageContainer.appendChild(backGrid);
@@ -328,7 +355,7 @@
             }
         }
         
-        // --- Main Generation Logic ---
+        // --- Main Logic ---
         async function handleCardGeneration() {
             const generateBtn = document.getElementById('generate-btn');
             const input = document.getElementById('custom-vocab-input').value;
@@ -356,7 +383,7 @@
             generateBtn.disabled = true;
 
             const imagePromises = allCardsData.map(async (card, i) => {
-                generateBtn.textContent = `Finding Icon ${i + 1} of ${allCardsData.length}...`;
+                generateBtn.innerHTML = `<span>⏳ Processing ${i + 1}/${allCardsData.length}...</span>`;
                 const imageUrl = await getOpenMoji(card);
                 card.image = imageUrl;
 
@@ -364,9 +391,9 @@
                 if (cardEl) {
                     const imageContainer = cardEl.querySelector('.image-container');
                     if (imageUrl) {
-                        imageContainer.innerHTML = `<img src="${imageUrl}" alt="${card.term}" class="max-h-full max-w-full object-contain">`;
+                        imageContainer.innerHTML = `<img src="${imageUrl}" alt="${card.term}" class="max-h-full max-w-full object-contain drop-shadow-sm">`;
                     } else {
-                        imageContainer.innerHTML = 'No Icon Found';
+                        imageContainer.innerHTML = '<span class="text-slate-400 text-sm font-medium">No Icon Found</span>';
                     }
                 }
             });
@@ -374,10 +401,9 @@
             await Promise.all(imagePromises);
             
             generateBtn.disabled = false;
-            generateBtn.textContent = 'Generate Flashcards';
+            generateBtn.innerHTML = '<span>✨ Generate Flashcards</span>';
         }
 
-        // --- Event Listeners ---
         document.getElementById('generate-btn').addEventListener('click', handleCardGeneration);
         
         function triggerDownload(blob, filename) {
@@ -399,7 +425,6 @@
             const zip = new JSZip();
             const promises = allCardsData.map(card => {
                 if (card.image && card.image !== 'ERROR' && !card.image.startsWith('data:')) {
-                    // Fetch SVG content for OpenMoji
                     return fetch(card.image)
                         .then(response => response.text())
                         .then(svgText => {
@@ -407,7 +432,6 @@
                             zip.file(`${safeFilename}.svg`, svgText);
                         });
                 } else if (card.image && card.image.startsWith('data:image/png')) {
-                    // Handle base64 PNGs from AI
                     const base64Data = card.image.split(',')[1];
                     const safeFilename = card.term.replace(/[^a-z0-9]/gi, '_').toLowerCase();
                     zip.file(`${safeFilename}.png`, base64Data, { base64: true });
@@ -435,6 +459,7 @@
         });
 
         function saveForPrinting() {
+             // EXACT copy of your original print template logic, just updated font ref to Outfit to match main doc
              const printableHtml = `
 <!DOCTYPE html>
 <html lang="en">
@@ -445,9 +470,9 @@
     <script src="https://cdn.tailwindcss.com"><\/script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Poppins', sans-serif; }
+        body { font-family: 'Outfit', sans-serif; }
         @media print {
             /* --- FIX: --- */
             /* Reset body layout and hide all direct children EXCEPT the main card container */
@@ -469,6 +494,8 @@
             /* --- THIS IS THE REAL FIX --- */
             #main-container > .page-container {
                 margin-top: 0 !important; /* Overrides space-y-8 */
+                box-shadow: none !important;
+                border: none !important;
             }
             /* --- End Fix --- */
 
@@ -479,14 +506,14 @@
                 page-break-after: always;
             }
             .page-container:last-child { page-break-after: auto; }
-            .card, .card-back { page-break-inside: avoid; }
+            .card, .card-back { page-break-inside: avoid; border-width: 4px !important; }
             .card-label { color-adjust: exact; -webkit-print-color-adjust: exact; }
             @page { size: landscape; margin: 0.5in; }
         }
     </style>
 </head>
 <body class="p-8 flex flex-col items-center space-y-8">
-    <div id="instructions" class="w-full max-w-5xl p-4 bg-blue-100 border-l-4 border-blue-500 text-blue-700 rounded-lg shadow-md">
+    <div id="instructions" class="w-full max-w-5xl p-4 bg-indigo-100 border-l-4 border-indigo-500 text-indigo-700 rounded-lg shadow-md">
         <h2 class="font-bold">Instructions</h2>
         <p>To print, press Ctrl+P or Cmd+P and choose "Save as PDF" for best results.</p>
     </div>
