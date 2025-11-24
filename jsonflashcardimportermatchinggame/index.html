@@ -90,6 +90,21 @@
         .drop-slot { transition: all 0.2s; }
         .drop-slot.over { background-color: #e0e7ff; border-color: #6366f1; transform: scale(1.05); }
 
+        /* Flashcard Styles */
+        .perspective-1000 { perspective: 1000px; }
+        .transform-style-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+        
+        .flashcard-inner {
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        /* Corrected Selector: Target ID instead of class if element only has ID */
+        #flashcard.flipped .flashcard-inner {
+            transform: rotateY(180deg);
+        }
+
         /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -137,7 +152,7 @@
                 <p class="text-slate-500 text-lg">Import a JSON file or use the sample set.</p>
             </div>
             
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-8 w-full max-w-4xl pb-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 w-full max-w-6xl pb-4">
                 <!-- Game 1: Match -->
                 <div class="group bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl border border-slate-200 transition-all duration-300 flex flex-col items-center text-center">
                     <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-2xl mb-3">🧩</div>
@@ -168,6 +183,14 @@
                     <h3 class="text-lg font-bold text-slate-800">Word Scramble</h3>
                     <p class="text-slate-500 mb-4 text-xs leading-relaxed flex-grow">Type or Unscramble letters to spell.</p>
                     <button id="start-scramble-game-btn" class="btn-primary text-white w-full py-2 rounded-lg font-bold text-sm">Play Scramble</button>
+                </div>
+
+                <!-- Game 5: Flashcards -->
+                <div class="group bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl border border-slate-200 transition-all duration-300 flex flex-col items-center text-center">
+                    <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-2xl mb-3">🎓</div>
+                    <h3 class="text-lg font-bold text-slate-800">Flashcard Study</h3>
+                    <p class="text-slate-500 mb-4 text-xs leading-relaxed flex-grow">Flip through cards to study terms.</p>
+                    <button id="start-flashcard-game-btn" class="btn-primary text-white w-full py-2 rounded-lg font-bold text-sm">Start Study</button>
                 </div>
             </div>
         </section>
@@ -223,7 +246,7 @@
                 </div>
             </div>
 
-            <!-- FAILURE MODAL (Added) -->
+            <!-- FAILURE MODAL -->
             <div id="quiz-failure-modal" class="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
                 <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-[90%] text-center transform scale-95 transition-transform duration-300 flex flex-col items-center" id="quiz-failure-content">
                     <div class="mb-4 w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-600 text-3xl font-bold shadow-inner">✕</div>
@@ -243,7 +266,7 @@
                 <button class="main-menu-btn text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-2 text-sm bg-white/80 backdrop-blur px-3 py-2 rounded-lg shadow-sm">← Exit</button>
             </div>
             
-            <!-- Visual Cues (Added) -->
+            <!-- Visual Cues -->
             <div class="absolute left-4 top-1/2 transform -translate-y-1/2 hidden md:flex flex-col items-center z-0 opacity-50">
                 <div class="text-4xl font-black text-red-200 mb-2">✕</div>
                 <div class="text-xs font-bold text-red-300 uppercase tracking-widest rotate-90 origin-center whitespace-nowrap">No Match &lt;</div>
@@ -311,18 +334,57 @@
                     <!-- Slots injected via JS -->
                 </div>
 
-                <!-- Input Field (Added) -->
+                <!-- Input Field -->
                 <div class="w-full max-w-xs mb-8">
                     <input type="text" id="scramble-input" class="w-full text-center px-4 py-3 rounded-xl border-2 border-indigo-100 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-slate-700 font-bold uppercase tracking-widest placeholder-slate-300" placeholder="TYPE ANSWER HERE">
                 </div>
 
-                <!-- Letter Tiles (Draggable) -->
+                <!-- Letter Tiles -->
                 <div id="letter-bank" class="flex flex-wrap justify-center gap-3 p-4 bg-slate-200/50 rounded-2xl min-h-[80px] w-full">
                     <!-- Tiles injected via JS -->
                 </div>
                 
                 <div id="scramble-message" class="h-8 mt-4 text-lg font-bold text-emerald-500"></div>
                 <button id="scramble-next-btn" class="mt-4 btn-primary text-white px-6 py-2 rounded-lg hidden">Next Word →</button>
+            </div>
+        </main>
+
+        <!-- GAME 5: Flashcard Study Container -->
+        <main id="flashcard-game-container" class="hidden w-full h-full flex-grow flex flex-col items-center relative overflow-y-auto">
+            <div class="w-full flex items-center justify-between mb-4 px-1 flex-shrink-0">
+                <button class="main-menu-btn text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-2 text-sm">← Exit</button>
+                <div class="text-sm font-bold text-slate-400 uppercase tracking-wider" id="flashcard-counter">Card 1 of 10</div>
+            </div>
+
+            <div class="flex-grow flex flex-col items-center justify-center w-full h-full pb-10 px-4">
+                <!-- Flashcard with Class -->
+                <div id="flashcard" class="flashcard group perspective-1000 w-full max-w-md h-96 cursor-pointer mb-8 relative">
+                    <div class="flashcard-inner relative w-full h-full transition-all duration-500 transform-style-3d shadow-xl rounded-2xl">
+                        <!-- Front -->
+                        <div class="absolute w-full h-full backface-hidden bg-white rounded-2xl p-8 flex flex-col items-center justify-center border border-slate-200">
+                            <div class="flex-grow flex items-center justify-center mb-4 w-full h-3/5">
+                                <img id="fc-front-img" src="" class="max-w-full max-h-full object-contain drop-shadow-sm">
+                            </div>
+                            <h2 id="fc-front-term" class="text-3xl font-bold text-slate-800 text-center">Term</h2>
+                            <p class="absolute bottom-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Click to Flip</p>
+                        </div>
+                        <!-- Back -->
+                        <div class="absolute w-full h-full backface-hidden rotate-y-180 bg-indigo-600 rounded-2xl p-8 flex flex-col items-center justify-center text-white border border-indigo-500">
+                            <p class="text-xs font-bold text-indigo-200 uppercase tracking-widest mb-4">Definition</p>
+                            <p id="fc-back-def" class="text-xl font-medium text-center leading-relaxed">Definition goes here.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="flex gap-6 items-center">
+                    <button id="fc-prev-btn" class="btn-secondary w-12 h-12 rounded-full flex items-center justify-center text-xl shadow-md">←</button>
+                    <button id="fc-flip-btn" class="btn-primary text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        Flip
+                    </button>
+                    <button id="fc-next-btn" class="btn-secondary w-12 h-12 rounded-full flex items-center justify-center text-xl shadow-md">→</button>
+                </div>
             </div>
         </main>
 
@@ -342,7 +404,8 @@
             match: document.getElementById('match-game-container'),
             quiz: document.getElementById('quiz-game-container'),
             swipe: document.getElementById('swipe-game-container'),
-            scramble: document.getElementById('scramble-game-container')
+            scramble: document.getElementById('scramble-game-container'),
+            flashcard: document.getElementById('flashcard-game-container')
         };
 
         // --- Master Vocabulary Store ---
@@ -373,6 +436,7 @@
         document.getElementById('start-quiz-game-btn').addEventListener('click', () => { initGame('quiz'); });
         document.getElementById('start-swipe-game-btn').addEventListener('click', () => { initGame('swipe'); });
         document.getElementById('start-scramble-game-btn').addEventListener('click', () => { initGame('scramble'); });
+        document.getElementById('start-flashcard-game-btn').addEventListener('click', () => { initGame('flashcard'); });
 
         function showStartScreen() {
             startScreen.classList.remove('hidden');
@@ -394,6 +458,7 @@
             if (type === 'quiz') quizGame.init();
             if (type === 'swipe') swipeGame.init();
             if (type === 'scramble') scrambleGame.init();
+            if (type === 'flashcard') flashcardGame.init();
         }
 
         // --- Import / Export ---
@@ -747,24 +812,34 @@
 
             init: function() {
                 this.queue = [];
-                for(let i=0; i<10; i++) {
-                    const correct = MASTER_VOCABULARY[Math.floor(Math.random() * MASTER_VOCABULARY.length)];
+                
+                // Create a FULL deck of questions for EVERY term
+                // Shuffle MASTER_VOCABULARY first to randomize order
+                const deck = [...MASTER_VOCABULARY].sort(() => Math.random() - 0.5);
+                
+                deck.forEach(correct => {
+                    // 50% chance of match vs mismatch
                     const isMatch = Math.random() > 0.5;
                     let displayedTerm = correct.term;
                     
-                    if (!isMatch) {
+                    if (!isMatch && MASTER_VOCABULARY.length > 1) {
                         let wrong;
-                        do { wrong = MASTER_VOCABULARY[Math.floor(Math.random() * MASTER_VOCABULARY.length)]; }
-                        while (wrong.term === correct.term);
+                        // Pick a random WRONG term
+                        do { 
+                            wrong = MASTER_VOCABULARY[Math.floor(Math.random() * MASTER_VOCABULARY.length)]; 
+                        } while (wrong.term === correct.term);
+                        
                         displayedTerm = wrong.term;
                     }
+                    
                     this.queue.push({ 
                         imageSrc: correct.imageSrc, 
                         term: displayedTerm, 
                         isMatch: isMatch,
                         correctTerm: correct.term 
                     });
-                }
+                });
+
                 this.loadCard();
                 this.bindEvents();
             },
@@ -776,6 +851,7 @@
                     setTimeout(showStartScreen, 2000);
                     return;
                 }
+                // Queue behaves as a stack here (pop from end)
                 this.currentPair = this.queue.pop();
                 this.imgEl.src = this.currentPair.imageSrc;
                 this.termEl.textContent = this.currentPair.term;
@@ -1012,6 +1088,87 @@
                 setTimeout(() => {
                     this.loadWord();
                 }, 1500);
+            }
+        };
+
+        /*********************************************************
+         * GAME 5: FLASHCARD STUDY MODE
+         *********************************************************/
+        const flashcardGame = {
+            container: document.getElementById('flashcard-game-container'),
+            cardEl: null, // Will set in init
+            frontImg: null,
+            frontTerm: null,
+            backDef: null,
+            counter: null,
+            
+            cards: [],
+            index: 0,
+            isFlipped: false,
+
+            init: function() {
+                // Re-fetch elements FRESH to ensure no stale references if DOM updated
+                this.cardEl = document.getElementById('flashcard');
+                this.frontImg = document.getElementById('fc-front-img');
+                this.frontTerm = document.getElementById('fc-front-term');
+                this.backDef = document.getElementById('fc-back-def');
+                this.counter = document.getElementById('flashcard-counter');
+
+                this.cards = [...MASTER_VOCABULARY];
+                this.index = 0;
+                this.isFlipped = false;
+                this.renderCard();
+                this.bindEvents();
+            },
+
+            renderCard: function() {
+                const card = this.cards[this.index];
+                this.frontImg.src = card.imageSrc;
+                this.frontTerm.textContent = card.term;
+                this.backDef.textContent = card.definition;
+                this.counter.textContent = `Card ${this.index + 1} of ${this.cards.length}`;
+                
+                // Reset flip state
+                this.isFlipped = false;
+                this.cardEl.classList.remove('flipped');
+            },
+
+            flipCard: function() {
+                this.isFlipped = !this.isFlipped;
+                this.cardEl.classList.toggle('flipped');
+            },
+
+            nextCard: function() {
+                if (this.index < this.cards.length - 1) {
+                    this.index++;
+                    this.renderCard();
+                }
+            },
+
+            prevCard: function() {
+                if (this.index > 0) {
+                    this.index--;
+                    this.renderCard();
+                }
+            },
+
+            bindEvents: function() {
+                // Assign directly. If called multiple times, it just overwrites.
+                this.cardEl.onclick = (e) => {
+                    // Prevent bubbling if clicking inner interactive elements (though none here)
+                    this.flipCard();
+                };
+                document.getElementById('fc-flip-btn').onclick = () => this.flipCard();
+                document.getElementById('fc-next-btn').onclick = () => this.nextCard();
+                document.getElementById('fc-prev-btn').onclick = () => this.prevCard();
+
+                // Keyboard Nav
+                document.onkeydown = (e) => {
+                    if (containers.flashcard.classList.contains('hidden')) return;
+                    if (e.key === 'ArrowRight') this.nextCard();
+                    if (e.key === 'ArrowLeft') this.prevCard();
+                    if (e.key === ' ' || e.key === 'Enter') this.flipCard();
+                };
             }
         };
 
