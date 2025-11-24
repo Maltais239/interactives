@@ -3,107 +3,201 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vocabulary Game Creator</title>
+    <title>Vocabulary Game Arcade</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
         html, body {
             height: 100%;
             overflow: hidden;
         }
         body {
-            font-family: 'Poppins', sans-serif;
+            font-family: 'Outfit', sans-serif;
+            background-color: #f8fafc;
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 32px 32px;
             touch-action: none;
+            color: #1e293b;
         }
+        
+        /* Glassmorphism & UI Utils */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        
         canvas {
-            background-color: #f0f9ff;
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
             cursor: grab;
             display: block;
         }
-        .action-button {
-            transition: all 0.2s ease-in-out;
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            transition: all 0.2s ease;
         }
-        .action-button:hover:not(:disabled) {
-            transform: translateY(-3px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
         }
-        .action-button:disabled {
-            cursor: not-allowed;
-            opacity: 0.6;
+        .btn-secondary {
+            background: white;
+            border: 1px solid #e2e8f0;
+            color: #475569;
+            transition: all 0.2s ease;
         }
-        /* Styles for Quiz Game */
+        .btn-secondary:hover {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+            transform: translateY(-2px);
+        }
+        
+        /* Animations */
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
+            20% { transform: translateX(-4px) rotate(-2deg); }
+            40% { transform: translateX(4px) rotate(2deg); }
+            60% { transform: translateX(-2px); }
+            80% { transform: translateX(2px); }
         }
         .shake {
-            animation: shake 0.3s ease-in-out;
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
         }
+        
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.9); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .card-pop {
+            animation: popIn 0.3s ease-out forwards;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 </head>
-<body class="bg-gray-100 p-4 h-full w-full flex justify-center items-center">
+<body class="flex justify-center items-center p-4 sm:p-6">
 
-    <div id="app-container" class="w-full h-full max-w-7xl mx-auto flex flex-col text-center">
+    <div id="app-container" class="w-full h-full max-w-7xl mx-auto flex flex-col relative">
+        
         <!-- App Header -->
-        <header id="app-header" class="mb-4 flex-shrink-0">
-            <div class="bg-teal-600 text-white inline-block px-6 py-2 rounded-xl shadow-lg">
-                <h1 class="text-2xl font-bold">Vocabulary Game Creator</h1>
+        <header id="app-header" class="mb-6 flex-shrink-0 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white text-xl shadow-lg shadow-indigo-200">
+                    🕹️
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Vocabulary Arcade</h1>
+                    <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Import & Play</p>
+                </div>
+            </div>
+            
+            <!-- Header Actions -->
+            <div class="flex gap-3">
+                <button id="import-json-btn" class="btn-secondary px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    Import Set
+                </button>
+                <button id="download-html-btn" class="btn-secondary px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Save Game HTML
+                </button>
             </div>
         </header>
 
-        <!-- Start Screen -->
-        <section id="start-screen" class="p-4 rounded-xl flex-grow flex flex-col justify-center items-center">
-            <h2 id="start-title" class="text-xl font-semibold text-gray-700 mb-6">Import a custom set or play a sample game!</h2>
-            
-            <div class="flex flex-wrap justify-center items-center gap-4 mb-8">
-                 <button id="import-json-btn" class="action-button bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 text-lg rounded-lg shadow-md">Import Custom Set (.json)</button>
-                <button id="download-html-btn" class="action-button bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 text-lg rounded-lg shadow-md">Download Game (.html)</button>
-            </div>
-            <input type="file" id="json-importer" class="hidden" accept=".json">
+        <!-- Hidden File Input -->
+        <input type="file" id="json-importer" class="hidden" accept=".json">
 
-            <div class="grid md:grid-cols-2 gap-8 w-full max-w-4xl">
-                <!-- Game 1: Flashcard Match -->
-                <div class="bg-white p-6 rounded-lg shadow-md flex flex-col items-center">
-                    <h3 class="text-2xl font-bold text-gray-800 mb-4">Flashcard Match</h3>
-                    <p class="text-gray-600 mb-6">Drag the definition card onto its matching term card.</p>
-                    <button id="start-match-game-btn" class="action-button bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 text-lg rounded-lg shadow-md">Start Sample Game</button>
+        <!-- Start Screen -->
+        <section id="start-screen" class="flex-grow flex flex-col justify-center items-center relative z-10">
+            
+            <div class="text-center mb-10 max-w-2xl">
+                <h2 id="start-title" class="text-3xl font-bold text-slate-800 mb-3">Ready to Play?</h2>
+                <p class="text-slate-500 text-lg">Import a JSON file from the Flashcard Generator or play with the sample set below.</p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-6 w-full max-w-5xl">
+                <!-- Game 1 Card -->
+                <div class="group bg-white p-8 rounded-2xl shadow-sm hover:shadow-xl border border-slate-200 transition-all duration-300 flex flex-col items-center text-center relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-full h-1 bg-blue-500"></div>
+                    <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform">
+                        🧩
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">Match Master</h3>
+                    <p class="text-slate-500 mb-6 text-sm leading-relaxed">Drag definitions to their matching terms. Race against the clock to clear the board!</p>
+                    <button id="start-match-game-btn" class="btn-primary text-white w-full py-3 rounded-xl font-bold shadow-lg shadow-indigo-200">
+                        Play Match
+                    </button>
                 </div>
-                <!-- Game 2: Vocabulary Quiz -->
-                <div class="bg-white p-6 rounded-lg shadow-md flex flex-col items-center">
-                    <h3 class="text-2xl font-bold text-gray-800 mb-4">Vocabulary Quiz</h3>
-                    <p class="text-gray-600 mb-6">Read the definition at the top and click the matching term.</p>
-                    <button id="start-quiz-game-btn" class="action-button bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 text-lg rounded-lg shadow-md">Start Sample Game</button>
+
+                <!-- Game 2 Card -->
+                <div class="group bg-white p-8 rounded-2xl shadow-sm hover:shadow-xl border border-slate-200 transition-all duration-300 flex flex-col items-center text-center relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-full h-1 bg-orange-500"></div>
+                    <div class="w-16 h-16 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform">
+                        ⚡
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">Speed Quiz</h3>
+                    <p class="text-slate-500 mb-6 text-sm leading-relaxed">Read the hint at the top and spot the correct card instantly. Don't guess wrong!</p>
+                    <button id="start-quiz-game-btn" class="btn-primary text-white w-full py-3 rounded-xl font-bold shadow-lg shadow-indigo-200">
+                        Play Quiz
+                    </button>
                 </div>
             </div>
         </section>
         
         <!-- Game 1: Match Game Container -->
-        <main id="match-game-container" class="hidden w-full flex-grow flex flex-col items-center">
-            <div id="match-hud" class="flex justify-between items-center mb-2 text-gray-800 font-semibold text-lg w-full flex-shrink-0">
-                <div id="round-display">Round: 1</div>
-                <div id="timer-display">Time: 0s</div>
-                <div id="best-time-display">Best: N/A</div>
+        <main id="match-game-container" class="hidden w-full flex-grow flex flex-col items-center relative">
+            
+            <!-- HUD -->
+            <div class="w-full flex items-center justify-between mb-4 px-1">
+                <button class="main-menu-btn text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-2 text-sm">
+                    ← Exit
+                </button>
+                <div class="flex gap-4 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200 text-sm font-bold text-slate-600">
+                    <span id="round-display" class="text-indigo-600">Round 1</span>
+                    <span class="text-slate-300">|</span>
+                    <span id="timer-display">0s</span>
+                    <span class="text-slate-300">|</span>
+                    <span id="best-time-display">Best: --</span>
+                </div>
             </div>
-            <canvas id="game-canvas" class="w-full h-full mb-2"></canvas>
-            <button class="main-menu-btn action-button bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-5 rounded-lg shadow-md">Main Menu</button>
+
+            <!-- Canvas Wrapper -->
+            <div class="relative w-full flex-grow bg-slate-200/50 rounded-2xl border border-slate-200/60 p-1 shadow-inner overflow-hidden">
+                <canvas id="game-canvas" class="w-full h-full"></canvas>
+            </div>
         </main>
         
         <!-- Game 2: Quiz Game Container -->
         <main id="quiz-game-container" class="hidden w-full h-full flex-grow flex flex-col items-center">
-            <section id="hint-section" class="text-center mb-4 bg-white p-3 rounded-xl shadow-md w-full min-h-[60px] flex items-center justify-center">
-                 <p id="hint-text" class="text-lg font-semibold text-gray-700">Click start to play!</p>
-            </section>
-            <div id="card-container" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 w-full flex-grow overflow-y-auto p-2">
-                <!-- Quiz cards will be dynamically inserted here -->
+            
+            <!-- Top Bar -->
+            <div class="w-full flex items-center justify-between mb-4 px-1 flex-shrink-0">
+                <button class="main-menu-btn text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-2 text-sm">
+                    ← Exit
+                </button>
+                <div class="text-sm font-bold text-slate-400 uppercase tracking-wider">Select the match</div>
             </div>
-            <footer id="footer-section" class="text-center mt-4 flex-shrink-0">
-                 <button class="main-menu-btn action-button bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-5 rounded-lg shadow-md">Main Menu</button>
-            </footer>
+
+            <!-- Hint Box -->
+            <section id="hint-section" class="w-full max-w-3xl bg-white border border-indigo-100 p-6 rounded-2xl shadow-lg shadow-indigo-100/50 text-center mb-6 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+                <p class="text-xs font-bold text-indigo-500 uppercase tracking-wider mb-2">Find this Term</p>
+                <p id="hint-text" class="text-xl md:text-2xl font-bold text-slate-800">Click start to play!</p>
+            </section>
+
+            <!-- Grid -->
+            <div id="card-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 w-full max-w-6xl flex-grow overflow-y-auto p-2 pb-10">
+                <!-- Quiz cards injected here -->
+            </div>
         </main>
 
     </div>
@@ -165,16 +259,21 @@
                     const standardizedData = importedData.map(item => ({...item, imageSrc: item.imageSrc || item.image }));
 
                     if (!Array.isArray(standardizedData) || standardizedData.some(item => !item.term || !item.definition || !item.imageSrc)) {
-                       throw new Error("Invalid JSON format. Each item must have term, definition, and imageSrc.");
+                       throw new Error("Invalid JSON. Ensure your set has terms, definitions, and images.");
                     }
                     MASTER_VOCABULARY = standardizedData;
                     IS_CUSTOM_SET_LOADED = true;
-                    startTitle.textContent = `✅ ${MASTER_VOCABULARY.length} cards loaded! Ready to play!`;
-                    startMatchGameBtn.textContent = "Start Custom Game";
-                    startQuizGameBtn.textContent = "Start Custom Game";
+                    
+                    // Visual Feedback
+                    startTitle.innerHTML = `<span class="text-green-600">Success!</span> Loaded ${MASTER_VOCABULARY.length} Cards.`;
+                    importJsonButton.innerHTML = `Set Loaded (${MASTER_VOCABULARY.length})`;
+                    importJsonButton.classList.add('bg-green-100', 'text-green-700', 'border-green-200');
+                    
+                    startMatchGameBtn.textContent = "Play Custom Match";
+                    startQuizGameBtn.textContent = "Play Custom Quiz";
                 } catch (error) {
                     console.error("Failed to parse JSON:", error);
-                    startTitle.textContent = `❌ Error: ${error.message}`;
+                    startTitle.innerHTML = `<span class="text-red-500">Error:</span> ${error.message}`;
                 }
             };
             reader.readAsText(file);
@@ -185,18 +284,19 @@
             const currentVocabString = JSON.stringify(vocabToSave, null, 4);
             const fullHtml = document.documentElement.outerHTML;
             
-            // This replacement is tricky. We'll replace the default assignments.
+            // Inject current vocab into the downloaded file
             const vocabScriptSegment = `const DEFAULT_MATCH_VOCAB = ${currentVocabString};\n        const DEFAULT_QUIZ_VOCAB = [];\n        MASTER_VOCABULARY = DEFAULT_MATCH_VOCAB; IS_CUSTOM_SET_LOADED = true;`;
             const regex = /const DEFAULT_MATCH_VOCAB = \[[\s\S]*?\];\s*const DEFAULT_QUIZ_VOCAB = \[[\s\S]*?\];/;
             
             let modifiedHtml = fullHtml.replace(regex, vocabScriptSegment);
-            modifiedHtml = modifiedHtml.replace(/<title>.*<\/title>/, `<title>Flashcard Game</title>`);
+            // Clean title for saved file
+            modifiedHtml = modifiedHtml.replace(/<title>.*<\/title>/, `<title>Vocabulary Arcade Game</title>`);
 
 
             const blob = new Blob([modifiedHtml], { type: 'text/html' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = 'vocabulary-game.html';
+            link.download = 'vocab_game.html';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -230,8 +330,8 @@
             currentRound: 0,
             workingVocabulary: [],
             ROUND_SIZES: [],
-            CARD_WIDTH: 180,
-            CARD_HEIGHT: 140,
+            CARD_WIDTH: 200, // Slightly wider
+            CARD_HEIGHT: 150,
             PADDING: 20
         };
 
@@ -253,8 +353,11 @@
                 remaining -= roundSize;
             }
 
-            matchGame.canvas.width = matchGame.canvas.offsetWidth;
-            matchGame.canvas.height = matchGame.canvas.offsetHeight;
+            // Handle resize better
+            const parent = matchGame.canvas.parentElement;
+            matchGame.canvas.width = parent.offsetWidth;
+            matchGame.canvas.height = parent.offsetHeight;
+            
             startNextMatchRound();
         }
 
@@ -264,10 +367,10 @@
                 showFinalWinScreen();
                 return;
             }
-            matchGame.roundDisplay.textContent = `Round: ${matchGame.currentRound}`;
-            matchGame.timerDisplay.textContent = `Time: 0s`;
-            const bestTime = localStorage.getItem(`bestTime_round_${matchGame.currentRound}`) || 'N/A';
-            matchGame.bestTimeDisplay.textContent = `Best: ${bestTime === 'N/A' ? 'N/A' : bestTime + 's'}`;
+            matchGame.roundDisplay.textContent = `Round ${matchGame.currentRound}`;
+            matchGame.timerDisplay.textContent = `0s`;
+            const bestTime = localStorage.getItem(`bestTime_round_${matchGame.currentRound}`) || '--';
+            matchGame.bestTimeDisplay.textContent = `Best: ${bestTime === '--' ? '--' : bestTime + 's'}`;
             
             const vocabularyForRound = matchGame.workingVocabulary.splice(0, matchGame.ROUND_SIZES[matchGame.currentRound - 1]);
             preloadImages(vocabularyForRound, () => {
@@ -276,7 +379,7 @@
                 if (matchGame.timerInterval) clearInterval(matchGame.timerInterval);
                 matchGame.timerInterval = setInterval(() => {
                     matchGame.secondsElapsed++;
-                    matchGame.timerDisplay.textContent = `Time: ${matchGame.secondsElapsed}s`;
+                    matchGame.timerDisplay.textContent = `${matchGame.secondsElapsed}s`;
                 }, 1000);
                 drawMatchGame();
             });
@@ -304,24 +407,35 @@
         function setupMatchGameObjects(vocabulary) {
             matchGame.gameObjects = [];
             let placedObjects = [];
+            
+            // Simple logic to prevent overlaps on spawn
             const createObject = (item, type) => {
                 let newObj, overlapping;
+                let attempts = 0;
                 do {
                     overlapping = false;
+                    attempts++;
                     const x = matchGame.PADDING + Math.random() * (matchGame.canvas.width - matchGame.CARD_WIDTH - matchGame.PADDING * 2);
                     const y = matchGame.PADDING + Math.random() * (matchGame.canvas.height - matchGame.CARD_HEIGHT - matchGame.PADDING * 2);
                     newObj = {
                         id: `${item.term}-${type}`, term: item.term, type: type,
                         content: type === 'term' ? item.term : item.definition,
-                        x, y, width: matchGame.CARD_WIDTH, height: matchGame.CARD_HEIGHT, isMatched: false,
+                        x, y, width: matchGame.CARD_WIDTH, height: matchGame.CARD_HEIGHT, 
+                        isMatched: false,
+                        scale: 1,
+                        targetScale: 1
                     };
-                    for (const placed of placedObjects) {
-                        if (isOverlapping(newObj, placed)) { overlapping = true; break; }
+                    // Give up on overlap check after 100 tries to prevent freeze
+                    if(attempts < 100) {
+                        for (const placed of placedObjects) {
+                            if (isOverlapping(newObj, placed)) { overlapping = true; break; }
+                        }
                     }
-                } while (overlapping);
+                } while (overlapping && attempts < 100);
                 placedObjects.push(newObj);
                 return newObj;
             };
+            
             vocabulary.forEach(item => {
                 matchGame.gameObjects.push(createObject(item, 'term'));
                 matchGame.gameObjects.push(createObject(item, 'definition'));
@@ -331,41 +445,106 @@
         function drawMatchGame() {
             const { ctx, canvas, gameObjects, draggedObject } = matchGame;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            gameObjects.forEach(obj => { if (!obj.isMatched && obj !== draggedObject) drawCard(obj); });
+            
+            // Draw shadows first
+            gameObjects.forEach(obj => { 
+                if (!obj.isMatched) {
+                    drawCardShadow(ctx, obj, obj === draggedObject);
+                }
+            });
+
+            // Draw cards
+            gameObjects.forEach(obj => { 
+                if (!obj.isMatched && obj !== draggedObject) drawCard(obj); 
+            });
+            
+            // Draw dragged card last (on top)
             if (draggedObject) drawCard(draggedObject);
+        }
+
+        function drawCardShadow(ctx, obj, isDragging) {
+            const shadowOffset = isDragging ? 8 : 4;
+            const shadowBlur = isDragging ? 15 : 6;
+            const shadowColor = 'rgba(0,0,0,0.1)';
+            
+            ctx.shadowColor = shadowColor;
+            ctx.shadowBlur = shadowBlur;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = shadowOffset;
+            ctx.fillStyle = 'white';
+            
+            // Draw a dummy rect just to cast shadow
+            ctx.beginPath();
+            ctx.roundRect(obj.x, obj.y, obj.width, obj.height, 16);
+            ctx.fill();
+            
+            // Reset shadow
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
         }
 
         function drawCard(obj) {
             const { ctx, images } = matchGame;
-            ctx.lineWidth = 3;
-            ctx.fillStyle = obj.type === 'term' ? '#f3f4f6' : '#eef2ff';
-            ctx.strokeStyle = obj.type === 'term' ? '#4b5563' : '#6366f1';
+            
+            // Card Background
+            ctx.fillStyle = '#ffffff';
+            if(obj.type === 'term') {
+                 // Slight blue tint for terms
+                 // gradient
+                 const grd = ctx.createLinearGradient(obj.x, obj.y, obj.x, obj.y + obj.height);
+                 grd.addColorStop(0, '#ffffff');
+                 grd.addColorStop(1, '#f8fafc');
+                 ctx.fillStyle = grd;
+            } else {
+                 // Slight orange tint for definitions
+                 const grd = ctx.createLinearGradient(obj.x, obj.y, obj.x, obj.y + obj.height);
+                 grd.addColorStop(0, '#ffffff');
+                 grd.addColorStop(1, '#fff7ed');
+                 ctx.fillStyle = grd;
+            }
+
+            // Border
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = obj.type === 'term' ? '#e2e8f0' : '#fed7aa'; 
+            
             ctx.beginPath();
-            ctx.roundRect(obj.x, obj.y, obj.width, obj.height, [12]);
-            ctx.stroke();
+            ctx.roundRect(obj.x, obj.y, obj.width, obj.height, 16);
             ctx.fill();
-            ctx.fillStyle = '#1f2937';
+            ctx.stroke();
+
+            // Content
+            ctx.fillStyle = '#1e293b';
             ctx.textAlign = 'center';
 
             if (obj.type === 'term') {
                 const img = images[obj.term];
                 if (img) {
-                    const maxImgHeight = obj.height - 60;
-                    const maxImgWidth = obj.width - 20;
+                    const maxImgHeight = obj.height - 70;
+                    const maxImgWidth = obj.width - 30;
                     const scale = Math.min(maxImgWidth / img.width, maxImgHeight / img.height);
-                    ctx.drawImage(img, obj.x + (obj.width - img.width*scale) / 2, obj.y + 10, img.width*scale, img.height*scale);
+                    const drawWidth = img.width * scale;
+                    const drawHeight = img.height * scale;
+                    ctx.drawImage(img, obj.x + (obj.width - drawWidth) / 2, obj.y + 20, drawWidth, drawHeight);
                 }
-                ctx.font = 'bold 18px Poppins';
-                wrapText(ctx, obj.content, obj.x + obj.width / 2, obj.y + obj.height - 30, obj.width - 20, 20);
+                
+                // Accent bar at bottom
+                ctx.fillStyle = '#6366f1';
+                ctx.font = 'bold 16px Outfit';
+                wrapText(ctx, obj.content, obj.x + obj.width / 2, obj.y + obj.height - 25, obj.width - 20, 20);
             } else {
-                ctx.font = '16px Poppins';
-                wrapText(ctx, obj.content, obj.x + obj.width / 2, obj.y + obj.height / 2, obj.width - 20, 20);
+                // Definition text
+                ctx.fillStyle = '#ea580c'; // Orange text
+                ctx.font = '500 15px Outfit';
+                wrapText(ctx, obj.content, obj.x + obj.width / 2, obj.y + obj.height / 2, obj.width - 30, 22);
             }
         }
         
         function onMatchDown(evt) {
             if (!matchGame.timerInterval) return;
             const pos = getMousePos(matchGame.canvas, evt);
+            // Check matches in reverse order (top to bottom)
             for (let i = matchGame.gameObjects.length - 1; i >= 0; i--) {
                 const obj = matchGame.gameObjects[i];
                 if (!obj.isMatched && pos.x > obj.x && pos.x < obj.x + obj.width && pos.y > obj.y && pos.y < obj.y + obj.height) {
@@ -373,6 +552,9 @@
                     matchGame.offsetX = pos.x - obj.x;
                     matchGame.offsetY = pos.y - obj.y;
                     matchGame.canvas.style.cursor = 'grabbing';
+                    // Bring to front array-wise
+                    matchGame.gameObjects.push(matchGame.gameObjects.splice(i, 1)[0]);
+                    drawMatchGame();
                     break;
                 }
             }
@@ -392,8 +574,10 @@
                     obj.term === matchGame.draggedObject.term && isOverlapping(matchGame.draggedObject, obj));
 
                 if (dropTarget) {
+                    // Match Found!
                     matchGame.draggedObject.isMatched = true;
                     dropTarget.isMatched = true;
+                    // Nice particle effect here? (Simplified: just draw)
                 }
                 matchGame.draggedObject = null;
                 drawMatchGame();
@@ -406,13 +590,30 @@
             if (matchGame.gameObjects.every(obj => obj.isMatched)) {
                 clearInterval(matchGame.timerInterval);
                 matchGame.timerInterval = null;
+                
+                // Save Score
+                const key = `bestTime_round_${matchGame.currentRound}`;
+                const currentBest = localStorage.getItem(key);
+                if (!currentBest || matchGame.secondsElapsed < parseInt(currentBest)) {
+                    localStorage.setItem(key, matchGame.secondsElapsed);
+                }
+
                 const { ctx, canvas } = matchGame;
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                
+                // Overlay
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = 'white';
-                ctx.font = 'bold 40px Poppins';
+                
+                // Text
+                ctx.fillStyle = '#4f46e5';
+                ctx.font = 'bold 40px Outfit';
                 ctx.textAlign = 'center';
-                ctx.fillText(`Round ${matchGame.currentRound} Complete!`, canvas.width / 2, canvas.height / 2);
+                ctx.fillText(`Round Complete!`, canvas.width / 2, canvas.height / 2 - 10);
+                
+                ctx.fillStyle = '#64748b';
+                ctx.font = '20px Outfit';
+                ctx.fillText(`Next round starting...`, canvas.width / 2, canvas.height / 2 + 30);
+
                 setTimeout(startNextMatchRound, 2000);
             }
         }
@@ -421,9 +622,9 @@
             clearInterval(matchGame.timerInterval);
             matchGame.timerInterval = null;
             showStartScreen();
-            startTitle.textContent = "🎉 You completed the game! Well done! 🎉";
-            startMatchGameBtn.textContent = "Play Again";
-            startQuizGameBtn.textContent = "Play Again";
+            // Update start screen content to show win
+            startTitle.innerHTML = "🏆 Game Complete! 🏆";
+            importJsonButton.innerHTML = "Play Again";
         }
         
         // --- Shared Helper Functions ---
@@ -445,8 +646,10 @@
             }
         }
         function isOverlapping(rect1, rect2) {
-            return rect1.x < rect2.x + rect2.width && rect1.x + rect1.width > rect2.x &&
-                   rect1.y < rect2.y + rect2.height && rect1.y + rect1.height > rect2.y;
+            // A slightly tighter overlap check for better feel
+            const padding = 20; 
+            return rect1.x < rect2.x + rect2.width - padding && rect1.x + rect1.width > rect2.x + padding &&
+                   rect1.y < rect2.y + rect2.height - padding && rect1.y + rect1.height > rect2.y + padding;
         }
         function getMousePos(canvas, evt) {
             const rect = canvas.getBoundingClientRect();
@@ -465,7 +668,9 @@
             shuffledCards: [],
             currentCardIndex: 0,
             lockBoard: false,
-            borderColors: ['border-green-500', 'border-blue-500', 'border-orange-500', 'border-red-500', 'border-purple-500', 'border-cyan-500', 'border-yellow-500', 'border-lime-500']
+            // Modern palette
+            colors: ['bg-rose-50', 'bg-orange-50', 'bg-amber-50', 'bg-emerald-50', 'bg-teal-50', 'bg-cyan-50', 'bg-indigo-50', 'bg-violet-50'],
+            borders: ['border-rose-200', 'border-orange-200', 'border-amber-200', 'border-emerald-200', 'border-teal-200', 'border-cyan-200', 'border-indigo-200', 'border-violet-200']
         };
 
         function initQuizGame() {
@@ -486,10 +691,18 @@
 
         function displayNextQuizHint() {
             if (quizGame.currentCardIndex < quizGame.shuffledCards.length) {
-                quizGame.hintText.textContent = quizGame.shuffledCards[quizGame.currentCardIndex].definition;
+                quizGame.hintText.style.opacity = 0;
+                setTimeout(() => {
+                    quizGame.hintText.textContent = quizGame.shuffledCards[quizGame.currentCardIndex].definition;
+                    quizGame.hintText.style.opacity = 1;
+                    quizGame.hintText.style.transition = "opacity 0.5s ease";
+                }, 200);
             } else {
-                quizGame.hintText.textContent = "🎉 You found them all! 🎉";
+                quizGame.hintText.textContent = "🎉 All Found! Great job! 🎉";
                 quizGame.lockBoard = true;
+                setTimeout(() => {
+                    showFinalWinScreen();
+                }, 2000);
             }
         }
 
@@ -498,16 +711,28 @@
             const displayOrderCards = [...quizGame.shuffledCards].sort(() => Math.random() - 0.5);
 
             displayOrderCards.forEach((card, index) => {
-                const colorClass = quizGame.borderColors[index % quizGame.borderColors.length];
+                const colorClass = quizGame.colors[index % quizGame.colors.length];
+                const borderClass = quizGame.borders[index % quizGame.borders.length];
+                
                 const cardElement = document.createElement('div');
-                cardElement.classList.add('card', 'h-40', 'bg-white', 'rounded-xl', 'border-4', colorClass, 'shadow-md', 'overflow-hidden', 'cursor-pointer', 'relative');
+                cardElement.className = `card-pop h-48 ${colorClass} rounded-xl border-2 ${borderClass} shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-200 cursor-pointer relative overflow-hidden flex flex-col`;
                 cardElement.dataset.term = card.term;
+                
                 cardElement.innerHTML = `
-                    <div class="flex items-center justify-center h-2/3 p-1"><img src="${card.imageSrc}" alt="${card.term}" class="max-h-full max-w-full"></div>
-                    <div class="text-center bg-gray-50 py-1 h-1/3 flex items-center justify-center px-1"><h2 class="text-sm font-semibold text-gray-800">${card.term}</h2></div>
-                    <div class="absolute inset-0 bg-green-500 bg-opacity-75 flex items-center justify-center hidden is-correct-overlay">
-                        <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
-                    </div>`;
+                    <div class="flex-1 p-4 flex items-center justify-center">
+                        <img src="${card.imageSrc}" alt="${card.term}" class="max-h-full max-w-full object-contain drop-shadow-sm">
+                    </div>
+                    <div class="h-12 bg-white/50 backdrop-blur border-t border-black/5 flex items-center justify-center px-2">
+                        <h2 class="text-sm font-bold text-slate-700 text-center leading-tight">${card.term}</h2>
+                    </div>
+                    
+                    <!-- Overlay for Correct -->
+                    <div class="absolute inset-0 bg-emerald-500/90 backdrop-blur-sm flex items-center justify-center opacity-0 transition-opacity duration-300 is-correct-overlay pointer-events-none">
+                        <div class="bg-white text-emerald-600 rounded-full p-3 shadow-lg transform scale-0 transition-transform duration-300 checkmark">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                        </div>
+                    </div>
+                `;
                 cardElement.addEventListener('click', handleQuizCardClick);
                 quizGame.cardContainer.appendChild(cardElement);
             });
@@ -521,17 +746,25 @@
             const correctTerm = quizGame.shuffledCards[quizGame.currentCardIndex].term;
 
             if (clickedCard.dataset.term === correctTerm) {
-                clickedCard.classList.add('is-correct', 'pointer-events-none');
-                clickedCard.querySelector('.is-correct-overlay').classList.remove('hidden');
+                // Correct
+                clickedCard.classList.add('is-correct', 'ring-4', 'ring-emerald-400', 'ring-opacity-50', 'pointer-events-none');
+                const overlay = clickedCard.querySelector('.is-correct-overlay');
+                const checkmark = clickedCard.querySelector('.checkmark');
+                
+                overlay.classList.remove('opacity-0');
+                // Small delay for checkmark pop
+                setTimeout(() => checkmark.classList.remove('scale-0'), 50);
+                
                 quizGame.currentCardIndex++;
-                setTimeout(displayNextQuizHint, 700);
+                displayNextQuizHint();
             } else {
+                // Incorrect
                 quizGame.lockBoard = true;
-                clickedCard.classList.add('shake');
+                clickedCard.classList.add('shake', 'ring-4', 'ring-red-400', 'ring-opacity-50');
                 setTimeout(() => {
-                    clickedCard.classList.remove('shake');
+                    clickedCard.classList.remove('shake', 'ring-4', 'ring-red-400', 'ring-opacity-50');
                     quizGame.lockBoard = false;
-                }, 300);
+                }, 400);
             }
         }
         
@@ -550,5 +783,3 @@
     </script>
 </body>
 </html>
-
-
