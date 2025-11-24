@@ -1,0 +1,538 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { Heart, Square, Volume2, Check, RotateCcw, Plus, Trash2, Edit, Play, ArrowRight, Settings, Info, Save, Layers, LayoutGrid, Shuffle, ChevronLeft, ChevronRight, RefreshCw, Filter } from 'lucide-react';
+
+// --- DATA & HELPER FUNCTIONS ---
+
+const KNOWN_PATTERNS = {
+  'SAID': [{t:'S',y:'s'}, {t:'AI',y:'h'}, {t:'D',y:'s'}],
+  'THE': [{t:'TH',y:'s'}, {t:'E',y:'h'}],
+  'TO': [{t:'T',y:'s'}, {t:'O',y:'h'}],
+  'DO': [{t:'D',y:'s'}, {t:'O',y:'h'}],
+  'OF': [{t:'O',y:'h'}, {t:'F',y:'s'}],
+  'WAS': [{t:'W',y:'s'}, {t:'A',y:'h'}, {t:'S',y:'s'}],
+  'IS': [{t:'I',y:'s'}, {t:'S',y:'h'}], 
+  'HIS': [{t:'H',y:'s'}, {t:'I',y:'s'}, {t:'S',y:'h'}],
+  'AS': [{t:'A',y:'s'}, {t:'S',y:'h'}],
+  'HAS': [{t:'H',y:'s'}, {t:'A',y:'s'}, {t:'S',y:'h'}],
+  'ARE': [{t:'AR',y:'h'}, {t:'E',y:'s'}],
+  'WANT': [{t:'W',y:'s'}, {t:'A',y:'h'}, {t:'N',y:'s'}, {t:'T',y:'s'}],
+  'WHAT': [{t:'WH',y:'s'}, {t:'A',y:'h'}, {t:'T',y:'s'}],
+  'THEY': [{t:'TH',y:'s'}, {t:'EY',y:'h'}],
+  'COULD': [{t:'C',y:'s'}, {t:'OUL',y:'h'}, {t:'D',y:'s'}],
+  'WOULD': [{t:'W',y:'s'}, {t:'OUL',y:'h'}, {t:'D',y:'s'}],
+  'SHOULD': [{t:'SH',y:'s'}, {t:'OUL',y:'h'}, {t:'D',y:'s'}],
+  'YOUR': [{t:'Y',y:'s'}, {t:'OUR',y:'h'}],
+  'FOUR': [{t:'F',y:'s'}, {t:'OUR',y:'h'}],
+  'FROM': [{t:'F',y:'s'}, {t:'R',y:'s'}, {t:'O',y:'h'}, {t:'M',y:'s'}],
+  'HAVE': [{t:'H',y:'s'}, {t:'A',y:'s'}, {t:'V',y:'s'}, {t:'E',y:'h'}],
+  'GIVE': [{t:'G',y:'s'}, {t:'I',y:'s'}, {t:'V',y:'s'}, {t:'E',y:'h'}],
+  'LIVE': [{t:'L',y:'s'}, {t:'I',y:'s'}, {t:'V',y:'s'}, {t:'E',y:'h'}],
+  'LOVE': [{t:'L',y:'s'}, {t:'O',y:'h'}, {t:'V',y:'s'}, {t:'E',y:'h'}],
+  'SOME': [{t:'S',y:'s'}, {t:'O',y:'h'}, {t:'M',y:'s'}, {t:'E',y:'h'}],
+  'COME': [{t:'C',y:'s'}, {t:'O',y:'h'}, {t:'M',y:'s'}, {t:'E',y:'h'}],
+  'DONE': [{t:'D',y:'s'}, {t:'O',y:'h'}, {t:'N',y:'s'}, {t:'E',y:'h'}],
+  'GONE': [{t:'G',y:'s'}, {t:'O',y:'h'}, {t:'N',y:'s'}, {t:'E',y:'h'}],
+  'ONE': [{t:'ONE',y:'h'}],
+  'ONCE': [{t:'ONCE',y:'h'}],
+  'WHO': [{t:'WH',y:'h'}, {t:'O',y:'h'}],
+  'TWO': [{t:'T',y:'s'}, {t:'W',y:'h'}, {t:'O',y:'h'}],
+  'BEEN': [{t:'B',y:'s'}, {t:'EE',y:'h'}, {t:'N',y:'s'}],
+  'PUT': [{t:'P',y:'s'}, {t:'U',y:'h'}, {t:'T',y:'s'}],
+  'PUSH': [{t:'P',y:'s'}, {t:'U',y:'h'}, {t:'SH',y:'s'}],
+  'PULL': [{t:'P',y:'s'}, {t:'U',y:'h'}, {t:'LL',y:'s'}],
+  'FULL': [{t:'F',y:'s'}, {t:'U',y:'h'}, {t:'LL',y:'s'}],
+  'WALK': [{t:'W',y:'s'}, {t:'AL',y:'h'}, {t:'K',y:'s'}],
+  'TALK': [{t:'T',y:'s'}, {t:'AL',y:'h'}, {t:'K',y:'s'}],
+  'ANY': [{t:'A',y:'h'}, {t:'N',y:'s'}, {t:'Y',y:'s'}],
+  'MANY': [{t:'M',y:'s'}, {t:'A',y:'h'}, {t:'N',y:'s'}, {t:'Y',y:'s'}],
+  'AGAIN': [{t:'A',y:'s'}, {t:'G',y:'s'}, {t:'AI',y:'h'}, {t:'N',y:'s'}],
+  'PEOPLE': [{t:'P',y:'s'}, {t:'EO',y:'h'}, {t:'P',y:'s'}, {t:'LE',y:'s'}],
+  'FRIEND': [{t:'F',y:'s'}, {t:'R',y:'s'}, {t:'IE',y:'h'}, {t:'N',y:'s'}, {t:'D',y:'s'}],
+  'BECAUSE': [{t:'B',y:'s'}, {t:'E',y:'s'}, {t:'C',y:'s'}, {t:'AU',y:'h'}, {t:'SE',y:'s'}],
+  'DOES': [{t:'D',y:'s'}, {t:'OE',y:'h'}, {t:'S',y:'s'}],
+  'LAUGH': [{t:'L',y:'s'}, {t:'AU',y:'h'}, {t:'GH',y:'h'}],
+  'BEAUTY': [{t:'B',y:'s'}, {t:'EAU',y:'h'}, {t:'T',y:'s'}, {t:'Y',y:'s'}],
+  'SURE': [{t:'S',y:'h'}, {t:'URE',y:'s'}], 
+  'SUGAR': [{t:'S',y:'h'}, {t:'U',y:'h'}, {t:'G',y:'s'}, {t:'AR',y:'s'}],
+  'EYE': [{t:'EYE',y:'h'}],
+  'HEART': [{t:'H',y:'s'}, {t:'EAR',y:'h'}, {t:'T',y:'s'}],
+  'WATCH': [{t:'W',y:'s'}, {t:'A',y:'h'}, {t:'TCH',y:'s'}]
+};
+
+// Organized by PDF order which roughly correlates to levels
+const WORD_LEVELS = {
+  1: ["the", "you", "to", "do", "said", "of", "is", "his", "has", "as", "was", "want", "are", "what", "they", "could", "should", "would", "your", "were", "knew", "know", "about", "all", "talk", "walk", "two", "who", "many", "any", "from"],
+  2: ["front", "people", "off", "too", "been", "come", "some", "none", "done", "once", "one", "love", "above", "use", "does", "here", "there", "very", "where", "give", "have", "work", "live", "word", "world", "fourth", "four", "forty"],
+  3: ["today", "mother", "other", "brother", "another", "because", "father", "won", "son", "heart", "eye", "water", "watch", "truth", "their", "truly", "whom", "minute", "whose", "hour", "honest", "says", "honor", "great", "break", "fought", "thought", "bought", "brought", "push", "put", "pull"],
+  4: ["full", "listen", "often", "gone", "move", "pear", "pretty", "bear", "tear", "write", "wear", "again", "against", "almost", "friend", "though", "although", "always", "thorough", "among", "anyone", "ocean", "nothing", "buy", "build", "aunt", "built", "cousin"],
+  5: ["young", "toward", "touch", "enough", "rough", "laugh", "tough", "learn", "earth", "sugar", "early", "sure", "busy", "eight", "half", "weight", "straight", "door", "through", "poor", "floor", "prove", "shoe", "every", "woman", "false", "women", "cough"],
+  6: ["beauty", "backward", "beautiful", "forward", "imagine", "month", "whole", "doubt", "height", "guess", "business", "guest", "guide", "guard", "guy", "journey", "journal", "answer", "muscle", "sign", "island", "machine", "science", "character", "favorite", "breakfast", "Wednesday", "February"]
+};
+
+const generateInitialData = () => {
+  let allWords = [];
+  
+  Object.keys(WORD_LEVELS).forEach(level => {
+    const words = WORD_LEVELS[level];
+    const levelWords = words.map((word, index) => {
+      const upper = word.toUpperCase();
+      const cleanWord = upper.replace(/[^A-Z]/g, '');
+      
+      let segments = [];
+      if (KNOWN_PATTERNS[cleanWord]) {
+        segments = KNOWN_PATTERNS[cleanWord].map(p => ({ 
+          text: p.t, 
+          type: p.y === 'h' ? 'heart' : 'square' 
+        }));
+      } else {
+        segments = cleanWord.split('').map(char => ({ text: char, type: 'square' }));
+      }
+
+      return {
+        id: `w-l${level}-${index}-${cleanWord}`,
+        word: cleanWord,
+        level: parseInt(level),
+        segments: segments
+      };
+    });
+    allWords = [...allWords, ...levelWords];
+  });
+  
+  return allWords;
+};
+
+const INITIAL_DATA = generateInitialData();
+
+// Helper for dynamic text sizing
+const getWordFontSize = (word) => {
+  const len = word.length;
+  if (len > 12) return 'text-4xl md:text-5xl';
+  if (len > 9) return 'text-5xl md:text-6xl';
+  if (len > 6) return 'text-6xl md:text-7xl';
+  return 'text-7xl md:text-8xl';
+};
+
+const HeartWordMapper = () => {
+  const [activeTab, setActiveTab] = useState('flashcards');
+  const [globalWords, setGlobalWords] = useState(INITIAL_DATA);
+  const [selectedLevel, setSelectedLevel] = useState('all'); // 'all', 1, 2, 3, 4, 5, 6
+  
+  // --- FLASHCARD STATE ---
+  const [flashcardList, setFlashcardList] = useState(INITIAL_DATA);
+  const [flashcardIndex, setFlashcardIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [fcShuffled, setFcShuffled] = useState(false);
+
+  // --- MAPPER STATE ---
+  const [mapperList, setMapperList] = useState(INITIAL_DATA);
+  const [mapperIndex, setMapperIndex] = useState(0);
+  const [userMapping, setUserMapping] = useState([]);
+  const [feedback, setFeedback] = useState(null);
+  
+  // --- EDITOR STATE ---
+  const [isEditing, setIsEditing] = useState(false);
+  const [editWordInput, setEditWordInput] = useState('');
+  const [editSegments, setEditSegments] = useState([]);
+  const [editorSource, setEditorSource] = useState(null);
+
+  // Load/Save Global Words
+  useEffect(() => {
+    const saved = localStorage.getItem('heartWordData_v4');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setGlobalWords(parsed);
+      } catch (e) {}
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('heartWordData_v4', JSON.stringify(globalWords));
+  }, [globalWords]);
+
+  // Filter lists when Level or Global Data changes
+  useEffect(() => {
+    let filtered = globalWords;
+    if (selectedLevel !== 'all') {
+      filtered = globalWords.filter(w => w.level === selectedLevel);
+    }
+    
+    // Reset Flashcards
+    setFlashcardList(filtered);
+    setFlashcardIndex(0);
+    setIsFlipped(false);
+    setFcShuffled(false);
+
+    // Reset Mapper
+    setMapperList(filtered);
+    setMapperIndex(0);
+    setUserMapping([]);
+    setFeedback(null);
+  }, [selectedLevel, globalWords]);
+
+  // --- ACTIONS ---
+
+  const shuffleFlashcards = () => {
+    const shuffled = [...flashcardList].sort(() => Math.random() - 0.5);
+    setFlashcardList(shuffled);
+    setFlashcardIndex(0);
+    setFcShuffled(true);
+    setIsFlipped(false);
+  };
+
+  const resetFlashcards = () => {
+    let filtered = globalWords;
+    if (selectedLevel !== 'all') {
+      filtered = globalWords.filter(w => w.level === selectedLevel);
+    }
+    setFlashcardList(filtered);
+    setFlashcardIndex(0);
+    setFcShuffled(false);
+    setIsFlipped(false);
+  };
+
+  const nextFlashcard = () => {
+    if (flashcardIndex < flashcardList.length - 1) {
+      setFlashcardIndex(c => c + 1);
+      setIsFlipped(false);
+    }
+  };
+
+  const prevFlashcard = () => {
+    if (flashcardIndex > 0) {
+      setFlashcardIndex(c => c - 1);
+      setIsFlipped(false);
+    }
+  };
+
+  // Mapper
+  useEffect(() => {
+    if (mapperList[mapperIndex]) {
+      const w = mapperList[mapperIndex];
+      setUserMapping(w.segments.map(() => 'empty'));
+      setFeedback(null);
+    }
+  }, [mapperIndex, mapperList]);
+
+  const handleSegmentClick = (index) => {
+    if (feedback === 'correct') return;
+    setUserMapping(prev => {
+      const newMap = [...prev];
+      const current = newMap[index];
+      if (current === 'empty') newMap[index] = 'square';
+      else if (current === 'square') newMap[index] = 'heart';
+      else newMap[index] = 'empty';
+      return newMap;
+    });
+  };
+
+  const checkMapperAnswer = () => {
+    const currentWord = mapperList[mapperIndex];
+    const isCorrect = currentWord.segments.every((seg, idx) => seg.type === userMapping[idx]);
+    if (isCorrect) {
+      setFeedback('correct');
+      const audio = new Audio('https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg');
+      audio.volume = 0.2;
+      audio.play().catch(e => {});
+    } else {
+      setFeedback('incorrect');
+      setTimeout(() => setFeedback(null), 1000);
+    }
+  };
+
+  // Editor
+  const startEditing = (source) => {
+    setEditorSource(source);
+    const w = source === 'flashcards' ? flashcardList[flashcardIndex] : mapperList[mapperIndex];
+    setEditWordInput(w.word);
+    setEditSegments([...w.segments]);
+    setIsEditing(true);
+  };
+
+  const saveEdit = () => {
+    const currentList = editorSource === 'flashcards' ? flashcardList : mapperList;
+    const currentIndex = editorSource === 'flashcards' ? flashcardIndex : mapperIndex;
+    const wordId = currentList[currentIndex].id;
+
+    const updatedGlobal = globalWords.map(w => 
+      w.id === wordId ? { ...w, word: editWordInput, segments: editSegments } : w
+    );
+    setGlobalWords(updatedGlobal);
+    setIsEditing(false);
+  };
+
+  const editorMerge = (idx) => {
+    if (idx >= editSegments.length - 1) return;
+    const newSegs = [...editSegments];
+    newSegs[idx].text += newSegs[idx+1].text;
+    newSegs.splice(idx+1, 1);
+    setEditSegments(newSegs);
+  };
+
+  const editorSplit = (idx) => {
+    const seg = editSegments[idx];
+    if (seg.text.length <= 1) return;
+    const p1 = seg.text[0];
+    const p2 = seg.text.slice(1);
+    const newSegs = [...editSegments];
+    newSegs[idx] = { text: p1, type: seg.type };
+    newSegs.splice(idx+1, 0, { text: p2, type: seg.type });
+    setEditSegments(newSegs);
+  };
+
+  const editorToggleType = (idx) => {
+    const newSegs = [...editSegments];
+    newSegs[idx].type = newSegs[idx].type === 'square' ? 'heart' : 'square';
+    setEditSegments(newSegs);
+  };
+
+  const speakWord = (text) => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  return (
+    <div className="flex flex-col h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
+      
+      {/* HEADER & TABS */}
+      <div className="bg-white shadow-sm z-10">
+        {/* Level Selector Header */}
+        <div className="px-4 py-3 flex justify-between items-center border-b border-gray-100 bg-slate-50">
+          <div className="flex items-center gap-2 text-slate-600 font-medium text-sm">
+            <Filter size={16} />
+            <span className="hidden md:inline">Current Set:</span>
+          </div>
+          <select 
+            value={selectedLevel} 
+            onChange={(e) => setSelectedLevel(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+            className="bg-white border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2"
+          >
+            <option value="all">All Words (Mixed)</option>
+            <option value="1">Level 1 (Lessons 1-34)</option>
+            <option value="2">Level 2 (Lessons 35-53)</option>
+            <option value="3">Level 3 (Lessons 54-76)</option>
+            <option value="4">Level 4 (Lessons 77-100)</option>
+            <option value="5">Level 5 (Lessons 100+)</option>
+            <option value="6">Level 6 (Challenge)</option>
+          </select>
+        </div>
+
+        <div className="flex border-b border-gray-200">
+          <button 
+            onClick={() => setActiveTab('flashcards')}
+            className={`flex-1 py-4 text-sm md:text-base font-bold flex items-center justify-center gap-2 transition-all duration-300 ${
+              activeTab === 'flashcards' 
+                ? 'border-b-4 border-indigo-500 text-indigo-700 bg-indigo-50' 
+                : 'text-gray-400 hover:bg-gray-50'
+            }`}
+          >
+            <Layers size={20}/> Flashcards
+          </button>
+          <button 
+            onClick={() => setActiveTab('mapper')}
+            className={`flex-1 py-4 text-sm md:text-base font-bold flex items-center justify-center gap-2 transition-all duration-300 ${
+              activeTab === 'mapper' 
+                ? 'border-b-4 border-pink-500 text-pink-700 bg-pink-50' 
+                : 'text-gray-400 hover:bg-gray-50'
+            }`}
+          >
+            <LayoutGrid size={20}/> Word Mapper
+          </button>
+        </div>
+      </div>
+
+      {/* MAIN CONTENT */}
+      <div className="flex-1 flex flex-col relative overflow-hidden bg-slate-100">
+        
+        {/* EDITOR OVERLAY */}
+        {isEditing && (
+          <div className="absolute inset-0 bg-white/95 z-50 flex flex-col p-6 animate-in fade-in slide-in-from-bottom-10">
+            <h3 className="text-lg font-bold mb-6">Edit Word Segmentation</h3>
+            <div className="flex-1 flex flex-col items-center justify-center gap-8 overflow-y-auto">
+               <div className="flex flex-wrap justify-center gap-2">
+                 {editSegments.map((seg, idx) => (
+                   <div key={idx} className="flex flex-col items-center gap-2">
+                      <button onClick={() => editorToggleType(idx)} className={`p-4 rounded-xl border-2 text-2xl font-bold min-w-[3.5rem] ${seg.type === 'heart' ? 'bg-red-100 border-red-300 text-red-600' : 'bg-blue-100 border-blue-300 text-blue-600'}`}>
+                        {seg.text}
+                      </button>
+                      <div className="flex gap-1">
+                         {seg.text.length > 1 && <button onClick={() => editorSplit(idx)} className="text-xs bg-gray-200 px-2 rounded hover:bg-gray-300">Split</button>}
+                         {idx < editSegments.length - 1 && <button onClick={() => editorMerge(idx)} className="text-xs bg-gray-200 px-2 rounded hover:bg-gray-300">Merge</button>}
+                      </div>
+                   </div>
+                 ))}
+               </div>
+               <p className="text-sm text-gray-500 max-w-xs text-center">
+                 Use <b>Split/Merge</b> to group letters. Tap box to toggle <span className="text-blue-500 font-bold">Square</span>/<span className="text-red-500 font-bold">Heart</span>.
+               </p>
+            </div>
+            <div className="flex gap-4 mt-4">
+              <button onClick={() => setIsEditing(false)} className="flex-1 py-3 rounded-lg bg-gray-200 font-bold text-gray-700 hover:bg-gray-300">Cancel</button>
+              <button onClick={saveEdit} className="flex-1 py-3 rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold">Save Changes</button>
+            </div>
+          </div>
+        )}
+
+        {/* --- TAB 1: FLASHCARDS --- */}
+        {activeTab === 'flashcards' && (
+          <div className="flex flex-col h-full items-center justify-between p-4 md:p-8 animate-in fade-in duration-300">
+            
+            {/* Top Bar */}
+            <div className="w-full flex justify-between items-center text-gray-400 text-sm mb-4">
+               <span>Card {flashcardIndex + 1} of {flashcardList.length}</span>
+               {fcShuffled && <span className="flex items-center gap-1 text-indigo-500 font-medium"><Shuffle size={12}/> Shuffled</span>}
+            </div>
+
+            {/* Card Container */}
+            {flashcardList.length > 0 ? (
+            <div className="w-full max-w-2xl flex-1 flex flex-col justify-center perspective-1000 group cursor-pointer" onClick={() => setIsFlipped(!isFlipped)}>
+               <div className={`relative w-full aspect-[16/10] md:aspect-[16/9] transition-all duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+                 
+                 {/* FRONT */}
+                 <div className="absolute inset-0 backface-hidden bg-white rounded-3xl shadow-xl flex flex-col items-center justify-center border border-gray-100 p-4">
+                    <span className={`${getWordFontSize(flashcardList[flashcardIndex].word)} font-black text-slate-800 tracking-tight text-center break-words w-full`}>
+                      {flashcardList[flashcardIndex].word}
+                    </span>
+                    <p className="absolute bottom-8 text-gray-400 text-sm font-medium animate-pulse">Tap to Reveal</p>
+                 </div>
+
+                 {/* BACK */}
+                 <div className="absolute inset-0 backface-hidden bg-indigo-600 rounded-3xl shadow-xl flex flex-col items-center justify-center rotate-y-180 border-4 border-white p-4">
+                    <div className="flex flex-wrap justify-center items-end gap-2 mb-4">
+                        {flashcardList[flashcardIndex].segments.map((s, i) => (
+                          <div key={i} className="flex flex-col items-center">
+                            <span className="text-4xl md:text-5xl font-bold text-white mb-2">{s.text}</span>
+                            {s.type === 'heart' ? <Heart className="text-red-400 fill-red-400 animate-bounce" size={28} /> : <div className="w-7 h-7 bg-blue-400/50 rounded-md border-2 border-white/30" />}
+                          </div>
+                        ))}
+                    </div>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); startEditing('flashcards'); }}
+                      className="absolute top-4 right-4 p-2 text-white/50 hover:text-white hover:bg-white/20 rounded-full"
+                    >
+                      <Edit size={20}/>
+                    </button>
+                 </div>
+
+               </div>
+            </div>
+            ) : (
+                <div className="flex items-center justify-center h-full text-gray-400">No words in this level</div>
+            )}
+
+            {/* Controls */}
+            <div className="w-full max-w-2xl flex items-center justify-between mt-8">
+               <button onClick={prevFlashcard} disabled={flashcardIndex === 0} className="p-4 rounded-full bg-white shadow hover:bg-gray-50 text-gray-600 disabled:opacity-50">
+                 <ChevronLeft size={24}/>
+               </button>
+               
+               <div className="flex gap-4">
+                  <button onClick={fcShuffled ? resetFlashcards : shuffleFlashcards} className={`p-4 rounded-full shadow transition-all ${fcShuffled ? 'bg-indigo-100 text-indigo-600' : 'bg-white text-gray-500 hover:text-indigo-600'}`}>
+                    {fcShuffled ? <RefreshCw size={24}/> : <Shuffle size={24}/>}
+                  </button>
+                  <button onClick={() => speakWord(flashcardList[flashcardIndex]?.word || '')} className="p-4 rounded-full bg-white shadow text-indigo-600 hover:scale-110 transition-transform">
+                    <Volume2 size={24}/>
+                  </button>
+               </div>
+
+               <button onClick={nextFlashcard} disabled={flashcardIndex === flashcardList.length - 1} className="p-4 rounded-full bg-white shadow hover:bg-gray-50 text-gray-600 disabled:opacity-50">
+                 <ChevronRight size={24}/>
+               </button>
+            </div>
+
+          </div>
+        )}
+
+        {/* --- TAB 2: MAPPER --- */}
+        {activeTab === 'mapper' && (
+          <div className="flex flex-col h-full items-center justify-center p-4 bg-slate-50 animate-in fade-in duration-300">
+             
+             <div className="w-full flex justify-between items-center text-gray-400 text-sm mb-8 px-4 max-w-4xl">
+               <span>Word {mapperIndex + 1} of {mapperList.length}</span>
+               <button onClick={() => startEditing('mapper')} className="flex items-center gap-1 hover:text-indigo-600"><Edit size={14}/> Edit Word</button>
+             </div>
+
+            {mapperList.length > 0 ? (
+             <div className="flex flex-col items-center gap-8 w-full max-w-4xl flex-1 justify-center">
+               
+               {/* Word Display Area */}
+               <div className="flex flex-wrap justify-center gap-2 md:gap-6">
+                 {mapperList[mapperIndex].segments.map((seg, idx) => (
+                    <div key={idx} className="flex flex-col items-center gap-4">
+                      <div className="text-5xl md:text-7xl font-black text-slate-800 select-none">
+                        {seg.text}
+                      </div>
+                      <button
+                        onClick={() => handleSegmentClick(idx)}
+                        className={`
+                          w-14 h-14 md:w-20 md:h-20 rounded-2xl border-4 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md active:scale-95
+                          ${userMapping[idx] === 'empty' ? 'border-dashed border-slate-300 bg-white hover:bg-slate-50' : ''}
+                          ${userMapping[idx] === 'square' ? 'border-blue-500 bg-blue-500 text-white' : ''}
+                          ${userMapping[idx] === 'heart' ? 'border-red-500 bg-red-500 text-white' : ''}
+                        `}
+                      >
+                         {userMapping[idx] === 'square' && <div className="w-6 h-6 bg-white/30 rounded-sm" />}
+                         {userMapping[idx] === 'heart' && <Heart size={32} fill="currentColor" />}
+                      </button>
+                    </div>
+                 ))}
+               </div>
+
+               {/* Feedback Controls */}
+               <div className="h-20 flex items-center justify-center">
+                  {feedback === 'correct' ? (
+                    <div className="flex flex-col items-center gap-4 animate-in zoom-in">
+                        <div className="text-green-500 font-bold text-xl flex items-center gap-2"><Check/> Correct!</div>
+                        <button onClick={() => { if(mapperIndex < mapperList.length -1) setMapperIndex(i => i+1) }} className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2">
+                            Next Word <ArrowRight/>
+                        </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-4">
+                         <button onClick={() => speakWord(mapperList[mapperIndex].word)} className="p-3 bg-white border border-gray-200 rounded-full text-indigo-600 shadow-sm hover:scale-105 transition-transform">
+                            <Volume2 size={24}/>
+                         </button>
+                        <button onClick={checkMapperAnswer} className={`px-12 py-3 rounded-full font-bold text-xl shadow-md transition-all ${feedback === 'incorrect' ? 'bg-red-100 text-red-600 animate-shake' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
+                        {feedback === 'incorrect' ? 'Try Again' : 'Check'}
+                        </button>
+                    </div>
+                  )}
+               </div>
+
+             </div>
+             ) : (
+                <div className="flex-1 flex items-center justify-center text-gray-400">No words in this level</div>
+             )}
+
+             {/* Mapper Nav */}
+             <div className="w-full max-w-4xl flex justify-between items-center mt-auto py-6 px-4">
+                 <button onClick={() => {if(mapperIndex > 0) setMapperIndex(i => i-1)}} disabled={mapperIndex === 0} className="text-gray-400 hover:text-gray-800 disabled:opacity-20 flex items-center gap-2 font-bold"><ChevronLeft/> Prev</button>
+                 
+                 <div className="flex gap-1 h-1.5 bg-gray-200 rounded-full w-32 md:w-64 overflow-hidden">
+                    <div className="bg-pink-500 transition-all duration-300" style={{ width: `${((mapperIndex + 1) / mapperList.length) * 100}%` }}/>
+                 </div>
+
+                 <button onClick={() => {if(mapperIndex < mapperList.length - 1) setMapperIndex(i => i+1)}} disabled={mapperIndex === mapperList.length - 1} className="text-gray-400 hover:text-gray-800 disabled:opacity-20 flex items-center gap-2 font-bold">Next <ChevronRight/></button>
+             </div>
+          </div>
+        )}
+
+      </div>
+
+      <style>{`
+        .rotate-y-180 { transform: rotateY(180deg); }
+        .transform-style-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        .perspective-1000 { perspective: 1000px; }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+        .animate-shake { animation: shake 0.3s ease-in-out; }
+      `}</style>
+    </div>
+  );
+};
+
+export default HeartWordMapper;
