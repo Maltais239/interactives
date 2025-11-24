@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Flashcard Generator</title>
+    <title>Working AI Flashcard Generator Nov. 24</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- JSZip for creating zip files -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -38,33 +38,28 @@
         textarea::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         textarea::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-        /* --- Print Styles (PRESERVED EXACTLY) --- */
+        /* --- Print Styles --- */
         @media print {
-            /* --- FIX: --- */
-            /* Reset body layout and hide all direct children EXCEPT the main card container */
             body { 
                 background-color: #ffffff; 
                 background-image: none;
                 padding: 0 !important; 
                 margin: 0 !important; 
-                display: block; /* Turn off body flex layout */
+                display: block;
             }
             body > *:not(#main-container) {
                 display: none !important;
             }
             #main-container {
-                /* Reset spacing on the container itself */
                 padding: 0;
                 margin: 0;
-                display: block; /* Override flex */
+                display: block;
             }
-            /* --- THIS IS THE REAL FIX --- */
             #main-container > .page-container {
-                margin-top: 0 !important; /* Overrides space-y-8 */
+                margin-top: 0 !important; 
                 box-shadow: none !important;
                 border: none !important;
             }
-            /* --- End Fix --- */
             
             #controls, .regenerate-btn, .hint-input { display: none !important; }
             .page-container {
@@ -75,7 +70,18 @@
             .page-container:last-child { page-break-after: auto; }
             .card, .card-back { page-break-inside: avoid; border-width: 4px !important; }
             .card-label { color-adjust: exact; -webkit-print-color-adjust: exact; }
+            
              @page { size: landscape; margin: 0.5in; }
+
+            /* FIX: Remove padding and shadows from the image container and image */
+            .card .image-container {
+                padding: 0 !important; /* Remove the white frame */
+            }
+            .card .image-container img {
+                border: none !important; 
+                outline: none !important;
+                box-shadow: none !important; /* Remove any shadow artifact */
+            }
         }
     </style>
 </head>
@@ -245,9 +251,9 @@
                 cardData.image = newImageUrl;
 
                 if (newImageUrl) {
-                     imageContainer.innerHTML = `<img src="${newImageUrl}" alt="${cardData.term}" class="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500">`;
+                     imageContainer.innerHTML = `<img src="${newImageUrl}" alt="${cardData.term}" class="max-h-full max-w-full object-contain drop-shadow-sm">`;
                 } else {
-                     imageContainer.innerHTML = '<p class="text-red-400 font-bold text-sm">Failed</p>';
+                     imageContainer.innerHTML = '<p class="text-red-400 font-bold text-sm">Generation Failed</p>';
                 }
                
                 regenerateBtn.disabled = false;
@@ -357,7 +363,7 @@
                     if (imageUrl) {
                         imageContainer.innerHTML = `<img src="${imageUrl}" alt="${card.term}" class="max-h-full max-w-full object-contain drop-shadow-sm">`;
                     } else {
-                        imageContainer.innerHTML = '<span class="text-red-400 text-sm font-medium">Generation Failed</span>';
+                        imageContainer.innerHTML = '<p class="text-red-400 font-bold text-sm">Generation Failed</p>';
                     }
                 }
             });
@@ -381,20 +387,20 @@
         }
 
         document.getElementById('download-zip-btn').addEventListener('click', () => {
-            if (allCardsData.length === 0 || allCardsData.some(c => !c.image)) {
-                // IMPORTANT: Replacing alert() with console.error as per instructions
-                console.error('Please generate all flashcard images first!');
+            // Check if any data exists and if all cards have an image
+            const validCards = allCardsData.filter(c => c.image && c.image.startsWith('data:image/png'));
+            
+            if (validCards.length === 0) {
+                console.error('Download failed: Please generate flashcards and ensure images are created first.');
                 return;
             }
 
             const zip = new JSZip();
-            const promises = allCardsData.map(card => {
-                // With Pure AI, all images are data:image/png base64
-                if (card.image && card.image.startsWith('data:image/png')) {
-                    const base64Data = card.image.split(',')[1];
-                    const safeFilename = card.term.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-                    zip.file(`${safeFilename}.png`, base64Data, { base64: true });
-                }
+            const promises = validCards.map(card => {
+                const base64Data = card.image.split(',')[1];
+                // Sanitize filename
+                const safeFilename = card.term.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                zip.file(`${safeFilename}.png`, base64Data, { base64: true });
                 return Promise.resolve();
             });
 
@@ -406,25 +412,38 @@
         });
 
         document.getElementById('export-json-btn').addEventListener('click', () => {
-            if (allCardsData.length === 0 || allCardsData.some(c => !c.image)) {
-                // IMPORTANT: Replacing alert() with console.error as per instructions
-                console.error('Please generate all flashcard images first!');
+            if (allCardsData.length === 0) {
+                console.error('Export failed: No flashcard data has been generated yet.');
                 return;
             }
             
-            const exportData = allCardsData.map(({ term, definition, image }) => ({ term, definition, imageSrc: image }));
+            // Only export data that has a term and definition
+            const exportData = allCardsData
+                .filter(c => c.term && c.definition)
+                .map(({ term, definition, image }) => ({ 
+                    term, 
+                    definition, 
+                    // Export imageSrc only if it exists
+                    imageSrc: image || 'N/A' 
+                }));
+            
+            if (exportData.length === 0) {
+                console.error('Export failed: No valid flashcard data found.');
+                return;
+            }
+
             const jsonString = JSON.stringify(exportData, null, 2);
             const blob = new Blob([jsonString], { type: 'application/json' });
             triggerDownload(blob, 'flashcard-data.json');
         });
 
-        // --- STOLEN CODE: Print function from index (39).html ---
+        // --- Print function ---
         function saveForPrinting() {
              if (allCardsData.length === 0) {
                 console.warn('Cannot print: No flashcards have been generated yet.');
                 return;
             }
-            // EXACT copy of your desired print template logic, just ensuring font ref matches main doc
+            
              const printableHtml = `
 <!DOCTYPE html>
 <html lang="en">
@@ -439,32 +458,28 @@
     <style>
         body { font-family: 'Outfit', sans-serif; }
         @media print {
-            /* --- FIX: --- */
-            /* Reset body layout and hide all direct children EXCEPT the main card container */
+            /* Full page print overrides */
             body { 
                 background-color: #ffffff; 
                 padding: 0 !important; 
                 margin: 0 !important; 
-                display: block; /* Turn off body flex layout */
+                display: block;
             }
             body > *:not(#main-container) {
                 display: none !important;
             }
             #main-container {
-                /* Reset spacing on the container itself */
                 padding: 0;
                 margin: 0;
-                display: block; /* Override flex */
+                display: block;
             }
-            /* --- THIS IS THE REAL FIX --- */
             #main-container > .page-container {
                 margin-top: 0 !important; 
                 box-shadow: none !important;
                 border: none !important;
             }
-            /* --- End Fix --- */
 
-            /* Note: #instructions is replaced by #controls in the main app, hiding controls works the same */
+            /* Card structure overrides */
             #controls, .regenerate-btn, .hint-input { display: none !important; } 
             .page-container {
                 box-shadow: none; width: 100%; height: 100%;
@@ -475,22 +490,28 @@
             .card, .card-back { page-break-inside: avoid; border-width: 4px !important; }
             .card-label { color-adjust: exact; -webkit-print-color-adjust: exact; }
             @page { size: landscape; margin: 0.5in; }
+            
+            /* The fix for the image box */
+            .card .image-container {
+                padding: 0 !important; 
+            }
+            .card .image-container img {
+                border: none !important; 
+                outline: none !important;
+                box-shadow: none !important; 
+            }
         }
     </style>
 </head>
 <body class="p-8 flex flex-col items-center space-y-8">
-    <!-- NOTE: Instructions div from original template is omitted, but you can see how it was written below -->
-    <!-- <div id="instructions" class="w-full max-w-5xl p-4 bg-indigo-100 border-l-4 border-indigo-500 text-indigo-700 rounded-lg shadow-md">
-        <h2 class="font-bold">Instructions</h2>
-        <p>To print, press Ctrl+P or Cmd+P and choose "Save as PDF" for best results.</p>
-    </div> -->
-    <div id="main-container" class="w-full flex flex-col items-center space-y-8">${document.getElementById('main-container').innerHTML}</div>
+    
+
+<div id="main-container" class="w-full flex flex-col items-center space-y-8">${document.getElementById('main-container').innerHTML}</div>
 </body>
 </html>`;
             const blob = new Blob([printableHtml.trim()], { type: 'text/html' });
             triggerDownload(blob, 'flashcards-for-printing.html');
         }
-        // --- END STOLEN CODE ---
 
         document.getElementById('save-btn').addEventListener('click', saveForPrinting);
     </script>
