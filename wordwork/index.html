@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vocabulary Worksheet</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Font: Patrick Hand for the handwriting look -->
+    <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- html2pdf.js for direct PDF download -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <style>
+        .font-handwriting {
+            font-family: 'Patrick Hand', cursive, sans-serif;
+        }
+        
+        /* Custom styles for lined paper background */
+        .bg-lines {
+            background-image: linear-gradient(transparent 95%, #e5e7eb 95%);
+            background-size: 100% 3rem;
+            line-height: 3rem;
+        }
+
+        /* Print specific overrides */
+        @media print {
+            @page {
+                margin: 0.5cm;
+                size: portrait;
+            }
+            
+            body { 
+                background-color: white !important; 
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .no-print { display: none !important; }
+            
+            /* Ensure the worksheet fits the printed page width */
+            #worksheet-container {
+                box-shadow: none !important;
+                width: 100% !important;
+                max-width: none !important;
+                border-width: 4px !important;
+                margin: 0 !important;
+            }
+            
+            /* Hide inputs and show static text divs during standard print */
+            textarea, input {
+                display: none !important;
+            }
+            .print-text-display {
+                display: block !important;
+                white-space: pre-wrap;
+            }
+        }
+
+        /* Helper class to show text only during print/pdf generation */
+        .print-text-display {
+            display: none;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Patrick Hand', cursive, sans-serif;
+            pointer-events: none;
+            color: black;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-100 p-4 md:p-8 font-sans">
+
+    <!-- Controls (Hidden when printing) -->
+    <div class="max-w-4xl mx-auto mb-6 flex flex-wrap justify-between items-center gap-3 no-print">
+        <!-- Dictionary Link -->
+        <a href="https://www.merriam-webster.com/kids" target="_blank" class="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-bold text-lg underline decoration-2 underline-offset-2 transition-colors">
+            <i class="fas fa-book-open"></i> Dictionary for Kids
+        </a>
+
+        <!-- Action Buttons -->
+        <div class="flex gap-3">
+            <button type="button" onclick="showClearModal()" class="flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition-colors border-2 border-transparent hover:border-red-300 font-bold cursor-pointer">
+                <i class="fas fa-trash-alt"></i> Clear
+            </button>
+            <button type="button" onclick="downloadPDF()" class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md transition-transform hover:scale-105 font-bold cursor-pointer">
+                <i class="fas fa-file-pdf"></i> Download PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Worksheet Container -->
+    <div id="worksheet-container" class="max-w-4xl mx-auto bg-white border-4 border-black p-6 shadow-[10px_10px_0px_0px_rgba(0,0,0,0.2)]">
+        
+        <!-- Name Header -->
+        <div class="mb-8">
+            <div class="relative border-4 border-black rounded-lg bg-gray-50 p-1">
+                <!-- Label with z-index to stay on top -->
+                <div class="absolute -top-3 left-4 bg-white px-2 font-black text-xl tracking-tighter uppercase border-2 border-black transform -rotate-1 z-10">
+                    NAME:
+                </div>
+                <div class="relative w-full h-12">
+                    <!-- Input: Added data-html2canvas-ignore to preventing ghosting -->
+                    <input 
+                        type="text" 
+                        id="input-name"
+                        class="w-full h-full pl-32 pr-4 text-2xl font-handwriting bg-transparent border-none outline-none focus:ring-0 placeholder-gray-300 absolute top-0 left-0"
+                        placeholder="Your Name Here..."
+                        oninput="updatePrintText('name')"
+                        data-html2canvas-ignore="true"
+                    >
+                    <!-- Static text for print - Centered with Flexbox to match input -->
+                    <div id="print-name" class="print-text-display pl-32 pr-4 text-2xl flex items-center h-full"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grid Layout -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            <!-- Section 1: WORD (Spiral Notebook Style) -->
+            <div class="relative group">
+                <div class="h-full bg-white border-4 border-black rounded-sm p-6 pt-12 relative shadow-[5px_5px_0px_0px_rgba(0,0,0,0.1)] transition-all">
+                    <!-- Spiral Binding Visuals -->
+                    <div class="absolute top-0 left-0 w-full h-8 flex justify-evenly items-end px-4 z-10 pointer-events-none">
+                        <div class="w-4 h-8 border-4 border-black rounded-full bg-white -mt-4 transform -rotate-12"></div>
+                        <div class="w-4 h-8 border-4 border-black rounded-full bg-white -mt-4 transform -rotate-12"></div>
+                        <div class="w-4 h-8 border-4 border-black rounded-full bg-white -mt-4 transform -rotate-12"></div>
+                        <div class="w-4 h-8 border-4 border-black rounded-full bg-white -mt-4 transform -rotate-12"></div>
+                        <div class="w-4 h-8 border-4 border-black rounded-full bg-white -mt-4 transform -rotate-12"></div>
+                        <div class="w-4 h-8 border-4 border-black rounded-full bg-white -mt-4 transform -rotate-12"></div>
+                        <div class="w-4 h-8 border-4 border-black rounded-full bg-white -mt-4 transform -rotate-12"></div>
+                        <div class="w-4 h-8 border-4 border-black rounded-full bg-white -mt-4 transform -rotate-12"></div>
+                    </div>
+                    
+                    <div class="bg-black text-white inline-block px-3 py-1 font-black text-2xl uppercase transform -rotate-2 absolute top-10 left-[-10px] z-20 shadow-sm border-2 border-white">
+                        WORD:
+                    </div>
+
+                    <div class="relative w-full h-48 mt-4">
+                        <textarea 
+                            id="input-word"
+                            class="w-full h-full p-4 text-4xl text-center resize-none border-b-2 border-gray-200 outline-none focus:bg-yellow-50 font-handwriting leading-relaxed absolute top-0 left-0"
+                            placeholder="Write word..."
+                            oninput="updatePrintText('word')"
+                            data-html2canvas-ignore="true"
+                        ></textarea>
+                         <!-- Static text for print -->
+                         <div id="print-word" class="print-text-display p-4 text-4xl text-center leading-relaxed flex items-center justify-center"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 2: DEFINITION (Note Paper Style) -->
+            <div class="relative group">
+                <div class="h-full bg-white border-4 border-black p-6 relative shadow-[5px_5px_0px_0px_rgba(0,0,0,0.1)] transition-all">
+                    <!-- Holes on the left -->
+                    <div class="absolute top-0 bottom-0 left-3 flex flex-col justify-evenly pointer-events-none">
+                        <div class="w-4 h-4 rounded-full border-2 border-black bg-gray-200"></div>
+                        <div class="w-4 h-4 rounded-full border-2 border-black bg-gray-200"></div>
+                        <div class="w-4 h-4 rounded-full border-2 border-black bg-gray-200"></div>
+                    </div>
+
+                    <div class="bg-black text-white inline-block px-3 py-1 font-black text-2xl uppercase transform rotate-1 absolute -top-4 right-4 z-20">
+                        DEFINITION:
+                    </div>
+
+                    <div class="ml-6 h-full border-l-2 border-red-200 pl-4">
+                        <div class="relative w-full h-48">
+                            <textarea 
+                                id="input-definition"
+                                class="w-full h-full p-2 text-xl resize-none outline-none focus:bg-blue-50 font-handwriting bg-lines absolute top-0 left-0 leading-[3rem]"
+                                placeholder="What does it mean?"
+                                oninput="updatePrintText('definition')"
+                                data-html2canvas-ignore="true"
+                            ></textarea>
+                            <!-- Static text for print - Use padding to align with lines -->
+                            <div id="print-definition" class="print-text-display p-2 text-xl leading-[3rem] bg-lines"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Decorative Pencil Divider (Visible on desktop) -->
+            <div class="hidden md:flex col-span-2 justify-center py-2 relative">
+                <div class="w-full max-w-md h-8 bg-yellow-400 border-4 border-black rounded-r-full relative flex items-center shadow-md">
+                    <div class="w-12 h-full bg-pink-400 border-r-4 border-black"></div> <!-- Eraser -->
+                    <div class="w-8 h-full bg-gray-300 border-r-4 border-black"></div> <!-- Ferrule -->
+                    <div class="flex-grow"></div>
+                    <div class="w-0 h-0 border-t-[14px] border-t-transparent border-b-[14px] border-b-transparent border-l-[30px] border-l-yellow-400 absolute -right-6"></div> <!-- Wood tip base -->
+                    <div class="w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-l-[12px] border-l-black absolute -right-[34px] top-1.5 z-10"></div> <!-- Lead tip -->
+                </div>
+            </div>
+
+            <!-- Section 3: SENTENCE (Book Style) -->
+            <div class="relative group">
+                <!-- Book top pages effect -->
+                <div class="absolute -top-2 left-2 right-2 h-4 bg-white border-4 border-black border-b-0 rounded-t-sm z-0"></div>
+                
+                <div class="h-full bg-white border-4 border-black p-6 relative z-10 shadow-[5px_5px_0px_0px_rgba(0,0,0,0.1)] transition-all rounded-b-sm">
+                    
+                    <div class="bg-black text-white inline-block px-3 py-1 font-black text-2xl uppercase transform rotate-1 absolute top-4 -left-3 z-20 shadow-md">
+                        SENTENCE:
+                    </div>
+
+                    <div class="mt-8 border-l-4 border-gray-300 pl-4 h-full">
+                        <div class="relative w-full h-48">
+                            <textarea 
+                                id="input-sentence"
+                                class="w-full h-full p-2 text-xl resize-none outline-none focus:bg-green-50 font-handwriting italic absolute top-0 left-0"
+                                placeholder="Use the word in a sentence..."
+                                oninput="updatePrintText('sentence')"
+                                data-html2canvas-ignore="true"
+                            ></textarea>
+                             <!-- Static text for print -->
+                             <div id="print-sentence" class="print-text-display p-2 text-xl italic"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 4: SYNONYM (Clipboard Style) -->
+            <div class="relative group pt-4">
+                <!-- Clipboard Clip -->
+                <div class="absolute -top-4 left-1/2 transform -translate-x-1/2 w-32 h-12 bg-gray-200 border-4 border-black rounded-lg z-20 flex items-center justify-center shadow-sm">
+                    <div class="w-4 h-4 rounded-full bg-white border-4 border-black"></div>
+                </div>
+
+                <div class="h-full bg-white border-4 border-black p-6 pt-10 relative shadow-[5px_5px_0px_0px_rgba(0,0,0,0.1)] transition-all rounded-xl">
+                    
+                    <div class="bg-black text-white inline-block px-3 py-1 font-black text-2xl uppercase transform -rotate-1 absolute top-8 left-4 z-20">
+                        SYNONYM:
+                    </div>
+
+                    <div class="relative w-full h-48 mt-8">
+                        <textarea 
+                            id="input-synonym"
+                            class="w-full h-full p-4 text-3xl text-center resize-none outline-none focus:bg-purple-50 font-handwriting border-2 border-dashed border-gray-300 rounded-lg absolute top-0 left-0"
+                            placeholder="Similar word..."
+                            oninput="updatePrintText('synonym')"
+                            data-html2canvas-ignore="true"
+                        ></textarea>
+                         <!-- Static text for print -->
+                         <div id="print-synonym" class="print-text-display p-4 text-3xl text-center flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Custom Modal for Clear Confirmation -->
+    <div id="clear-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden flex items-center justify-center z-50 transition-opacity">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4 border-4 border-black">
+            <h3 class="text-xl font-bold mb-4 font-sans text-center">Clear Worksheet?</h3>
+            <p class="mb-6 text-gray-700 text-center">This will erase everything you've written. Are you sure?</p>
+            <div class="flex justify-center gap-4">
+                <button type="button" onclick="closeClearModal()" class="px-4 py-2 text-gray-700 font-bold hover:bg-gray-200 rounded-lg border-2 border-transparent transition-colors">
+                    Cancel
+                </button>
+                <button type="button" onclick="performClear()" class="px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-md transition-transform hover:scale-105">
+                    Yes, Clear
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // Make functions globally accessible by attaching to window
+        window.updatePrintText = function(id) {
+            const inputVal = document.getElementById('input-' + id).value;
+            // Use textContent for safety
+            document.getElementById('print-' + id).innerText = inputVal;
+        };
+
+        // Modal Logic replacement for confirm()
+        window.showClearModal = function() {
+            const modal = document.getElementById('clear-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        };
+
+        window.closeClearModal = function() {
+            const modal = document.getElementById('clear-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        };
+
+        window.performClear = function() {
+            const inputs = ['name', 'word', 'definition', 'sentence', 'synonym'];
+            inputs.forEach(id => {
+                const el = document.getElementById('input-' + id);
+                if (el) {
+                    el.value = '';
+                    window.updatePrintText(id); // Clear the print view too
+                }
+            });
+            window.closeClearModal();
+        };
+
+        window.downloadPDF = function() {
+            // 1. Prepare for PDF generation
+            const element = document.getElementById('worksheet-container');
+            const originalShadow = element.style.boxShadow;
+            
+            // 2. Hide inputs, show static divs MANUALLY
+            // We do this by adding a temporary class to the container that CSS targets
+            element.classList.add('pdf-mode');
+
+            // Access the inputs and display divs manually to toggle visibility for html2pdf capture
+            // Note: with data-html2canvas-ignore on inputs, we just need to ensure the print divs are visible.
+            const printDivs = document.querySelectorAll('.print-text-display');
+            
+            // We only need to show the print divs. The inputs will be ignored by the library.
+            printDivs.forEach(el => el.style.display = 'block');
+            
+            // Remove shadow for clean PDF
+            element.style.boxShadow = 'none';
+
+            // 3. Generate PDF
+            const studentName = document.getElementById('input-name').value.trim();
+            const filename = studentName ? `Worksheet-${studentName}.pdf` : 'Vocabulary-Worksheet.pdf';
+
+            const opt = {
+                margin:       0.3,
+                filename:     filename,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true }, 
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                // 4. Cleanup / Restore State
+                element.style.boxShadow = originalShadow;
+                element.classList.remove('pdf-mode');
+                
+                // Revert to stylesheet default (inputs visible, print divs hidden)
+                printDivs.forEach(el => el.style.display = ''); 
+            });
+        };
+
+        // Initialize on load
+        window.onload = function() {
+            const inputs = ['name', 'word', 'definition', 'sentence', 'synonym'];
+            inputs.forEach(id => window.updatePrintText(id));
+        };
+    </script>
+</body>
+</html>
