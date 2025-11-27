@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Treaty Explorer: Student Research Edition</title>
+  
+  <!-- Load Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <!-- Load 'Poppins' Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    /* --- CLEAN & MODERN THEME --- */
+    :root {
+      --primary-color: #0284c7; /* Stronger Blue */
+      --secondary-color: #7c3aed; /* Deep Purple */
+      --accent-color: #e11d48; /* Red for emphasis */
+      --bg-color: #f8fafc; /* Slate white bg */
+      --card-bg: #ffffff;
+      --text-color: #334155;
+    }
+
+    body, html { 
+      margin: 0; 
+      padding: 0; 
+      width: 100%; 
+      height: 100%; 
+      display: flex; 
+      font-family: 'Poppins', sans-serif; /* Clean font */
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      overflow: hidden;
+    }
+    
+    /* Responsive layout */
+    @media (max-width: 768px) {
+      body, html { flex-direction: column; }
+      #map { height: 50%; width: 100%; border-radius: 0 0 20px 20px; }
+      #info-panel { width: 100%; height: 50%; padding: 1rem; }
+      h1 { font-size: 1.5rem; }
+    }
+
+    /* Map container */
+    #map { 
+      flex: 1; 
+      height: 100%; 
+      z-index: 1;
+    }
+    
+    /* Info panel container */
+    #info-panel { 
+      width: 480px; 
+      max-width: 100%;
+      padding: 2rem; 
+      background: var(--card-bg); 
+      box-shadow: -5px 0 20px rgba(0,0,0,0.08); 
+      display: flex; 
+      flex-direction: column; 
+      overflow-y: auto;
+      border-left: 6px solid var(--primary-color);
+      position: relative;
+    }
+
+    /* Typography */
+    h1 { 
+      color: var(--secondary-color); 
+      font-size: 1.8rem; 
+      margin-top: 0;
+      margin-bottom: 0.5rem;
+      text-align: center;
+      font-weight: 700;
+    }
+    
+    h2 {
+      color: var(--primary-color);
+      font-size: 1.6rem;
+      margin-bottom: 0.5rem;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 8px;
+    }
+
+    h3 {
+      background-color: #e0f2fe;
+      color: #0369a1;
+      padding: 6px 12px;
+      border-radius: 8px;
+      display: inline-block;
+      margin: 1.2rem 0 0.5rem 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    p {
+      font-size: 1rem;
+      line-height: 1.6;
+      margin-bottom: 0.8rem;
+    }
+    
+    /* Research Card Styles */
+    .fact-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 15px;
+    }
+    
+    .fact-item {
+        background: #f1f5f9;
+        padding: 12px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        border: 1px solid #cbd5e1;
+    }
+    
+    .fact-label {
+        font-weight: 700;
+        color: #64748b;
+        display: block;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+    }
+
+    /* Special Gift Box */
+    .gift-box {
+        background-color: #ecfdf5; /* Light green */
+        border: 2px dashed #10b981;
+        padding: 15px;
+        border-radius: 12px;
+        margin-top: 15px;
+    }
+
+    /* "Primary Source" Box Styles */
+    .primary-source-box {
+      background-color: #fff1f2; /* Light pink background */
+      border-left: 4px solid var(--accent-color);
+      padding: 1rem;
+      margin-top: 1.5rem;
+      border-radius: 0 8px 8px 0;
+    }
+    
+    .primary-source-badge {
+      font-weight: bold;
+      color: var(--accent-color);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+      display: block;
+    }
+
+    /* Button styles */
+    .reset-btn {
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 50px;
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: auto;
+      align-self: center;
+      transition: all 0.2s;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .reset-btn:hover {
+      transform: translateY(-2px);
+      background-color: #0369a1;
+      box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+    }
+    
+    .source-btn {
+        display: inline-block;
+        background-color: #334155;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        margin-top: 10px;
+        text-decoration: none;
+        transition: background 0.2s;
+    }
+    .source-btn:hover { background-color: #0f172a; text-decoration: none; }
+
+    /* Custom Scrollbar */
+    #info-panel::-webkit-scrollbar { width: 8px; }
+    #info-panel::-webkit-scrollbar-track { background: transparent; }
+    #info-panel::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    #info-panel::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Leaflet Popup overrides */
+    .leaflet-popup-content-wrapper { border-radius: 8px; }
+    .leaflet-popup-content { font-family: 'Poppins', sans-serif; font-size: 1rem; font-weight: 600; text-align: center;}
+  </style>
+</head>
+<body>
+
+  <!-- Map Div -->
+  <div id="map"></div>
+  
+  <!-- Side Panel -->
+  <div id="info-panel">
+    <h1>Treaty Research 🪶</h1>
+    <div id="info-content">
+      <div style="text-align: center; margin-top: 2rem;">
+        <p>👋 <strong>Hi Researcher!</strong></p>
+        <p>Use this map to gather facts for your project.</p>
+        <div style="background: #e0f2fe; padding: 20px; border-radius: 12px; display: inline-block; text-align: left; border: 1px solid #bae6fd;">
+          <strong>How to use this tool:</strong><br>
+          1. 🖱️ <strong>Hover</strong> to highlight the border.<br>
+          2. 👉 <strong>Click</strong> to open the full report.<br>
+          3. 📝 <strong>Look for</strong> the "Special Items" section.
+        </div>
+        <br><br>
+        <div style="font-size: 0.9rem; color: #64748b;">
+            Start exploring the map to reveal history!
+        </div>
+      </div>
+    </div>
+    <button class="reset-btn" onclick="resetView()">Back to Map 🗺️</button>
+  </div>
+  
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script>
+    // --- 1. SETUP THE MAP ---
+    const map = L.map('map', { zoomControl: false }).setView([55.0, -115.0], 5);
+    
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    // Use a clean, bright map tile
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png', {
+      attribution: '© OpenStreetMap, © CARTO',
+      maxZoom: 10,
+      minZoom: 4
+    }).addTo(map);
+
+    const infoContent = document.getElementById('info-content');
+    const defaultHTML = infoContent.innerHTML;
+    let geojsonLayer;
+
+    // --- 2. RESEARCH DATA (Enhanced for Grade 3) ---
+    const treatyStories = {
+      '4': {
+        title: "Treaty 4",
+        alias: "The Qu'Appelle Treaty",
+        year: "1874",
+        location: "Fort Qu'Appelle",
+        story: "This was the first 'numbered treaty' in this area. The Chiefs were very worried because the Hudson's Bay Company had sold their land to Canada without asking them! They wanted to be sure they would be paid fairly for the land.",
+        promise: "The government promised that each Chief would get a <strong>silver medal</strong> and a <strong>flag</strong>. They also promised <strong>tools for farming</strong> (like hoes, spades, and axes) so the people could build houses and grow food.",
+        items: "🧥 <strong>Special Gift:</strong> Every 3 years, the Chiefs and Headmen were promised a new suit of clothing!",
+        primarySource: "We have lists that show exactly what tools were given: 'one saw, one axe, and one grindstone' for families to share.",
+        link: "https://thecanadianencyclopedia.ca/en/article/treaty-4"
+      },
+      '6': {
+        title: "Treaty 6",
+        alias: "The Central Alberta Treaty",
+        year: "1876",
+        location: "Fort Carlton & Fort Pitt",
+        story: "Famous leaders like <strong>Chief Poundmaker</strong> and <strong>Chief Big Bear</strong> were here. They were very smart negotiators. They knew sickness was coming with the settlers, so they asked for extra help.",
+        promise: "This is the only treaty with a <strong>Medicine Chest</strong> clause. The Chiefs said, 'If we get sick, you must help us.' They also made the government promise to give food if the buffalo disappeared completely.",
+        items: "💊 <strong>Special Item:</strong> A 'Medicine Chest' to be kept at the Indian Agent's house for everyone to use.",
+        primarySource: "You can see photos of the large silver medals. They show a British officer shaking hands with a First Nations Chief.",
+        link: "https://thecanadianencyclopedia.ca/en/article/treaty-6"
+      },
+      '7': {
+        title: "Treaty 7",
+        alias: "The Blackfoot Treaty",
+        year: "1877",
+        location: "Blackfoot Crossing",
+        story: "<strong>Chief Crowfoot</strong> led the signing here. The land in Southern Alberta is very dry and windy. The First Nations knew that regular farming wouldn't work well there.",
+        promise: "Instead of just farm tools, the leaders asked for <strong>cattle (cows)</strong>! They wanted to become ranchers. They also asked for money to pay for <strong>teachers</strong> to teach their children.",
+        items: "🐄 <strong>Special Deal:</strong> Fewer farm tools, but more cows! They wanted to raise animals on the open plains.",
+        primarySource: "Diaries from 1877 describe thousands of teepees set up in a giant circle at Blackfoot Crossing for the meeting.",
+        link: "https://thecanadianencyclopedia.ca/en/article/treaty-7"
+      },
+      '8': {
+        title: "Treaty 8",
+        alias: "The Northern Treaty",
+        year: "1899",
+        location: "Lesser Slave Lake",
+        story: "This treaty happened later, during the <strong>Klondike Gold Rush</strong>. Miners were rushing north to find gold. The government wanted peace so the miners could travel safely.",
+        promise: "The area was HUGE and covered with forests. The government promised the people could keep <strong>hunting, fishing, and trapping</strong> just like they always did.",
+        items: "🌲 <strong>Key Promise:</strong> The people were told they would NOT have to live on small reserves right away if they didn't want to.",
+        primarySource: "The written paper says one thing, but the Elders say the spoken promises were even stronger—that their way of life would not change.",
+        link: "https://thecanadianencyclopedia.ca/en/article/treaty-8"
+      },
+      '10': {
+        title: "Treaty 10",
+        alias: "The Northern Saskatchewan Treaty",
+        year: "1906",
+        location: "Île-à-la-Crosse",
+        story: "The people here had been asking for a treaty for a long time because they were hungry and needed help. The government finally came when they wanted to create the provinces of Alberta and Saskatchewan.",
+        promise: "Since there were so many lakes in the north, the government promised supplies for fishing, like <strong>netting twine</strong>, along with money and schools.",
+        items: "🎣 <strong>Special Tools:</strong> Fishing nets and twine were very important gifts for survival in the north.",
+        primarySource: "Reports tell us the commissioners had to travel by canoe and river boat to find everyone because there were no roads!",
+        link: "https://thecanadianencyclopedia.ca/en/article/treaty-10"
+      }
+    };
+
+    // --- 3. COLORS & HIGHLIGHTING ---
+    
+    // Normal Colors
+    const colors = {
+      '4': '#fbbf24', // Amber
+      '6': '#4ade80', // Green
+      '7': '#f87171', // Red
+      '8': '#60a5fa', // Blue
+      '10': '#c084fc', // Purple
+      'default': '#cbd5e1'
+    };
+
+    // Darker Colors for Border Highlight
+    const darkColors = {
+      '4': '#b45309',
+      '6': '#15803d',
+      '7': '#b91c1c',
+      '8': '#1d4ed8',
+      '10': '#7e22ce',
+      'default': '#64748b'
+    };
+
+    function getTreatyNumber(props) {
+      if (!props || !props.ENAME) return 'default';
+      const match = props.ENAME.match(/Treaty\s*#?(\d+)/);
+      return match ? match[1] : 'default';
+    }
+
+    function style(feature) {
+      const num = getTreatyNumber(feature.properties);
+      return {
+        fillColor: colors[num] || colors['default'],
+        weight: 2,
+        opacity: 1,
+        color: 'white',
+        dashArray: '3',
+        fillOpacity: 0.6
+      };
+    }
+
+    function highlightFeature(e) {
+      const layer = e.target;
+      const num = getTreatyNumber(layer.feature.properties);
+      const highlightColor = darkColors[num] || '#666';
+
+      layer.setStyle({
+        weight: 5,        // Thicker border
+        color: highlightColor, // Darker border color
+        dashArray: '',
+        fillOpacity: 0.6
+      });
+      layer.bringToFront();
+    }
+
+    function resetHighlight(e) {
+      geojsonLayer.resetStyle(e.target);
+    }
+
+    // --- 4. SHOW INFO PANEL ---
+    
+    function showTreatyInfo(e) {
+        L.DomEvent.stopPropagation(e);
+        const props = e.target.feature.properties;
+        const num = getTreatyNumber(props);
+        const data = treatyStories[num];
+        
+        let html = "";
+        
+        if (data) {
+            html = `
+                <h2>${data.title}</h2>
+                <div style="font-style: italic; color: #64748b; margin-bottom: 15px;">"${data.alias}"</div>
+
+                <div class="fact-grid">
+                    <div class="fact-item">
+                        <span class="fact-label">📅 Year Signed</span>
+                        ${data.year}
+                    </div>
+                    <div class="fact-item">
+                        <span class="fact-label">📍 Key Location</span>
+                        ${data.location}
+                    </div>
+                </div>
+
+                <h3>📜 The Story</h3>
+                <p>${data.story}</p>
+                
+                <h3>🤝 The Promises</h3>
+                <p>${data.promise}</p>
+
+                <div class="gift-box">
+                    ${data.items}
+                </div>
+                
+                <div class="primary-source-box">
+                  <span class="primary-source-badge">🕵️ Primary Source</span>
+                  <p style="font-size: 0.95rem; margin:0;">${data.primarySource}</p>
+                  <a href="${data.link}" target="_blank" class="source-btn">🔗 Read More on Encyclopedia</a>
+                </div>
+            `;
+        } else {
+            html = `
+                <h2>${props.ENAME}</h2>
+                <p>We are still researching this area! It is an important part of Canadian history.</p>
+            `;
+        }
+        
+        infoContent.innerHTML = html;
+        map.fitBounds(e.target.getBounds(), { padding: [50, 50], maxZoom: 6 });
+    }
+
+    function onEachFeature(feature, layer) {
+      layer.on({
+        mouseover: highlightFeature,
+        mouseout: resetHighlight,
+        click: showTreatyInfo
+      });
+      
+      const num = getTreatyNumber(feature.properties);
+      if(num !== 'default') {
+          layer.bindTooltip(`Treaty ${num}`, { permanent: false, direction: "center", className: "my-label" });
+      }
+    }
+
+    // --- 5. LOAD DATA ---
+
+    function resetView() {
+      map.setView([55.0, -115.0], 5);
+      infoContent.innerHTML = defaultHTML;
+      if(geojsonLayer) {
+        geojsonLayer.resetStyle();
+      }
+    }
+
+    fetch('https://raw.githubusercontent.com/Maltais239/interactives/main/numbered_treaties.geojson')
+      .then(r => r.json())
+      .then(data => {
+        geojsonLayer = L.geoJson(data, {
+          style: style,
+          onEachFeature: onEachFeature
+        }).addTo(map);
+      });
+
+    fetch('https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/canada.geojson')
+      .then(r => r.json())
+      .then(data => {
+        L.geoJson(data, {
+          style: { fillOpacity: 0, color: '#334155', weight: 3, dashArray: '10, 10' },
+          filter: f => f.properties.name === 'Alberta',
+          interactive: false
+        }).addTo(map);
+      });
+      
+    fetch('https://raw.githubusercontent.com/Maltais239/interactives/main/alberta_map_data.geojson')
+    .then(r => r.json())
+    .then(data => {
+      L.geoJson(data, {
+        style: { fillColor: '#d946ef', color: '#fff', weight: 1, fillOpacity: 0.8 },
+        filter: f => f.properties.ENAME === 'METIS SETTLEMENTS',
+        onEachFeature: (f, l) => l.bindPopup("<strong>Metis Settlement</strong><br>A home for Metis people.")
+      }).addTo(map);
+    });
+
+  </script>
+</body>
+</html>
