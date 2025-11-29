@@ -51,6 +51,8 @@
                         <i data-lucide="users" width="16"></i> Teacher Dashboard
                     </button>
                 </div>
+                <!-- Debug Status -->
+                <div id="db-status" class="mt-4 text-center text-xs text-slate-500 font-mono">Initializing...</div>
             </div>
         </div>
 
@@ -123,23 +125,30 @@
         };
 
         let app, auth, db;
-        // Use a consistent ID for the app data
-        const LAB_ID = 'elementary_moon_lab';
+        // CORRECTED ID TO MATCH PREVIOUS VERSION
+        const LAB_ID = 'moon_lab_default'; 
         
+        const statusEl = document.getElementById('db-status');
+
         try {
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
 
-            // Log in anonymously immediately
-            signInAnonymously(auth).catch(e => {
-                console.error("Auth Error:", e);
-                alert("Could not sign in. Check your internet or Firebase config.");
-            });
+            signInAnonymously(auth)
+                .then(() => {
+                    statusEl.innerHTML = "✅ Database Connected (Anonymous)";
+                    statusEl.className = "mt-4 text-center text-xs text-green-500 font-mono";
+                })
+                .catch(e => {
+                    console.error("Auth Error:", e);
+                    statusEl.innerHTML = "❌ Connection Failed: " + e.message;
+                    statusEl.className = "mt-4 text-center text-xs text-red-500 font-mono";
+                });
 
         } catch(e) { 
             console.error("Firebase Initialization Error:", e);
-            alert("Database connection failed. Check console for details.");
+            statusEl.innerHTML = "❌ Init Error (See Console)";
         }
 
         // --- GLOBAL CONSTANTS ---
@@ -158,11 +167,9 @@
             unsubscribe: null
         };
 
-        // Listen for Auth State
         if (auth) {
             onAuthStateChanged(auth, (user) => {
                 state.user = user;
-                console.log("User authenticated:", user ? user.uid : "No");
             });
         }
 
@@ -525,6 +532,7 @@
             sliderContainer.classList.add('hidden');
             canvas.style.display = 'none';
             teacherTable.classList.remove('hidden');
+            statusEl.classList.add('hidden'); // Hide debug on teacher view
         };
 
         window.loadTeacherData = () => {
