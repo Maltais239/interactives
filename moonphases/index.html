@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moon Phase Lab</title>
+    <title>Moon Phases Lab</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -123,12 +123,24 @@
         };
 
         let app, auth, db;
+        // Use a consistent ID for the app data
+        const LAB_ID = 'elementary_moon_lab';
+        
         try {
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
-            signInAnonymously(auth);
-        } catch(e) { console.error("Firebase Error", e); }
+
+            // Log in anonymously immediately
+            signInAnonymously(auth).catch(e => {
+                console.error("Auth Error:", e);
+                alert("Could not sign in. Check your internet or Firebase config.");
+            });
+
+        } catch(e) { 
+            console.error("Firebase Initialization Error:", e);
+            alert("Database connection failed. Check console for details.");
+        }
 
         // --- GLOBAL CONSTANTS ---
         const MOON_R = 30;
@@ -145,6 +157,14 @@
             explorer: { angle: Math.PI, label: 'New Moon', sliderVal: 0 },
             unsubscribe: null
         };
+
+        // Listen for Auth State
+        if (auth) {
+            onAuthStateChanged(auth, (user) => {
+                state.user = user;
+                console.log("User authenticated:", user ? user.uid : "No");
+            });
+        }
 
         const MOON_DATA = [
             { id: '1', type: 'new-moon', label: 'New Moon', correctZone: 1 },
@@ -274,6 +294,18 @@
             const rad = angleDeg * (Math.PI / 180);
             state.explorer.angle = rad;
             state.explorer.label = getPhaseLabelFromAngle(rad);
+        }
+        
+        function updateExplorerFromMouse(x, y) {
+            const cx = state.width / 2; const cy = (state.height - 120) * 0.5;
+            let angle = Math.atan2(y - cy, x - cx);
+            let deg = angle * (180/Math.PI);
+            // Convert to slider range (0-360, where 180 is left/new moon)
+            // Slider 0 = 180deg (left)
+            let sliderVal = 180 - deg;
+            if (sliderVal < 0) sliderVal += 360;
+            if (sliderVal > 360) sliderVal -= 360;
+            updateExplorerFromSlider(sliderVal);
         }
 
         function getPhaseLabelFromAngle(rad) {
@@ -429,6 +461,13 @@
             const sName = document.getElementById('student-name').value;
             const cCode = document.getElementById('class-code-input').value;
             if(!sName.trim() || !cCode.trim()) return;
+            
+            // Check auth
+            if(!auth.currentUser) {
+                alert("Authenticating... please try again in a moment.");
+                return;
+            }
+            
             state.name = sName;
             state.classCode = cCode.toUpperCase().trim();
             userDisplay.innerText = `${sName} (${state.classCode})`;
@@ -440,6 +479,11 @@
 
         window.setMode = (m) => resetGame(m);
         window.checkAnswers = async () => {
+            if (!state.user) {
+                alert("You are not connected to the database. Scores cannot be saved.");
+                return;
+            }
+            
             let count = 0;
             state.items.forEach(i => {
                 const m = MOON_DATA.find(d => d.id === i.id);
@@ -448,21 +492,29 @@
             });
             recalcLayout();
             setFeedback(count === 8 ? 'Perfect! Score saved.' : `You got ${count}/8. Try again.`);
+            
             if(db) {
                 const field = state.mode === 'drag-moons' ? 'score_moons' : 'score_labels';
                 try { 
-                    await addDoc(collection(db, 'artifacts', 'elementary_moon_lab', 'public', 'data', 'scores'), { 
+                    await addDoc(collection(db, 'artifacts', LAB_ID, 'public', 'data', 'scores'), { 
                         name: state.name, 
                         classCode: state.classCode, 
                         [field]: count, 
                         timestamp: serverTimestamp() 
                     }); 
-                } catch(e) { console.error("Save failed", e); }
+                } catch(e) { 
+                    console.error("Save failed", e);
+                    alert("Error saving score: " + e.message);
+                }
             }
         };
 
         // --- Teacher Controls ---
         document.getElementById('btn-teacher-view').onclick = () => {
+            if (!state.user) {
+                alert("Connecting to database... please wait.");
+                return;
+            }
             state.isTeacher = true;
             loginScreen.classList.add('hidden');
             mainUi.classList.remove('hidden');
@@ -482,42 +534,53 @@
             if(state.unsubscribe) state.unsubscribe(); // Stop old listener
 
             if(db) {
-                const q = query(
-                    collection(db, 'artifacts', 'elementary_moon_lab', 'public', 'data', 'scores'),
-                    where("classCode", "==", filterCode)
-                );
-                
-                state.unsubscribe = onSnapshot(q, (snap) => {
-                    const tbody = document.getElementById('score-table-body');
-                    tbody.innerHTML = '';
-                    if(snap.empty) {
-                        tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-500">No results found for Class Code: ${filterCode}</td></tr>`;
-                        return;
-                    }
+                try {
+                    const q = query(
+                        collection(db, 'artifacts', LAB_ID, 'public', 'data', 'scores'),
+                        where("classCode", "==", filterCode)
+                    );
                     
-                    const rows = [];
-                    snap.forEach(doc => rows.push(doc.data()));
-                    rows.sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
-                    
-                    rows.forEach(r => {
-                        const time = r.timestamp ? new Date(r.timestamp.seconds*1000).toLocaleTimeString() : '';
-                        const tr = document.createElement('tr');
-                        tr.className = "hover:bg-slate-700/50";
-                        tr.innerHTML = `<td class="p-4 font-bold text-white">${r.name}</td>
-                                        <td class="p-4">${r.classCode}</td>
-                                        <td class="p-4 font-bold ${r.score_moons===8?'text-green-400':'text-slate-400'}">${r.score_moons ?? '-'}</td>
-                                        <td class="p-4 font-bold ${r.score_labels===8?'text-green-400':'text-slate-400'}">${r.score_labels ?? '-'}</td>
-                                        <td class="p-4 text-xs text-slate-500">${time}</td>`;
-                        tbody.appendChild(tr);
+                    state.unsubscribe = onSnapshot(q, (snap) => {
+                        const tbody = document.getElementById('score-table-body');
+                        tbody.innerHTML = '';
+                        if(snap.empty) {
+                            tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-500">No results found for Class Code: ${filterCode}</td></tr>`;
+                            return;
+                        }
+                        
+                        const rows = [];
+                        snap.forEach(doc => rows.push(doc.data()));
+                        rows.sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
+                        
+                        rows.forEach(r => {
+                            const time = r.timestamp ? new Date(r.timestamp.seconds*1000).toLocaleTimeString() : '';
+                            const tr = document.createElement('tr');
+                            tr.className = "hover:bg-slate-700/50";
+                            tr.innerHTML = `<td class="p-4 font-bold text-white">${r.name}</td>
+                                            <td class="p-4">${r.classCode}</td>
+                                            <td class="p-4 font-bold ${r.score_moons===8?'text-green-400':'text-slate-400'}">${r.score_moons ?? '-'}</td>
+                                            <td class="p-4 font-bold ${r.score_labels===8?'text-green-400':'text-slate-400'}">${r.score_labels ?? '-'}</td>
+                                            <td class="p-4 text-xs text-slate-500">${time}</td>`;
+                            tbody.appendChild(tr);
+                        });
+                    }, (error) => {
+                         console.error("Error fetching data:", error);
+                         alert("Could not load data. Ensure permissions are correct.");
                     });
-                });
+                } catch (e) {
+                    console.error("Query Error", e);
+                }
             }
         };
 
         window.logout = () => location.reload();
         window.purgeData = async () => {
             if(!confirm("Are you sure? This deletes ALL student scores.")) return;
-            if(db) { const q = query(collection(db, 'artifacts', 'elementary_moon_lab', 'public', 'data', 'scores')); const snap = await getDocs(q); snap.forEach(d => deleteDoc(d.ref)); }
+            if(db) { 
+                const q = query(collection(db, 'artifacts', LAB_ID, 'public', 'data', 'scores')); 
+                const snap = await getDocs(q); 
+                snap.forEach(d => deleteDoc(d.ref)); 
+            }
         };
 
         function setFeedback(msg) { feedbackEl.innerText = msg; }
