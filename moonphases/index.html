@@ -1,700 +1,693 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { RefreshCw, Check, User, Users, Trophy, Download, Trash2, AlertTriangle, Layers, Move, Type, MousePointer2 } from 'lucide-react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
-import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, getDocs, deleteDoc, where } from 'firebase/firestore';
-
-// ==========================================
-// 🚨 TEACHER / ADMIN SETUP 🚨
-// ==========================================
-const YOUR_FIREBASE_CONFIG = {
-  // Paste config here...
-};
-
-// --- IMAGE ASSETS ---
-const EARTH_IMG_URL = "https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/600px-The_Earth_seen_from_Apollo_17.jpg";
-
-// --- App Initialization ---
-let firebaseConfig;
-let appId = 'default-app-id';
-
-try {
-  // @ts-ignore
-  if (typeof __firebase_config !== 'undefined') {
-    // @ts-ignore
-    firebaseConfig = JSON.parse(__firebase_config);
-    // @ts-ignore
-    if (typeof __app_id !== 'undefined') appId = __app_id;
-  } else {
-    firebaseConfig = YOUR_FIREBASE_CONFIG;
-  }
-} catch (e) {
-  firebaseConfig = YOUR_FIREBASE_CONFIG;
-}
-
-let app, auth, db;
-try {
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-} catch (e) {
-    console.warn("Firebase waiting for config...");
-}
-
-// --- Types ---
-type PhaseType = 'new-moon' | 'waxing-crescent' | 'first-quarter' | 'waxing-gibbous' | 'full-moon' | 'waning-gibbous' | 'third-quarter' | 'waning-crescent';
-type GameMode = 'explore' | 'drag-moons' | 'drag-labels'; 
-
-interface MoonData { id: string; type: PhaseType; label: string; correctZone: number; }
-interface GameItem { 
-    id: string; 
-    text?: string; 
-    type?: PhaseType; 
-    x: number; 
-    y: number; 
-    isDragging: boolean; 
-    currentZone: number | null; 
-    isLocked: boolean; 
-    bankIndex: number; 
-    width?: number;
-}
-interface DropZone { id: number; x: number; y: number; r: number; }
-interface Star { x: number; y: number; size: number; opacity: number; speed: number; }
-interface StudentResult { id: string; name: string; teacher: string; score_moons?: number; score_labels?: number; timestamp: any; }
-
-// --- Constants ---
-const MOON_R = 30;
-const ORBIT_SCALE = 0.35;
-
-// --- Helper Math ---
-const getPhaseLabelFromAngle = (angleRad: number): string => {
-    let deg = angleRad * (180 / Math.PI);
-    while (deg <= -180) deg += 360;
-    while (deg > 180) deg -= 360;
-
-    const d = Math.abs(deg);
-    if (d > 160) return 'New Moon';
-    if (d > 110) return deg > 0 ? 'Waxing Crescent' : 'Waning Crescent';
-    if (d > 70)  return deg > 0 ? 'First Quarter' : 'Third Quarter';
-    if (d > 20)  return deg > 0 ? 'Waxing Gibbous' : 'Waning Gibbous';
-    return 'Full Moon';
-};
-
-// --- Drawing Functions ---
-const drawStarfield = (ctx: CanvasRenderingContext2D, stars: Star[], width: number, height: number) => {
-  stars.forEach(star => {
-    ctx.globalAlpha = Math.abs(Math.sin(Date.now() * star.speed * 0.001)) * star.opacity;
-    ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2); ctx.fill();
-  });
-  ctx.globalAlpha = 1.0;
-};
-
-// --- EARTH RENDERER ---
-const drawEarth = (ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, img?: HTMLImageElement) => {
-  ctx.save(); ctx.translate(x, y);
-
-  if (img && img.complete && img.naturalWidth !== 0) {
-      ctx.save();
-      ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.clip();
-      ctx.drawImage(img, -radius, -radius, radius * 2, radius * 2);
-      const shadow = ctx.createLinearGradient(-radius, 0, radius, 0);
-      shadow.addColorStop(0, 'rgba(0,0,0,0)');
-      shadow.addColorStop(0.5, 'rgba(0,0,0,0.1)');
-      shadow.addColorStop(1, 'rgba(0,0,0,0.85)');
-      ctx.fillStyle = shadow;
-      ctx.fillRect(-radius, -radius, radius*2, radius*2);
-      ctx.restore();
-  } else {
-      const ocean = ctx.createRadialGradient(-radius * 0.3, -radius * 0.3, 0, 0, 0, radius * 1.2);
-      ocean.addColorStop(0, '#3B82F6'); ocean.addColorStop(1, '#1E3A8A');
-      ctx.fillStyle = ocean; ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#22C55E'; ctx.beginPath(); ctx.arc(0,0,radius*0.8, 0, Math.PI*2); ctx.fill(); 
-  }
-
-  const halo = ctx.createRadialGradient(0, 0, radius * 0.95, 0, 0, radius * 1.2);
-  halo.addColorStop(0, 'rgba(59, 130, 246, 0.4)'); 
-  halo.addColorStop(1, 'rgba(59, 130, 246, 0)');
-  ctx.fillStyle = halo; 
-  ctx.beginPath(); ctx.arc(0, 0, radius * 1.3, 0, Math.PI * 2); ctx.fill();
-  ctx.restore();
-};
-
-const drawMoon = (ctx: CanvasRenderingContext2D, type: PhaseType, x: number, y: number, radius: number, inBank: boolean = false) => {
-  ctx.save(); ctx.translate(x, y);
-  ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fillStyle = '#18181B'; ctx.fill();
-  ctx.fillStyle = '#F4F4F5'; 
-  const drawHalf = (isRight: boolean) => { ctx.beginPath(); ctx.arc(0, 0, radius, isRight ? -Math.PI/2 : Math.PI/2, isRight ? Math.PI/2 : -Math.PI/2); ctx.fill(); };
-  switch (type) {
-    case 'full-moon': ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI*2); ctx.fill(); break;
-    case 'first-quarter': drawHalf(true); break;
-    case 'third-quarter': drawHalf(false); break;
-    case 'waxing-crescent': drawHalf(true); ctx.fillStyle = '#18181B'; ctx.beginPath(); ctx.ellipse(0, 0, radius*0.6, radius, 0, 0, Math.PI*2); ctx.fill(); break;
-    case 'waning-crescent': drawHalf(false); ctx.fillStyle = '#18181B'; ctx.beginPath(); ctx.ellipse(0, 0, radius*0.6, radius, 0, 0, Math.PI*2); ctx.fill(); break;
-    case 'waxing-gibbous': drawHalf(true); ctx.beginPath(); ctx.ellipse(0, 0, radius*0.6, radius, 0, 0, Math.PI*2); ctx.fill(); break;
-    case 'waning-gibbous': drawHalf(false); ctx.fillStyle = '#F4F4F5'; ctx.beginPath(); ctx.ellipse(0, 0, radius*0.6, radius, 0, 0, Math.PI*2); ctx.fill(); break;
-    case 'new-moon': break; 
-  }
-  if (inBank) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI*2); ctx.stroke();
-  }
-  ctx.fillStyle = 'rgba(0,0,0,0.05)'; ctx.beginPath(); ctx.arc(radius*0.3, -radius*0.2, radius*0.2, 0, Math.PI*2); ctx.fill();
-  ctx.restore();
-};
-
-// --- NEW SEAMLESS MOON RENDERER ---
-const drawContinuousMoon = (ctx: CanvasRenderingContext2D, angle: number, x: number, y: number, radius: number) => {
-    ctx.save();
-    ctx.translate(x, y);
-
-    // 1. Draw Full Dark Circle
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.fillStyle = '#18181B';
-    ctx.fill();
-
-    // 2. Prepare to Draw Lit Portion as ONE Shape
-    ctx.fillStyle = '#F4F4F5';
-    ctx.beginPath();
-
-    // Normalize angle to [0, 2PI)
-    let ang = angle % (Math.PI * 2);
-    if (ang < 0) ang += Math.PI * 2;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moon Phase Lab</title>
     
-    // Terminator Width
-    const xTerm = radius * Math.cos(ang); 
+    <!-- 1. Tailwind CSS for styling (loaded from web) -->
+    <script src="https://cdn.tailwindcss.com"></script>
     
-    if (ang >= 0 && ang < Math.PI) {
-        // Waxing (Bottom Half): Right side lit
-        // Draw Right Semicircle (Top Pole to Bottom Pole)
-        ctx.arc(0, 0, radius, -Math.PI/2, Math.PI/2);
-        // Close with Terminator Curve back to Top Pole
-        // If xTerm > 0 (Gibbous), bulge Left (CCW: false)
-        // If xTerm < 0 (Crescent), bulge Right (CCW: true)
-        ctx.ellipse(0, 0, Math.abs(xTerm), radius, 0, Math.PI/2, 3*Math.PI/2, xTerm < 0);
-    } else {
-        // Waning (Top Half): Left side lit
-        // Draw Left Semicircle (Bottom Pole to Top Pole)
-        ctx.arc(0, 0, radius, Math.PI/2, 3*Math.PI/2);
-        // Close with Terminator Curve back to Bottom Pole
-        // If xTerm > 0 (Gibbous), bulge Right (CCW: false)
-        // If xTerm < 0 (Crescent), bulge Left (CCW: true)
-        ctx.ellipse(0, 0, Math.abs(xTerm), radius, 0, 3*Math.PI/2, Math.PI/2, xTerm < 0);
-    }
-    
-    ctx.fill();
+    <!-- 2. Icons (Lucide) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 
-    // 3. Craters
-    ctx.fillStyle = 'rgba(0,0,0,0.05)'; 
-    ctx.beginPath(); ctx.arc(radius*0.3, -radius*0.2, radius*0.2, 0, Math.PI*2); ctx.fill();
-    
-    ctx.restore();
-};
-
-const drawLabelBox = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, isDragging: boolean, isLocked: boolean) => {
-    ctx.font = 'bold 12px sans-serif';
-    const padding = 10;
-    const w = ctx.measureText(text).width + padding * 2;
-    const h = 26;
-    ctx.save(); ctx.translate(x, y);
-    ctx.fillStyle = isLocked ? '#22C55E' : isDragging ? '#3B82F6' : '#334155';
-    ctx.strokeStyle = isLocked ? '#166534' : '#94A3B8';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.roundRect(-w/2, -h/2, w, h, 4); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#F8FAFC'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, 0, 0);
-    ctx.restore();
-    return w;
-};
-
-const drawCheckmark = (ctx: CanvasRenderingContext2D, x: number, y: number) => {
-    ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI*2); ctx.fillStyle = '#22C55E'; ctx.fill();
-    ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x-5, y); ctx.lineTo(x-1, y+4); ctx.lineTo(x+4, y-3); ctx.stroke();
-};
-
-// --- Main Application ---
-export default function App() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [earthImg, setEarthImg] = useState<HTMLImageElement | null>(null);
-
-  // App State - Default to Explore
-  const [mode, setMode] = useState<GameMode>('explore');
-  const [user, setUser] = useState<any>(null);
-  const [studentName, setStudentName] = useState('');
-  const [teacherName, setTeacherName] = useState('');
-  const [isNameSet, setIsNameSet] = useState(false);
-  const [isTeacherMode, setIsTeacherMode] = useState(false);
-  const [classResults, setClassResults] = useState<StudentResult[]>([]);
-  const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
-  const [feedback, setFeedback] = useState({ msg: 'Welcome to the Moon Lab!', type: 'neutral' });
-
-  // Game State
-  const [items, setItems] = useState<GameItem[]>([]);
-  const itemsRef = useRef<GameItem[]>([]);
-  const zonesRef = useRef<DropZone[]>([]);
-  const starsRef = useRef<Star[]>([]);
-  const dragRef = useRef<{ id: string | null, offsetX: number, offsetY: number }>({ id: null, offsetX: 0, offsetY: 0 });
-  const dimsRef = useRef({ w: 0, h: 0 });
-  
-  // Explorer State
-  // Initialize with 0 slider value (Left/New Moon)
-  const explorerRef = useRef({ angle: Math.PI, label: 'New Moon' });
-  const [explorerSliderVal, setExplorerSliderVal] = useState(0);
-
-  // --- Definitions ---
-  const moonData: MoonData[] = useMemo(() => [
-    { id: '1', type: 'new-moon', label: 'New Moon', correctZone: 1 },
-    { id: '2', type: 'waxing-crescent', label: 'Waxing Crescent', correctZone: 2 },
-    { id: '3', type: 'first-quarter', label: 'First Quarter', correctZone: 3 },
-    { id: '4', type: 'waxing-gibbous', label: 'Waxing Gibbous', correctZone: 4 },
-    { id: '5', type: 'full-moon', label: 'Full Moon', correctZone: 5 },
-    { id: '6', type: 'waning-gibbous', label: 'Waning Gibbous', correctZone: 6 },
-    { id: '7', type: 'third-quarter', label: 'Third Quarter', correctZone: 7 },
-    { id: '8', type: 'waning-crescent', label: 'Waning Crescent', correctZone: 8 },
-  ], []);
-
-  // --- Load Earth Image ---
-  useEffect(() => {
-      const img = new Image();
-      img.src = EARTH_IMG_URL;
-      img.crossOrigin = "anonymous";
-      img.onload = () => setEarthImg(img);
-  }, []);
-
-  // --- Auth & Init ---
-  useEffect(() => {
-    if (!auth) return;
-    const initAuth = async () => {
-       // @ts-ignore
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
-      else await signInAnonymously(auth);
-    };
-    initAuth();
-    onAuthStateChanged(auth, setUser);
-  }, []);
-
-  // --- Keyboard Control ---
-  useEffect(() => {
-    if (mode !== 'explore' || (!isNameSet && !isTeacherMode)) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-            e.preventDefault();
-            const step = 2;
-            let newVal = explorerSliderVal;
-            if (e.key === 'ArrowRight') newVal += step;
-            if (e.key === 'ArrowLeft') newVal -= step;
-            
-            if (newVal > 360) newVal = newVal - 360;
-            if (newVal < 0) newVal = 360 + newVal;
-            
-            updateExplorerFromSlider(newVal);
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #0F172A; font-family: sans-serif; }
+        canvas { touch-action: none; } /* Prevents scrolling on mobile */
+        
+        /* Custom Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none; 
+            background: transparent; 
         }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, explorerSliderVal, isNameSet, isTeacherMode]);
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px; width: 20px;
+            border-radius: 50%;
+            background: #A855F7;
+            cursor: pointer;
+            margin-top: -8px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 4px;
+            cursor: pointer;
+            background: #475569;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
 
-  // --- Initialization & Mode Switching ---
-  useEffect(() => {
-    if (!isNameSet && !isTeacherMode) return;
-    setTimeout(() => {
-        const stars: Star[] = [];
-        for(let i=0; i<100; i++) stars.push({ x: Math.random(), y: Math.random(), size: Math.random()*2+0.5, opacity: Math.random(), speed: Math.random()*2+0.5 });
-        starsRef.current = stars;
-        resetGame(mode);
-    }, 50);
-  }, [mode, isNameSet, isTeacherMode]);
-
-  const resetGame = (currentMode: GameMode) => {
-    if (currentMode === 'drag-moons') {
-        const shuffled = [...moonData].sort(() => Math.random() - 0.5);
-        itemsRef.current = shuffled.map((m, idx) => ({ 
-            id: m.id, type: m.type, 
-            x: 0, y: 0, 
-            isDragging: false, currentZone: null, isLocked: false, bankIndex: idx 
-        }));
-        setFeedback({ msg: 'Drag moons to their correct orbit position.', type: 'neutral' });
-    } else if (currentMode === 'drag-labels') {
-        const shuffled = [...moonData].sort(() => Math.random() - 0.5);
-        itemsRef.current = shuffled.map((m, idx) => ({ 
-            id: m.id, text: m.label,
-            x: 0, y: 0, 
-            isDragging: false, currentZone: null, isLocked: false, bankIndex: idx 
-        }));
-        setFeedback({ msg: 'Drag the LABELS to the matching moon.', type: 'neutral' });
-    } else if (currentMode === 'explore') {
-        itemsRef.current = [];
-        setFeedback({ msg: 'Drag moon, use slider, or use arrow keys.', type: 'neutral' });
-        updateExplorerFromSlider(0); // Slider 0 = New Moon
-    }
-    handleResize();
-  };
-
-  const handleResize = () => {
-    if (!containerRef.current || !canvasRef.current) return;
-    const { clientWidth, clientHeight } = containerRef.current;
-    canvasRef.current.width = clientWidth;
-    canvasRef.current.height = clientHeight;
-    dimsRef.current = { w: clientWidth, h: clientHeight };
-
-    const cx = clientWidth / 2;
-    const cy = (clientHeight - 120) * 0.5;
-    const r = Math.min(clientWidth, clientHeight - 120) * ORBIT_SCALE;
-
-    const newZones: DropZone[] = [];
-    for (let i = 1; i <= 8; i++) {
-        let deg = 0;
-        if(i===1) deg=180; else if(i===2) deg=135; else if(i===3) deg=90;
-        else if(i===4) deg=45; else if(i===5) deg=0; else if(i===6) deg=315;
-        else if(i===7) deg=270; else if(i===8) deg=225;
-        const rad = deg * (Math.PI/180);
-        newZones.push({ id: i, x: cx + r*Math.cos(rad), y: cy + r*Math.sin(rad), r: MOON_R });
-    }
-    zonesRef.current = newZones;
-    refreshPositions(clientWidth, clientHeight);
-  };
-
-  const refreshPositions = (w: number, h: number) => {
-    const bankY = h - 60;
-    const itemW = mode === 'drag-labels' ? 100 : 70;
-    const totalW = 8 * itemW;
-    const startX = (w - totalW)/2 + itemW/2;
-
-    itemsRef.current = itemsRef.current.map(item => {
-      if (item.isDragging) return item;
-      if (item.currentZone) {
-        const z = zonesRef.current.find(z => z.id === item.currentZone);
-        if (z) return { ...item, x: z.x, y: mode === 'drag-labels' ? z.y + 45 : z.y };
-      } 
-      return { ...item, x: startX + item.bankIndex * itemW, y: bankY };
-    });
-  };
-
-  useEffect(() => {
-    window.addEventListener('resize', handleResize);
-    setTimeout(handleResize, 100);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [mode, isNameSet]);
-
-  // --- RENDER LOOP ---
-  useEffect(() => {
-    if (!isNameSet || isTeacherMode) return;
-    let animId: number;
-    const ctx = canvasRef.current?.getContext('2d');
-
-    const render = () => {
-      if (!ctx || !canvasRef.current) return;
-      const { width, height } = canvasRef.current;
-      const cx = width / 2;
-      const cy = (height - 120) * 0.5;
-      const r = Math.min(width, height - 120) * ORBIT_SCALE;
-
-      // 1. Background
-      ctx.fillStyle = '#0F172A'; ctx.fillRect(0, 0, width, height);
-      drawStarfield(ctx, starsRef.current.map(s => ({...s, x: s.x*width, y: s.y*height})), width, height);
-
-      const sunGrad = ctx.createLinearGradient(0, 0, 150, 0);
-      sunGrad.addColorStop(0, 'rgba(253, 186, 116, 0.4)'); sunGrad.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = sunGrad; ctx.fillRect(0, 0, 150, height);
-      ctx.save(); ctx.translate(30, height/2); ctx.rotate(-Math.PI/2); 
-      ctx.fillStyle = '#FDBA74'; ctx.font = 'bold 24px sans-serif'; ctx.fillText('SUNLIGHT', -50, 0); ctx.restore();
-
-      // 2. Earth & Orbit
-      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.strokeStyle = '#334155'; ctx.setLineDash([10, 10]); ctx.stroke(); ctx.setLineDash([]);
-      drawEarth(ctx, cx, cy, r * 0.35, earthImg || undefined);
-
-      // 3. Bank Background (Behind Items)
-      if (mode !== 'explore') {
-        ctx.fillStyle = '#334155';
-        ctx.fillRect(0, height - 110, width, 110);
-        ctx.strokeStyle = '#475569'; 
-        ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(0, height-110); ctx.lineTo(width, height-110); ctx.stroke();
-        ctx.fillStyle = '#CBD5E1'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'left'; 
-        ctx.fillText(mode === 'drag-moons' ? 'MOON BANK' : 'LABEL BANK', 20, height - 90);
-      } else {
-        ctx.fillStyle = '#1E293B';
-        ctx.fillRect(0, height - 80, width, 80);
-        ctx.strokeStyle = '#475569'; 
-        ctx.beginPath(); ctx.moveTo(0, height-80); ctx.lineTo(width, height-80); ctx.stroke();
-      }
-
-      // 4. Game Elements (On Top)
-      if (mode === 'explore') {
-        const ex = explorerRef.current;
-        const moonX = cx + r * Math.cos(ex.angle);
-        const moonY = cy + r * Math.sin(ex.angle);
+    <!-- APP CONTAINER -->
+    <div id="app" class="w-full h-screen flex flex-col text-slate-100">
         
-        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(moonX, moonY); ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.stroke();
-        
-        // Draw Smooth Moon
-        drawContinuousMoon(ctx, ex.angle, moonX, moonY, MOON_R * 1.5);
-        
-        const labelW = ctx.measureText(ex.label).width + 20;
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)'; ctx.strokeStyle = '#94A3B8'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.roundRect(moonX - labelW/2, moonY - 70, labelW, 30, 8); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = '#FDBA74'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(ex.label, moonX, moonY - 55);
-        ctx.beginPath(); ctx.arc(moonX, moonY, MOON_R * 1.8, 0, Math.PI*2); ctx.strokeStyle = 'white'; ctx.lineWidth = 1; ctx.setLineDash([4,4]); ctx.stroke();
-
-      } else {
-        zonesRef.current.forEach(z => {
-            if (mode === 'drag-labels') {
-                 const mData = moonData.find(m => m.correctZone === z.id);
-                 if (mData) drawMoon(ctx, mData.type, z.x, z.y, MOON_R);
-            }
-            let isHovered = false;
-            if (dragRef.current.id) {
-                const dItem = itemsRef.current.find(i => i.id === dragRef.current.id);
-                if (dItem) {
-                    const dist = Math.sqrt(Math.pow(dItem.x - z.x, 2) + Math.pow(dItem.y - z.y, 2));
-                    const hitR = mode === 'drag-labels' ? 60 : MOON_R * 1.5;
-                    if (dist < hitR) isHovered = true;
-                }
-            }
-            if (mode === 'drag-moons') {
-                ctx.beginPath(); ctx.arc(z.x, z.y, MOON_R + 5, 0, Math.PI*2);
-                ctx.strokeStyle = isHovered ? '#60A5FA' : '#334155'; ctx.lineWidth = isHovered ? 3 : 2; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
-                ctx.fillStyle = isHovered ? '#60A5FA' : '#475569'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(z.id.toString(), z.x, z.y);
-            } else if (mode === 'drag-labels') {
-                const by = z.y + 45;
-                ctx.strokeStyle = isHovered ? '#60A5FA' : 'rgba(255,255,255,0.1)'; ctx.lineWidth = isHovered ? 2 : 1; ctx.setLineDash([4,4]); ctx.strokeRect(z.x - 40, by - 13, 80, 26); ctx.setLineDash([]);
-            }
-        });
-
-        const sorted = [...itemsRef.current].sort((a,b) => a.isDragging ? 1 : -1);
-        sorted.forEach(item => {
-            if (mode === 'drag-moons' && item.type) {
-                const inBank = !item.currentZone && !item.isDragging;
-                drawMoon(ctx, item.type, item.x, item.y, MOON_R, inBank);
-                
-                // Keep label visible in Phase Match mode!
-                ctx.fillStyle = '#E2E8F0'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
-                ctx.fillText(moonData.find(m=>m.id===item.id)?.label || '', item.x, item.y + MOON_R + 15);
-                
-                if (item.isLocked) drawCheckmark(ctx, item.x + 20, item.y - 20);
-            } 
-            else if (mode === 'drag-labels' && item.text) {
-                drawLabelBox(ctx, item.text, item.x, item.y, item.isDragging, item.isLocked);
-                if (item.isLocked) drawCheckmark(ctx, item.x + 35, item.y - 15);
-            }
-        });
-      }
-
-      animId = requestAnimationFrame(render);
-    };
-    render();
-    return () => cancelAnimationFrame(animId);
-  }, [moonData, isNameSet, isTeacherMode, mode, earthImg]);
-
-  const updateExplorerFromMouse = (mx: number, my: number) => {
-      const cx = dimsRef.current.w / 2;
-      const cy = (dimsRef.current.h - 120) * 0.5;
-      let angle = Math.atan2(my - cy, mx - cx);
-      let deg = angle * (180 / Math.PI);
-      
-      // Calculate Slider Val (0-360 starting from New Moon at 180 deg)
-      // New Moon (180) -> Slider 0
-      // 180 - deg = slider
-      
-      let sliderVal = 180 - deg;
-      if (sliderVal < 0) sliderVal += 360;
-      if (sliderVal >= 360) sliderVal -= 360;
-      
-      updateExplorerFromSlider(sliderVal);
-  };
-
-  const updateExplorerFromSlider = (sliderVal: number) => {
-      setExplorerSliderVal(sliderVal);
-      // Map Slider 0-360 back to Angle
-      // Angle = 180 - Slider
-      const angleDeg = 180 - sliderVal;
-      const rad = angleDeg * (Math.PI / 180);
-      const label = getPhaseLabelFromAngle(rad);
-      explorerRef.current = { angle: rad, label: label };
-  };
-
-  // --- Handlers ---
-  const getPos = (e: React.PointerEvent) => {
-      if (!canvasRef.current) return {x:0, y:0};
-      const r = canvasRef.current.getBoundingClientRect();
-      return { x: e.clientX - r.left, y: e.clientY - r.top };
-  };
-  const onDown = (e: React.PointerEvent) => {
-    const { x, y } = getPos(e);
-    if (mode === 'explore') {
-        dragRef.current = { id: 'explorer', offsetX: 0, offsetY: 0 };
-        updateExplorerFromMouse(x, y);
-        (e.target as Element).setPointerCapture(e.pointerId);
-        return;
-    }
-    const hitRadius = mode === 'drag-labels' ? 40 : MOON_R;
-    const item = [...itemsRef.current].reverse().find(i => { 
-        const dx = Math.abs(i.x - x); const dy = Math.abs(i.y - y); return dx < hitRadius && dy < 20;
-    });
-    if (item && !item.isLocked) {
-        dragRef.current = { id: item.id, offsetX: item.x - x, offsetY: item.y - y };
-        itemsRef.current = itemsRef.current.map(i => i.id === item.id ? {...i, isDragging: true} : i);
-        (e.target as Element).setPointerCapture(e.pointerId);
-    }
-  };
-  const onMove = (e: React.PointerEvent) => {
-      if (!dragRef.current.id) return;
-      const { x, y } = getPos(e);
-      if (mode === 'explore') { updateExplorerFromMouse(x, y); return; }
-      itemsRef.current = itemsRef.current.map(i => i.id === dragRef.current.id ? { ...i, x: x + dragRef.current.offsetX, y: y + dragRef.current.offsetY } : i);
-  };
-  const onUp = (e: React.PointerEvent) => {
-    if (!dragRef.current.id) return;
-    if (mode === 'explore') { dragRef.current.id = null; return; }
-    const id = dragRef.current.id;
-    const item = itemsRef.current.find(i => i.id === id);
-    if (item) {
-        let hit: DropZone | undefined;
-        const hitR = mode === 'drag-labels' ? 60 : MOON_R * 1.5;
-        zonesRef.current.forEach(z => { const d = Math.sqrt(Math.pow(item.x - z.x, 2) + Math.pow(item.y - z.y, 2)); if (d < hitR) hit = z; });
-        itemsRef.current = itemsRef.current.map(i => {
-            if (i.id === id) {
-                if(hit) return { ...i, isDragging: false, currentZone: hit.id, x: hit.x, y: mode === 'drag-labels' ? hit.y + 45 : hit.y };
-                return { ...i, isDragging: false, currentZone: null };
-            }
-            if (hit && i.currentZone === hit.id && i.id !== id) return { ...i, currentZone: null };
-            return i;
-        });
-        refreshPositions(dimsRef.current.w, dimsRef.current.h);
-        setItems([...itemsRef.current]);
-    }
-    dragRef.current = { id: null, offsetX: 0, offsetY: 0 };
-  };
-
-  const check = async () => {
-    if (!user || !db || mode === 'explore') return;
-    let count = 0;
-    itemsRef.current = itemsRef.current.map(i => { const m = moonData.find(d => d.id === i.id); if (i.currentZone === m?.correctZone) { count++; return { ...i, isLocked: true }; } return { ...i, currentZone: null, isLocked: false }; });
-    refreshPositions(dimsRef.current.w, dimsRef.current.h);
-    setItems([...itemsRef.current]);
-    setFeedback({ msg: count===8 ? 'Perfect! Score saved.' : `Score: ${count}/8.`, type: count===8 ? 'success' : 'error' });
-    const activeAppId = appId || 'elementary_moon_lab';
-    const field = mode === 'drag-moons' ? 'score_moons' : 'score_labels';
-    await addDoc(collection(db, 'artifacts', activeAppId, 'public', 'data', 'scores'), { name: studentName, teacher: teacherName || 'Unspecified', [field]: count, timestamp: serverTimestamp() });
-  };
-
-  // --- Admin ---
-  useEffect(() => {
-    if (!user || !isTeacherMode || !db) return;
-    const activeAppId = appId || 'elementary_moon_lab'; 
-    const q = query(collection(db, 'artifacts', activeAppId, 'public', 'data', 'scores'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const results: StudentResult[] = [];
-        snapshot.forEach(doc => { const data = doc.data(); results.push({ id: doc.id, name: data.name, teacher: data.teacher, score_moons: data.score_moons, score_labels: data.score_labels, timestamp: data.timestamp }); });
-        results.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
-        setClassResults(results);
-    });
-    return () => unsubscribe();
-  }, [user, isTeacherMode]);
-
-  const purgeData = async () => {
-      if(!db) return;
-      const q = query(collection(db, 'artifacts', appId || 'elementary_moon_lab', 'public', 'data', 'scores'));
-      const snap = await getDocs(q);
-      await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
-      setShowPurgeConfirm(false);
-  };
-
-  return (
-    <div className="w-full h-screen bg-slate-900 flex flex-col font-sans text-slate-100 overflow-hidden">
-      
-      {/* LOGIN */}
-      {!isNameSet && !isTeacherMode && (
-        <div className="flex-grow flex items-center justify-center p-4">
-            <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full border border-slate-700">
-                <h1 className="text-3xl font-bold text-center text-blue-400 mb-6">Moon Lab</h1>
-                <form onSubmit={(e) => { e.preventDefault(); if(studentName.trim()) setIsNameSet(true); }}>
-                    <div className="space-y-4">
-                        <input type="text" value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="First Name" className="w-full p-4 rounded-xl bg-slate-900 border border-slate-600 focus:border-blue-500 outline-none text-white" />
-                        <input type="text" value={teacherName} onChange={(e) => setTeacherName(e.target.value)} placeholder="Teacher (Optional)" className="w-full p-4 rounded-xl bg-slate-900 border border-slate-600 focus:border-blue-500 outline-none text-white" />
-                        <button type="submit" disabled={!studentName.trim()} className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl font-bold text-lg">Start</button>
-                    </div>
+        <!-- LOGIN SCREEN (Hidden by default) -->
+        <div id="login-screen" class="flex-grow flex items-center justify-center p-4 hidden">
+            <div class="bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full border border-slate-700">
+                <h1 class="text-3xl font-bold text-center text-blue-400 mb-6">Moon Lab</h1>
+                <form id="login-form" class="space-y-4">
+                    <input type="text" id="student-name" placeholder="First Name" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-600 focus:border-blue-500 outline-none text-white" required>
+                    <input type="text" id="teacher-name" placeholder="Teacher (Optional)" class="w-full p-4 rounded-xl bg-slate-900 border border-slate-600 focus:border-blue-500 outline-none text-white">
+                    <button type="submit" class="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-lg transition">Start Lab</button>
                 </form>
-                <div className="mt-6 pt-6 border-t border-slate-700 text-center"><button onClick={() => setIsTeacherMode(true)} className="text-slate-500 hover:text-slate-300 text-sm flex gap-2 mx-auto items-center"><Users size={16}/> Teacher View</button></div>
+                <div class="mt-6 pt-6 border-t border-slate-700 text-center">
+                    <button id="btn-teacher-view" class="text-slate-500 hover:text-slate-300 text-sm flex gap-2 mx-auto items-center">
+                        <i data-lucide="users" width="16"></i> Teacher View
+                    </button>
+                </div>
             </div>
         </div>
-      )}
 
-      {/* MAIN UI */}
-      {(isNameSet || isTeacherMode) && (
-          <>
-            <div className="bg-slate-800 p-2 shadow-md flex flex-col sm:flex-row justify-between items-center z-10 shrink-0 border-b border-slate-700 gap-2">
-                <div className="flex items-center gap-4">
-                    <h1 className="text-lg font-bold text-white hidden sm:block">{isTeacherMode ? 'Teacher Dashboard' : studentName}</h1>
-                    {!isTeacherMode && (
-                        <div className="flex bg-slate-900 rounded-lg p-1">
-                            <button onClick={() => setMode('explore')} className={`px-3 py-1.5 rounded-md text-sm font-bold flex items-center gap-2 transition-colors ${mode==='explore' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}><Move size={16}/> Explore</button>
-                            <button onClick={() => setMode('drag-moons')} className={`px-3 py-1.5 rounded-md text-sm font-bold flex items-center gap-2 transition-colors ${mode==='drag-moons' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}><MousePointer2 size={16}/> Phase Match</button>
-                            <button onClick={() => setMode('drag-labels')} className={`px-3 py-1.5 rounded-md text-sm font-bold flex items-center gap-2 transition-colors ${mode==='drag-labels' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}><Type size={16}/> Label Match</button>
-                        </div>
-                    )}
+        <!-- MAIN INTERFACE (Hidden by default) -->
+        <div id="main-ui" class="flex flex-col h-full hidden">
+            <!-- Header -->
+            <div class="bg-slate-800 p-2 shadow-md flex flex-col sm:flex-row justify-between items-center z-10 shrink-0 border-b border-slate-700 gap-2">
+                <div class="flex items-center gap-4">
+                    <h1 id="user-display" class="text-lg font-bold text-white hidden sm:block">Student</h1>
+                    
+                    <!-- Tabs -->
+                    <div id="tabs-student" class="flex bg-slate-900 rounded-lg p-1">
+                        <button onclick="setMode('explore')" id="tab-explore" class="px-3 py-1.5 rounded-md text-sm font-bold flex items-center gap-2 transition-colors bg-purple-600 text-white">
+                            <i data-lucide="move" width="16"></i> Explore
+                        </button>
+                        <button onclick="setMode('drag-moons')" id="tab-moons" class="px-3 py-1.5 rounded-md text-sm font-bold flex items-center gap-2 transition-colors text-slate-400 hover:text-white">
+                            <i data-lucide="mouse-pointer-2" width="16"></i> Phase Match
+                        </button>
+                        <button onclick="setMode('drag-labels')" id="tab-labels" class="px-3 py-1.5 rounded-md text-sm font-bold flex items-center gap-2 transition-colors text-slate-400 hover:text-white">
+                            <i data-lucide="type" width="16"></i> Label Match
+                        </button>
+                    </div>
                 </div>
-                <div className="flex gap-2 items-center">
-                    {!isTeacherMode && <span className={`text-xs ${feedback.type === 'success' ? 'text-green-400' : 'text-slate-400'} hidden sm:block`}>{feedback.msg}</span>}
-                    {isTeacherMode ? (
-                        <>
-                           {showPurgeConfirm ? <button onClick={purgeData} className="px-3 py-1.5 bg-rose-600 rounded text-xs font-bold">Confirm Delete</button> : <button onClick={() => setShowPurgeConfirm(true)} className="px-3 py-1.5 bg-rose-900/50 text-rose-300 border border-rose-800 rounded text-xs font-bold"><Trash2 size={14}/></button>}
-                           <button onClick={() => setIsTeacherMode(false)} className="px-3 py-1.5 bg-slate-700 rounded text-xs font-bold">Exit</button>
-                        </>
-                    ) : (
-                        mode !== 'explore' && <button onClick={check} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold flex gap-2 items-center text-sm"><Check size={16}/> Submit</button>
-                    )}
+
+                <div class="flex gap-2 items-center">
+                    <span id="feedback-msg" class="text-xs text-slate-400 hidden sm:block">Welcome!</span>
+                    <button id="btn-submit" onclick="checkAnswers()" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold flex gap-2 items-center text-sm hidden">
+                        <i data-lucide="check" width="16"></i> Submit
+                    </button>
+                    <!-- Teacher Controls -->
+                    <div id="teacher-controls" class="hidden flex gap-2">
+                        <button onclick="purgeData()" class="px-3 py-1.5 bg-rose-900/50 text-rose-300 border border-rose-800 rounded text-xs font-bold">Clear Data</button>
+                        <button onclick="logout()" class="px-3 py-1.5 bg-slate-700 rounded text-xs font-bold">Exit</button>
+                    </div>
                 </div>
             </div>
-            
-            {!isTeacherMode && (
-                <div ref={containerRef} className="flex-grow relative bg-slate-900">
-                    <canvas ref={canvasRef} className="absolute inset-0 touch-none cursor-crosshair" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp} />
-                    
-                    {/* EXPLORE SLIDER */}
-                    {mode === 'explore' && (
-                        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-full max-w-md px-8">
-                            <input 
-                                type="range" 
-                                min="0" 
-                                max="360" 
-                                value={explorerSliderVal} 
-                                onChange={(e) => updateExplorerFromSlider(Number(e.target.value))}
-                                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
-                            />
-                            <div className="flex justify-between text-xs text-slate-500 mt-2 font-bold px-1">
-                                <span>Left</span>
-                                <span>Bottom</span>
-                                <span>Right</span>
-                                <span>Top</span>
-                                <span>Left</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
 
-            {isTeacherMode && (
-                <div className="flex-grow bg-slate-900 p-6 overflow-auto">
-                    <div className="max-w-5xl mx-auto bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-950 text-slate-400 uppercase text-xs font-bold"><tr><th className="p-4">Name</th><th className="p-4">Teacher</th><th className="p-4">Phases Score</th><th className="p-4">Labels Score</th><th className="p-4">Time</th></tr></thead>
-                            <tbody className="divide-y divide-slate-700 text-slate-300">
-                                {classResults.map(r => (
-                                    <tr key={r.id} className="hover:bg-slate-700/50">
-                                        <td className="p-4 font-bold text-white">{r.name}</td>
-                                        <td className="p-4 text-sm">{r.teacher}</td>
-                                        <td className="p-4"><span className={`font-bold ${r.score_moons===8?'text-green-400':r.score_moons?'text-yellow-400':'text-slate-600'}`}>{r.score_moons ?? '-'} / 8</span></td>
-                                        <td className="p-4"><span className={`font-bold ${r.score_labels===8?'text-green-400':r.score_labels?'text-yellow-400':'text-slate-600'}`}>{r.score_labels ?? '-'} / 8</span></td>
-                                        <td className="p-4 text-xs text-slate-500">{r.timestamp ? new Date(r.timestamp.seconds*1000).toLocaleTimeString() : ''}</td>
-                                    </tr>
-                                ))}
+            <!-- Canvas Area -->
+            <div id="canvas-container" class="flex-grow relative bg-slate-900 overflow-hidden">
+                <canvas id="game-canvas" class="absolute inset-0 cursor-crosshair"></canvas>
+                
+                <!-- Explore Slider -->
+                <div id="explore-slider-container" class="absolute bottom-8 left-1/2 -translate-x-1/2 w-full max-w-md px-8">
+                    <input type="range" min="0" max="360" value="0" id="explore-slider" class="w-full">
+                    <div class="flex justify-between text-xs text-slate-500 mt-2 font-bold px-1">
+                        <span>Left</span><span>Bottom</span><span>Right</span><span>Top</span><span>Left</span>
+                    </div>
+                </div>
+
+                <!-- Teacher Table -->
+                <div id="teacher-table-container" class="absolute inset-0 bg-slate-900 p-6 overflow-auto hidden">
+                    <div class="max-w-5xl mx-auto bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-950 text-slate-400 uppercase font-bold">
+                                <tr><th class="p-4">Name</th><th class="p-4">Teacher</th><th class="p-4">Phases</th><th class="p-4">Labels</th><th class="p-4">Time</th></tr>
+                            </thead>
+                            <tbody id="score-table-body" class="divide-y divide-slate-700 text-slate-300">
+                                <!-- Rows injected by JS -->
                             </tbody>
                         </table>
                     </div>
                 </div>
-            )}
-          </>
-      )}
+            </div>
+        </div>
     </div>
-  );
-}
+
+    <!-- 3. MAIN JAVASCRIPT LOGIC -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // ==========================================
+        // 🚨 PASTE YOUR CONFIG HERE 🚨
+        // ==========================================
+        const firebaseConfig = {
+            // apiKey: "...",
+            // authDomain: "...",
+            // ... paste everything between the curly braces here
+        };
+
+        // --- Init Firebase ---
+        let app, auth, db;
+        try {
+            if (firebaseConfig.apiKey) {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                signInAnonymously(auth);
+            } else {
+                console.warn("⚠️ NO FIREBASE CONFIG FOUND. App will run in offline mode (no saving).");
+            }
+        } catch(e) { console.error(e); }
+
+        // --- Game State ---
+        const state = {
+            mode: 'explore', // explore | drag-moons | drag-labels
+            user: null,
+            name: '',
+            teacher: '',
+            isTeacher: false,
+            items: [],
+            zones: [],
+            stars: [],
+            width: 0,
+            height: 0,
+            dragId: null,
+            dragOffset: {x:0, y:0},
+            explorer: { angle: Math.PI, label: 'New Moon', sliderVal: 0 }
+        };
+
+        // --- Constants ---
+        const MOON_R = 30;
+        const ORBIT_SCALE = 0.35;
+        const EARTH_IMG_URL = "https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/600px-The_Earth_seen_from_Apollo_17.jpg";
+        
+        // --- Data ---
+        const MOON_DATA = [
+            { id: '1', type: 'new-moon', label: 'New Moon', correctZone: 1 },
+            { id: '2', type: 'waxing-crescent', label: 'Waxing Crescent', correctZone: 2 },
+            { id: '3', type: 'first-quarter', label: 'First Quarter', correctZone: 3 },
+            { id: '4', type: 'waxing-gibbous', label: 'Waxing Gibbous', correctZone: 4 },
+            { id: '5', type: 'full-moon', label: 'Full Moon', correctZone: 5 },
+            { id: '6', type: 'waning-gibbous', label: 'Waning Gibbous', correctZone: 6 },
+            { id: '7', type: 'third-quarter', label: 'Third Quarter', correctZone: 7 },
+            { id: '8', type: 'waning-crescent', label: 'Waning Crescent', correctZone: 8 },
+        ];
+
+        // --- DOM Elements ---
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const loginScreen = document.getElementById('login-screen');
+        const mainUi = document.getElementById('main-ui');
+        const sliderContainer = document.getElementById('explore-slider-container');
+        const slider = document.getElementById('explore-slider');
+        const feedbackEl = document.getElementById('feedback-msg');
+        const userDisplay = document.getElementById('user-display');
+        const teacherTable = document.getElementById('teacher-table-container');
+        const submitBtn = document.getElementById('btn-submit');
+
+        // --- Images ---
+        const earthImg = new Image();
+        earthImg.crossOrigin = "anonymous";
+        earthImg.src = EARTH_IMG_URL;
+
+        // --- Init ---
+        function init() {
+            // Generate stars
+            for(let i=0; i<100; i++) state.stars.push({ x: Math.random(), y: Math.random(), size: Math.random()*2+0.5, opacity: Math.random(), speed: Math.random()*2+0.5 });
+            
+            // Show Login
+            loginScreen.classList.remove('hidden');
+            lucide.createIcons();
+            
+            resize();
+            requestAnimationFrame(loop);
+        }
+
+        // --- Logic ---
+        function resetGame(newMode) {
+            state.mode = newMode;
+            state.dragId = null;
+            
+            // Update UI Tabs
+            document.querySelectorAll('#tabs-student button').forEach(b => {
+                b.className = "px-3 py-1.5 rounded-md text-sm font-bold flex items-center gap-2 transition-colors text-slate-400 hover:text-white";
+            });
+            const activeBtn = document.getElementById(newMode === 'drag-moons' ? 'tab-moons' : newMode === 'drag-labels' ? 'tab-labels' : 'tab-explore');
+            // Colors: Explore=Purple, Phase=Blue, Label=Emerald
+            let colorClass = newMode === 'explore' ? 'bg-purple-600' : newMode === 'drag-moons' ? 'bg-blue-600' : 'bg-emerald-600';
+            activeBtn.className = `px-3 py-1.5 rounded-md text-sm font-bold flex items-center gap-2 transition-colors text-white ${colorClass}`;
+
+            // Visibility
+            sliderContainer.style.display = newMode === 'explore' ? 'block' : 'none';
+            submitBtn.style.display = newMode === 'explore' ? 'none' : 'flex';
+
+            // Items
+            if (newMode === 'explore') {
+                state.items = [];
+                updateExplorerFromSlider(0); // Reset to New Moon (Left)
+                setFeedback('Drag moon, use slider, or arrow keys.');
+            } else {
+                // Shuffle items
+                const shuffled = [...MOON_DATA].sort(() => Math.random() - 0.5);
+                state.items = shuffled.map((m, idx) => ({
+                    id: m.id,
+                    type: m.type,
+                    text: newMode === 'drag-labels' ? m.label : null,
+                    x: 0, y: 0,
+                    isDragging: false, currentZone: null, isLocked: false, bankIndex: idx
+                }));
+                setFeedback(newMode === 'drag-moons' ? 'Drag moons to orbit.' : 'Drag labels to moons.');
+            }
+            recalcLayout();
+        }
+
+        function recalcLayout() {
+            if(!state.width) return;
+            const cx = state.width / 2;
+            const cy = (state.height - 120) * 0.5;
+            const r = Math.min(state.width, state.height - 120) * ORBIT_SCALE;
+
+            // Zones
+            state.zones = [];
+            for (let i = 1; i <= 8; i++) {
+                let deg = 0;
+                if(i===1) deg=180; else if(i===2) deg=135; else if(i===3) deg=90;
+                else if(i===4) deg=45; else if(i===5) deg=0; else if(i===6) deg=315;
+                else if(i===7) deg=270; else if(i===8) deg=225;
+                const rad = deg * (Math.PI/180);
+                state.zones.push({ id: i, x: cx + r*Math.cos(rad), y: cy + r*Math.sin(rad) });
+            }
+
+            // Snap Items to Bank or Zone
+            const bankY = state.height - 60;
+            const itemW = state.mode === 'drag-labels' ? 100 : 70;
+            const totalW = 8 * itemW;
+            const startX = (state.width - totalW)/2 + itemW/2;
+
+            state.items.forEach(item => {
+                if(item.isDragging) return;
+                if(item.currentZone) {
+                    const z = state.zones.find(z => z.id === item.currentZone);
+                    if(z) {
+                        item.x = z.x;
+                        item.y = state.mode === 'drag-labels' ? z.y + 45 : z.y;
+                    }
+                } else {
+                    item.x = startX + item.bankIndex * itemW;
+                    item.y = bankY;
+                }
+            });
+        }
+
+        // --- Interaction Logic ---
+        function updateExplorerFromSlider(val) {
+            state.explorer.sliderVal = Number(val);
+            slider.value = val;
+            
+            // Map 0 (Left) -> 360 (Left)
+            // At slider 0, we want angle 180 (PI)
+            // At slider 180 (Right), we want angle 0
+            // Angle = 180 - slider
+            
+            const angleDeg = 180 - val;
+            const rad = angleDeg * (Math.PI / 180);
+            
+            state.explorer.angle = rad;
+            state.explorer.label = getPhaseLabelFromAngle(rad);
+        }
+
+        function getPhaseLabelFromAngle(rad) {
+            let deg = rad * (180/Math.PI);
+            while(deg <= -180) deg += 360;
+            while(deg > 180) deg -= 360;
+            const d = Math.abs(deg);
+            if(d > 160) return 'New Moon';
+            if(d > 110) return deg > 0 ? 'Waxing Crescent' : 'Waning Crescent';
+            if(d > 70) return deg > 0 ? 'First Quarter' : 'Third Quarter';
+            if(d > 20) return deg > 0 ? 'Waxing Gibbous' : 'Waning Gibbous';
+            return 'Full Moon';
+        }
+
+        // --- Render Helpers ---
+        function drawEarth(cx, cy, r) {
+            ctx.save(); ctx.translate(cx, cy);
+            if(earthImg.complete && earthImg.naturalWidth) {
+                ctx.save(); ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.clip();
+                ctx.drawImage(earthImg, -r, -r, r*2, r*2);
+                // Terminator shadow
+                const grad = ctx.createLinearGradient(-r, 0, r, 0);
+                grad.addColorStop(0, 'rgba(0,0,0,0)');
+                grad.addColorStop(0.5, 'rgba(0,0,0,0.1)');
+                grad.addColorStop(1, 'rgba(0,0,0,0.85)');
+                ctx.fillStyle = grad; ctx.fillRect(-r,-r,r*2,r*2);
+                ctx.restore();
+            } else {
+                ctx.fillStyle = '#2563EB'; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
+            }
+            // Halo
+            const halo = ctx.createRadialGradient(0,0,r*0.9, 0,0,r*1.2);
+            halo.addColorStop(0, 'rgba(59,130,246,0.4)'); halo.addColorStop(1, 'rgba(59,130,246,0)');
+            ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(0,0,r*1.3,0,Math.PI*2); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawContinuousMoon(angle, x, y, r) {
+            ctx.save(); ctx.translate(x, y);
+            // Dark Base
+            ctx.fillStyle = '#18181B'; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
+            
+            // Lit Path
+            ctx.fillStyle = '#F4F4F5'; ctx.beginPath();
+            let ang = angle % (Math.PI*2);
+            if(ang < 0) ang += Math.PI*2;
+            const xTerm = r * Math.cos(ang);
+
+            if(ang >= 0 && ang < Math.PI) { // Waxing (Bottom)
+                ctx.arc(0, 0, r, -Math.PI/2, Math.PI/2); // Right arc
+                ctx.ellipse(0, 0, Math.abs(xTerm), r, 0, Math.PI/2, 3*Math.PI/2, xTerm < 0);
+            } else { // Waning (Top)
+                ctx.arc(0, 0, r, Math.PI/2, 3*Math.PI/2); // Left arc
+                ctx.ellipse(0, 0, Math.abs(xTerm), r, 0, 3*Math.PI/2, Math.PI/2, xTerm < 0);
+            }
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawStaticMoon(type, x, y, r, inBank) {
+            ctx.save(); ctx.translate(x, y);
+            ctx.fillStyle = '#18181B'; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
+            
+            ctx.fillStyle = '#F4F4F5';
+            const half = (right) => { ctx.beginPath(); ctx.arc(0,0,r, right?-Math.PI/2:Math.PI/2, right?Math.PI/2:-Math.PI/2); ctx.fill(); };
+            
+            if(type.includes('full')) { ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill(); }
+            else if(type.includes('first')) half(true);
+            else if(type.includes('third')) half(false);
+            else if(type.includes('waxing-crescent')) { half(true); ctx.fillStyle='#18181B'; ctx.beginPath(); ctx.ellipse(0,0,r*0.6,r,0,0,Math.PI*2); ctx.fill(); }
+            else if(type.includes('waning-crescent')) { half(false); ctx.fillStyle='#18181B'; ctx.beginPath(); ctx.ellipse(0,0,r*0.6,r,0,0,Math.PI*2); ctx.fill(); }
+            else if(type.includes('waxing-gibbous')) { half(true); ctx.beginPath(); ctx.ellipse(0,0,r*0.6,r,0,0,Math.PI*2); ctx.fill(); }
+            else if(type.includes('waning-gibbous')) { half(false); ctx.fillStyle='#F4F4F5'; ctx.beginPath(); ctx.ellipse(0,0,r*0.6,r,0,0,Math.PI*2); ctx.fill(); }
+
+            if(inBank) {
+                ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function drawLabel(text, x, y, isLocked) {
+            ctx.save(); ctx.translate(x,y);
+            ctx.font = 'bold 12px sans-serif';
+            const w = ctx.measureText(text).width + 20;
+            ctx.fillStyle = isLocked ? '#22C55E' : '#334155';
+            ctx.strokeStyle = isLocked ? '#166534' : '#94A3B8';
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.roundRect(-w/2, -13, w, 26, 4); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = 'white'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(text, 0, 0);
+            ctx.restore();
+        }
+
+        function loop() {
+            // 1. Background
+            ctx.fillStyle = '#0F172A'; ctx.fillRect(0,0,state.width, state.height);
+            
+            // Stars
+            state.stars.forEach(s => {
+                ctx.globalAlpha = Math.abs(Math.sin(Date.now() * s.speed * 0.001)) * s.opacity;
+                ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(s.x*state.width, s.y*state.height, s.size, 0, Math.PI*2); ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+
+            // Sun
+            const sunGrad = ctx.createLinearGradient(0,0,150,0);
+            sunGrad.addColorStop(0, 'rgba(253, 186, 116, 0.4)'); sunGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = sunGrad; ctx.fillRect(0,0,150,state.height);
+            ctx.save(); ctx.translate(30, state.height/2); ctx.rotate(-Math.PI/2);
+            ctx.fillStyle = '#FDBA74'; ctx.font = 'bold 24px sans-serif'; ctx.fillText('SUNLIGHT', -50, 0); ctx.restore();
+
+            // Earth
+            const cx = state.width / 2;
+            const cy = (state.height - 120) * 0.5;
+            const r = Math.min(state.width, state.height - 120) * ORBIT_SCALE;
+            
+            ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.strokeStyle = '#334155'; ctx.setLineDash([10,10]); ctx.stroke(); ctx.setLineDash([]);
+            drawEarth(cx, cy, r*0.35);
+
+            // Bank Background (Behind items)
+            if(state.mode !== 'explore') {
+                ctx.fillStyle = '#334155'; ctx.fillRect(0, state.height-110, state.width, 110);
+                ctx.fillStyle = '#CBD5E1'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'left';
+                ctx.fillText(state.mode === 'drag-moons' ? 'MOON BANK' : 'LABEL BANK', 20, state.height-90);
+            }
+
+            // --- Explore Mode ---
+            if(state.mode === 'explore') {
+                const ex = state.explorer;
+                const mx = cx + r * Math.cos(ex.angle);
+                const my = cy + r * Math.sin(ex.angle);
+                
+                // Line
+                ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(mx, my); ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.stroke();
+                
+                // Moon
+                drawContinuousMoon(ex.angle, mx, my, MOON_R * 1.5);
+                
+                // Label
+                drawLabel(ex.label, mx, my - 55, false);
+            } 
+            // --- Game Modes ---
+            else {
+                // Zones
+                state.zones.forEach(z => {
+                    // Drop target highlight
+                    if(state.dragId) {
+                        const item = state.items.find(i => i.id === state.dragId);
+                        const dist = Math.hypot(item.x - z.x, item.y - z.y);
+                        const hitR = state.mode === 'drag-labels' ? 60 : MOON_R * 1.5;
+                        if(dist < hitR) {
+                            ctx.strokeStyle = '#60A5FA'; ctx.lineWidth = 3;
+                            ctx.beginPath(); ctx.arc(z.x, z.y, MOON_R+5, 0, Math.PI*2); ctx.stroke();
+                        }
+                    }
+
+                    if(state.mode === 'drag-moons') {
+                        ctx.strokeStyle = '#334155'; ctx.lineWidth = 2; ctx.setLineDash([5,5]);
+                        ctx.beginPath(); ctx.arc(z.x, z.y, MOON_R+5, 0, Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+                        ctx.fillStyle = '#475569'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                        ctx.fillText(z.id, z.x, z.y);
+                    } else {
+                        // Label match: Show correct moon
+                        const m = MOON_DATA.find(d => d.correctZone === z.id);
+                        if(m) drawStaticMoon(m.type, z.x, z.y, MOON_R, false);
+                        // Box target
+                        ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+                        ctx.strokeRect(z.x - 40, z.y + 32, 80, 26); ctx.setLineDash([]);
+                    }
+                });
+
+                // Items
+                // Sort dragging to top
+                state.items.sort((a,b) => a.isDragging ? 1 : -1).forEach(item => {
+                    if(state.mode === 'drag-moons' && !item.text) {
+                        const inBank = !item.currentZone && !item.isDragging;
+                        drawStaticMoon(item.type, item.x, item.y, MOON_R, inBank);
+                        
+                        // Show label if in bank or dragging, OR if docked in Phase Match (New Feature)
+                        ctx.fillStyle = '#E2E8F0'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+                        ctx.fillText(MOON_DATA.find(m=>m.id===item.id).label, item.x, item.y + MOON_R + 15);
+                        
+                        if(item.isLocked) drawCheckmark(item.x + 20, item.y - 20);
+                    } 
+                    else if(state.mode === 'drag-labels' && item.text) {
+                        drawLabel(item.text, item.x, item.y, item.isLocked);
+                        if(item.isLocked) drawCheckmark(item.x + 35, item.y - 15);
+                    }
+                });
+            }
+
+            requestAnimationFrame(loop);
+        }
+
+        function drawCheckmark(x, y) {
+            ctx.beginPath(); ctx.arc(x,y,10,0,Math.PI*2); ctx.fillStyle = '#22C55E'; ctx.fill();
+            ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x-5,y); ctx.lineTo(x-1,y+4); ctx.lineTo(x+4,y-3); ctx.stroke();
+        }
+
+        // --- Events ---
+        window.addEventListener('resize', resize);
+        function resize() {
+            state.width = mainUi.clientWidth || window.innerWidth;
+            state.height = mainUi.clientHeight || window.innerHeight;
+            canvas.width = state.width;
+            canvas.height = state.height;
+            recalcLayout();
+        }
+
+        canvas.addEventListener('pointerdown', e => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            if(state.mode === 'explore') return; // Slider only
+
+            // Find clicked item
+            const hitR = state.mode === 'drag-labels' ? 40 : MOON_R;
+            const item = [...state.items].reverse().find(i => Math.hypot(i.x - x, i.y - y) < hitR);
+            
+            if(item && !item.isLocked) {
+                state.dragId = item.id;
+                state.dragOffset = { x: item.x - x, y: item.y - y };
+                item.isDragging = true;
+                canvas.setPointerCapture(e.pointerId);
+            }
+        });
+
+        canvas.addEventListener('pointermove', e => {
+            if(!state.dragId) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const item = state.items.find(i => i.id === state.dragId);
+            if(item) {
+                item.x = x + state.dragOffset.x;
+                item.y = y + state.dragOffset.y;
+            }
+        });
+
+        canvas.addEventListener('pointerup', e => {
+            if(!state.dragId) return;
+            const item = state.items.find(i => i.id === state.dragId);
+            
+            // Hit Test
+            let hit = null;
+            const hitR = state.mode === 'drag-labels' ? 60 : MOON_R * 1.5;
+            state.zones.forEach(z => {
+                if(Math.hypot(item.x - z.x, item.y - z.y) < hitR) hit = z;
+            });
+
+            if(hit) {
+                // Kick out existing
+                const existing = state.items.find(i => i.currentZone === hit.id && i.id !== item.id);
+                if(existing) { existing.currentZone = null; }
+                
+                item.currentZone = hit.id;
+                item.x = hit.x;
+                item.y = state.mode === 'drag-labels' ? hit.y + 45 : hit.y;
+            } else {
+                item.currentZone = null;
+            }
+            
+            item.isDragging = false;
+            state.dragId = null;
+            recalcLayout(); // Snap back to bank if needed
+        });
+
+        // Slider Event
+        slider.addEventListener('input', (e) => {
+            updateExplorerFromSlider(Number(e.target.value));
+        });
+
+        // Arrow Keys
+        window.addEventListener('keydown', (e) => {
+            if(state.mode !== 'explore' || loginScreen.style.display !== 'none') return;
+            let val = Number(slider.value);
+            if(e.key === 'ArrowRight') val += 2;
+            if(e.key === 'ArrowLeft') val -= 2;
+            if(val > 360) val -= 360;
+            if(val < 0) val += 360;
+            updateExplorerFromSlider(val);
+        });
+
+        // --- DOM Bindings ---
+        document.getElementById('login-form').onsubmit = (e) => {
+            e.preventDefault();
+            const sName = document.getElementById('student-name').value;
+            if(!sName.trim()) return;
+            state.name = sName;
+            state.teacher = document.getElementById('teacher-name').value;
+            
+            userDisplay.innerText = sName;
+            loginScreen.classList.add('hidden');
+            mainUi.classList.remove('hidden');
+            resize();
+            resetGame('explore'); // Start in Explore
+        };
+
+        window.setMode = (m) => resetGame(m);
+        
+        window.checkAnswers = async () => {
+            let count = 0;
+            state.items.forEach(i => {
+                const m = MOON_DATA.find(d => d.id === i.id);
+                if(i.currentZone === m.correctZone) {
+                    count++;
+                    i.isLocked = true;
+                } else {
+                    i.currentZone = null; // Kick back wrong ones
+                    i.isLocked = false;
+                }
+            });
+            recalcLayout();
+            setFeedback(count === 8 ? 'Perfect! Score saved.' : `You got ${count}/8. Try again.`);
+            
+            // Save to Firebase
+            if(db) {
+                const field = state.mode === 'drag-moons' ? 'score_moons' : 'score_labels';
+                try {
+                    await addDoc(collection(db, 'artifacts', 'elementary_moon_lab', 'public', 'data', 'scores'), {
+                        name: state.name, teacher: state.teacher, [field]: count, timestamp: serverTimestamp()
+                    });
+                } catch(e) { console.error("Save failed", e); }
+            }
+        };
+
+        // --- Teacher View ---
+        document.getElementById('btn-teacher-view').onclick = () => {
+            state.isTeacher = true;
+            loginScreen.classList.add('hidden');
+            mainUi.classList.remove('hidden');
+            userDisplay.innerText = "Teacher Dashboard";
+            document.getElementById('teacher-controls').classList.remove('hidden');
+            document.getElementById('tabs-student').classList.add('hidden');
+            document.getElementById('btn-submit').classList.add('hidden');
+            sliderContainer.classList.add('hidden');
+            canvas.style.display = 'none';
+            teacherTable.classList.remove('hidden');
+            
+            // Fetch Data
+            if(db) {
+                const q = query(collection(db, 'artifacts', 'elementary_moon_lab', 'public', 'data', 'scores'));
+                onSnapshot(q, (snap) => {
+                    const tbody = document.getElementById('score-table-body');
+                    tbody.innerHTML = '';
+                    const rows = [];
+                    snap.forEach(doc => rows.push(doc.data()));
+                    rows.sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
+                    
+                    rows.forEach(r => {
+                        const time = r.timestamp ? new Date(r.timestamp.seconds*1000).toLocaleTimeString() : '';
+                        const tr = document.createElement('tr');
+                        tr.className = "hover:bg-slate-700/50";
+                        tr.innerHTML = `<td class="p-4 font-bold text-white">${r.name}</td>
+                                        <td class="p-4">${r.teacher || '-'}</td>
+                                        <td class="p-4 font-bold ${r.score_moons===8?'text-green-400':'text-slate-400'}">${r.score_moons ?? '-'}</td>
+                                        <td class="p-4 font-bold ${r.score_labels===8?'text-green-400':'text-slate-400'}">${r.score_labels ?? '-'}</td>
+                                        <td class="p-4 text-xs text-slate-500">${time}</td>`;
+                        tbody.appendChild(tr);
+                    });
+                });
+            }
+        };
+
+        window.logout = () => location.reload();
+        window.purgeData = async () => {
+            if(!confirm("Are you sure? This deletes ALL student scores.")) return;
+            if(db) {
+                const q = query(collection(db, 'artifacts', 'elementary_moon_lab', 'public', 'data', 'scores'));
+                const snap = await getDocs(q);
+                snap.forEach(d => deleteDoc(d.ref));
+            }
+        };
+
+        function setFeedback(msg) {
+            feedbackEl.innerText = msg;
+        }
+
+        // Initial launch
+        init();
+
+    </script>
+</body>
+</html>
