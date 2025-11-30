@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moon Phases with Data v2.4</title>
+    <title>Moon Phases with Data v2.6</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -33,7 +33,7 @@
         <!-- LOGIN SCREEN -->
         <div id="login-screen" class="flex-grow flex items-center justify-center p-4 hidden">
             <div class="bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full border border-slate-700">
-                <h1 class="text-3xl font-bold text-center text-blue-400 mb-6">Moon Lab v2.4</h1>
+                <h1 class="text-3xl font-bold text-center text-blue-400 mb-6">Moon Lab v2.6</h1>
                 <form id="login-form" class="space-y-4">
                     <div>
                         <label class="block text-xs font-bold text-slate-400 mb-1 uppercase">Class Code (Required)</label>
@@ -293,9 +293,21 @@
                 let deg = 0; if(i===1) deg=180; else if(i===2) deg=135; else if(i===3) deg=90; else if(i===4) deg=45; else if(i===5) deg=0; else if(i===6) deg=315; else if(i===7) deg=270; else if(i===8) deg=225;
                 const rad = deg * (Math.PI/180); state.zones.push({ id: i, x: cx + r*Math.cos(rad), y: cy + r*Math.sin(rad) });
             }
-            // MODIFIED: Increased bottom padding for bank items
-            const bankY = state.height - 80; 
+            // SMART BANK POSITIONING
+            let bankHeight, bankY;
+            
+            if (state.mode === 'drag-moons') {
+                // Phase Match needs height for moons + staggered text
+                bankHeight = 160;
+                bankY = state.height - 100;
+            } else {
+                // Label Match is compact
+                bankHeight = 110;
+                bankY = state.height - 55;
+            }
+
             const itemW = state.mode === 'drag-labels' ? 100 : 70; const totalW = 8 * itemW; const startX = (state.width - totalW)/2 + itemW/2;
+            
             state.items.forEach(item => {
                 if(item.isDragging) return;
                 if(item.currentZone) {
@@ -359,11 +371,13 @@
             drawEarth(ctx, cx, cy, r*0.35, earthImg);
 
             if(state.mode !== 'explore') {
-                // MODIFIED: Taller bank background
-                ctx.fillStyle = '#334155'; ctx.fillRect(0, state.height-140, state.width, 140);
+                // SMART BANK DRAWING
+                let bankHeight = state.mode === 'drag-moons' ? 160 : 110;
+                let textY = state.mode === 'drag-moons' ? state.height - 140 : state.height - 90;
+                
+                ctx.fillStyle = '#334155'; ctx.fillRect(0, state.height-bankHeight, state.width, bankHeight);
                 ctx.fillStyle = '#CBD5E1'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'left';
-                // MODIFIED: Adjusted text position for taller bank
-                ctx.fillText(state.mode === 'drag-moons' ? 'MOON BANK' : 'LABEL BANK', 20, state.height-120);
+                ctx.fillText(state.mode === 'drag-moons' ? 'MOON BANK' : 'LABEL BANK', 20, textY);
             }
 
             if(state.mode === 'explore') {
