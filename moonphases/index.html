@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moon Phases Lab</title>
+    <title>Moon Phases with Data v2.0</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -33,7 +33,7 @@
         <!-- LOGIN SCREEN -->
         <div id="login-screen" class="flex-grow flex items-center justify-center p-4 hidden">
             <div class="bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full border border-slate-700">
-                <h1 class="text-3xl font-bold text-center text-blue-400 mb-6">Moon Lab</h1>
+                <h1 class="text-3xl font-bold text-center text-blue-400 mb-6">Moon Lab v2.0</h1>
                 <form id="login-form" class="space-y-4">
                     <div>
                         <label class="block text-xs font-bold text-slate-400 mb-1 uppercase">Class Code (Required)</label>
@@ -51,8 +51,6 @@
                         <i data-lucide="users" width="16"></i> Teacher Dashboard
                     </button>
                 </div>
-                <!-- Debug Status -->
-                <div id="db-status" class="mt-4 text-center text-xs text-slate-500 font-mono">Initializing...</div>
             </div>
         </div>
 
@@ -78,7 +76,7 @@
                             <input type="text" id="teacher-code-filter" placeholder="ENTER CODE" class="bg-transparent text-white text-sm font-bold w-24 outline-none uppercase placeholder-slate-600">
                             <button onclick="loadTeacherData()" class="ml-2 text-blue-400 hover:text-blue-300 bg-slate-800 p-1 rounded"><i data-lucide="search" width="14"></i></button>
                         </div>
-                        <button onclick="purgeData()" class="px-3 py-1.5 bg-rose-900/50 text-rose-300 border border-rose-800 rounded text-xs font-bold">Clear</button>
+                        <button onclick="purgeData()" class="px-3 py-1.5 bg-rose-900/50 text-rose-300 border border-rose-800 rounded text-xs font-bold hover:bg-rose-900 hover:text-white transition">Clear Class</button>
                         <button onclick="logout()" class="px-3 py-1.5 bg-slate-700 rounded text-xs font-bold">Exit</button>
                     </div>
                 </div>
@@ -107,48 +105,39 @@
 
     <!-- MAIN SCRIPT -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, getDocs, deleteDoc, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, getDocs, deleteDoc, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ==========================================
-        // 🚨 YOUR KEYS ARE PRE-FILLED BELOW 🚨
+        // 🚨 FIREBASE CONFIGURATION 🚨
         // ==========================================
-        const firebaseConfig = {
-            apiKey: "AIzaSyAootkVh2WxqUHUFQEPlyBIPjUtYawjhrk",
-            authDomain: "engaging-students.firebaseapp.com",
-            projectId: "engaging-students",
-            storageBucket: "engaging-students.firebasestorage.app",
-            messagingSenderId: "546664658446",
-            appId: "1:546664658446:web:040f9b92ef3c223641ae5f",
-            measurementId: "G-E7ZTRD10MB"
-        };
-
-        let app, auth, db;
-        // CORRECTED ID TO MATCH PREVIOUS VERSION
-        const LAB_ID = 'moon_lab_default'; 
         
-        const statusEl = document.getElementById('db-status');
-
+        let app, auth, db;
+        let appId = 'default-app-id'; // Fallback
+        
         try {
+            // Using environment variables for compatibility with the current platform
+            const firebaseConfig = JSON.parse(__firebase_config);
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'moon_lab_default';
+            
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
 
-            signInAnonymously(auth)
-                .then(() => {
-                    statusEl.innerHTML = "✅ Database Connected (Anonymous)";
-                    statusEl.className = "mt-4 text-center text-xs text-green-500 font-mono";
-                })
-                .catch(e => {
-                    console.error("Auth Error:", e);
-                    statusEl.innerHTML = "❌ Connection Failed: " + e.message;
-                    statusEl.className = "mt-4 text-center text-xs text-red-500 font-mono";
-                });
+            // Auth Logic: Prefer custom token, fallback to anonymous
+            const initAuth = async () => {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            };
+            initAuth();
 
         } catch(e) { 
             console.error("Firebase Initialization Error:", e);
-            statusEl.innerHTML = "❌ Init Error (See Console)";
+            alert("Database connection failed. Scores may not save.");
         }
 
         // --- GLOBAL CONSTANTS ---
@@ -167,9 +156,11 @@
             unsubscribe: null
         };
 
+        // Listen for Auth State
         if (auth) {
             onAuthStateChanged(auth, (user) => {
                 state.user = user;
+                // Once authenticated, we could load user prefs here if needed
             });
         }
 
@@ -503,7 +494,8 @@
             if(db) {
                 const field = state.mode === 'drag-moons' ? 'score_moons' : 'score_labels';
                 try { 
-                    await addDoc(collection(db, 'artifacts', LAB_ID, 'public', 'data', 'scores'), { 
+                    // Using standardized path structure
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'scores'), { 
                         name: state.name, 
                         classCode: state.classCode, 
                         [field]: count, 
@@ -532,7 +524,6 @@
             sliderContainer.classList.add('hidden');
             canvas.style.display = 'none';
             teacherTable.classList.remove('hidden');
-            statusEl.classList.add('hidden'); // Hide debug on teacher view
         };
 
         window.loadTeacherData = () => {
@@ -544,7 +535,7 @@
             if(db) {
                 try {
                     const q = query(
-                        collection(db, 'artifacts', LAB_ID, 'public', 'data', 'scores'),
+                        collection(db, 'artifacts', appId, 'public', 'data', 'scores'),
                         where("classCode", "==", filterCode)
                     );
                     
@@ -582,12 +573,40 @@
         };
 
         window.logout = () => location.reload();
+        
+        // SAFE PURGE FUNCTION (UPDATED)
         window.purgeData = async () => {
-            if(!confirm("Are you sure? This deletes ALL student scores.")) return;
+            const filterCode = document.getElementById('teacher-code-filter').value.toUpperCase().trim();
+            
+            if (!filterCode) {
+                alert("Please enter a Class Code in the filter box first. To prevent accidents, you can only clear one class at a time.");
+                return;
+            }
+
+            if(!confirm(`Are you sure you want to PERMANENTLY delete all student data for Class Code: "${filterCode}"?`)) return;
+            
             if(db) { 
-                const q = query(collection(db, 'artifacts', LAB_ID, 'public', 'data', 'scores')); 
-                const snap = await getDocs(q); 
-                snap.forEach(d => deleteDoc(d.ref)); 
+                try {
+                    const q = query(
+                        collection(db, 'artifacts', appId, 'public', 'data', 'scores'),
+                        where("classCode", "==", filterCode)
+                    ); 
+                    const snap = await getDocs(q); 
+                    
+                    if (snap.empty) {
+                        alert("No data found for this class code.");
+                        return;
+                    }
+
+                    const deletePromises = [];
+                    snap.forEach(d => deletePromises.push(deleteDoc(d.ref)));
+                    
+                    await Promise.all(deletePromises);
+                    alert(`Cleared ${snap.size} records for class ${filterCode}.`);
+                } catch (e) {
+                    console.error("Error clearing data:", e);
+                    alert("Error clearing data. Check console for details.");
+                }
             }
         };
 
