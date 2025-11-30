@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moon Phases with Data v2.0</title>
+    <title>Moon Phases with Data v2.1</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -33,7 +33,7 @@
         <!-- LOGIN SCREEN -->
         <div id="login-screen" class="flex-grow flex items-center justify-center p-4 hidden">
             <div class="bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full border border-slate-700">
-                <h1 class="text-3xl font-bold text-center text-blue-400 mb-6">Moon Lab v2.0</h1>
+                <h1 class="text-3xl font-bold text-center text-blue-400 mb-6">Moon Lab v2.1</h1>
                 <form id="login-form" class="space-y-4">
                     <div>
                         <label class="block text-xs font-bold text-slate-400 mb-1 uppercase">Class Code (Required)</label>
@@ -114,18 +114,35 @@
         // ==========================================
         
         let app, auth, db;
-        let appId = 'default-app-id'; // Fallback
+        let appId = 'moon_lab_default'; 
         
         try {
-            // Using environment variables for compatibility with the current platform
-            const firebaseConfig = JSON.parse(__firebase_config);
-            appId = typeof __app_id !== 'undefined' ? __app_id : 'moon_lab_default';
+            // HYBRID CONFIG: Works in Preview AND on GitHub
+            let firebaseConfig;
+            
+            // 1. Try to get config from the environment (Preview Mode)
+            if (typeof __firebase_config !== 'undefined') {
+                firebaseConfig = JSON.parse(__firebase_config);
+                if (typeof __app_id !== 'undefined') appId = __app_id;
+            } 
+            // 2. Fallback to hardcoded keys (GitHub Deployment Mode)
+            else {
+                firebaseConfig = {
+                    apiKey: "AIzaSyAootkVh2WxqUHUFQEPlyBIPjUtYawjhrk",
+                    authDomain: "engaging-students.firebaseapp.com",
+                    projectId: "engaging-students",
+                    storageBucket: "engaging-students.firebasestorage.app",
+                    messagingSenderId: "546664658446",
+                    appId: "1:546664658446:web:040f9b92ef3c223641ae5f",
+                    measurementId: "G-E7ZTRD10MB"
+                };
+            }
             
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
 
-            // Auth Logic: Prefer custom token, fallback to anonymous
+            // Auth Logic: Prefer custom token (Preview), fallback to anonymous (GitHub)
             const initAuth = async () => {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
@@ -594,15 +611,29 @@
                     const snap = await getDocs(q); 
                     
                     if (snap.empty) {
-                        alert("No data found for this class code.");
+                        alert(`No data found for class code "${filterCode}". Nothing was deleted.`);
                         return;
                     }
 
                     const deletePromises = [];
-                    snap.forEach(d => deletePromises.push(deleteDoc(d.ref)));
+                    let deletedCount = 0;
                     
-                    await Promise.all(deletePromises);
-                    alert(`Cleared ${snap.size} records for class ${filterCode}.`);
+                    snap.forEach(d => {
+                        // EXTRA SAFETY CHECK: Verify data matches before delete
+                        const data = d.data();
+                        if (data.classCode === filterCode) {
+                            deletePromises.push(deleteDoc(d.ref));
+                            deletedCount++;
+                        }
+                    });
+                    
+                    if (deletePromises.length > 0) {
+                        await Promise.all(deletePromises);
+                        alert(`Successfully deleted ${deletedCount} records for class "${filterCode}".`);
+                    } else {
+                        alert("No matching records found to delete.");
+                    }
+
                 } catch (e) {
                     console.error("Error clearing data:", e);
                     alert("Error clearing data. Check console for details.");
