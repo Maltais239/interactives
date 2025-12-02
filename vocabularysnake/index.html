@@ -1,0 +1,551 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vocabulary Snake: Social Studies Review</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        // Firebase Imports (Mandatory setup, even if not used for persistence)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, getDoc, setDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Firebase Variables
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth, userId;
+
+        /**
+         * Initializes Firebase and authenticates the user.
+         */
+        async function initializeFirebase() {
+            if (!firebaseConfig) {
+                console.error("Firebase config is missing.");
+                return;
+            }
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                await new Promise(resolve => {
+                    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+                        if (user) {
+                            userId = user.uid;
+                            console.log("Authenticated user ID:", userId);
+                        } else {
+                            try {
+                                if (initialAuthToken) {
+                                    await signInWithCustomToken(auth, initialAuthToken);
+                                } else {
+                                    await signInAnonymously(auth);
+                                }
+                                userId = auth.currentUser?.uid || crypto.randomUUID();
+                                console.log("Sign-in complete. User ID:", userId);
+                            } catch (error) {
+                                console.error("Firebase Sign-in Failed:", error);
+                                userId = crypto.randomUUID();
+                            }
+                        }
+                        unsubscribe();
+                        resolve();
+                    });
+                });
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+            }
+        }
+        
+        // --- Vocabulary Data ---
+        const vocabulary = [
+            { term: "Historical Site", definition: "A special place that is important to our past." },
+            { term: "Landforms", definition: "The natural shapes of the land, like mountains, hills, or flat prairies." },
+            { term: "Landmark", definition: "An important place or building that is easy to recognize." },
+            { term: "Natural Resources", definition: "Things from nature that people use, like water, trees, and oil." },
+            { term: "Physical Features", definition: "The different parts of the land you can see, like rivers, lakes, and mountains." },
+            { term: "Political Boundaries", definition: "The lines on a map that show where a province or country begins and ends." },
+            { term: "Territory", definition: "An area of land that belongs to a group of people." },
+            { term: "Treaty", definition: "A special promise or agreement made between groups of people, like First Nations and the government." },
+            { term: "Settlement", definition: "A community or place where people build homes and live." },
+            { term: "Province", definition: "A large area in Canada, like Alberta, that has its own government." },
+            { term: "Physical region", definition: "A big area of land that has special features, like mountains or plains." },
+            { term: "Map", definition: "A drawing that shows where places are on Earth." },
+            { term: "Bodies of Water", definition: "Large areas of water, like lakes and rivers, that help define physical regions." },
+            { term: "Farmland", definition: "Land used for growing crops or raising animals, which the government offered to settlers for a low price." },
+            { term: "Natural Landmark", definition: "A special feature created by nature, like a mountain or a rock formation, that is easy to recognize like the Big Rock in Alberta or the Three Sisters in Canmore." }
+        ];
+
+        // --- Game Setup ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const messageBox = document.getElementById('messageBox');
+        const quizModal = document.getElementById('quizModal');
+        const quizDefinition = document.getElementById('quizDefinition');
+        const quizOptionsContainer = document.getElementById('quizOptions');
+
+        const TILE_SIZE = 20;
+        let TILE_COUNT_X = 25; // 500 / 20
+        let TILE_COUNT_Y = 25; // 500 / 20
+        
+        let snake = [];
+        let dx = TILE_SIZE; // velocity in X direction (starts right)
+        let dy = 0; // velocity in Y direction
+        let food = {};
+        let score = 0;
+        let gameLoopInterval = null;
+        const INITIAL_SPEED = 250; // Slower speed as requested (250ms)
+        let gamePaused = true;
+        let currentQuizItem = null;
+        let growing = 0; // Number of segments to add
+        let nextDirection = {x: TILE_SIZE, y: 0};
+
+        /**
+         * Hides the quiz modal.
+         */
+        function hideQuizModal() {
+            // Use display: none directly for strict hiding
+            quizModal.style.display = 'none';
+        }
+
+        /**
+         * Shows the quiz modal.
+         */
+        function showQuizModal() {
+            quizModal.style.display = 'flex';
+        }
+
+
+        /**
+         * Converts the game grid size to match the canvas size.
+         */
+        function resizeCanvas() {
+            // Ensure the canvas is a multiple of TILE_SIZE and fits nicely
+            let width = Math.min(600, window.innerWidth - 40);
+            let height = Math.min(600, window.innerHeight - 40);
+
+            // Adjust to the nearest multiple of TILE_SIZE
+            width = Math.floor(width / TILE_SIZE) * TILE_SIZE;
+            height = Math.floor(height / TILE_SIZE) * TILE_SIZE;
+
+            canvas.width = width;
+            canvas.height = height;
+            TILE_COUNT_X = width / TILE_SIZE;
+            TILE_COUNT_Y = height / TILE_SIZE;
+            
+            if (gameLoopInterval) drawGame();
+        }
+
+        /**
+         * Starts the game with initial settings.
+         */
+        function startGame() {
+            console.log("Game started!"); 
+            if (gameLoopInterval) clearInterval(gameLoopInterval);
+            
+            // Initial snake: 3 segments near the center
+            const startX = Math.floor(TILE_COUNT_X / 4) * TILE_SIZE;
+            const startY = Math.floor(TILE_COUNT_Y / 2) * TILE_SIZE;
+            
+            snake = [
+                { x: startX, y: startY },
+                { x: startX - TILE_SIZE, y: startY },
+                { x: startX - 2 * TILE_SIZE, y: startY }
+            ];
+            dx = TILE_SIZE;
+            dy = 0;
+            nextDirection = {x: TILE_SIZE, y: 0};
+            score = 0;
+            growing = 0;
+            gamePaused = false;
+            
+            updateScore();
+            hideMessage();
+            generateFood();
+            hideQuizModal(); // Ensure quiz modal is hidden when starting
+            
+            // Start the game loop at the slow requested speed
+            gameLoopInterval = setInterval(gameLoop, INITIAL_SPEED);
+            
+            document.getElementById('startButton').textContent = 'Restart Game';
+        }
+
+        /**
+         * Main game loop: updates position, checks logic, and redraws.
+         */
+        function gameLoop() {
+            if (gamePaused) return;
+
+            // Update direction with the buffered input
+            dx = nextDirection.x;
+            dy = nextDirection.y;
+
+            const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+
+            // Check for game over conditions
+            if (checkCollision(head)) {
+                endGame();
+                return;
+            }
+
+            // Move the snake by adding the new head
+            snake.unshift(head);
+
+            // Check if the snake ate the food
+            if (head.x === food.x && head.y === food.y) {
+                gamePaused = true;
+                // Do not remove the tail yet, wait for the quiz result
+                
+                // Show the quiz
+                showQuiz(food.term, food.definition);
+            } else {
+                // If not eating food and not growing, remove the tail
+                if (growing <= 0) {
+                    snake.pop();
+                } else {
+                    growing--; // Decrement the growing count
+                }
+            }
+            
+            drawGame();
+        }
+
+        /**
+         * Checks if the given position collides with walls or the snake's body.
+         * @param {object} head - The new head position {x, y}.
+         * @returns {boolean} True if collision occurred, false otherwise.
+         */
+        function checkCollision(head) {
+            // Wall collision
+            if (head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height) {
+                return true;
+            }
+
+            // Self-collision (start checking from the 4th segment to avoid immediate self-collision)
+            for (let i = 1; i < snake.length; i++) {
+                if (head.x === snake[i].x && head.y === snake[i].y) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /**
+         * Stops the game loop and displays the game over message.
+         */
+        function endGame() {
+            clearInterval(gameLoopInterval);
+            gameLoopInterval = null;
+            gamePaused = true;
+            showMessage(`Game Over! Your final vocabulary score is: ${score}`, 'bg-red-500');
+        }
+
+        /**
+         * Generates a random position for the food that is not under the snake.
+         */
+        function generateFood() {
+            let newFood;
+            do {
+                newFood = {
+                    x: Math.floor(Math.random() * TILE_COUNT_X) * TILE_SIZE,
+                    y: Math.floor(Math.random() * TILE_COUNT_Y) * TILE_SIZE,
+                    // Pick a random vocabulary item for the food
+                    ...vocabulary[Math.floor(Math.random() * vocabulary.length)]
+                };
+            } while (snake.some(segment => segment.x === newFood.x && segment.y === newFood.y));
+            
+            food = newFood;
+        }
+
+        /**
+         * Draws the snake, food, and score on the canvas.
+         */
+        function drawGame() {
+            // Clear the canvas
+            ctx.fillStyle = '#1f2937'; // Dark gray background
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw the food (Definition Block)
+            ctx.fillStyle = '#10b981'; // Green (emerald) for the food
+            ctx.fillRoundedRect(food.x, food.y, TILE_SIZE, TILE_SIZE, 5); // Using custom rounded rect
+
+            // Draw the snake
+            snake.forEach((segment, index) => {
+                ctx.fillStyle = index === 0 ? '#fde047' : '#fef08a'; // Yellow head, lighter body
+                ctx.fillRoundedRect(segment.x, segment.y, TILE_SIZE, TILE_SIZE, 3);
+                ctx.strokeStyle = '#1f2937';
+                ctx.strokeRect(segment.x, segment.y, TILE_SIZE, TILE_SIZE);
+            });
+        }
+        
+        /**
+         * Helper function to draw a rounded rectangle (for nicer visuals).
+         */
+        CanvasRenderingContext2D.prototype.fillRoundedRect = function(x, y, width, height, radius) {
+            this.beginPath();
+            this.moveTo(x + radius, y);
+            this.lineTo(x + width - radius, y);
+            this.arcTo(x + width, y, x + width, y + radius, radius);
+            this.lineTo(x + width, y + height - radius);
+            this.arcTo(x + width, y + height, x + width - radius, y + height, radius);
+            this.lineTo(x + radius, y + height);
+            this.arcTo(x, y + height, x, y + height - radius, radius);
+            this.lineTo(x, y + radius);
+            this.arcTo(x, y, x + radius, y, radius);
+            this.closePath();
+            this.fill();
+        };
+
+        /**
+         * Updates the score displayed on the screen.
+         */
+        function updateScore() {
+            scoreDisplay.textContent = score;
+        }
+
+        /**
+         * Displays a temporary message (Game Over/etc.).
+         * @param {string} text - The message to display.
+         * @param {string} bgColorClass - Tailwind background class for styling.
+         */
+        function showMessage(text, bgColorClass) {
+            messageBox.textContent = text;
+            messageBox.className = `absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-4 rounded-lg shadow-2xl font-bold text-white text-center z-10 ${bgColorClass}`;
+            messageBox.classList.remove('hidden');
+        }
+
+        /**
+         * Hides the temporary message.
+         */
+        function hideMessage() {
+            messageBox.classList.add('hidden');
+        }
+
+        /**
+         * Generates and displays the vocabulary quiz modal.
+         * @param {string} correctTerm - The correct vocabulary term.
+         * @param {string} definition - The definition (the question).
+         */
+        function showQuiz(correctTerm, definition) {
+            quizDefinition.textContent = `Definition: "${definition}"`;
+            quizOptionsContainer.innerHTML = '';
+            
+            // 1. Get the correct answer
+            const correctAnswer = correctTerm;
+
+            // 2. Select 3 random distractors
+            const distractors = vocabulary
+                .filter(item => item.term !== correctAnswer)
+                .map(item => item.term)
+                .sort(() => 0.5 - Math.random()) // Shuffle the terms
+                .slice(0, 3);
+            
+            // 3. Combine and shuffle options
+            const options = [correctAnswer, ...distractors].sort(() => 0.5 - Math.random());
+            
+            // 4. Create and append buttons
+            options.forEach(option => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.className = 'w-full py-3 px-4 mb-3 text-lg font-medium text-gray-900 bg-white rounded-lg border-2 border-gray-300 hover:bg-yellow-100 transition duration-150 ease-in-out shadow-md cursor-pointer'; 
+                button.onclick = () => checkQuizAnswer(option, correctAnswer);
+                quizOptionsContainer.appendChild(button);
+            });
+
+            showQuizModal(); // Now uses the new style-based function
+        }
+
+        /**
+         * Checks the user's answer from the quiz modal.
+         * @param {string} selectedAnswer - The term the user clicked.
+         * @param {string} correctAnswer - The actual correct term.
+         */
+        function checkQuizAnswer(selectedAnswer, correctAnswer) {
+            hideQuizModal(); // Now uses the new style-based function
+
+            if (selectedAnswer === correctAnswer) {
+                // Correct Answer
+                score += 10;
+                growing += 1; // Grow the snake by 1 segment
+                updateScore();
+                showMessage('Correct! +10 Points', 'bg-green-500');
+                
+                // Since the snake is already at the food location (head is at food.x, food.y)
+                // we just need to generate the next food and resume.
+                generateFood(); 
+                
+            } else {
+                // Incorrect Answer
+                showMessage('Incorrect Term! Game Over.', 'bg-red-600');
+                endGame();
+                return; // Do not resume the game
+            }
+            
+            // Wait briefly to show the message, then resume
+            setTimeout(() => {
+                hideMessage();
+                gamePaused = false;
+                // Game loop will automatically pick up from the pause point
+            }, 1000); 
+        }
+
+        /**
+         * Handles keyboard input for snake movement.
+         * @param {Event} event - The keyboard event.
+         */
+        function handleKeydown(event) {
+            if (gamePaused && gameLoopInterval) return; // Prevent movement during quiz/pause
+
+            const key = event.key;
+            const movingHorizontally = dx !== 0;
+
+            // Prevent reversing direction immediately
+            switch (key) {
+                case 'ArrowUp':
+                case 'w':
+                    if (!movingHorizontally) return;
+                    nextDirection = { x: 0, y: -TILE_SIZE };
+                    break;
+                case 'ArrowDown':
+                case 's':
+                    if (!movingHorizontally) return;
+                    nextDirection = { x: 0, y: TILE_SIZE };
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                    if (movingHorizontally) return;
+                    nextDirection = { x: -TILE_SIZE, y: 0 };
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                    if (movingHorizontally) return;
+                    nextDirection = { x: TILE_SIZE, y: 0 };
+                    break;
+            }
+        }
+        
+        // --- Event Listeners and Initialization (Corrected Flow) ---
+        
+        window.onload = async function() {
+            // 1. **CRITICAL FIX:** Ensure the modal is strictly hidden using style property immediately.
+            hideQuizModal(); 
+
+            // 2. Initialize UI elements (synchronous)
+            resizeCanvas();
+            drawGame(); // Draw initial empty canvas
+
+            // 3. Attach ALL necessary event listeners immediately (synchronous)
+            document.getElementById('startButton').addEventListener('click', startGame);
+            window.addEventListener('keydown', handleKeydown);
+            window.addEventListener('resize', resizeCanvas);
+
+            // 4. Initialize Firebase (asynchronous, non-blocking for button clicks)
+            await initializeFirebase();
+        }
+
+    </script>
+    <style>
+        /* Custom CSS for a clean, centered game look */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* Darker blue-gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .game-container {
+            position: relative;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            overflow: hidden; /* Contains the shadow/border effect */
+            background-color: #1f2937; /* Canvas container background */
+            max-width: 600px;
+            width: 100%;
+        }
+
+        #gameCanvas {
+            display: block;
+            border-bottom-left-radius: 12px;
+            border-bottom-right-radius: 12px;
+        }
+
+        .status-bar {
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #1f2937; /* Match canvas container */
+            color: #f3f4f6;
+            border-bottom: 2px solid #374151;
+        }
+
+        /* Styling the quiz modal */
+        #quizModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.75);
+            display: flex; /* Default display style is flex */
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            /* Ensure it is hidden by default via style, overriding the HTML attribute */
+            display: none; 
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <!-- Header/Status Bar -->
+        <div class="status-bar">
+            <h1 class="text-xl font-extrabold text-yellow-300 tracking-wider uppercase">Vocab Snake</h1>
+            <div>Score: <span id="score" class="text-2xl font-bold text-green-400">0</span></div>
+        </div>
+
+        <!-- Game Canvas -->
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+
+        <!-- Start/Restart Button -->
+        <div class="p-4 bg-gray-800 flex justify-center">
+            <button id="startButton" class="bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-bold py-3 px-6 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-xl">
+                Start Game
+            </button>
+        </div>
+
+        <!-- Message Box (Game Over, Correct, Incorrect) -->
+        <div id="messageBox" class="hidden"></div>
+    </div>
+
+    <!-- Quiz Modal -->
+    <!-- The 'hidden' class is removed here, and hiding is handled purely by the style property to prevent click-through issues. -->
+    <div id="quizModal">
+        <div class="bg-white p-8 rounded-xl shadow-2xl max-w-lg w-full m-4 transform transition-all duration-500 scale-100">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">What is this term?</h2>
+            
+            <p id="quizDefinition" class="text-lg text-gray-600 mb-6 italic"></p>
+            
+            <div id="quizOptions" class="space-y-3">
+                <!-- Quiz options will be inserted here by JavaScript -->
+            </div>
+            <p class="mt-4 text-sm text-center text-gray-500">Answer correctly to grow and continue!</p>
+        </div>
+    </div>
+
+</body>
+</html>
+
+
