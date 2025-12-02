@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vocabulary Invaders</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+       
+        body {
+            background-color: #0d1117; /* Dark space background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Space Mono', monospace;
+            color: #ffffff;
+        }
+
+        .game-container {
+            border: 4px solid #00f0ff; /* Neon blue border */
+            box-shadow: 0 0 20px #00f0ff, 0 0 5px rgba(0, 240, 255, 0.5);
+            background: #000000;
+            border-radius: 8px;
+            padding: 10px;
+            width: 90%;
+            max-width: 600px;
+        }
+
+        canvas {
+            display: block;
+            background-color: #1a1f25;
+            border: 2px solid #00f0ff;
+            border-radius: 4px;
+        }
+
+        #game-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 5px;
+            font-size: 0.9rem;
+            color: #ffffff;
+        }
+
+        #definition-box {
+            background: #333;
+            color: #ffcc00; /* Gold text for definition */
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 1rem;
+            box-shadow: inset 0 0 5px #ffcc00;
+        }
+
+        button {
+            background: linear-gradient(145deg, #00bfff, #007bff);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px #0056b3;
+        }
+
+        button:hover {
+            background: linear-gradient(145deg, #007bff, #00bfff);
+            box-shadow: 0 2px #0056b3;
+            transform: translateY(2px);
+        }
+
+        button:active {
+            box-shadow: none;
+            transform: translateY(4px);
+        }
+
+        /* Game Over Modal */
+        #message-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none; /* Hidden by default */
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        #message-box {
+            background: #1a1f25;
+            border: 4px solid #ff0077; /* Neon pink for alerts */
+            box-shadow: 0 0 30px #ff0077;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        #message-text {
+            font-size: 1.5rem;
+            color: #ff0077;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 10px;
+        }
+
+        .control-button {
+            width: 48%;
+            padding: 15px 0;
+            font-size: 1.2rem;
+        }
+
+        /* Canvas drawing styles are handled in JS, but overall look is set here */
+    </style>
+</head>
+<body class="bg-gray-900">
+
+    <div class="game-container">
+        <h1 class="text-3xl text-center font-bold mb-4 text-[#00f0ff] uppercase tracking-wider">
+            Vocabulary Invaders
+        </h1>
+
+        <div id="definition-box" class="rounded-lg">
+            Press 'Start Game' or use **Arrow Keys and Space Bar** to play!
+        </div>
+
+        <div id="game-info" class="mb-2">
+            <div>Score: <span id="score">0</span></div>
+            <div>Lives: <span id="lives">3</span></div>
+        </div>
+
+        <canvas id="gameCanvas" width="600" height="400"></canvas>
+       
+        <div class="flex justify-center mt-4">
+            <button id="startButton">Start Game</button>
+        </div>
+
+        <!-- Mobile/Touch Controls -->
+        <div class="controls md:hidden">
+            <button class="control-button" id="leftButton"> &lt; Move Left </button>
+            <button class="control-button" id="rightButton"> Move Right &gt; </button>
+        </div>
+        <!-- Note: Tap the canvas on mobile to shoot, or use the Space Bar on desktop. -->
+    </div>
+
+    <!-- Game Over/Message Overlay -->
+    <div id="message-overlay">
+        <div id="message-box">
+            <div id="message-text">Game Over!</div>
+            <button id="retryButton">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // --- GAME DATA AND CONFIGURATION ---
+        const VOCABULARY = [
+            // Historical Sites & Geography
+            { term: "Historical Site", definition: "A special place that is important to our past." },
+            { term: "Landforms", definition: "The natural shapes of the land, like mountains, hills, or flat prairies." },
+            { term: "Landmark", definition: "An important place or building that is easy to recognize." },
+            { term: "Natural Resources", definition: "Things from nature that people use, like water, trees, and oil." },
+            { term: "Physical Features", definition: "The different parts of the land you can see, like rivers, lakes, and mountains." },
+            { term: "Political Boundaries", definition: "The lines on a map that show where a province or country begins and ends." },
+            { term: "Territory", definition: "An area of land that belongs to a group of people." },
+            { term: "Treaty", definition: "A special promise or agreement made between groups of people, like First Nations and the government." },
+            { term: "Settlement", definition: "A community or place where people build homes and live." },
+            { term: "Province", definition: "A large area in Canada, like Alberta, that has its own government." },
+            { term: "Physical region", definition: "A big area of land that has special features, like mountains or plains." },
+            { term: "Map", definition: "A drawing that shows where places are on Earth." },
+            { term: "Bodies of Water", definition: "Large areas of water, like lakes and rivers, that help define physical regions." },
+            { term: "Farmland", definition: "Land used for growing crops or raising animals, which the government offered to settlers for a low price." },
+            { term: "Natural Landmark", definition: "A special feature created by nature, like a mountain or a rock formation, that is easy to recognize." },
+            // Our People & Culture
+            { term: "Culture", definition: "The special way a group of people lives, including their language, food, music, holidays, and traditions." },
+            { term: "Diverse", definition: "Made up of many different kinds of people or things." },
+            { term: "Diversity", definition: "Having many different kinds of people, languages, and cultures living together." },
+            { term: "Empathy", definition: "Understanding and caring about how someone else feels." },
+            { term: "First Nations", definition: "The first people who lived on the land we now call Alberta." },
+            { term: "Fleur-de-lis", definition: "A symbol shaped like a flower, often used by French communities." },
+            { term: "Francophone", definition: "A person whose first language is French." },
+            { term: "Heritage", definition: "The history and traditions passed down from family members who lived long ago." },
+            { term: "Identity", definition: "The special qualities that make a person or group who they are." },
+            { term: "Immigrant", definition: "A person who moves from one country to another to live." },
+            { term: "Inhabitants", definition: "People or animals who live in a place." },
+            { term: "Métis", definition: "People who have both First Nations and European family history." },
+            { term: "Pluralistic", definition: "A community made up of many different groups who share and respect their differences." },
+            { term: "Red River cart", definition: "A wooden cart made by the Métis, pulled by horses or oxen, used to carry goods." },
+            { term: "Sash", definition: "A colorful woven belt worn by Métis people." },
+            { term: "Self-govern", definition: "When a community makes its own rules and decisions." },
+            { term: "Settlers", definition: "People who move to a new place to build homes and start a community." },
+            { term: "Symbol", definition: "A picture or object that stands for a bigger idea." },
+            { term: "Unity", definition: "When people join together and act as one group." },
+            { term: "Tradition", definition: "A custom or practice passed down from parents to children." },
+            { term: "Tipi ring", definition: "Stones left in a circle that show where a tipi (First Nations home) once stood." },
+            { term: "Numbered Treaties", definition: "Specific agreements made between First Nations and the government to share the land." },
+            { term: "Time Immemorial", definition: "A time so long ago that it is before anyone can remember or record history." },
+            { term: "Coat of Arms", definition: "A special design on a shield that serves as an official symbol for the province." },
+            { term: "Isolation", definition: "Being far away from other people or places, which was a big challenge for early settlers." },
+            { term: "Michif", definition: "A language spoken by Métis people in the Prairies." },
+            { term: "Missionary", definition: "A person who travels to a new place to teach others about their religion, such as the early Francophones in Alberta." },
+            { term: "Negotiate", definition: "To talk with others to reach a fair agreement or promise." },
+            { term: "Perspectives", definition: "The different ways people see or understand an event or idea." },
+        ];
+
+        // Constants
+        const ALIEN_SPEED_START = 0.2;
+        const ALIEN_TEXT_SIZE = 16;
+        const ALIEN_LINE_SPACING = 1.2; // Multiplier for vertical text spacing
+        const MIN_ALIEN_WIDTH = 50;
+        const MIN_ALIEN_HEIGHT = 20;
+        const ALIEN_PADDING_X = 20;
+        const PLAYER_SPEED = 5;
+        const BULLET_SPEED = 7;
+        const MAX_LIVES = 3;
+        const RESPAWN_DELAY = 100; // frames
+        const MAX_ALIENS_ON_SCREEN = 4; // Max number of choices
+
+        // DOM Elements
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const livesDisplay = document.getElementById('lives');
+        const definitionBox = document.getElementById('definition-box');
+        const startButton = document.getElementById('startButton');
+        const messageOverlay = document.getElementById('message-overlay');
+        const messageText = document.getElementById('message-text');
+        const retryButton = document.getElementById('retryButton');
+        const leftButton = document.getElementById('leftButton');
+        const rightButton = document.getElementById('rightButton');
+
+        // Game State Variables
+        let gameRunning = false;
+        let score = 0;
+        let lives = MAX_LIVES;
+        let alienSpeed = ALIEN_SPEED_START;
+        let lastTimestamp = 0;
+        let playerRespawning = false;
+        let respawnTimer = 0;
+
+        // Game Objects
+        let player = {};
+        let bullets = [];
+        let aliens = [];
+        let currentChallenge = {};
+
+        // Input handling
+        let keys = {
+            ArrowLeft: false, // Left arrow key
+            ArrowRight: false, // Right arrow key
+            'Space': false // Spacebar for firing
+        };
+        let lastShotTime = 0;
+        const shotCooldown = 300; // milliseconds
+
+        // --- GAME OBJECTS & CLASSES ---
+
+        class Player {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 40;
+                this.height = 10;
+                this.cannonHeight = 15;
+                this.cannonWidth = 4;
+            }
+
+            draw() {
+                if (playerRespawning && respawnTimer % 10 < 5) return; // Blinking effect
+
+                ctx.fillStyle = '#00ffaa'; // Neon green
+                // Cannon
+                ctx.fillRect(this.x + this.width / 2 - this.cannonWidth / 2, this.y - this.cannonHeight, this.cannonWidth, this.cannonHeight);
+                // Body
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+
+            update() {
+                // Movement controlled by Arrow Keys or touch buttons
+                if (keys.ArrowLeft) {
+                    this.x = Math.max(0, this.x - PLAYER_SPEED);
+                }
+                if (keys.ArrowRight) {
+                    this.x = Math.min(canvas.width - this.width, this.x + PLAYER_SPEED);
+                }
+            }
+
+            shoot() {
+                if (Date.now() - lastShotTime > shotCooldown) {
+                    const bulletX = this.x + this.width / 2 - 1;
+                    const bulletY = this.y - this.cannonHeight;
+                    bullets.push(new Bullet(bulletX, bulletY));
+                    lastShotTime = Date.now();
+                }
+            }
+        }
+
+        class Bullet {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 2;
+                this.height = 6;
+                this.speed = BULLET_SPEED;
+            }
+
+            draw() {
+                ctx.fillStyle = '#ff0077'; // Neon pink
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+
+            update() {
+                this.y -= this.speed;
+            }
+        }
+
+        class Alien {
+            constructor(x, y, term, isCorrect) {
+                this.x = x; // Center X
+                this.y = y; // Center Y
+                this.term = term;
+                this.isCorrect = isCorrect;
+
+                ctx.font = `${ALIEN_TEXT_SIZE}px 'Space Mono', monospace`;
+               
+                // --- NEW MULTI-LINE LOGIC ---
+                // 1. Split term into lines (words)
+                this.lines = term.split(' ');
+
+                // 2. Find the widest line and calculate total required height
+                let maxLineWidth = 0;
+                this.lines.forEach(line => {
+                    maxLineWidth = Math.max(maxLineWidth, ctx.measureText(line).width);
+                });
+
+                const lineHeight = ALIEN_TEXT_SIZE * ALIEN_LINE_SPACING;
+                const requiredTextHeight = this.lines.length * lineHeight;
+
+                // 3. Set Dimensions based on multi-line text
+                // Width is based on the widest word + padding
+                this.width = Math.max(maxLineWidth + ALIEN_PADDING_X, MIN_ALIEN_WIDTH);
+                // Height is based on total text height plus the shape padding
+                this.height = requiredTextHeight + MIN_ALIEN_HEIGHT + 10;
+            }
+
+            // Function to draw the invader shape
+            drawInvader(centerX, centerY, dynamicW, dynamicH, color) {
+                ctx.fillStyle = color;
+               
+                // Base rectangle - scales to 90% of the calculated width
+                const baseW = dynamicW * 0.9;
+                const baseH = dynamicH * 0.7;
+                ctx.fillRect(centerX - baseW / 2, centerY - baseH / 2, baseW, baseH);
+
+                // Top antennae/eyes (Two small blocks)
+                const eyeW = 5;
+                const eyeH = 5;
+                const eyeOffset = baseW * 0.35;
+                ctx.fillRect(centerX - eyeOffset - eyeW/2, centerY - baseH/2 - eyeH, eyeW, eyeH);
+                ctx.fillRect(centerX + eyeOffset - eyeW/2, centerY - baseH/2 - eyeH, eyeW, eyeH);
+
+                // Bottom 'legs' (Two small blocks)
+                const legW = 5;
+                const legH = 5;
+                const legOffset = baseW * 0.25;
+                ctx.fillRect(centerX - legOffset - legW/2, centerY + baseH/2, legW, legH);
+                ctx.fillRect(centerX + legOffset - legW/2, centerY + baseH/2, legW, legH);
+            }
+
+            draw() {
+                ctx.font = `${ALIEN_TEXT_SIZE}px 'Space Mono', monospace`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                // All aliens are neon blue, text is black
+                const color = '#00f0ff';
+                const textColor = '#000000';
+               
+                // Draw the stylized alien shape using the dynamically calculated dimensions
+                this.drawInvader(this.x, this.y, this.width, this.height, color);
+               
+                // Draw stacked text
+                ctx.fillStyle = textColor;
+                const lineHeight = ALIEN_TEXT_SIZE * ALIEN_LINE_SPACING;
+               
+                // Calculate the starting Y position to center the block of text vertically
+                // Total text height: this.lines.length * lineHeight
+                // Center offset: (Total text height / 2)
+                let startY = this.y - (lineHeight * (this.lines.length - 1)) / 2;
+
+                this.lines.forEach((line, index) => {
+                    ctx.fillText(line, this.x, startY + index * lineHeight);
+                });
+            }
+
+            update() {
+                this.y += alienSpeed;
+            }
+        }
+
+        // --- GAME FUNCTIONS ---
+
+        function initGame() {
+            // Set canvas size to be responsive up to max width
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
+            // Initial setup
+            score = 0;
+            lives = MAX_LIVES;
+            alienSpeed = ALIEN_SPEED_START;
+            gameRunning = false;
+           
+            updateDisplay();
+            setupPlayer();
+            resetChallenge();
+
+            // Setup input listeners only once
+            document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('keyup', handleKeyUp);
+            startButton.addEventListener('click', startGame);
+            retryButton.addEventListener('click', startGame);
+
+            // Mobile controls
+            leftButton.addEventListener('touchstart', (e) => { e.preventDefault(); keys.ArrowLeft = true; });
+            leftButton.addEventListener('touchend', (e) => { e.preventDefault(); keys.ArrowLeft = false; });
+            rightButton.addEventListener('touchstart', (e) => { e.preventDefault(); keys.ArrowRight = true; });
+            rightButton.addEventListener('touchend', (e) => { e.preventDefault(); keys.ArrowRight = false; });
+            // Add a dedicated fire trigger for touch devices (tapping the canvas)
+            canvas.addEventListener('click', () => { if (gameRunning && !playerRespawning) player.shoot(); });
+        }
+
+        function resizeCanvas() {
+            const container = canvas.closest('.game-container');
+            const containerWidth = container.clientWidth - 20; // Padding adjustment
+           
+            // Set max width constraint
+            const newWidth = Math.min(containerWidth, 600);
+           
+            canvas.width = newWidth;
+            canvas.height = newWidth * (2/3); // Maintain aspect ratio
+           
+            // Re-center player on resize
+            if (player.x !== undefined) {
+                 player.x = (canvas.width / 2) - (player.width / 2);
+                 player.y = canvas.height - player.height - 10;
+            }
+        }
+
+        function setupPlayer() {
+            player = new Player(
+                canvas.width / 2 - 20,
+                canvas.height - 10 - 10
+            );
+        }
+
+        function startGame() {
+            if (gameRunning) return;
+
+            messageOverlay.style.display = 'none';
+            score = 0;
+            lives = MAX_LIVES;
+            // Reset to the new slower start speed
+            alienSpeed = ALIEN_SPEED_START;
+            bullets = [];
+            aliens = [];
+            playerRespawning = false;
+           
+            setupPlayer();
+            resetChallenge();
+            updateDisplay();
+           
+            gameRunning = true;
+            requestAnimationFrame(gameLoop);
+        }
+
+        function endGame(message) {
+            gameRunning = false;
+            messageText.textContent = message;
+            messageOverlay.style.display = 'flex';
+        }
+
+        function updateDisplay() {
+            scoreDisplay.textContent = score;
+            livesDisplay.textContent = lives;
+            definitionBox.textContent = currentChallenge.definition || "Shoot the word that matches the definition!";
+        }
+
+        function resetChallenge() {
+            // 1. Select the correct vocabulary pair
+            const correctPairIndex = Math.floor(Math.random() * VOCABULARY.length);
+            currentChallenge = VOCABULARY[correctPairIndex];
+
+            // 2. Select MAX_ALIENS_ON_SCREEN - 1 incorrect terms
+            let incorrectPairs = VOCABULARY.filter((_, index) => index !== correctPairIndex);
+            // Shuffle and pick a few (or all if the vocab list is small)
+            incorrectPairs.sort(() => 0.5 - Math.random());
+            const choicePool = [currentChallenge.term, ...incorrectPairs.slice(0, MAX_ALIENS_ON_SCREEN - 1).map(p => p.term)];
+           
+            // 3. Shuffle the choices and create the new aliens array
+            choicePool.sort(() => 0.5 - Math.random());
+            aliens = [];
+
+            // Calculate slot size required for even spacing
+            const numChoices = Math.min(MAX_ALIENS_ON_SCREEN, choicePool.length);
+            const alienSpacingX = canvas.width / numChoices;
+            const startX = alienSpacingX / 2; // Start position (centered for the first slot)
+           
+            let alienIndex = 0;
+
+            for (let i = 0; i < numChoices; i++) {
+                const term = choicePool[alienIndex];
+                const isCorrect = term === currentChallenge.term;
+               
+                const x = startX + i * alienSpacingX;
+                const y = 30; // Start high up
+               
+                // Create Alien at its center position (x is now the center)
+                aliens.push(new Alien(x, y, term, isCorrect));
+                alienIndex++;
+            }
+
+            // Increase speed slightly for challenge, capped lower than before
+            alienSpeed = Math.min(1.0, alienSpeed + 0.05);
+
+            // Ensure the definition display is updated
+            updateDisplay();
+        }
+
+        // --- INPUT HANDLERS ---
+        function handleKeyDown(event) {
+            if (!gameRunning) return;
+           
+            // Check for movement keys
+            if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
+                keys[event.code] = true;
+            }
+
+            // Check for spacebar (shoot)
+            if (event.code === 'Space') {
+                event.preventDefault(); // Prevent scrolling the page
+                if (!playerRespawning) player.shoot();
+            }
+        }
+
+        function handleKeyUp(event) {
+            if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
+                keys[event.code] = false;
+            }
+        }
+
+        // --- GAME LOOP & UPDATES ---
+
+        function update(deltaTime) {
+            if (playerRespawning) {
+                respawnTimer++;
+                if (respawnTimer > RESPAWN_DELAY) {
+                    playerRespawning = false;
+                    respawnTimer = 0;
+                }
+            }
+
+            player.update();
+
+            // 1. Update Bullets
+            bullets.forEach(bullet => bullet.update());
+            bullets = bullets.filter(bullet => bullet.y > 0);
+
+            // 2. Update Aliens
+            aliens.forEach(alien => alien.update());
+
+            // 3. Check Bullet-Alien Collisions
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                for (let j = aliens.length - 1; j >= 0; j--) {
+                    const alien = aliens[j];
+
+                    // Simple AABB collision detection
+                    // Note: Collision box uses the calculated width/height from the Alien class constructor
+                    const collision = bullet.x < alien.x + alien.width/2 &&
+                                      bullet.x + bullet.width > alien.x - alien.width/2 &&
+                                      bullet.y < alien.y + alien.height/2 &&
+                                      bullet.y + bullet.height > alien.y - alien.height/2;
+
+                    if (collision) {
+                        bullets.splice(i, 1); // Remove bullet
+                       
+                        if (alien.isCorrect) {
+                            // CORRECT HIT!
+                            score += 10;
+                            showFeedback("CORRECT!", '#00ffaa');
+                            // Clear all invaders and start next challenge
+                            aliens = [];
+                            resetChallenge();
+                        } else {
+                            // INCORRECT HIT!
+                            score = Math.max(0, score - 5);
+                            showFeedback("WRONG TERM!", '#ff0077');
+                            // Only remove the incorrect alien to keep the correct option visible
+                            aliens.splice(j, 1);
+                        }
+                       
+                        updateDisplay();
+                        // Exit inner loop since bullet is gone
+                        break;
+                    }
+                }
+            }
+
+            // 4. Check Alien-Player Collision (Game Over condition)
+            for (let i = aliens.length - 1; i >= 0; i--) {
+                const alien = aliens[i];
+               
+                // Check if alien passed the player/bottom line
+                // Alien Y is center, so alien.y + alien.height / 2 is the bottom edge
+                if (alien.y + alien.height / 2 > canvas.height - player.height) {
+                    // Invader reached the bottom!
+                    lives--;
+                    showFeedback("INVADER REACHED BASE!", '#ff0077');
+                    aliens = []; // Clear invaders
+                   
+                    if (lives <= 0) {
+                        endGame(`GAME OVER! Final Score: ${score}`);
+                        return;
+                    } else {
+                        playerRespawning = true;
+                        respawnTimer = 0;
+                        resetChallenge();
+                    }
+                   
+                    updateDisplay();
+                    break;
+                }
+            }
+           
+            // 5. If all current invaders are cleared (e.g., after an incorrect hit and the correct one is left, or if a challenge was manually cleared by a bug), reset the challenge.
+            if (aliens.length === 0 && gameRunning) {
+                 // Only reset if there's a current challenge defined (i.e., not before the first game starts)
+                 if (currentChallenge.term) {
+                    resetChallenge();
+                 }
+            }
+
+        }
+
+        function draw() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#1a1f25';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw player
+            if (gameRunning && !playerRespawning) {
+                player.draw();
+            } else if (playerRespawning) {
+                player.draw(); // Draw blinking player
+            }
+
+            // Draw bullets
+            bullets.forEach(bullet => bullet.draw());
+
+            // Draw aliens/terms
+            aliens.forEach(alien => alien.draw());
+           
+            // Draw feedback text
+            drawFeedback();
+        }
+       
+        // Simple feedback system (instead of alert)
+        let feedbackMessage = null;
+        let feedbackColor = '';
+        let feedbackTimer = 0;
+        const FEEDBACK_DURATION = 90; // frames
+
+        function showFeedback(text, color) {
+            feedbackMessage = text;
+            feedbackColor = color;
+            feedbackTimer = FEEDBACK_DURATION;
+        }
+
+        function drawFeedback() {
+            if (feedbackTimer > 0) {
+                ctx.fillStyle = feedbackColor;
+                ctx.font = `bold 24px 'Space Mono', monospace`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                // Move text up as it fades
+                const opacity = feedbackTimer / FEEDBACK_DURATION;
+                ctx.globalAlpha = opacity;
+                ctx.fillText(feedbackMessage, canvas.width / 2, canvas.height / 2 - (FEEDBACK_DURATION - feedbackTimer));
+                ctx.globalAlpha = 1.0;
+                feedbackTimer--;
+            }
+        }
+
+        function gameLoop(timestamp) {
+            if (!gameRunning) return;
+
+            const deltaTime = timestamp - lastTimestamp;
+            lastTimestamp = timestamp;
+
+            update(deltaTime);
+            draw();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- INITIALIZATION ---
+        window.onload = function() {
+            initGame();
+        }
+    </script>
+</body>
+</html>
