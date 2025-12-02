@@ -134,9 +134,13 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                     Import Set
                 </button>
+                <button id="copy-html-btn" class="btn-secondary px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                    Copy HTML
+                </button>
                 <button id="download-html-btn" class="btn-secondary px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                    Save Game HTML
+                    Download
                 </button>
             </div>
         </header>
@@ -397,70 +401,11 @@
         const startTitle = document.getElementById('start-title');
         const importJsonButton = document.getElementById('import-json-btn');
         const downloadHtmlButton = document.getElementById('download-html-btn');
+        const copyHtmlButton = document.getElementById('copy-html-btn');
         const jsonImporter = document.getElementById('json-importer');
         
         // Game Containers
-        const containers = {
-            match: document.getElementById('match-game-container'),
-            quiz: document.getElementById('quiz-game-container'),
-            swipe: document.getElementById('swipe-game-container'),
-            scramble: document.getElementById('scramble-game-container'),
-            flashcard: document.getElementById('flashcard-game-container')
-        };
-
-        // --- Master Vocabulary Store ---
-        let MASTER_VOCABULARY = [];
-        let IS_CUSTOM_SET_LOADED = false;
-        const DEFAULT_MATCH_VOCAB = [
-            { term: 'Map', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F5FA.svg', definition: 'A drawing that shows where places are on Earth.' },
-            { term: 'Landmark', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F5FC.svg', definition: 'An important place or building that is easy to recognize.' },
-            { term: 'Settlement', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F3E0.svg', definition: 'A community or place where people build homes and live.' },
-            { term: 'Territory', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F3DD.svg', definition: 'An area of land that belongs to a group of people.' },
-            { term: 'Continent', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F30D.svg', definition: 'One of the seven main landmasses on Earth.' },
-            { term: 'Ocean', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F30A.svg', definition: 'A very large expanse of sea, in particular one of Earth\'s major divisions.' },
-            { term: 'River', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F3DE.svg', definition: 'A large natural stream of water flowing in a channel to the sea, a lake, or another river.' },
-            { term: 'Mountain', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/26F0.svg', definition: 'A large natural elevation of the earth\'s surface rising abruptly from the surrounding level.' }
-        ];
-        const DEFAULT_QUIZ_VOCAB = [
-            { term: 'Historical Site', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F3DB.svg', definition: 'A special place that is important to our past.' },
-            { term: 'Landforms', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F3DE.svg', definition: 'The natural shapes of the land, like mountains, hills, or flat prairies.' },
-            { term: 'Natural Resources', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F333.svg', definition: 'Things from nature that people use, like water, trees, and oil.' },
-            { term: 'Political Boundaries', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F5FA.svg', definition: 'The lines on a map that show where a province or country begins and ends.' },
-            { term: 'Treaty', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F4DC.svg', definition: 'A special promise or agreement made between groups of people.' },
-            { term: 'Landmark', imageSrc: 'https://cdn.jsdelivr.net/npm/openmoji@14.0.0/color/svg/1F5FC.svg', definition: 'An important place or building that is easy to recognize.' }
-        ];
-
-        // Navigation
-        document.querySelectorAll('.main-menu-btn').forEach(btn => btn.addEventListener('click', showStartScreen));
-        document.getElementById('start-match-game-btn').addEventListener('click', () => { initGame('match'); });
-        document.getElementById('start-quiz-game-btn').addEventListener('click', () => { initGame('quiz'); });
-        document.getElementById('start-swipe-game-btn').addEventListener('click', () => { initGame('swipe'); });
-        document.getElementById('start-scramble-game-btn').addEventListener('click', () => { initGame('scramble'); });
-        document.getElementById('start-flashcard-game-btn').addEventListener('click', () => { initGame('flashcard'); });
-
-        function showStartScreen() {
-            startScreen.classList.remove('hidden');
-            document.getElementById('app-header').classList.remove('hidden');
-            Object.values(containers).forEach(el => el.classList.add('hidden'));
-            if(matchGame.timerInterval) clearInterval(matchGame.timerInterval);
-        }
-
-        function initGame(type) {
-            if (!IS_CUSTOM_SET_LOADED) MASTER_VOCABULARY = DEFAULT_MATCH_VOCAB.concat(DEFAULT_QUIZ_VOCAB);
-            
-            startScreen.classList.add('hidden');
-            document.getElementById('app-header').classList.add('hidden');
-            
-            Object.values(containers).forEach(el => el.classList.add('hidden'));
-            containers[type].classList.remove('hidden');
-
-            if (type === 'match') matchGame.init();
-            if (type === 'quiz') quizGame.init();
-            if (type === 'swipe') swipeGame.init();
-            if (type === 'scramble') scrambleGame.init();
-            if (type === 'flashcard') flashcardGame.init();
-        }
-
+// ... existing code ... -->
         // --- Import / Export ---
         importJsonButton.addEventListener('click', () => jsonImporter.click());
         jsonImporter.addEventListener('change', (event) => {
@@ -482,10 +427,56 @@
             reader.readAsText(file);
         });
 
-        downloadHtmlButton.addEventListener('click', () => {
+        const getSelfContainedHtml = () => {
             const vocabToSave = IS_CUSTOM_SET_LOADED ? MASTER_VOCABULARY : DEFAULT_MATCH_VOCAB;
-            const script = `const DEFAULT_MATCH_VOCAB = ${JSON.stringify(vocabToSave)};\n        const DEFAULT_QUIZ_VOCAB = [];\n        MASTER_VOCABULARY = DEFAULT_MATCH_VOCAB; IS_CUSTOM_SET_LOADED = true;`;
-            const fullHtml = document.documentElement.outerHTML.replace(/const DEFAULT_MATCH_VOCAB = \[[\s\S]*?\];\s*const DEFAULT_QUIZ_VOCAB = \[[\s\S]*?\];/, script);
+            // Clean data to ensure consistency
+            const cleanVocab = vocabToSave.map(item => ({
+                term: item.term,
+                definition: item.definition,
+                imageSrc: item.imageSrc || item.image 
+            }));
+            
+            // Create the injection script that forces the game to use this data
+            const script = `const DEFAULT_MATCH_VOCAB = ${JSON.stringify(cleanVocab)};\n        const DEFAULT_QUIZ_VOCAB = [];\n        MASTER_VOCABULARY = DEFAULT_MATCH_VOCAB; IS_CUSTOM_SET_LOADED = true;`;
+            
+            // Replace the initial variable declarations with our populated ones
+            return document.documentElement.outerHTML.replace(
+                /const DEFAULT_MATCH_VOCAB = \[[\s\S]*?\];\s*const DEFAULT_QUIZ_VOCAB = \[[\s\S]*?\];/, 
+                script
+            );
+        };
+
+        copyHtmlButton.addEventListener('click', () => {
+            const fullHtml = getSelfContainedHtml();
+            
+            // Use textarea hack for maximum browser/iframe compatibility
+            const textarea = document.createElement('textarea');
+            textarea.value = fullHtml;
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                document.execCommand('copy');
+                const originalContent = copyHtmlButton.innerHTML;
+                copyHtmlButton.innerHTML = `<span class="text-green-600 font-bold flex items-center gap-2">✓ Copied!</span>`;
+                copyHtmlButton.classList.remove('btn-secondary');
+                copyHtmlButton.classList.add('bg-green-50', 'border-green-200');
+                
+                setTimeout(() => {
+                    copyHtmlButton.innerHTML = originalContent;
+                    copyHtmlButton.classList.add('btn-secondary');
+                    copyHtmlButton.classList.remove('bg-green-50', 'border-green-200');
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy', err);
+                alert('Failed to copy. Please use the Download button instead.');
+            }
+            
+            document.body.removeChild(textarea);
+        });
+
+        downloadHtmlButton.addEventListener('click', () => {
+            const fullHtml = getSelfContainedHtml();
             const blob = new Blob([fullHtml], { type: 'text/html' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
