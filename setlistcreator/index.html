@@ -583,18 +583,109 @@
 
         function downloadSetImage(index) {
             const element = document.getElementById(`set-container-${index}`);
-            showToast("Saving set image...");
+            showToast("Processing image...");
             
             html2canvas(element, {
                 scale: 2,
-                backgroundColor: "#1f2937",
-                useCORS: true
+                backgroundColor: "#1f2937", // Matches bg-gray-800
+                useCORS: true,
+                windowHeight: document.documentElement.scrollHeight + 1500, // Ensure ample vertical space
+                onclone: (clonedDoc) => {
+                    const container = clonedDoc.getElementById(`set-container-${index}`);
+                    const list = clonedDoc.getElementById(`list-set-${index}`);
+                    
+                    if (container) {
+                        container.style.height = 'auto';
+                        container.style.overflow = 'visible';
+                        container.style.paddingBottom = '40px'; // Extra breathing room at bottom of container
+                    }
+                    if (list) {
+                        list.style.maxHeight = 'none';
+                        list.style.overflow = 'visible';
+                    }
+
+                    // Fix 1: Un-restrict all parents that might be hiding content
+                    const overflowHidden = container.querySelectorAll('.overflow-hidden');
+                    overflowHidden.forEach(el => {
+                        el.style.overflow = 'visible';
+                        el.style.height = 'auto';
+                    });
+
+                    // Fix 2: Relax text wrapping and add padding for descenders (g, j, p, q, y)
+                    const textItems = container.querySelectorAll('.truncate');
+                    textItems.forEach(el => {
+                        el.style.whiteSpace = 'normal';       // Allow wrapping
+                        el.style.overflow = 'visible';        // Show overflow
+                        el.style.textOverflow = 'clip';       // No ellipses
+                        el.style.lineHeight = '1.5';          // Increase line height
+                        el.style.paddingBottom = '5px';       // Add padding for tails/descenders
+                        el.style.display = 'block';           // Ensure padding takes effect
+                    });
+                }
             }).then(canvas => {
                 const link = document.createElement('a');
                 link.download = `set-${index+1}-${currentTab}.png`;
                 link.href = canvas.toDataURL();
                 link.click();
                 showToast("Set saved!");
+            }).catch(err => {
+                console.error(err);
+                showToast("Error generating image");
+            });
+        }
+
+        function downloadAllImage() {
+            window.scrollTo(0,0);
+            const element = document.getElementById('sets-capture-area');
+            showToast("Processing full image...");
+            
+            html2canvas(element, { 
+                backgroundColor: "#111827", // Matches bg-gray-900
+                scale: 2,
+                windowHeight: document.documentElement.scrollHeight + 3000, 
+                onclone: (clonedDoc) => {
+                    // Expand ALL containers
+                    const containers = clonedDoc.querySelectorAll('.set-container');
+                    containers.forEach(container => {
+                        container.style.height = 'auto';
+                        container.style.overflow = 'visible';
+                        container.style.marginBottom = '40px';
+                    });
+
+                    // Expand ALL lists
+                    const lists = clonedDoc.querySelectorAll('ul[id^="list-set-"]');
+                    lists.forEach(list => {
+                        list.style.maxHeight = 'none';
+                        list.style.overflow = 'visible';
+                    });
+
+                    // Unlock all overflow-hidden parents
+                    const overflowHidden = clonedDoc.querySelectorAll('.overflow-hidden');
+                    overflowHidden.forEach(el => {
+                        el.style.overflow = 'visible';
+                        el.style.height = 'auto';
+                    });
+
+                    // Fix text rendering for everything
+                    const textItems = clonedDoc.querySelectorAll('.truncate');
+                    textItems.forEach(el => {
+                        el.style.whiteSpace = 'normal';
+                        el.style.overflow = 'visible';
+                        el.style.textOverflow = 'clip';
+                        el.style.lineHeight = '1.5';
+                        el.style.paddingBottom = '5px'; 
+                        el.style.display = 'block';
+                    });
+                }
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `setlist-full-${currentTab}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+                showToast("Image downloaded!");
+            }).catch(err => {
+                console.error(err);
+                showToast("Error generating image");
             });
         }
 
