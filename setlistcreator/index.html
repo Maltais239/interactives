@@ -32,7 +32,7 @@
             .text-green-400 { color: black !important; font-weight: bold; border-bottom: 2px solid #ccc; display: block; width: 100%; }
             .text-cyan-400 { color: black !important; font-weight: bold; }
             
-            #song-bank-section, .tab-nav, header, #add-song-form { display: none !important; } 
+            #song-bank-section, .tab-nav, header, #add-song-form, #custom-controls { display: none !important; } 
 
             /* Single Set Print Mode */
             body.print-single-mode > :not(#print-area-wrapper) { display: none !important; }
@@ -79,6 +79,26 @@
             <button onclick="switchTab('christmas')" id="tab-christmas" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none text-white bg-gray-700 shadow">Christmas Party 2025</button>
             <button onclick="switchTab('custom')" id="tab-custom" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none text-gray-400 hover:text-white hover:bg-gray-750">Create Your Own</button>
             <button onclick="switchTab('originals')" id="tab-originals" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none text-gray-400 hover:text-white hover:bg-gray-750">Band Originals</button>
+        </div>
+
+        <!-- Custom Tab Controls (Only shows on Custom Tab) -->
+        <div id="custom-controls" class="no-print mb-6 hidden">
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 flex flex-wrap gap-4 items-center justify-between">
+                <div class="text-sm text-gray-400">
+                    <span class="text-indigo-400 font-bold">Auto-Save:</span> Your changes are saved to this browser automatically.
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="exportCustomData()" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Save to File
+                    </button>
+                    <label class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition cursor-pointer">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        Load from File
+                        <input type="file" id="import-file" class="hidden" accept=".json" onchange="importCustomData(this)">
+                    </label>
+                </div>
+            </div>
         </div>
 
         <!-- Input Section -->
@@ -185,6 +205,21 @@
     <!-- Toast -->
     <div id="toast" class="fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center gap-2">
         <span id="toast-message">Action successful</span>
+    </div>
+
+    <!-- Copy Modal -->
+    <div id="copy-modal" class="fixed inset-0 bg-black/70 z-50 hidden flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-gray-800 p-6 rounded-xl border border-gray-600 shadow-2xl w-full max-w-sm">
+            <h3 class="text-xl font-bold text-white mb-2">Copy Set to "Create Your Own"</h3>
+            <p class="text-gray-400 text-sm mb-4">Select which Custom Set (1-4) you want to copy these songs into.</p>
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <button onclick="executeCopy(0)" class="bg-gray-700 hover:bg-indigo-600 hover:text-white p-3 rounded-lg transition border border-gray-600">Custom Set 1</button>
+                <button onclick="executeCopy(1)" class="bg-gray-700 hover:bg-indigo-600 hover:text-white p-3 rounded-lg transition border border-gray-600">Custom Set 2</button>
+                <button onclick="executeCopy(2)" class="bg-gray-700 hover:bg-indigo-600 hover:text-white p-3 rounded-lg transition border border-gray-600">Custom Set 3</button>
+                <button onclick="executeCopy(3)" class="bg-gray-700 hover:bg-indigo-600 hover:text-white p-3 rounded-lg transition border border-gray-600">Custom Set 4</button>
+            </div>
+            <button onclick="closeCopyModal()" class="w-full text-gray-500 hover:text-gray-300 py-2 text-sm">Cancel</button>
+        </div>
     </div>
 
     <script>
@@ -361,6 +396,14 @@
 
         function switchTab(tabId) {
             currentTab = tabId;
+            const controls = document.getElementById('custom-controls');
+            
+            if(tabId === 'custom') {
+                controls.classList.remove('hidden');
+            } else {
+                controls.classList.add('hidden');
+            }
+
             ['christmas', 'custom', 'originals'].forEach(t => {
                 const btn = document.getElementById(`tab-${t}`);
                 if (t === tabId) {
@@ -379,6 +422,80 @@
             if (currentTab === 'custom') {
                 localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
             }
+        }
+
+        // --- Copy to Custom Logic ---
+        let sourceSetToCopy = null;
+
+        function openCopyModal(setIdx) {
+            sourceSetToCopy = setIdx;
+            document.getElementById('copy-modal').classList.remove('hidden');
+        }
+
+        function closeCopyModal() {
+            document.getElementById('copy-modal').classList.add('hidden');
+            sourceSetToCopy = null;
+        }
+
+        function executeCopy(targetSetIdx) {
+            if(sourceSetToCopy === null) return;
+
+            const sourceSongs = setCollections[currentTab][sourceSetToCopy];
+            // Deep copy to prevent reference issues
+            const songsToCopy = JSON.parse(JSON.stringify(sourceSongs));
+            
+            // Add to Custom Set
+            setCollections.custom[targetSetIdx] = setCollections.custom[targetSetIdx].concat(songsToCopy);
+            
+            // Save
+            localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
+            
+            closeCopyModal();
+            showToast(`Copied ${songsToCopy.length} songs to Custom Set ${targetSetIdx + 1}`);
+        }
+
+        // --- Export / Import ---
+
+        function exportCustomData() {
+            const dataStr = JSON.stringify(setCollections.custom, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = 'my_setlists.json';
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+            showToast("Setlist file saved to downloads!");
+        }
+
+        function importCustomData(input) {
+            const file = input.files[0];
+            if(!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const loadedData = JSON.parse(e.target.result);
+                    // Basic validation
+                    if(Array.isArray(loadedData) && loadedData.length === 4) {
+                        if(confirm("This will overwrite your current 'Create Your Own' sets. Continue?")) {
+                            setCollections.custom = loadedData;
+                            saveCustomData();
+                            render();
+                            showToast("Setlists loaded successfully!");
+                        }
+                    } else {
+                        alert("Invalid file format.");
+                    }
+                } catch(err) {
+                    console.error(err);
+                    alert("Error reading file.");
+                }
+                // Reset input
+                input.value = '';
+            };
+            reader.readAsText(file);
         }
 
         function timeToSeconds(str) {
@@ -429,11 +546,21 @@
                 setSongs.forEach(s => setSeconds += timeToSeconds(s.durationStr));
                 grandTotalSeconds += setSeconds;
 
+                // Copy Button Logic: Show if NOT custom tab
+                const copyBtn = currentTab !== 'custom' ? `
+                    <button onclick="openCopyModal(${i})" class="text-indigo-400 hover:text-white p-1 hover:bg-gray-600 rounded flex items-center gap-1 text-xs font-bold border border-transparent hover:border-gray-500" title="Copy to 'Create Your Own'">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        COPY
+                    </button>
+                    <div class="w-px h-4 bg-gray-600 mx-1"></div>
+                ` : '';
+
                 headerDiv.innerHTML = `
                     <h2 class="text-xl font-bold text-green-400">${title}</h2>
                     <div class="flex items-center gap-3">
                         <span class="font-mono text-gray-400 bg-gray-900 px-2 py-1 rounded text-sm">${secondsToTime(setSeconds)}</span>
-                        <div class="flex gap-1 no-print" data-html2canvas-ignore>
+                        <div class="flex gap-1 no-print items-center" data-html2canvas-ignore>
+                            ${copyBtn}
                             <button onclick="downloadSetImage(${i})" class="text-gray-400 hover:text-white p-1 hover:bg-gray-600 rounded" title="Save Image">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
                             </button>
@@ -786,7 +913,7 @@
         }
 
         // Init
-        render();
+        switchTab('christmas'); // Ensure correct initial state
         renderBank();
 
     </script>
