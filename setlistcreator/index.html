@@ -6,11 +6,18 @@
     <title>Set List Creator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <style>
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #1f2937; }
         ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        
+        /* Dragging Styles */
+        .sortable-ghost { opacity: 0.4; background: #374151; }
+        .sortable-drag { cursor: grabbing; }
+        .drag-handle { cursor: grab; }
+        .drag-handle:active { cursor: grabbing; }
 
         /* Print Logic */
         @media print {
@@ -112,7 +119,7 @@
                         <h2 class="text-xl font-bold text-green-400">Set 1</h2>
                         <!-- Header populated in JS -->
                     </div>
-                    <ul id="list-set-0" class="divide-y divide-gray-700 overflow-y-auto max-h-[600px] flex-grow"></ul>
+                    <ul id="list-set-0" class="divide-y divide-gray-700 overflow-y-auto max-h-[600px] flex-grow min-h-[50px]"></ul>
                 </div>
 
                 <!-- Set 2 -->
@@ -120,7 +127,7 @@
                     <div class="p-4 bg-gray-750 border-b border-gray-700 flex justify-between items-center bg-gray-800">
                         <h2 class="text-xl font-bold text-green-400">Set 2</h2>
                     </div>
-                    <ul id="list-set-1" class="divide-y divide-gray-700 overflow-y-auto max-h-[600px] flex-grow"></ul>
+                    <ul id="list-set-1" class="divide-y divide-gray-700 overflow-y-auto max-h-[600px] flex-grow min-h-[50px]"></ul>
                 </div>
 
                 <!-- Set 3 -->
@@ -128,7 +135,7 @@
                     <div class="p-4 bg-gray-750 border-b border-gray-700 flex justify-between items-center bg-gray-800">
                         <h2 class="text-xl font-bold text-green-400">Set 3</h2>
                     </div>
-                    <ul id="list-set-2" class="divide-y divide-gray-700 overflow-y-auto max-h-[600px] flex-grow"></ul>
+                    <ul id="list-set-2" class="divide-y divide-gray-700 overflow-y-auto max-h-[600px] flex-grow min-h-[50px]"></ul>
                 </div>
 
                 <!-- Set 4 -->
@@ -136,7 +143,7 @@
                     <div class="p-4 bg-gray-750 border-b border-gray-700 flex justify-between items-center bg-gray-800">
                         <h2 class="text-xl font-bold text-green-400">Set 4</h2>
                     </div>
-                    <ul id="list-set-3" class="divide-y divide-gray-700 overflow-y-auto max-h-[600px] flex-grow"></ul>
+                    <ul id="list-set-3" class="divide-y divide-gray-700 overflow-y-auto max-h-[600px] flex-grow min-h-[50px]"></ul>
                 </div>
 
             </div>
@@ -301,6 +308,8 @@
             custom: customData,
             originals: JSON.parse(JSON.stringify(originalsData))
         };
+        
+        let sortables = [];
 
         // Load custom data from LocalStorage if available
         if(localStorage.getItem('myCustomSets')) {
@@ -395,6 +404,10 @@
         }
 
         function render() {
+            // Cleanup old sortables
+            sortables.forEach(s => s.destroy());
+            sortables = [];
+
             let grandTotalSeconds = 0;
             const activeSets = setCollections[currentTab];
 
@@ -437,11 +450,17 @@
                     listEl.innerHTML = `<li class="p-4 text-gray-500 text-center text-sm italic">Empty Set</li>`;
                 } else {
                     setSongs.forEach((song, idx) => {
+                        // Escape quotes for data attribute
+                        const safeTitle = song.title.replace(/"/g, '&quot;');
+                        
                         listEl.innerHTML += `
-                            <li class="group flex items-center justify-between p-3 hover:bg-gray-750 transition border-l-4 border-transparent hover:border-indigo-500 bg-gray-800 odd:bg-gray-800 even:bg-gray-800/50">
+                            <li class="group flex items-center justify-between p-3 hover:bg-gray-750 transition border-l-4 border-transparent hover:border-indigo-500 bg-gray-800 odd:bg-gray-800 even:bg-gray-800/50" data-title="${safeTitle}">
                                 <div class="flex items-center gap-3 overflow-hidden">
-                                    <span class="text-gray-500 font-mono text-xs w-5 text-right no-print">${idx + 1}.</span>
-                                    <div class="truncate pr-2">
+                                    <div class="drag-handle cursor-grab text-gray-600 hover:text-gray-400 no-print" title="Drag to reorder">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+                                    </div>
+                                    <span class="text-gray-500 font-mono text-xs w-5 text-right no-print select-none">${idx + 1}.</span>
+                                    <div class="truncate pr-2 flex-grow">
                                         <div class="text-gray-200 text-sm md:text-base print-black truncate" title="${song.title}">${song.title}</div>
                                     </div>
                                 </div>
@@ -449,15 +468,13 @@
                                     <input type="text" 
                                         value="${song.durationStr === '0:00' ? '' : song.durationStr}" 
                                         placeholder="0:00"
-                                        class="w-12 bg-transparent text-right text-cyan-400 font-mono text-sm focus:outline-none focus:text-white placeholder-gray-600 no-print"
+                                        class="duration-input w-12 bg-transparent text-right text-cyan-400 font-mono text-sm focus:outline-none focus:text-white placeholder-gray-600 no-print"
                                         onchange="updateDuration(${i}, ${idx}, this.value)"
                                     >
                                     <span class="hidden print-block text-sm font-mono text-black">${song.durationStr}</span>
                                     
                                     <!-- Controls -->
                                     <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity no-print">
-                                        <button onclick="moveSong(${i}, ${idx}, -1)" class="p-1 hover:text-white text-gray-500" ${idx === 0 ? 'disabled class="invisible"' : ''}>↑</button>
-                                        <button onclick="moveSong(${i}, ${idx}, 1)" class="p-1 hover:text-white text-gray-500" ${idx === setSongs.length - 1 ? 'disabled class="invisible"' : ''}>↓</button>
                                         <button onclick="deleteSong(${i}, ${idx})" class="p-1 hover:text-red-400 text-gray-600">×</button>
                                     </div>
                                 </div>
@@ -468,6 +485,60 @@
             }
 
             document.getElementById('grand-total-time').textContent = secondsToTime(grandTotalSeconds);
+            
+            // Re-init Sortable
+            initDragAndDrop();
+        }
+
+        function initDragAndDrop() {
+            for(let i=0; i<4; i++) {
+                const el = document.getElementById(`list-set-${i}`);
+                if(el) {
+                    const sortable = new Sortable(el, {
+                        group: 'shared', // Allow dragging between sets
+                        animation: 150,
+                        handle: '.drag-handle', // Drag handle selector
+                        ghostClass: 'sortable-ghost',
+                        dragClass: 'sortable-drag',
+                        onEnd: function(evt) {
+                            handleDragDrop(); // Rebuild state from DOM
+                        }
+                    });
+                    sortables.push(sortable);
+                }
+            }
+        }
+        
+        function handleDragDrop() {
+            // Rebuild setCollections from DOM
+            const newSets = [[], [], [], []];
+            
+            for(let i=0; i<4; i++) {
+                const listEl = document.getElementById(`list-set-${i}`);
+                // Iterate over children (ignoring "Empty Set" text if present, though Sortable might have moved it)
+                const items = listEl.querySelectorAll('li[data-title]');
+                
+                items.forEach(item => {
+                    const title = item.getAttribute('data-title');
+                    // Get current value from input, in case user typed but didn't blur
+                    const durationInput = item.querySelector('.duration-input');
+                    let durationStr = durationInput ? durationInput.value : "0:00";
+                    
+                    if(!durationStr) durationStr = "0:00";
+                    
+                    newSets[i].push({
+                        title: title,
+                        durationStr: durationStr
+                    });
+                });
+            }
+            
+            // Update State
+            setCollections[currentTab] = newSets;
+            saveCustomData();
+            
+            // Re-render to update numbers and totals
+            render();
         }
 
         function renderBank() {
@@ -527,6 +598,8 @@
             render();
         }
 
+        // moveSong is now redundant with drag and drop but kept for fallback or accessibility if desired, 
+        // though I removed the buttons from the HTML above to declutter. 
         function moveSong(setIdx, songIdx, direction) {
             const arr = setCollections[currentTab][setIdx];
             const newIdx = songIdx + direction;
