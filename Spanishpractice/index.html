@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3 Minute Spanish Practice App</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #2c3e50;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            overflow: hidden; /* Prevent scrolling on mobile */
+        }
+        canvas {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            cursor: pointer;
+            max-width: 100%;
+            max-height: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="400" height="600"></canvas>
+
+<script>
+    // --- DATA: Words, Phrases & Sentences ---
+    const vocabList = [
+        // --- Single Words ---
+        { en: "Good", es: "Bueno", type: "word" },
+        { en: "Bad", es: "Malo", type: "word" },
+        { en: "Here", es: "Aquí", type: "word" },
+        { en: "It is", es: "Es", type: "word" },
+        { en: "Very", es: "Muy", type: "word" },
+        { en: "But", es: "Pero", type: "word" },
+        { en: "Because", es: "Porque", type: "word" },
+        { en: "I want", es: "Quiero", type: "word" },
+        { en: "To eat", es: "Comer", type: "word" },
+        { en: "To drink", es: "Beber", type: "word" },
+        { en: "Can I?", es: "¿Puedo?", type: "word" },
+        { en: "I would like", es: "Me gustaría", type: "word" },
+        { en: "Thank you", es: "Gracias", type: "word" },
+        { en: "A coffee", es: "Un café", type: "word" },
+        { en: "The check/bill", es: "La cuenta", type: "word" },
+        { en: "Chicken", es: "Pollo", type: "word" },
+        { en: "Fish", es: "Pescado", type: "word" },
+        { en: "Salad", es: "Ensalada", type: "word" },
+        { en: "The beach", es: "La playa", type: "word" },
+        { en: "The supermarket", es: "El supermercado", type: "word" },
+        { en: "A room", es: "Una habitación", type: "word" },
+        { en: "Where is...?", es: "¿Dónde está...?", type: "word" },
+        // --- NEW VOCABULARY ---
+        { en: "Left", es: "Izquierda", type: "word" },
+        { en: "Right", es: "Derecha", type: "word" },
+        { en: "Straight ahead", es: "Todo recto", type: "phrase" },
+        { en: "Bathroom", es: "El baño", type: "word" },
+        { en: "Water", es: "Agua", type: "word" },
+        { en: "Beer", es: "Cerveza", type: "word" },
+        { en: "Wine", es: "Vino", type: "word" },
+        { en: "Breakfast", es: "Desayuno", type: "word" },
+        { en: "Lunch", es: "Almuerzo", type: "word" },
+        { en: "Dinner", es: "Cena", type: "word" },
+        { en: "Delicious", es: "Delicioso", type: "word" },
+        { en: "Help!", es: "¡Ayuda!", type: "word" },
+        { en: "Doctor", es: "Médico", type: "word" },
+        { en: "Open", es: "Abierto", type: "word" },
+        { en: "Closed", es: "Cerrado", type: "word" },
+
+        // --- Common Phrases ---
+        { en: "Hello", es: "Hola", type: "phrase" },
+        { en: "Goodbye", es: "Adiós", type: "phrase" },
+        { en: "Please", es: "Por favor", type: "phrase" },
+        { en: "I am sorry", es: "Lo siento", type: "phrase" },
+        { en: "Good morning", es: "Buenos días", type: "phrase" },
+        { en: "See you later", es: "Hasta luego", type: "phrase" },
+        { en: "How much is it?", es: "¿Cuánto es?", type: "phrase" },
+        { en: "At what time?", es: "¿A qué hora?", type: "phrase" },
+        { en: "For two people", es: "Para dos personas", type: "phrase" },
+        { en: "With a shower", es: "Con ducha", type: "phrase" },
+        { en: "I don't understand", es: "No entiendo", type: "phrase" },
+        // --- NEW PHRASES ---
+        { en: "How are you?", es: "¿Cómo estás?", type: "phrase" },
+        { en: "Very well", es: "Muy bien", type: "phrase" },
+        { en: "Nice to meet you", es: "Mucho gusto", type: "phrase" },
+        { en: "Excuse me", es: "Disculpe", type: "phrase" },
+        { en: "Do you speak English?", es: "¿Habla inglés?", type: "phrase" },
+        { en: "I don't speak Spanish", es: "No hablo español", type: "phrase" },
+        { en: "Too expensive", es: "Demasiado caro", type: "phrase" },
+        { en: "Do you have...?", es: "¿Tiene...?", type: "phrase" },
+
+        // --- Full Sentences ---
+        { en: "I want to eat a salad", es: "Quiero comer una ensalada", type: "sentence" },
+        { en: "Where is the bank?", es: "¿Dónde está el banco?", type: "sentence" },
+        { en: "I would like a room", es: "Quisiera una habitación", type: "sentence" },
+        { en: "It is very good here", es: "Es muy bueno aquí", type: "sentence" },
+        { en: "Can I have a coffee?", es: "¿Puedo tomar un café?", type: "sentence" },
+        { en: "I want to eat something", es: "Quiero comer algo", type: "sentence" },
+        { en: "It is good but not fantastic", es: "Es bueno pero no es fantástico", type: "sentence" },
+        { en: "I have a reservation", es: "Tengo una reserva", type: "sentence" }
+    ];
+
+    // --- GAME CONSTANTS ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Brand Colors
+    const COLORS = {
+        bg: "#f3f4f6",
+        primary: "#7CB342", // Green
+        secondary: "#8E24AA", // Purple
+        tertiary: "#0288D1", // Blue for Phrases
+        text: "#333333",
+        white: "#ffffff",
+        error: "#e53935",
+        success: "#43A047",
+        highlight: "#42A5F5",
+        gold: "#FFB300"
+    };
+
+    // --- STATE MANAGEMENT ---
+    let gameState = 'START'; 
+    let currentQuestion = null;
+    let quizFilter = 'all'; // 'all' or 'phrases'
+    let feedbackMessage = "";
+    let feedbackColor = "";
+    let matchData = { left: [], right: [], selectedIndex: -1, matchedCount: 0 };
+    let matchFeedback = { index: -1, color: null };
+    let buttons = [];
+    let lastQuestionTerm = null;
+
+    // Persistent Stats
+    let stats = {
+        totalCorrect: 0,
+        totalAttempts: 0,
+        currentStreak: 0,
+        bestStreak: 0
+    };
+
+    // Load Stats from LocalStorage
+    function loadStats() {
+        const saved = localStorage.getItem('spanishAppStats');
+        if (saved) {
+            stats = JSON.parse(saved);
+        }
+    }
+
+    function saveStats() {
+        localStorage.setItem('spanishAppStats', JSON.stringify(stats));
+    }
+
+    function updateStats(isCorrect) {
+        stats.totalAttempts++;
+        if (isCorrect) {
+            stats.totalCorrect++;
+            stats.currentStreak++;
+            if (stats.currentStreak > stats.bestStreak) {
+                stats.bestStreak = stats.currentStreak;
+            }
+        } else {
+            stats.currentStreak = 0;
+        }
+        saveStats();
+    }
+
+    function getAccuracy() {
+        if (stats.totalAttempts === 0) return 0;
+        return Math.round((stats.totalCorrect / stats.totalAttempts) * 100);
+    }
+
+    // --- HELPER FUNCTIONS ---
+
+    function shuffle(array) {
+        let currentIndex = array.length, randomIndex;
+        while (currentIndex != 0) {
+            randomIndex = Math.floor(Math.random() * currentIndex);
+            currentIndex--;
+            [array[currentIndex], array[randomIndex]] = [
+                array[randomIndex], array[currentIndex]];
+        }
+        return array;
+    }
+
+    // --- GAME LOGIC GENERATORS ---
+
+    function generateQuestion() {
+        // Filter pool based on mode
+        let activePool = vocabList;
+        if (quizFilter === 'phrases') {
+            activePool = vocabList.filter(v => v.type === 'phrase' || v.type === 'sentence');
+        }
+
+        let item;
+        let attempts = 0;
+        do {
+            item = activePool[Math.floor(Math.random() * activePool.length)];
+            attempts++;
+        } while (item.en === lastQuestionTerm && attempts < 5);
+        
+        lastQuestionTerm = item.en;
+
+        const isEnToEs = Math.random() > 0.4; 
+        const questionText = isEnToEs ? item.en : item.es;
+        const correctAnswer = isEnToEs ? item.es : item.en;
+        const targetLang = isEnToEs ? 'es' : 'en';
+
+        let pool = vocabList.filter(w => w[targetLang] !== correctAnswer && w.type === item.type);
+        if (pool.length < 3) pool = vocabList.filter(w => w[targetLang] !== correctAnswer);
+
+        let distractors = shuffle([...pool]).slice(0, 3).map(w => w[targetLang]);
+        let options = shuffle([...distractors, correctAnswer]);
+
+        return {
+            text: questionText,
+            correct: correctAnswer,
+            options: options,
+            langDir: isEnToEs ? "EN → ES" : "ES → EN"
+        };
+    }
+
+    function generateMatchingRound() {
+        const roundItems = shuffle([...vocabList]).slice(0, 5);
+        const leftSide = roundItems.map((item, i) => ({
+            text: item.en,
+            id: i,
+            state: 'neutral'
+        }));
+        
+        let rightSideData = roundItems.map((item, i) => ({
+            text: item.es,
+            targetId: i,
+            state: 'neutral'
+        }));
+        
+        const rightSide = shuffle([...rightSideData]);
+
+        return {
+            left: leftSide,
+            right: rightSide,
+            selectedIndex: -1,
+            matchedCount: 0
+        };
+    }
+
+    // --- DRAWING FUNCTIONS ---
+
+    function drawRoundedRect(x, y, w, h, r, color, stroke = false) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+        if (stroke) {
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#ddd";
+            ctx.stroke();
+        }
+    }
+
+    function drawText(text, x, y, size, color, align = "center", maxWidth = 380) {
+        ctx.fillStyle = color;
+        ctx.textAlign = align;
+        let fontSize = size;
+        ctx.font = `bold ${fontSize}px Arial`;
+        while (ctx.measureText(text).width > maxWidth && fontSize > 10) {
+            fontSize -= 1;
+            ctx.font = `bold ${fontSize}px Arial`;
+        }
+        ctx.fillText(text, x, y);
+    }
+
+    function drawStatsBar() {
+        drawRoundedRect(0, 0, 400, 60, 0, COLORS.secondary);
+        
+        // Streak (Left)
+        ctx.fillStyle = COLORS.gold;
+        ctx.font = "20px Arial";
+        ctx.textAlign = "left";
+        ctx.fillText("🔥 " + stats.currentStreak, 20, 38);
+        
+        // Total Score (Center)
+        ctx.fillStyle = COLORS.white;
+        ctx.textAlign = "center";
+        ctx.fillText("Score: " + stats.totalCorrect, 200, 38);
+
+        // Accuracy (Right)
+        ctx.textAlign = "right";
+        ctx.font = "16px Arial";
+        ctx.fillStyle = "#ddd";
+        ctx.fillText(getAccuracy() + "% Acc", 380, 38);
+    }
+
+    // --- SCREEN RENDERERS ---
+
+    function renderStartScreen() {
+        ctx.fillStyle = COLORS.bg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Header
+        drawRoundedRect(20, 30, 360, 90, 15, COLORS.primary);
+        drawText("3 Minute", 200, 75, 26, COLORS.white);
+        drawText("SPANISH", 200, 105, 36, COLORS.white);
+
+        // Stats Dashboard
+        drawRoundedRect(30, 140, 340, 70, 10, COLORS.white, true);
+        drawText("YOUR PROGRESS", 200, 160, 12, "#888");
+        
+        ctx.textAlign = "center";
+        ctx.fillStyle = COLORS.text;
+        ctx.font = "bold 20px Arial";
+        // Best Streak
+        ctx.fillText("Best Streak", 110, 185);
+        ctx.fillStyle = COLORS.primary;
+        ctx.fillText(stats.bestStreak, 110, 205);
+        
+        // Total Accuracy
+        ctx.fillStyle = COLORS.text;
+        ctx.fillText("Accuracy", 290, 185);
+        ctx.fillStyle = COLORS.secondary;
+        ctx.fillText(getAccuracy() + "%", 290, 205);
+
+        // Menu Buttons
+        drawText("Choose Mode:", 200, 240, 18, COLORS.text);
+
+        // 1. Standard Quiz
+        drawRoundedRect(50, 260, 300, 60, 10, COLORS.secondary);
+        drawText("Standard Quiz", 200, 298, 20, COLORS.white);
+
+        // 2. Phrase Practice (New)
+        drawRoundedRect(50, 335, 300, 60, 10, COLORS.tertiary);
+        drawText("Phrase Master", 200, 373, 20, COLORS.white);
+
+        // 3. Matching
+        drawRoundedRect(50, 410, 300, 60, 10, "#F57C00");
+        drawText("Matching Madness", 200, 448, 20, COLORS.white);
+        
+        // Reset Data Link
+        drawText("Reset Progress", 200, 560, 14, "#999");
+
+        buttons = [
+            { id: 'start_quiz', x: 50, y: 260, w: 300, h: 60 },
+            { id: 'start_phrases', x: 50, y: 335, w: 300, h: 60 },
+            { id: 'start_match', x: 50, y: 410, w: 300, h: 60 },
+            { id: 'reset_data', x: 140, y: 540, w: 120, h: 30 }
+        ];
+    }
+
+    function renderQuizScreen() {
+        ctx.fillStyle = COLORS.bg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        drawStatsBar();
+
+        // Home Button
+        buttons.push({ id: 'home', x: 0, y: 0, w: 60, h: 60 });
+        drawText("🏠", 30, 85, 20, "#555", "left"); 
+
+        // Context Title
+        const modeTitle = quizFilter === 'phrases' ? "Phrase Master" : "Standard Quiz";
+        drawText(modeTitle, 370, 85, 14, COLORS.primary, "right");
+
+        // Question Card
+        drawRoundedRect(30, 100, 340, 130, 15, COLORS.white, true);
+        drawText("Translate:", 200, 130, 14, "#888");
+        drawText(currentQuestion.text, 200, 175, 28, COLORS.text, "center", 320);
+
+        // Options
+        let startY = 250;
+        currentQuestion.options.forEach((opt, index) => {
+            const btnY = startY + (index * 75);
+            drawRoundedRect(30, btnY, 340, 60, 10, COLORS.primary);
+            drawText(opt, 200, btnY + 38, 20, COLORS.white, "center", 320);
+            buttons.push({ id: 'option', val: opt, x: 30, y: btnY, w: 340, h: 60 });
+        });
+
+        if (feedbackMessage) {
+            ctx.globalAlpha = 0.95;
+            ctx.fillStyle = feedbackColor;
+            ctx.fillRect(30, 540, 340, 45);
+            ctx.globalAlpha = 1.0;
+            drawText(feedbackMessage, 200, 570, 18, COLORS.white);
+        }
+    }
+
+    function renderMatchingScreen() {
+        ctx.fillStyle = COLORS.bg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Header with specific match color
+        drawRoundedRect(0, 0, 400, 60, 0, "#F57C00");
+        ctx.fillStyle = COLORS.white;
+        ctx.textAlign = "left";
+        ctx.font = "20px Arial";
+        ctx.fillText("🔥 " + stats.currentStreak, 20, 38);
+        ctx.textAlign = "center";
+        ctx.fillText("Match Pairs", 200, 38);
+        
+        // Home Button Zone (top left invisible overlay)
+        buttons.push({ id: 'home', x: 0, y: 0, w: 70, h: 60 });
+
+        const rowHeight = 85;
+        const startY = 100;
+        
+        matchData.left.forEach((item, i) => {
+            let color = COLORS.white;
+            let textColor = COLORS.text;
+            if (item.state === 'matched') { color = COLORS.success; textColor = COLORS.white; }
+            else if (item.state === 'selected') { color = COLORS.highlight; textColor = COLORS.white; }
+
+            const yPos = startY + (i * rowHeight);
+            drawRoundedRect(10, yPos, 180, 70, 10, color, item.state === 'neutral');
+            drawText(item.text, 100, yPos + 42, 16, textColor, "center", 170);
+            if(item.state !== 'matched') {
+                buttons.push({ id: 'match_left', index: i, x: 10, y: yPos, w: 180, h: 70 });
+            }
+        });
+
+        matchData.right.forEach((item, i) => {
+            let color = COLORS.white;
+            let textColor = COLORS.text;
+            if (item.state === 'matched') { color = COLORS.success; textColor = COLORS.white; }
+            else if (matchFeedback.index === i && matchFeedback.color) {
+                color = matchFeedback.color;
+                textColor = COLORS.white;
+            }
+
+            const yPos = startY + (i * rowHeight);
+            drawRoundedRect(210, yPos, 180, 70, 10, color, item.state === 'neutral');
+            drawText(item.text, 300, yPos + 42, 16, textColor, "center", 170);
+            if(item.state !== 'matched') {
+                buttons.push({ id: 'match_right', index: i, x: 210, y: yPos, w: 180, h: 70 });
+            }
+        });
+
+        if (matchData.matchedCount === 5) {
+             drawRoundedRect(50, 250, 300, 100, 15, COLORS.primary);
+             drawText("Round Complete!", 200, 290, 28, COLORS.white);
+             drawText("Tap for Next Round", 200, 330, 18, COLORS.white);
+             buttons.push({ id: 'next_match_round', x: 0, y: 0, w: 400, h: 600 });
+        }
+    }
+
+    // --- MAIN LOOP ---
+
+    function startQuiz(mode = 'all') {
+        quizFilter = mode;
+        buttons = [];
+        nextQuizTurn();
+    }
+
+    function nextQuizTurn() {
+        feedbackMessage = "";
+        currentQuestion = generateQuestion();
+        gameState = 'QUIZ';
+        drawScreen();
+    }
+
+    function startMatching() {
+        matchData = generateMatchingRound();
+        matchFeedback = { index: -1, color: null };
+        gameState = 'MATCH';
+        buttons = [];
+        drawScreen();
+    }
+
+    function drawScreen() {
+        buttons = []; 
+        if (gameState === 'START') renderStartScreen();
+        else if (gameState === 'QUIZ' || gameState === 'WAIT_QUIZ') renderQuizScreen();
+        else if (gameState === 'MATCH') renderMatchingScreen();
+    }
+
+    function handleInput(x, y) {
+        for (let i = buttons.length - 1; i >= 0; i--) {
+            let btn = buttons[i];
+            if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+                
+                if (btn.id === 'start_quiz') startQuiz('all');
+                else if (btn.id === 'start_phrases') startQuiz('phrases');
+                else if (btn.id === 'start_match') startMatching();
+                else if (btn.id === 'home') { gameState = 'START'; drawScreen(); }
+                else if (btn.id === 'reset_data') { 
+                    if(confirm("Reset all progress stats?")) {
+                        stats = { totalCorrect: 0, totalAttempts: 0, currentStreak: 0, bestStreak: 0 };
+                        saveStats();
+                        drawScreen();
+                    }
+                }
+                
+                else if (btn.id === 'option' && gameState === 'QUIZ') {
+                    checkQuizAnswer(btn.val);
+                }
+                
+                else if (gameState === 'MATCH') {
+                    if (btn.id === 'match_left') handleMatchLeft(btn.index);
+                    else if (btn.id === 'match_right') handleMatchRight(btn.index);
+                    else if (btn.id === 'next_match_round') startMatching();
+                }
+                
+                return; 
+            }
+        }
+    }
+
+    // --- HANDLERS ---
+    function checkQuizAnswer(answer) {
+        if (answer === currentQuestion.correct) {
+            updateStats(true);
+            feedbackMessage = "Correct! ¡Muy bien!";
+            feedbackColor = COLORS.success;
+        } else {
+            updateStats(false);
+            let displayAns = currentQuestion.correct;
+            if(displayAns.length > 25) displayAns = displayAns.substring(0, 25) + "...";
+            feedbackMessage = `Oops! It was: "${displayAns}"`;
+            feedbackColor = COLORS.error;
+        }
+        
+        gameState = 'WAIT_QUIZ';
+        drawScreen(); 
+        
+        setTimeout(() => {
+            if (gameState === 'WAIT_QUIZ') nextQuizTurn();
+        }, 1500);
+    }
+
+    function handleMatchLeft(index) {
+        if (matchData.left[index].state !== 'matched') {
+            matchData.left.forEach(i => { if(i.state === 'selected') i.state = 'neutral'; });
+            matchData.left[index].state = 'selected';
+            matchData.selectedIndex = index;
+            drawScreen();
+        }
+    }
+
+    function handleMatchRight(rightIndex) {
+        if (matchData.selectedIndex === -1) return; 
+
+        const leftIndex = matchData.selectedIndex;
+        const leftItem = matchData.left[leftIndex];
+        const rightItem = matchData.right[rightIndex];
+
+        if (leftItem.id === rightItem.targetId) {
+            // Success Match
+            updateStats(true); // Treat individual match as a correct answer for stats
+            leftItem.state = 'matched';
+            rightItem.state = 'matched';
+            matchData.selectedIndex = -1;
+            matchData.matchedCount++;
+            drawScreen();
+        } else {
+            // Failed Match
+            updateStats(false);
+            matchFeedback = { index: rightIndex, color: COLORS.error };
+            drawScreen();
+            setTimeout(() => {
+                matchFeedback = { index: -1, color: null };
+                matchData.left[leftIndex].state = 'neutral'; 
+                matchData.selectedIndex = -1;
+                drawScreen();
+            }, 500);
+        }
+    }
+
+    // --- EVENTS ---
+    canvas.addEventListener('mousedown', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        handleInput((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY);
+    });
+
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches[0];
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        handleInput((touch.clientX - rect.left) * scaleX, (touch.clientY - rect.top) * scaleY);
+    }, { passive: false });
+
+    // --- INIT ---
+    loadStats();
+    renderStartScreen();
+
+</script>
+
+</body>
+</html>
