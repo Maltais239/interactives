@@ -33,6 +33,7 @@
 
 <script>
     // --- DATA: Words, Phrases & Sentences ---
+    // Added 'weight' property initialization logic later to support Spaced Repetition
     const vocabList = [
         // --- Single Words ---
         { en: "Good", es: "Bueno", type: "word" },
@@ -107,6 +108,11 @@
         { en: "I have a reservation", es: "Tengo una reserva", type: "sentence" }
     ];
 
+    // Initialize Spaced Repetition Weights
+    vocabList.forEach(item => {
+        item.weight = 10; // Default weight
+    });
+
     // --- GAME CONSTANTS ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
@@ -122,50 +128,85 @@
         error: "#e53935",
         success: "#43A047",
         highlight: "#42A5F5",
-        gold: "#FFB300"
+        gold: "#FFB300",
+        urgent: "#FF5722"
     };
 
     // --- STATE MANAGEMENT ---
     let gameState = 'START'; 
     let currentQuestion = null;
-    let quizFilter = 'all'; // 'all' or 'phrases'
+    let quizFilter = 'all'; // 'all', 'phrases', 'review'
     let feedbackMessage = "";
     let feedbackColor = "";
     let matchData = { left: [], right: [], selectedIndex: -1, matchedCount: 0 };
     let matchFeedback = { index: -1, color: null };
     let buttons = [];
     let lastQuestionTerm = null;
+    let mistakes = []; // Metacognitive strategy: Track errors for review
+
+    // Timer Logic (Pressured Response)
+    let quizTimer = 0;
+    let maxQuizTime = 1000; // Frames approx
+    let lastFrameTime = 0;
 
     // Persistent Stats
     let stats = {
         totalCorrect: 0,
         totalAttempts: 0,
         currentStreak: 0,
-        bestStreak: 0
+        bestStreak: 0,
+        dailyGoal: 20,
+        todayCorrect: 0
     };
 
     // Load Stats from LocalStorage
     function loadStats() {
-        const saved = localStorage.getItem('spanishAppStats');
+        const saved = localStorage.getItem('spanishAppStats_v2');
         if (saved) {
             stats = JSON.parse(saved);
+        }
+        // Load weights if they exist
+        const savedWeights = localStorage.getItem('spanishAppWeights');
+        if(savedWeights) {
+            const weightMap = JSON.parse(savedWeights);
+            vocabList.forEach(v => {
+                if(weightMap[v.en]) v.weight = weightMap[v.en];
+            });
         }
     }
 
     function saveStats() {
-        localStorage.setItem('spanishAppStats', JSON.stringify(stats));
+        localStorage.setItem('spanishAppStats_v2', JSON.stringify(stats));
+        // Save weights
+        const weightMap = {};
+        vocabList.forEach(v => weightMap[v.en] = v.weight);
+        localStorage.setItem('spanishAppWeights', JSON.stringify(weightMap));
     }
 
-    function updateStats(isCorrect) {
+    function updateStats(isCorrect, itemEn) {
         stats.totalAttempts++;
+        const item = vocabList.find(v => v.en === itemEn);
+
         if (isCorrect) {
             stats.totalCorrect++;
+            stats.todayCorrect++;
             stats.currentStreak++;
             if (stats.currentStreak > stats.bestStreak) {
                 stats.bestStreak = stats.currentStreak;
             }
+            // Spaced Repetition: Reduce weight (appear less often)
+            if(item) item.weight = Math.max(1, item.weight - 2);
+            
+            // Remove from mistakes list if present
+            mistakes = mistakes.filter(m => m !== itemEn);
+
         } else {
             stats.currentStreak = 0;
+            // Spaced Repetition: Increase weight (appear more often)
+            if(item) item.weight = Math.min(100, item.weight + 5);
+            
+            // Metacognition: Add to review list
+            if(!mistakes.includes(itemEn) && item) mistakes.push(itemEn);
         }
         saveStats();
     }
@@ -188,29 +229,51 @@
         return array;
     }
 
+    // Weighted Random Selection (Ellis: Frequency/Salience)
+    function getWeightedRandomItem(pool) {
+        const totalWeight = pool.reduce((acc, item) => acc + item.weight, 0);
+        let random = Math.random() * totalWeight;
+        
+        for (let item of pool) {
+            random -= item.weight;
+            if (random <= 0) return item;
+        }
+        return pool[0]; // Fallback
+    }
+
     // --- GAME LOGIC GENERATORS ---
 
     function generateQuestion() {
         // Filter pool based on mode
         let activePool = vocabList;
+        
         if (quizFilter === 'phrases') {
             activePool = vocabList.filter(v => v.type === 'phrase' || v.type === 'sentence');
+        } else if (quizFilter === 'review') {
+            // Only use items in the mistakes list
+            activePool = vocabList.filter(v => mistakes.includes(v.en));
+            // Fallback if review list is cleared mid-game
+            if(activePool.length === 0) activePool = vocabList;
         }
 
         let item;
         let attempts = 0;
+        
+        // Use Weighted Randomness for "Smart Learning"
         do {
-            item = activePool[Math.floor(Math.random() * activePool.length)];
+            item = getWeightedRandomItem(activePool);
             attempts++;
         } while (item.en === lastQuestionTerm && attempts < 5);
         
         lastQuestionTerm = item.en;
 
+        // Input vs Output processing
         const isEnToEs = Math.random() > 0.4; 
         const questionText = isEnToEs ? item.en : item.es;
         const correctAnswer = isEnToEs ? item.es : item.en;
         const targetLang = isEnToEs ? 'es' : 'en';
 
+        // Distractors
         let pool = vocabList.filter(w => w[targetLang] !== correctAnswer && w.type === item.type);
         if (pool.length < 3) pool = vocabList.filter(w => w[targetLang] !== correctAnswer);
 
@@ -218,6 +281,7 @@
         let options = shuffle([...distractors, correctAnswer]);
 
         return {
+            originalItem: item,
             text: questionText,
             correct: correctAnswer,
             options: options,
@@ -226,11 +290,15 @@
     }
 
     function generateMatchingRound() {
-        const roundItems = shuffle([...vocabList]).slice(0, 5);
+        // Prioritize items with higher weight (difficulty)
+        let weightedPool = [...vocabList].sort((a,b) => b.weight - a.weight).slice(0, 15);
+        const roundItems = shuffle(weightedPool).slice(0, 5);
+        
         const leftSide = roundItems.map((item, i) => ({
             text: item.en,
             id: i,
-            state: 'neutral'
+            state: 'neutral',
+            ref: item
         }));
         
         let rightSideData = roundItems.map((item, i) => ({
@@ -293,16 +361,19 @@
         ctx.textAlign = "left";
         ctx.fillText("🔥 " + stats.currentStreak, 20, 38);
         
-        // Total Score (Center)
+        // Daily Goal (Center)
         ctx.fillStyle = COLORS.white;
         ctx.textAlign = "center";
-        ctx.fillText("Score: " + stats.totalCorrect, 200, 38);
+        ctx.font = "14px Arial";
+        let goalText = `Daily Goal: ${stats.todayCorrect}/${stats.dailyGoal}`;
+        if(stats.todayCorrect >= stats.dailyGoal) goalText = "Daily Goal Reached! 🎉";
+        ctx.fillText(goalText, 200, 38);
 
         // Accuracy (Right)
         ctx.textAlign = "right";
         ctx.font = "16px Arial";
         ctx.fillStyle = "#ddd";
-        ctx.fillText(getAccuracy() + "% Acc", 380, 38);
+        ctx.fillText(getAccuracy() + "%", 380, 38);
     }
 
     // --- SCREEN RENDERERS ---
@@ -313,49 +384,55 @@
 
         // Header
         drawRoundedRect(20, 30, 360, 90, 15, COLORS.primary);
-        drawText("3 Minute", 200, 75, 26, COLORS.white);
-        drawText("SPANISH", 200, 105, 36, COLORS.white);
+        drawText("Spanish", 200, 75, 26, COLORS.white);
+        drawText("SPARK", 200, 105, 36, COLORS.white);
 
         // Stats Dashboard
         drawRoundedRect(30, 140, 340, 70, 10, COLORS.white, true);
-        drawText("YOUR PROGRESS", 200, 160, 12, "#888");
+        drawText("LEARNING METRICS", 200, 160, 12, "#888");
         
         ctx.textAlign = "center";
         ctx.fillStyle = COLORS.text;
         ctx.font = "bold 20px Arial";
-        // Best Streak
-        ctx.fillText("Best Streak", 110, 185);
+        // Today
+        ctx.fillText("Today", 110, 185);
         ctx.fillStyle = COLORS.primary;
-        ctx.fillText(stats.bestStreak, 110, 205);
+        ctx.fillText(stats.todayCorrect, 110, 205);
         
-        // Total Accuracy
+        // Mistakes
         ctx.fillStyle = COLORS.text;
-        ctx.fillText("Accuracy", 290, 185);
-        ctx.fillStyle = COLORS.secondary;
-        ctx.fillText(getAccuracy() + "%", 290, 205);
+        ctx.fillText("Review", 290, 185);
+        ctx.fillStyle = mistakes.length > 0 ? COLORS.error : COLORS.success;
+        ctx.fillText(mistakes.length, 290, 205);
 
         // Menu Buttons
-        drawText("Choose Mode:", 200, 240, 18, COLORS.text);
+        drawText("Select Strategy:", 200, 240, 18, COLORS.text);
 
         // 1. Standard Quiz
-        drawRoundedRect(50, 260, 300, 60, 10, COLORS.secondary);
-        drawText("Standard Quiz", 200, 298, 20, COLORS.white);
+        drawRoundedRect(50, 260, 300, 55, 10, COLORS.secondary);
+        drawText("Smart Quiz", 200, 295, 20, COLORS.white);
 
-        // 2. Phrase Practice (New)
-        drawRoundedRect(50, 335, 300, 60, 10, COLORS.tertiary);
-        drawText("Phrase Master", 200, 373, 20, COLORS.white);
+        // 2. Phrase Practice
+        drawRoundedRect(50, 325, 300, 55, 10, COLORS.tertiary);
+        drawText("Phrase Master", 200, 360, 20, COLORS.white);
+        
+        // 3. Review Mistakes (Metacognitive)
+        let reviewColor = mistakes.length > 0 ? COLORS.error : "#ccc";
+        drawRoundedRect(50, 390, 300, 55, 10, reviewColor);
+        drawText(`Review Mistakes (${mistakes.length})`, 200, 425, 20, COLORS.white);
 
-        // 3. Matching
-        drawRoundedRect(50, 410, 300, 60, 10, "#F57C00");
-        drawText("Matching Madness", 200, 448, 20, COLORS.white);
+        // 4. Matching
+        drawRoundedRect(50, 455, 300, 55, 10, "#F57C00");
+        drawText("Matching Madness", 200, 490, 20, COLORS.white);
         
         // Reset Data Link
         drawText("Reset Progress", 200, 560, 14, "#999");
 
         buttons = [
-            { id: 'start_quiz', x: 50, y: 260, w: 300, h: 60 },
-            { id: 'start_phrases', x: 50, y: 335, w: 300, h: 60 },
-            { id: 'start_match', x: 50, y: 410, w: 300, h: 60 },
+            { id: 'start_quiz', x: 50, y: 260, w: 300, h: 55 },
+            { id: 'start_phrases', x: 50, y: 325, w: 300, h: 55 },
+            { id: 'start_review', x: 50, y: 390, w: 300, h: 55 }, // Logic: only active if mistakes > 0
+            { id: 'start_match', x: 50, y: 455, w: 300, h: 55 },
             { id: 'reset_data', x: 140, y: 540, w: 120, h: 30 }
         ];
     }
@@ -371,13 +448,22 @@
         drawText("🏠", 30, 85, 20, "#555", "left"); 
 
         // Context Title
-        const modeTitle = quizFilter === 'phrases' ? "Phrase Master" : "Standard Quiz";
+        let modeTitle = "Smart Quiz";
+        if (quizFilter === 'phrases') modeTitle = "Phrase Master";
+        if (quizFilter === 'review') modeTitle = "Mistake Review";
         drawText(modeTitle, 370, 85, 14, COLORS.primary, "right");
 
+        // Timer Bar (Pressured Response)
+        if (gameState === 'QUIZ') {
+            const timerPct = quizTimer / maxQuizTime;
+            const barColor = timerPct < 0.3 ? COLORS.error : COLORS.highlight;
+            drawRoundedRect(30, 95, 340 * timerPct, 6, 3, barColor);
+        }
+
         // Question Card
-        drawRoundedRect(30, 100, 340, 130, 15, COLORS.white, true);
-        drawText("Translate:", 200, 130, 14, "#888");
-        drawText(currentQuestion.text, 200, 175, 28, COLORS.text, "center", 320);
+        drawRoundedRect(30, 110, 340, 120, 15, COLORS.white, true);
+        drawText("Translate:", 200, 140, 14, "#888");
+        drawText(currentQuestion.text, 200, 185, 26, COLORS.text, "center", 320);
 
         // Options
         let startY = 250;
@@ -466,6 +552,13 @@
     function nextQuizTurn() {
         feedbackMessage = "";
         currentQuestion = generateQuestion();
+        
+        // Reset Timer for "Pressured Response"
+        // Longer phrases get more time
+        const bonusTime = currentQuestion.text.length * 15;
+        maxQuizTime = 800 + bonusTime;
+        quizTimer = maxQuizTime;
+        
         gameState = 'QUIZ';
         drawScreen();
     }
@@ -485,6 +578,21 @@
         else if (gameState === 'MATCH') renderMatchingScreen();
     }
 
+    // --- ANIMATION LOOP (For Timer) ---
+    function gameLoop() {
+        if (gameState === 'QUIZ') {
+            quizTimer -= 3; // Deplete time
+            if (quizTimer <= 0) {
+                // Time's up!
+                checkQuizAnswer(null, true);
+            }
+            // Only redraw every few frames to save battery if needed, 
+            // but for smooth bar we draw every frame
+            drawScreen();
+        }
+        requestAnimationFrame(gameLoop);
+    }
+
     function handleInput(x, y) {
         for (let i = buttons.length - 1; i >= 0; i--) {
             let btn = buttons[i];
@@ -492,11 +600,16 @@
                 
                 if (btn.id === 'start_quiz') startQuiz('all');
                 else if (btn.id === 'start_phrases') startQuiz('phrases');
+                else if (btn.id === 'start_review') {
+                     if(mistakes.length > 0) startQuiz('review');
+                }
                 else if (btn.id === 'start_match') startMatching();
                 else if (btn.id === 'home') { gameState = 'START'; drawScreen(); }
                 else if (btn.id === 'reset_data') { 
                     if(confirm("Reset all progress stats?")) {
-                        stats = { totalCorrect: 0, totalAttempts: 0, currentStreak: 0, bestStreak: 0 };
+                        stats = { totalCorrect: 0, totalAttempts: 0, currentStreak: 0, bestStreak: 0, dailyGoal: 20, todayCorrect: 0 };
+                        mistakes = [];
+                        vocabList.forEach(v => v.weight = 10);
                         saveStats();
                         drawScreen();
                     }
@@ -518,13 +631,20 @@
     }
 
     // --- HANDLERS ---
-    function checkQuizAnswer(answer) {
-        if (answer === currentQuestion.correct) {
-            updateStats(true);
+    function checkQuizAnswer(answer, timeout = false) {
+        const itemEn = currentQuestion.originalItem.en;
+        
+        if (timeout) {
+            updateStats(false, itemEn);
+            feedbackMessage = "⏰ Time's up! Be faster next time!";
+            feedbackColor = COLORS.urgent;
+        }
+        else if (answer === currentQuestion.correct) {
+            updateStats(true, itemEn);
             feedbackMessage = "Correct! ¡Muy bien!";
             feedbackColor = COLORS.success;
         } else {
-            updateStats(false);
+            updateStats(false, itemEn);
             let displayAns = currentQuestion.correct;
             if(displayAns.length > 25) displayAns = displayAns.substring(0, 25) + "...";
             feedbackMessage = `Oops! It was: "${displayAns}"`;
@@ -535,8 +655,16 @@
         drawScreen(); 
         
         setTimeout(() => {
-            if (gameState === 'WAIT_QUIZ') nextQuizTurn();
-        }, 1500);
+            if (gameState === 'WAIT_QUIZ') {
+                if (quizFilter === 'review' && mistakes.length === 0) {
+                    gameState = 'START';
+                    drawScreen();
+                    alert("Review complete! Great job clearing your mistakes.");
+                } else {
+                    nextQuizTurn();
+                }
+            }
+        }, 1800);
     }
 
     function handleMatchLeft(index) {
@@ -557,7 +685,7 @@
 
         if (leftItem.id === rightItem.targetId) {
             // Success Match
-            updateStats(true); // Treat individual match as a correct answer for stats
+            updateStats(true, leftItem.ref.en); // Treat individual match as a correct answer for stats
             leftItem.state = 'matched';
             rightItem.state = 'matched';
             matchData.selectedIndex = -1;
@@ -565,7 +693,7 @@
             drawScreen();
         } else {
             // Failed Match
-            updateStats(false);
+            updateStats(false, leftItem.ref.en);
             matchFeedback = { index: rightIndex, color: COLORS.error };
             drawScreen();
             setTimeout(() => {
@@ -597,6 +725,8 @@
     // --- INIT ---
     loadStats();
     renderStartScreen();
+    // Start Animation Loop for Timer
+    requestAnimationFrame(gameLoop);
 
 </script>
 
