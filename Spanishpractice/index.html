@@ -135,7 +135,7 @@
     // --- STATE MANAGEMENT ---
     let gameState = 'START'; 
     let currentQuestion = null;
-    let quizFilter = 'all'; // 'all', 'phrases', 'review'
+    let quizFilter = 'all'; // 'all', 'words', 'phrases', 'review'
     let feedbackMessage = "";
     let feedbackColor = "";
     let matchData = { left: [], right: [], selectedIndex: -1, matchedCount: 0 };
@@ -247,7 +247,9 @@
         // Filter pool based on mode
         let activePool = vocabList;
         
-        if (quizFilter === 'phrases') {
+        if (quizFilter === 'words') {
+            activePool = vocabList.filter(v => v.type === 'word');
+        } else if (quizFilter === 'phrases') {
             activePool = vocabList.filter(v => v.type === 'phrase' || v.type === 'sentence');
         } else if (quizFilter === 'review') {
             // Only use items in the mistakes list
@@ -383,57 +385,72 @@
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         // Header
-        drawRoundedRect(20, 30, 360, 90, 15, COLORS.primary);
-        drawText("Spanish", 200, 75, 26, COLORS.white);
-        drawText("SPARK", 200, 105, 36, COLORS.white);
+        drawRoundedRect(20, 20, 360, 80, 15, COLORS.primary);
+        drawText("Spanish", 200, 60, 24, COLORS.white);
+        drawText("SPARK", 200, 85, 32, COLORS.white);
 
         // Stats Dashboard
-        drawRoundedRect(30, 140, 340, 70, 10, COLORS.white, true);
-        drawText("LEARNING METRICS", 200, 160, 12, "#888");
+        drawRoundedRect(30, 115, 340, 65, 10, COLORS.white, true);
+        drawText("LEARNING METRICS", 200, 135, 11, "#888");
         
         ctx.textAlign = "center";
         ctx.fillStyle = COLORS.text;
         ctx.font = "bold 20px Arial";
         // Today
-        ctx.fillText("Today", 110, 185);
+        ctx.fillText("Today", 110, 158);
         ctx.fillStyle = COLORS.primary;
-        ctx.fillText(stats.todayCorrect, 110, 205);
+        ctx.fillText(stats.todayCorrect, 110, 178);
         
         // Mistakes
         ctx.fillStyle = COLORS.text;
-        ctx.fillText("Review", 290, 185);
+        ctx.fillText("Review", 290, 158);
         ctx.fillStyle = mistakes.length > 0 ? COLORS.error : COLORS.success;
-        ctx.fillText(mistakes.length, 290, 205);
+        ctx.fillText(mistakes.length, 290, 178);
 
         // Menu Buttons
-        drawText("Select Strategy:", 200, 240, 18, COLORS.text);
+        drawText("Select Strategy:", 200, 210, 16, COLORS.text);
 
-        // 1. Standard Quiz
-        drawRoundedRect(50, 260, 300, 55, 10, COLORS.secondary);
-        drawText("Smart Quiz", 200, 295, 20, COLORS.white);
+        const btnH = 48; // Compact height
+        const gap = 12;
+        let startY = 225;
 
-        // 2. Phrase Practice
-        drawRoundedRect(50, 325, 300, 55, 10, COLORS.tertiary);
-        drawText("Phrase Master", 200, 360, 20, COLORS.white);
+        // 1. Word Builder (NEW)
+        drawRoundedRect(50, startY, 300, btnH, 10, COLORS.highlight);
+        drawText("Word Builder (Basic)", 200, startY + 32, 18, COLORS.white);
         
-        // 3. Review Mistakes (Metacognitive)
-        let reviewColor = mistakes.length > 0 ? COLORS.error : "#ccc";
-        drawRoundedRect(50, 390, 300, 55, 10, reviewColor);
-        drawText(`Review Mistakes (${mistakes.length})`, 200, 425, 20, COLORS.white);
+        // 2. Phrase Practice
+        startY += btnH + gap;
+        drawRoundedRect(50, startY, 300, btnH, 10, COLORS.tertiary);
+        drawText("Phrase Master", 200, startY + 32, 18, COLORS.white);
 
-        // 4. Matching
-        drawRoundedRect(50, 455, 300, 55, 10, "#F57C00");
-        drawText("Matching Madness", 200, 490, 20, COLORS.white);
+        // 3. Standard Quiz (Mix)
+        startY += btnH + gap;
+        drawRoundedRect(50, startY, 300, btnH, 10, COLORS.secondary);
+        drawText("Smart Mix (All)", 200, startY + 32, 18, COLORS.white);
+        
+        // 4. Review Mistakes
+        startY += btnH + gap;
+        let reviewColor = mistakes.length > 0 ? COLORS.error : "#ccc";
+        drawRoundedRect(50, startY, 300, btnH, 10, reviewColor);
+        drawText(`Review Mistakes (${mistakes.length})`, 200, startY + 32, 18, COLORS.white);
+
+        // 5. Matching
+        startY += btnH + gap;
+        drawRoundedRect(50, startY, 300, btnH, 10, "#F57C00");
+        drawText("Matching Madness", 200, startY + 32, 18, COLORS.white);
         
         // Reset Data Link
-        drawText("Reset Progress", 200, 560, 14, "#999");
+        drawText("Reset Progress", 200, 580, 12, "#999");
 
+        // Re-calculate touch targets based on new layout
+        startY = 225;
         buttons = [
-            { id: 'start_quiz', x: 50, y: 260, w: 300, h: 55 },
-            { id: 'start_phrases', x: 50, y: 325, w: 300, h: 55 },
-            { id: 'start_review', x: 50, y: 390, w: 300, h: 55 }, // Logic: only active if mistakes > 0
-            { id: 'start_match', x: 50, y: 455, w: 300, h: 55 },
-            { id: 'reset_data', x: 140, y: 540, w: 120, h: 30 }
+            { id: 'start_words', x: 50, y: startY, w: 300, h: btnH },
+            { id: 'start_phrases', x: 50, y: startY + (btnH+gap), w: 300, h: btnH },
+            { id: 'start_quiz', x: 50, y: startY + (btnH+gap)*2, w: 300, h: btnH },
+            { id: 'start_review', x: 50, y: startY + (btnH+gap)*3, w: 300, h: btnH }, 
+            { id: 'start_match', x: 50, y: startY + (btnH+gap)*4, w: 300, h: btnH },
+            { id: 'reset_data', x: 140, y: 560, w: 120, h: 30 }
         ];
     }
 
@@ -448,7 +465,8 @@
         drawText("🏠", 30, 85, 20, "#555", "left"); 
 
         // Context Title
-        let modeTitle = "Smart Quiz";
+        let modeTitle = "Smart Mix";
+        if (quizFilter === 'words') modeTitle = "Word Builder";
         if (quizFilter === 'phrases') modeTitle = "Phrase Master";
         if (quizFilter === 'review') modeTitle = "Mistake Review";
         drawText(modeTitle, 370, 85, 14, COLORS.primary, "right");
@@ -598,7 +616,8 @@
             let btn = buttons[i];
             if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
                 
-                if (btn.id === 'start_quiz') startQuiz('all');
+                if (btn.id === 'start_words') startQuiz('words');
+                else if (btn.id === 'start_quiz') startQuiz('all');
                 else if (btn.id === 'start_phrases') startQuiz('phrases');
                 else if (btn.id === 'start_review') {
                      if(mistakes.length > 0) startQuiz('review');
