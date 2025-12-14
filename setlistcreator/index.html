@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Set List Creator 2.8.5 (Firebase and Database)</title>
+    <title>Set List Creator 2.9.2 (Fixed)</title>
     
     <!-- Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <!-- Marked for Markdown parsing (Lyrics) -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <!-- Firebase SDKs -->
@@ -19,8 +18,6 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, where, getDocs, doc, setDoc, getDoc, updateDoc, increment, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase Config ---
-        // This fallback allows the file to run on GitHub Pages without environment variables
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyB-_e71_7lTDjU4zBCCnunGIRyf2zyTvhw",
             authDomain: "set-list-creator-ef3d8.firebaseapp.com",
@@ -32,7 +29,6 @@
         };
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'setlist-v2-demo';
 
-        // Init Firebase
         let app, auth, db;
         try {
             app = initializeApp(firebaseConfig);
@@ -57,7 +53,7 @@
             console.error("Firebase init error:", e);
         }
         
-        // --- UTILS & TOAST ---
+        // UTILS
         window.showToast = (msg, isError = false) => {
             const toast = document.getElementById('toast');
             const msgEl = document.getElementById('toast-message');
@@ -69,16 +65,14 @@
             }, 3000);
         };
 
-        // --- LYRICS & GITHUB LOGIC ---
+        // LYRICS
         const GITHUB_USER = "Maltais239";
         const GITHUB_REPO = "interactives";
         const GITHUB_BRANCH = "main";
         const GITHUB_PATH = "songfiles";
         const GITHUB_BASE_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${GITHUB_PATH}/`;
 
-        window.sanitizeId = (str) => {
-            return str.toLowerCase().replace(/[^a-z0-9]/g, '_');
-        };
+        window.sanitizeId = (str) => str.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
         window.openLyricsModal = async (title, artist) => {
             const modal = document.getElementById('lyrics-modal');
@@ -88,8 +82,8 @@
             
             modalTitle.textContent = title;
             modal.classList.remove('hidden');
-            
-            // Reset state
+            window.stopScroll();
+
             contentArea.innerHTML = '<div class="flex items-center justify-center h-40"><div class="spinner"></div><span class="text-gray-400 ml-2">Searching...</span></div>';
             document.getElementById('lyrics-view-mode').classList.remove('hidden');
             document.getElementById('lyrics-edit-mode').classList.add('hidden');
@@ -98,7 +92,6 @@
             let lyricsContent = null;
             let source = 'none';
 
-            // 1. Try Firebase First
             if(db) {
                 try {
                     const songId = window.sanitizeId(title);
@@ -111,7 +104,6 @@
                 } catch (e) { console.error("Firebase fetch error:", e); }
             }
 
-            // 2. Try GitHub if no Firebase content
             if (!lyricsContent) {
                 try {
                     const cleanTitle = title.split('(')[0].trim();
@@ -130,7 +122,6 @@
                 } catch (e) { console.error("GitHub fetch error:", e); }
             }
 
-            // 3. Render
             if (lyricsContent) {
                 renderLyrics(lyricsContent);
                 document.getElementById('lyrics-textarea').value = lyricsContent;
@@ -140,27 +131,19 @@
                     sourceBadge.innerHTML = '<span class="text-[10px] bg-gray-700 text-gray-300 px-2 py-1 rounded border border-gray-600">GitHub</span>';
                 }
             } else {
-                contentArea.innerHTML = `
-                    <div class="text-gray-500 italic text-center mt-10">
-                        <p class="mb-2">No lyrics found for "${title}"</p>
-                        <p class="text-xs text-gray-600">Checked GitHub & Cloud</p>
-                        <button onclick="toggleEditMode()" class="mt-4 text-indigo-400 hover:text-white underline">Write Lyrics Now</button>
-                    </div>`;
+                contentArea.innerHTML = `<div class="text-gray-500 italic text-center mt-10"><p class="mb-2">No lyrics found for "${title}"</p><button onclick="toggleEditMode()" class="mt-4 text-indigo-400 hover:text-white underline">Write Lyrics Now</button></div>`;
                 document.getElementById('lyrics-textarea').value = '';
             }
             window.currentLyricsSong = { title, artist, id: window.sanitizeId(title) };
         };
 
         window.renderLyrics = (text) => {
-            const html = text
-                .replace(/</g, "&lt;").replace(/>/g, "&gt;") 
-                .replace(/\n/g, "<br>")
-                .replace(/(\[[A-G][b#]?[0-9]*[a-z]*\])/g, '<span class="text-yellow-400 font-bold">$1</span>');
-            
-            document.getElementById('lyrics-content').innerHTML = `<div class="font-mono text-sm whitespace-pre-wrap">${html}</div>`;
+            const html = text.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>").replace(/(\[[A-G][b#]?[0-9]*[a-z]*\])/g, '<span class="text-yellow-400 font-bold">$1</span>');
+            document.getElementById('lyrics-content').innerHTML = `<div class="font-mono text-sm whitespace-pre-wrap pb-40">${html}</div>`;
         };
 
         window.toggleEditMode = () => {
+            window.stopScroll();
             const viewMode = document.getElementById('lyrics-view-mode');
             const editMode = document.getElementById('lyrics-edit-mode');
             if (viewMode.classList.contains('hidden')) {
@@ -181,15 +164,71 @@
                 await setDoc(docRef, { title: song.title, artist: song.artist, content: text, lastUpdated: Date.now() }, { merge: true });
                 renderLyrics(text);
                 window.toggleEditMode();
-                document.getElementById('lyrics-source-badge').innerHTML = '<span class="text-[10px] bg-indigo-900 text-indigo-300 px-2 py-1 rounded border border-indigo-700">Cloud Saved</span>';
                 showToast("Lyrics saved!");
-            } catch (e) {
-                console.error("Error saving lyrics:", e);
-                showToast("Error saving lyrics.", true);
+            } catch (e) { showToast("Error saving lyrics.", true); }
+        };
+        
+        // AUTO SCROLL
+        let scrollTimer = null;
+        let scrollDelay = 50; 
+        const minDelay = 10;
+        const maxDelay = 150; 
+
+        window.toggleAutoScroll = () => {
+            const btn = document.getElementById('btn-autoscroll');
+            if (scrollTimer) {
+                window.stopScroll();
+            } else {
+                if(btn) {
+                    btn.innerHTML = '⏸️';
+                    btn.classList.add('bg-red-600', 'text-white', 'border-red-500');
+                    btn.classList.remove('bg-gray-700', 'text-gray-300');
+                }
+                const container = document.getElementById('lyrics-view-mode');
+                const doScroll = () => {
+                    container.scrollTop += 1;
+                    if(container.scrollTop + container.clientHeight >= container.scrollHeight) window.stopScroll();
+                };
+                scrollTimer = setInterval(doScroll, scrollDelay);
             }
         };
 
-        // --- AUTH LOGIC ---
+        window.stopScroll = () => {
+            if (scrollTimer) clearInterval(scrollTimer);
+            scrollTimer = null;
+            const btn = document.getElementById('btn-autoscroll');
+            if(btn) {
+                btn.innerHTML = '▶️';
+                btn.classList.remove('bg-red-600', 'text-white', 'border-red-500');
+                btn.classList.add('bg-gray-700', 'text-gray-300');
+            }
+        };
+
+        window.changeSpeed = (delta) => {
+            scrollDelay += delta;
+            if (scrollDelay < minDelay) scrollDelay = minDelay;
+            if (scrollDelay > maxDelay) scrollDelay = maxDelay;
+            const speedDisplay = document.getElementById('scroll-speed-display');
+            if(speedDisplay) {
+                const percentage = Math.round(((maxDelay - scrollDelay) / (maxDelay - minDelay)) * 100);
+                speedDisplay.innerText = percentage + '%';
+            }
+            if (scrollTimer) {
+                clearInterval(scrollTimer);
+                const container = document.getElementById('lyrics-view-mode');
+                scrollTimer = setInterval(() => {
+                    container.scrollTop += 1;
+                    if(container.scrollTop + container.clientHeight >= container.scrollHeight) window.stopScroll();
+                }, scrollDelay);
+            }
+        };
+        
+        window.closeLyricsModal = () => {
+            window.stopScroll();
+            document.getElementById('lyrics-modal').classList.add('hidden');
+        };
+
+        // AUTH
         async function initAuth() {
             if (!auth) return;
             try {
@@ -199,11 +238,8 @@
                     await signInAnonymously(auth);
                 }
             } catch (error) { 
-                console.error("Auth Error:", error); 
                 const statusEl = document.getElementById('firebase-status');
-                if(statusEl) {
-                    statusEl.innerHTML = `<span class="text-red-400 font-bold">⚠️ Auth Error</span>`;
-                }
+                if(statusEl) statusEl.innerHTML = `<span class="text-red-400 font-bold">⚠️ Auth Error</span>`;
             }
         }
 
@@ -215,27 +251,24 @@
                     console.log("Connected as", user.uid);
                     const statusEl = document.getElementById('firebase-status');
                     if(statusEl) statusEl.innerHTML = '<span class="text-green-400 animate-pulse">● Online</span>';
-                    
-                    if(!window.location.search.includes('mode=audience')) {
-                        startRequestListeners();
-                    }
+                    if(!window.location.search.includes('mode=audience')) startRequestListeners();
                 }
             });
         }
 
-        // --- AUDIENCE REQUEST LOGIC ---
+        // AUDIENCE & REQUESTS
         window.addAudienceRequest = async (song, artist, source = 'new') => {
             if (!db) return false;
             const normalizedSong = song.trim(); 
             const deviceID = localStorage.getItem('deviceID') || crypto.randomUUID();
             if(!localStorage.getItem('deviceID')) localStorage.setItem('deviceID', deviceID);
-            const storageKey = `voted_${normalizedSong}`;
-
+            
+            const storageKey = `voted_${normalizedSong.replace(/[^a-zA-Z0-9]/g, '')}`;
             const lastVoted = localStorage.getItem(storageKey);
             const COOLDOWN_MS = 15 * 60 * 1000;
             
             if (lastVoted && (Date.now() - parseInt(lastVoted) < COOLDOWN_MS)) {
-                showToast(`Please wait before requesting "${normalizedSong}" again.`, true);
+                showToast(`You already requested "${normalizedSong}".`, true);
                 return false;
             }
 
@@ -269,14 +302,12 @@
         
         async function clearAllRequests() {
             if (!db || !confirm("Clear ALL pending requests?")) return;
-            try {
-                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'requests'));
-                const s = await getDocs(q);
-                const b = writeBatch(db);
-                s.forEach(d => b.delete(d.ref));
-                await b.commit();
-                showToast("Requests cleared.");
-            } catch(e) { console.error(e); }
+            const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'requests'));
+            const s = await getDocs(q);
+            const b = writeBatch(db);
+            s.forEach(d => b.delete(d.ref));
+            await b.commit();
+            showToast("Requests cleared.");
         }
 
         function startRequestListeners() {
@@ -284,14 +315,13 @@
             onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'requests')), (s) => {
                 const r = []; s.forEach(d => r.push({id: d.id, ...d.data()}));
                 r.sort((a,b) => (b.votes||0)-(a.votes||0) || (a.timestamp||0)-(b.timestamp||0));
-                window.renderIncomingRequests(r);
+                if (typeof window.renderIncomingRequests === 'function') window.renderIncomingRequests(r);
             });
         }
         
         window.saveRequestToSet = (song, artist, requestId) => {
             const targetSetIndex = 3; 
             const songTitle = artist ? `${song} (${artist})` : song;
-            // Assuming setCollections is globally available
             if(window.setCollections) {
                 window.setCollections.custom[targetSetIndex].push({title: songTitle, durationStr: "0:00"});
                 localStorage.setItem('myCustomSets', JSON.stringify(window.setCollections.custom));
@@ -301,7 +331,6 @@
             }
         }
 
-        // --- DISPLAY LOGIC ---
         window.renderIncomingRequests = (requests) => {
             const list = document.getElementById('requests-list');
             if(!list) return;
@@ -325,10 +354,6 @@
         
         window.deleteRequest = deleteRequest;
         window.clearAllRequests = clearAllRequests;
-        window.renderAudienceBank = () => {
-             // Will be defined in main script block if not already, 
-             // but we can define a fallback here that communicates with main scope
-        };
     </script>
 
     <style>
@@ -354,10 +379,10 @@
         <!-- Header -->
         <header class="mb-6 text-center flex flex-col md:flex-row justify-between items-end border-b border-gray-700 pb-4 gap-4">
             <div class="text-left">
-                <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">Set List Creator 2.8.5</h1>
-                <h2 class="text-sm font-bold text-indigo-300 opacity-75">Firebase & Database Edition</h2>
+                <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">Set List Creator 2.9.2</h1>
+                <h2 class="text-sm font-bold text-indigo-300 opacity-75">Active Rotation & Database</h2>
                 <div class="flex flex-col md:flex-row gap-4 mt-2">
-                    <p class="text-gray-400 text-sm mt-1">4 Sets • 300+ Song Database</p>
+                    <p class="text-gray-400 text-sm mt-1">4 Sets • Active Rotation • Full DB</p>
                     <div class="flex gap-2 items-center text-xs font-bold bg-gray-800 px-3 py-1 rounded-full border border-gray-700">
                         <span class="text-gray-500 uppercase tracking-wide mr-1">Vocals:</span>
                         <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500"></span> <span class="text-green-400">Darren</span></div>
@@ -367,13 +392,8 @@
                     <div id="firebase-status" class="text-xs font-mono border border-gray-700 rounded px-2 py-0.5 flex items-center text-gray-500">● Offline</div>
                 </div>
             </div>
-            <!-- Clean Genre Buttons -->
+            
             <div class="flex gap-2 no-print items-center flex-wrap justify-end">
-                <button onclick="switchTab('twostep')" class="bg-red-900/40 text-red-200 border border-red-800 hover:bg-red-800 px-3 py-1.5 rounded text-xs font-bold transition">Two Step</button>
-                <button onclick="switchTab('fifties')" class="bg-teal-900/40 text-teal-200 border border-teal-800 hover:bg-teal-800 px-3 py-1.5 rounded text-xs font-bold transition">50s</button>
-                <button onclick="switchTab('pophits')" class="bg-pink-900/40 text-pink-200 border border-pink-800 hover:bg-pink-800 px-3 py-1.5 rounded text-xs font-bold transition">Pop Hits</button>
-                <button onclick="switchTab('dance')" class="bg-blue-900/40 text-blue-200 border border-blue-800 hover:bg-blue-800 px-3 py-1.5 rounded text-xs font-bold transition">Dance</button>
-                <div class="w-px h-6 bg-gray-700 mx-1 hidden md:block"></div>
                 <button onclick="downloadAllImage()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-xs font-bold transition shadow-lg flex items-center gap-1">
                     <span>📷</span> Save Img
                 </button>
@@ -382,20 +402,11 @@
 
         <!-- Tabs -->
         <div class="mb-6 flex space-x-1 bg-gray-800 p-1 rounded-xl no-print tab-nav overflow-x-auto">
-            <button onclick="switchTab('christmas')" id="tab-christmas" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none text-white bg-gray-700 shadow whitespace-nowrap">Christmas Party</button>
-            <!-- MOVED: Live Mode Button -->
+            <button onclick="switchTab('current')" id="tab-current" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none text-white bg-gray-700 shadow whitespace-nowrap">Current Sets</button>
             <button onclick="switchTab('live')" id="tab-live" class="flex-1 py-2 px-4 rounded-lg text-sm font-bold transition focus:outline-none text-yellow-400 hover:text-white hover:bg-gray-750 border border-yellow-900/30 whitespace-nowrap flex items-center justify-center gap-2"><span class="animate-pulse">●</span> Live Mode</button>
-            
             <button onclick="switchTab('custom')" id="tab-custom" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none text-gray-400 hover:text-white hover:bg-gray-750 whitespace-nowrap">Create Your Own</button>
             <button onclick="switchTab('originals')" id="tab-originals" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none text-gray-400 hover:text-white hover:bg-gray-750 whitespace-nowrap">Originals</button>
-            <!-- DATABASE TAB -->
-            <button onclick="switchTab('database')" id="tab-database" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none text-gray-400 hover:text-white hover:bg-gray-750 whitespace-nowrap border-l border-gray-600 ml-2 pl-6">📚 Database (300+)</button>
-            
-            <!-- Hidden Tabs -->
-            <button onclick="switchTab('twostep')" id="tab-twostep" class="hidden flex-1 py-2 px-4 rounded-lg text-sm font-bold text-red-400 border border-red-900/30 whitespace-nowrap">Two Step</button>
-            <button onclick="switchTab('fifties')" id="tab-fifties" class="hidden flex-1 py-2 px-4 rounded-lg text-sm font-bold text-teal-400 border border-teal-900/30 whitespace-nowrap">50s</button>
-            <button onclick="switchTab('pophits')" id="tab-pophits" class="hidden flex-1 py-2 px-4 rounded-lg text-sm font-bold text-pink-400 border border-pink-900/30 whitespace-nowrap">Pop Hits</button>
-            <button onclick="switchTab('dance')" id="tab-dance" class="hidden flex-1 py-2 px-4 rounded-lg text-sm font-bold text-blue-400 border border-blue-900/30 whitespace-nowrap">Dance Hits</button>
+            <button onclick="switchTab('database')" id="tab-database" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none text-gray-400 hover:text-white hover:bg-gray-750 whitespace-nowrap border-l border-gray-600 ml-2 pl-6">📚 Database (800+)</button>
         </div>
 
         <!-- Custom Controls -->
@@ -431,7 +442,6 @@
 
         <!-- Sets Grid -->
         <div id="sets-capture-area" class="p-2 -m-2 bg-gray-900">
-            <!-- Adjusted Grid for Side-by-Side Sets on Tablet/Desktop -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
                 <div id="set-container-0" class="set-container bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-700 flex flex-col"><div class="p-4 bg-gray-800 border-b border-gray-700"><h2 class="text-xl font-bold text-green-400">Set 1</h2></div><ul id="list-set-0" class="divide-y divide-gray-700 overflow-y-auto max-h-[600px] flex-grow min-h-[50px]"></ul></div>
                 <div id="set-container-1" class="set-container bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-700 flex flex-col"><div class="p-4 bg-gray-800 border-b border-gray-700"><h2 class="text-xl font-bold text-green-400">Set 2</h2></div><ul id="list-set-1" class="divide-y divide-gray-700 overflow-y-auto max-h-[600px] flex-grow min-h-[50px]"></ul></div>
@@ -464,8 +474,11 @@
         <!-- Master Song Bank -->
         <div id="song-bank-section" class="no-print bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden hidden">
             <div class="p-6 bg-gray-800 border-b border-gray-700 flex flex-col md:flex-row justify-between items-center gap-4">
-                <h2 class="text-2xl font-bold text-indigo-400">Full Song Database</h2>
-                <input type="text" id="bank-search" oninput="renderBank()" class="w-full md:w-64 bg-gray-900 text-white border border-gray-600 rounded-full py-2 px-4 focus:outline-none focus:border-indigo-500 text-sm" placeholder="Search database...">
+                <h2 class="text-2xl font-bold text-indigo-400" id="bank-title">Active Rotation</h2>
+                <div class="flex items-center gap-2">
+                    <span id="bank-loading" class="text-xs text-yellow-400 hidden animate-pulse">Syncing...</span>
+                    <input type="text" id="bank-search" oninput="renderBank()" class="w-full md:w-64 bg-gray-900 text-white border border-gray-600 rounded-full py-2 px-4 focus:outline-none focus:border-indigo-500 text-sm" placeholder="Search...">
+                </div>
             </div>
             <div class="p-6 bg-gray-850">
                 <p class="text-gray-400 text-xs mb-4">Click numbered buttons to add songs to specific sets.</p>
@@ -498,9 +511,9 @@
 
     <!-- === LYRICS MODAL === -->
     <div id="lyrics-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center backdrop-blur-sm p-4">
-        <div class="bg-gray-800 w-full max-w-4xl h-[90vh] rounded-xl border border-gray-600 shadow-2xl flex flex-col animate-fade-in">
+        <div class="bg-gray-800 w-full max-w-4xl h-[90vh] rounded-xl border border-gray-600 shadow-2xl flex flex-col animate-fade-in relative">
             <!-- Header -->
-            <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900 rounded-t-xl">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900 rounded-t-xl z-20 relative">
                 <div>
                     <h3 id="lyrics-modal-title" class="text-xl font-bold text-white">Song Title</h3>
                     <div class="flex items-center gap-2">
@@ -508,14 +521,26 @@
                         <div id="lyrics-source-badge"></div>
                     </div>
                 </div>
-                <div class="flex gap-2">
+                <!-- Controls -->
+                <div class="flex items-center gap-3">
+                    <!-- Scroll Controls -->
+                    <div class="flex items-center bg-gray-800 rounded-lg p-1 border border-gray-700 mr-2">
+                        <button onclick="changeSpeed(10)" class="text-gray-400 hover:text-white px-2 text-sm" title="Slower">🐢</button>
+                        <span id="scroll-speed-display" class="text-xs font-mono font-bold text-indigo-400 w-8 text-center">70%</span>
+                        <button onclick="changeSpeed(-10)" class="text-gray-400 hover:text-white px-2 text-sm" title="Faster">🐇</button>
+                        <div class="w-px h-4 bg-gray-700 mx-1"></div>
+                        <button id="btn-autoscroll" onclick="toggleAutoScroll()" class="text-gray-300 hover:text-white px-3 py-1 rounded bg-gray-700 text-sm font-bold transition-colors border border-gray-600 flex items-center gap-1">
+                            ▶️
+                        </button>
+                    </div>
+
                     <button onclick="toggleEditMode()" class="text-indigo-400 hover:text-white px-3 py-1 text-sm border border-indigo-500/30 rounded transition-colors">Edit</button>
-                    <button onclick="document.getElementById('lyrics-modal').classList.add('hidden')" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+                    <button onclick="window.closeLyricsModal()" class="text-gray-400 hover:text-white text-2xl leading-none px-2">&times;</button>
                 </div>
             </div>
             
             <!-- View Mode -->
-            <div id="lyrics-view-mode" class="flex-grow overflow-y-auto p-6 bg-gray-900/50 text-gray-200">
+            <div id="lyrics-view-mode" class="flex-grow overflow-y-auto p-6 bg-gray-900/50 text-gray-200 scroll-smooth">
                 <div id="lyrics-content" class="text-lg leading-relaxed font-mono"></div>
             </div>
             
@@ -535,156 +560,16 @@
     <div id="copy-modal" class="fixed inset-0 bg-black/70 z-50 hidden flex items-center justify-center backdrop-blur-sm"><div class="bg-gray-800 p-6 rounded-xl border border-gray-600 shadow-2xl w-full max-w-sm"><h3 class="text-xl font-bold text-white mb-2">Copy Set to "Create Your Own"</h3><div class="grid grid-cols-2 gap-3 mb-4"><button onclick="executeCopy(0)" class="bg-gray-700 hover:bg-indigo-600 hover:text-white p-3 rounded-lg border border-gray-600">Set 1</button><button onclick="executeCopy(1)" class="bg-gray-700 hover:bg-indigo-600 hover:text-white p-3 rounded-lg border border-gray-600">Set 2</button><button onclick="executeCopy(2)" class="bg-gray-700 hover:bg-indigo-600 hover:text-white p-3 rounded-lg border border-gray-600">Set 3</button><button onclick="executeCopy(3)" class="bg-gray-700 hover:bg-indigo-600 hover:text-white p-3 rounded-lg border border-gray-600">Set 4</button></div><button onclick="document.getElementById('copy-modal').classList.add('hidden')" class="w-full text-gray-500 hover:text-gray-300 py-2 text-sm">Cancel</button></div></div>
 
     <script>
-        // --- SONG METADATA & DATABASE ---
-        // UPDATED: Added missing keys for current rotation master list (Bobcaygeon, Driving My Life Away, etc.)
+        // --- DATA SOURCE CONFIG ---
+        const MASTER_DB_URL = "https://raw.githubusercontent.com/Maltais239/interactives/main/master_song_database_cleaned.json";
+
+        // --- HELPER FUNCTION: DEFINED FIRST TO AVOID REFERENCE ERRORS ---
+        const createSongObject = (title, durationStr = "0:00") => ({ title, durationStr });
+
+        // --- SONG METADATA (Internal Fallback + Key Info) ---
         const songMetadata = {
             "5 Days In May": { k: "Em", c: "" }, "50 Ways To Leave Your Lover": { k: "Em", c: "" }, "54 46 Was My Number": { k: "G", c: "" }, "6th Avenue Heartache": { k: "G", c: "" }, 
-            "A Hard Day's Night": { k: "E", c: "" }, "A Little Honey": { k: "F", c: "" }, "A Little Something": { k: "C", c: "" }, "A Simple Thing": { k: "G", c: "" }, 
-            "A-Punk": { k: "A", c: "" }, "Africa": { k: "A", c: "" }, "Ahead By A Century": { k: "D", c: "" }, "Aint No Sunshine": { k: "Am", c: "" }, "Aint Too Proud To Beg": { k: "B", c: "" }, 
-            "All Along The Watchtower": { k: "Am", c: "" }, "ALL APOLOGIES": { k: "C", c: "" }, "All Day And All Of The Night": { k: "G", c: "" }, "All I Have To Do Is Dream": { k: "E", c: "" }, 
-            "All My Loving": { k: "Em", c: "" }, "All Shook Up chords": { k: "A", c: "" }, "All The Money I Had Is Gone": { k: "D", c: "" }, "All These Things That I've Done": { k: "G", c: "" }, 
-            "ALL YOU NEED IS LOVE - 1967": { k: "G", c: "" }, "Always On My Mind": { k: "C", c: "" }, "America": { k: "C", c: "" }, "American Girl": { k: "D", c: "" }, "American Music": { k: "C", c: "" }, 
-            "And It Stoned Me": { k: "G", c: "" }, "And Its Still Alright": { k: "C", c: "" }, "Angel From Montgomery": { k: "G", c: "" }, "Angela": { k: "C", c: "" }, "Another Road Home": { k: "G", c: "" }, 
-            "The Apartment Song": { k: "A", c: "" }, "Arms Of A Woman": { k: "A", c: "" }, "AS IT WAS CHORDS": { k: "C", c: "" }, "Ashes and Fire": { k: "Bb", c: "" }, "Astral Weeks": { k: "A", c: "" }, 
-            "Atlantic City": { k: "Em", c: "" }, "Auld Lang Syne": { k: "G", c: "" }, "Avec le temps": { k: "D", c: "" }, "Baby Driver": { k: "D", c: "" }, "Baby Its Cold Outside": { k: "C", c: "5" }, 
-            "Baby What You Want Me To Do": { k: "E", c: "" }, "Back To Black": { k: "Dm", c: "" }, "Ballad of ira hayes": { k: "A", c: "" }, "Band on the Run": { k: "D", c: "" }, "Bank Robber": { k: "G", c: "" }, 
-            "Bankrobber": { k: "D", c: "" }, "Barretts Privateers": { k: "C", c: "" }, "Basket Case": { k: "E", c: "" }, "Beast Of Burden": { k: "G", c: "" }, "Beautiful things": { k: "E", c: "" }, 
-            "Beds Are Burning": { k: "E", c: "" }, "Before Our Graves": { k: "C", c: "" }, "Beg Steal or Borrow": { k: "D", c: "" }, "Behind Blue Eyes": { k: "Em", c: "" }, "Bette Davis Eyes": { k: "F", c: "" }, 
-            "Between Us and the light": { k: "C", c: "" }, "Big Black Car": { k: "Am", c: "" }, "Big Change": { k: "Em", c: "" }, "Big River": { k: "F", c: "" }, "BIG YELLOW TAXI": { k: "A", c: "" }, 
-            "Billie Jean": { k: "F#", c: "" }, "Birthday chords": { k: "D", c: "" }, "BITTER SWEET SYMPHONY": { k: "E", c: "" }, "Black Horse And The Cherry Tree": { k: "Em", c: "" }, "Blank Space": { k: "C", c: "" }, 
-            "Blindman River": { k: "C", c: "" }, "Blister In The Sun": { k: "G", c: "" }, "Blitzkrieg Bop": { k: "A", c: "" }, "Bloom": { k: "Dm", c: "" }, "Blow At High Dough": { k: "B", c: "" }, 
-            "Blue Christmas": { k: "E", c: "" }, "Blue Eyes Crying In The Rain": { k: "B", c: "" }, "Blue Moon Of Kentucky": { k: "A", c: "" }, "Bobcaygeon": { k: "G", c: "" }, "Bonhomme, bonhomme, sais-tu jouer ?": { k: "F", c: "" }, 
-            "Boomer's Story": { k: "G", c: "" }, "Borrowed Time": { k: "D", c: "" }, "Bottom Feeders": { k: "C", c: "" }, "The Boxer": { k: "C", c: "" }, "The Boy In The Bubble": { k: "E", c: "" }, 
-            "BREAKDOWN": { k: "Am", c: "" }, "The Breeze": { k: "A", c: "" }, "Brian Wilson": { k: "G", c: "" }, "Bring It On Home To Me": { k: "C", c: "" }, "Broken Bones": { k: "Gm", c: "" }, 
-            "Broken Smoke Ranch": { k: "A", c: "" }, "Brown Eyed Girl": { k: "G", c: "" }, "Brown Eyed Woman": { k: "C#m", c: "" }, "Burning Love": { k: "D", c: "" }, "Bye Bye Love": { k: "D", c: "" }, 
-            "C'est l'Aviron": { k: "C", c: "" }, "C'EST LA VIE (YOU NEVER CAN TELL)": { k: "D", c: "" }, "Cabin Down Below": { k: "B", c: "" }, "CADILLAC RANCH": { k: "E", c: "" }, 
-            "California Stars": { k: "G", c: "" }, "Call Me the Breeze": { k: "A", c: "" }, "Canon In D Major": { k: "D", c: "2" }, "Cant Let Go": { k: "D", c: "" }, "The Cave": { k: "C#m", c: "" }, 
-            "Cecilia": { k: "B", c: "" }, "Chauffard": { k: "A", c: "" }, "Christmas (Baby Please Come Home)": { k: "C", c: "" }, "CHRISTMAS ALL OVER AGAIN CHORDS": { k: "A", c: "" }, 
-            "Cinnamon girl": { k: "C", c: "" }, "Cleopatra": { k: "Ab", c: "1" }, "Cold Roses": { k: "B", c: "" }, "COLD SHOT": { k: "Dm", c: "" }, "Cold Winter Song": { k: "Bb", c: "" }, 
-            "The Collector": { k: "C", c: "" }, "Colors": { k: "F#m", c: "" }, "Come Back Down": { k: "Em", c: "" }, "Come Dancing": { k: "G", c: "" }, "Come Pick Me Up": { k: "G", c: "" }, 
-            "Come Together": { k: "Dm", c: "" }, "Comes A Time": { k: "G", c: "" }, "Copperhead Road": { k: "D", c: "" }, "Corinna": { k: "A", c: "" }, "Country roads": { k: "G", c: "" }, 
-            "Cover of the rolling stone": { k: "A", c: "" }, "Cracklin Rosie": { k: "C", c: "" }, "Crazy": { k: "Cm", c: "" }, "Creep": { k: "G", c: "" }, "Cry love": { k: "F", c: "" }, 
-            "Cry Me A River": { k: "Em", c: "" }, "CRY TO ME": { k: "E", c: "" }, "Crying Waiting Hoping": { k: "G", c: "" }, "Cupid": { k: "G", c: "" }, "Cynthia": { k: "F#m", c: "" }, 
-            "Dancing In The Dark": { k: "G", c: "" }, "Dark Sleep": { k: "A", c: "" }, "Day Tripper": { k: "E", c: "" }, "Dead Flowers": { k: "D", c: "" }, "Dear Mr Fantasy": { k: "A", c: "" }, 
-            "DEAR PRUDENCE - The Beatles": { k: "D", c: "" }, "Deep elm blues": { k: "G", c: "" }, "Dirty Old Town": { k: "G", c: "" }, "DIRTY OLD TOWN": { k: "D", c: "" }, "Dixie chicken": { k: "A", c: "" }, 
-            "Do I Wanna Know": { k: "Gm", c: "" }, "Don't come around here no more": { k: "F", c: "" }, "Don’t Stop Believin’": { k: "E", c: "" }, "Don't Want to Wait": { k: "C", c: "" }, "Dont Be Cruel": { k: "D", c: "" }, 
-            "Dont Let Me Down": { k: "E", c: "" }, "Dont Think Twice Its All Right": { k: "C", c: "" }, "Dont Walk Away Eileen": { k: "C", c: "" }, "Dont You Take It Too Bad": { k: "C", c: "" }, 
-            "Down On The Corner": { k: "C", c: "" }, "Down Under": { k: "Bm", c: "" }, "Dreams": { k: "Am", c: "" }, "Dreams chords": { k: "F", c: "" }, "Driving My Life Away": { k: "E", c: "" }, "Drug Store Truck Drivin Man": { k: "D", c: "" }, 
-            "Duppy Conqueror": { k: "C", c: "" }, "Easy To Tame": { k: "C", c: "" }, "Eight Days A Week": { k: "C", c: "" }, "El Paso": { k: "D", c: "" }, "Elderly Woman Behind The Counter In A Small Town": { k: "D", c: "" }, 
-            "Empty": { k: "Am", c: "" }, "En roulant ma boule": { k: "C", c: "" }, "End of Set 1": { k: "C", c: "" }, "Ends Of The Earth": { k: "E", c: "" }, "English Bay": { k: "G", c: "" }, 
-            "English Girls Approximately": { k: "G", c: "" }, "Eurovision Song Contest The Story Of Fire Saga - Jaja Ding Dong": { k: "C#", c: "" }, "Even the Losers": { k: "A", c: "" }, "Everybody Knows This Is Nowhere": { k: "G", c: "" }, 
-            "Everyday": { k: "D", c: "1" }, "Everywhere": { k: "Bm", c: "" }, "The Eye": { k: "C", c: "" }, "Eyes Of Sarah Jane": { k: "G", c: "" }, "FAIRYTALE OF NEW YORK CHORDS (ver 2) by The Pogues feat. Kirsty MacColl @ Ultimate-Guitar.Com": { k: "D", c: "" }, 
-            "Faith": { k: "B", c: "" }, "Far Far Away": { k: "G", c: "" }, "Farewell To Nova Scotia": { k: "G", c: "" }, "Fashionable People": { k: "Ab", c: "" }, "Fast Car": { k: "C", c: "" }, 
-            "Fearless": { k: "G", c: "" }, "February Seven": { k: "C", c: "" }, "Feel Between My Fingers": { k: "E", c: "" }, "Feelin alright": { k: "C", c: "" }, "Fiddlers Green": { k: "D", c: "" }, 
-            "Fire And The Flood": { k: "F", c: "" }, "Fireworks": { k: "F", c: "" }, "Fishermans Blues": { k: "G", c: "" }, "Fishin In The Dark": { k: "D", c: "" }, "Five Dollar Bill": { k: "A", c: "" }, 
-            "Five Foot Two": { k: "F", c: "" }, "Flagship": { k: "G", c: "" }, "Flowers": { k: "C", c: "" }, "Flowers In Your Hair": { k: "G", c: "" }, "Fly At Night": { k: "D", c: "" }, 
-            "Folsom Prison Blues": { k: "F", c: "" }, "FOOL FOR LOVE - Lord Huron": { k: "E", c: "" }, "Forever": { k: "Am", c: "" }, "FOREVER AND EVER AMEN CHORDS by Randy Travis @ Ultimate-Guitar.Com": { k: "D", c: "" }, 
-            "Forget The Flowers": { k: "A", c: "" }, "Four Strong Winds": { k: "G", c: "" }, "Fragile Bird": { k: "G", c: "" }, "Frankie And Johnny": { k: "G", c: "" }, "Free Bird": { k: "G", c: "" }, 
-            "Free Fallin": { k: "D", c: "" }, "Friend of the Devil": { k: "G", c: "" }, "Friends In Low Places": { k: "G", c: "" }, "Furr": { k: "G", c: "" }, "Galway Girl": { k: "D", c: "" }, 
-            "The Galway Girl": { k: "D", c: "" }, "The Gambler": { k: "E", c: "" }, "Get Back": { k: "A", c: "" }, "Gin And Juice": { k: "A", c: "" }, "Glory Bound": { k: "Em", c: "" }, 
-            "Glory Days": { k: "C", c: "" }, "Glory Of True Love": { k: "D", c: "" }, "Go Your Own Way chords": { k: "F", c: "" }, "Going To California": { k: "G", c: "" }, "Gold On The Ceiling": { k: "G", c: "" }, 
-            "Gone": { k: "E", c: "" }, "Gonna Shine Up My Boots": { k: "C", c: "" }, "GOOD RIDDANCE TIME OF YOUR LIFE": { k: "G", c: "" }, "Goodbye": { k: "C", c: "" }, "Goodnight Goodnight": { k: "Am", c: "" }, 
-            "Goodnight Irene": { k: "A", c: "" }, "Goodnight Rose": { k: "C", c: "" }, "Gotta Quit Sometime": { k: "G", c: "" }, "Green River": { k: "E", c: "" }, "Growing Old With You": { k: "A", c: "" }, 
-            "Guitar Town": { k: "G", c: "" }, "Hallelujah": { k: "C", c: "" }, "Hand it over": { k: "G", c: "" }, "Handle With Care": { k: "D", c: "" }, "Hank Done It This Way": { k: "A", c: "" }, 
-            "Happy": { k: "B", c: "" }, "Happy Xmas War Is Over": { k: "A", c: "" }, "Hard Road": { k: "G", c: "" }, "Hard Sun": { k: "D", c: "" }, "Hard Way To Fall": { k: "C", c: "" }, 
-            "The Harder They Come": { k: "G", c: "" }, "HARLEM RIVER BLUES": { k: "E", c: "" }, "Harvest": { k: "D", c: "" }, "Harvest Moon": { k: "G", c: "" }, "Hasnt Hit Me Yet": { k: "E", c: "" }, "Havens to Hendrix": { k: "G", c: "" },
-            "Have You Ever Seen The Rain": { k: "Am", c: "" }, "Hazel Brown Eyes": { k: "Am", c: "" }, "Hazy shade of winter": { k: "Dm", c: "" }, "Heard It Through The Grape Vine": { k: "Dm", c: "" }, 
-            "Heart beat": { k: "A", c: "" }, "Heart of Glass": { k: "E", c: "" }, "Heart of Gold": { k: "Em", c: "" }, "Help!": { k: "Bm", c: "" }, "HERE COMES SANTA CLAUS": { k: "C", c: "" }, 
-            "Here Comes The Sun": { k: "D", c: "" }, "Here With You": { k: "Dm", c: "" }, "Hes Gone": { k: "E", c: "" }, "Hey Good Lookin": { k: "C", c: "" }, "Hey Hey What Can I Do": { k: "F", c: "" }, 
-            "Hey Jude": { k: "F", c: "" }, "HEY SOUL SISTER": { k: "C", c: "" }, "Hey Thats No Way To Say Goodbye": { k: "E", c: "" }, "Hey Ya": { k: "G", c: "" }, "Hickory Wind": { k: "G", c: "" }, 
-            "Hideaway": { k: "G", c: "" }, "High Time": { k: "D", c: "" }, "Higher ground": { k: "Em", c: "" }, "Highway To Hell": { k: "A", c: "" }, "Hockey Teeth": { k: "G", c: "" }, "Hold On": { k: "C", c: "" }, 
-            "HOLLY JOLLY CHRISTMAS": { k: "C", c: "" }, "Home For A Rest": { k: "Am", c: "" }, "Homeward bound": { k: "Bb", c: "" }, "Honey Bee": { k: "A", c: "" }, "HONEY BEE": { k: "Am", c: "" }, 
-            "Honky Tonk Women": { k: "G", c: "" }, "Hot Dog": { k: "G", c: "" }, "Hotel California": { k: "Am", c: "" }, "Hound Dog": { k: "G", c: "" }, "How Many More Times": { k: "", c: "" }, 
-            "How These Days Grow Long": { k: "G", c: "" }, "Howling At Nothing": { k: "C", c: "" }, "Hungry Like The Wolf": { k: "E", c: "" }, "I Ain't Never": { k: "B", c: "" }, "I Am A Rock": { k: "C", c: "" }, 
-            "I Am Trying To Break Your Heart Acoustic": { k: "A", c: "" }, "I Cant Dance": { k: "Bbm", c: "" }, "I Don't Know": { k: "E", c: "" }, "I Feel Fine": { k: "D", c: "" }, "I Fought The Law": { k: "G", c: "" }, 
-            "I Heard It Through The Grapevine": { k: "Dm", c: "" }, "I Know You Rider": { k: "D", c: "" }, "I Need Never Get Old": { k: "G", c: "" }, "I Put A Spell On You": { k: "Em", c: "" }, 
-            "I Saw Her Standing There": { k: "D", c: "" }, "I Shall Be Released": { k: "E", c: "" }, "I Shot The Sheriff": { k: "Gm", c: "" }, "I Still Haven't Found What I'm Looking For": { k: "D", c: "" }, 
-            "I Taught Myself How To Grow Old": { k: "C", c: "" }, "I Walk The Line": { k: "B", c: "" }, "I Wanna Be Like You": { k: "C#m", c: "" }, "I Wanna Sing That Rock N Roll": { k: "G", c: "" }, 
-            "I Want It That Way": { k: "Em", c: "" }, "I WON'T BACK DOWN": { k: "C#m", c: "" }, "I wonder": { k: "Bb", c: "" }, "I'm on Fire": { k: "E", c: "" }, "I'm So Lonesome I Could Cry": { k: "E", c: "" }, 
-            "I'M THE MAN": { k: "E", c: "" }, "I've Got A Feeling": { k: "A", c: "" }, "If I Am A Stranger": { k: "Em", c: "" }, "Ill Be Here In The Morning": { k: "C", c: "" }, "Ill Be Home For Christmas": { k: "G", c: "" }, 
-            "Illegal Smile": { k: "G", c: "" }, "Im Gonna Be 500 Miles": { k: "E", c: "" }, "In Hell I’ll Be In Good Company": { k: "Gm", c: "" }, "In My Life": { k: "A", c: "" }, "in spite of ourselves": { k: "C", c: "" }, 
-            "In the garden": { k: "G", c: "" }, "In the Weeds": { k: "Bb", c: "" }, "Into The Great Wide Open": { k: "Em", c: "" }, "Into the mystic": { k: "Eb", c: "" }, "IS THIS LOVE?": { k: "F#m", c: "" }, 
-            "Is your Heart a Map?": { k: "C#", c: "" }, "Isis": { k: "A", c: "" }, "Island In The Sun": { k: "Em", c: "" }, "Islands In The Stream": { k: "C", c: "" }, "It Came Out Of The Sky": { k: "D", c: "" }, 
-            "It Makes No Difference": { k: "D", c: "" }, "It Takes a Lot to Laugh, It Takes a Train to Cry": { k: "Ab", c: "" }, "It's A Long Way To The Top": { k: "A", c: "" }, 
-            "It's Beginning To Look A Lot Like Christmas chords": { k: "G", c: "" }, "It's The Most Wonderful Time Of The Year": { k: "D", c: "" }, "Its all over now": { k: "D", c: "" }, 
-            "Its Beginning To Look A Lot Like Christmas": { k: "D", c: "" }, "Its Still Rock & Roll To Me": { k: "C", c: "" }, "Ive Got A Feeling": { k: "A", c: "" }, "Ive Just Seen A Face": { k: "Em", c: "" }, 
-            "Jack and Diane - John Cougar Mellencamp": { k: "A", c: "" }, "Jackie And Wilson": { k: "C#", c: "" }, "Jambalaya": { k: "G", c: "" }, "Jammin Me": { k: "A", c: "" }, "Jealous Again": { k: "D", c: "" }, 
-            "Jealous Guy": { k: "G", c: "" }, "Jingle Bell Rock": { k: "D", c: "" }, "Jingle Bells": { k: "C", c: "" }, "Johnny B Goode": { k: "A", c: "" }, "Johnnys Garden": { k: "G", c: "" }, "Jolene": { k: "Am", c: "" }, 
-            "Just Another Number": { k: "A", c: "" }, "Just Breathe": { k: "C", c: "" }, "Just Like A Women": { k: "G", c: "" }, "Just What I Needed": { k: "E", c: "" }, "KANSAS CITY": { k: "F", c: "" }, 
-            "Kathy's Song": { k: "G", c: "" }, "Kd And Lunch Meat": { k: "Bb", c: "" }, "Keep on Rockin' in the Free World": { k: "Em", c: "" }, "Kind Woman": { k: "C", c: "" }, "King Harvest Has Surely Come": { k: "C", c: "" }, 
-            "King Of Pain": { k: "Am", c: "" }, "King Of The Road": { k: "C", c: "" }, "KING OF THE ROAD": { k: "A", c: "" }, "L'encre De Tes Yeux": { k: "E", c: "" }, "La Cienega Just Smiled": { k: "C", c: "" }, 
-            "LANDSLIDE CHORDS (ver 4) by Fleetwood Mac @ Ultimate-Guitar.Com": { k: "C", c: "" }, "Larbre Est Dans Ses Feuilles": { k: "G", c: "" }, "Last Christmas": { k: "C", c: "" }, "Last Night": { k: "C", c: "" }, 
-            "Last Nite": { k: "C", c: "" }, "The Late King Henry": { k: "D", c: "" }, "LAYLA ACOUSTIC LIVE": { k: "Dm", c: "" }, "Layla": { k: "Dm", c: "" }, "Le Picbois": { k: "Em", c: "" }, "Lean On Me": { k: "C", c: "" }, 
-            "Leavin Trunk": { k: "A#", c: "" }, "Led Zeppelin - Hey Hey What Can I Do | Ver. 1": { k: "F", c: "" }, "The Legend of the Chevy Farm": { k: "F", c: "" }, "Let It Be": { k: "C", c: "" }, 
-            "Let It Ride Acoustic": { k: "Am", c: "" }, "Let It Snow": { k: "C", c: "" }, "Let's Spend The Night Together": { k: "A", c: "" }, "Life By The Drop": { k: "A", c: "" }, "Life Of Sin": { k: "E", c: "" }, 
-            "Little Black Submarines": { k: "Am", c: "" }, "LITTLE BONES CHORDS by The Tragically Hip @ Ultimate-Guitar.Com": { k: "F#m", c: "" }, "Little Bones": { k: "F#m", c: "" }, "Little Lion Man": { k: "Dm", c: "" }, 
-            "The Littlest Hobo Theme Song - Maybe Tomorrow": { k: "F", c: "" }, "Living in all the times": { k: "A", c: "" }, "Lodi chords": { k: "G", c: "" }, "lonely boy": { k: "C", c: "" }, "Lonesome Grave": { k: "Am", c: "" }, "Long Ride": { k: "F#m", c: "" }, 
-            "Long Time Gone": { k: "E", c: "" }, "Long time running": { k: "A", c: "" }, "Lookin Out My Back Door": { k: "Bb", c: "" }, "Looking Out My Back Door": { k: "Bb", c: "" }, "Loser": { k: "Am", c: "" }, "Lost In The Light": { k: "A", c: "" }, 
-            "Lost Together": { k: "G", c: "" }, "Love In Vain": { k: "G", c: "" }, "Love Street": { k: "Am", c: "" }, "Love Struck Baby": { k: "E", c: "" }, "Lovers in a Dangerous Time by BNL": { k: "G", c: "" }, 
-            "Loving Cup": { k: "D", c: "" }, "The Luckiest": { k: "D", c: "" }, "Lucky Man": { k: "G", c: "" }, "Magnolia Mountain": { k: "Bm", c: "" }, "Make You Feel My Love": { k: "Fm", c: "" }, 
-            "Mama Tried": { k: "D", c: "" }, "Mamas Dont Let Your Babies": { k: "D", c: "" }, "The Man Who Sold The World": { k: "A", c: "" }, "Marie Stone": { k: "A", c: "" }, "Marshmallow World": { k: "E", c: "" }, 
-            "Maybe I'm Amazed": { k: "Bb", c: "" }, "MAYBELLENE": { k: "A", c: "" }, "Me and Julio Down By the School Yard": { k: "A", c: "" }, "Mean Little Woman": { k: "A", c: "" }, "Meet Me In The Woods": { k: "Em", c: "" }, 
-            "Mele Kalikimaka": { k: "D", c: "" }, "Memento": { k: "C", c: "" }, "Memories Are Made Of This": { k: "E", c: "" }, "MESSAGE IN A BOTTLE CHORDS (ver 3) by The Police @ Ultimate-Guitar.Com": { k: "C#m", c: "" }, 
-            "Midnight Rider": { k: "D", c: "" }, "The Mighty Quinn": { k: "A", c: "" }, "MODERN LOVE": { k: "C", c: "" }, "Mother and child reunion": { k: "C", c: "" }, "Mr. Soul": { k: "E", c: "" }, 
-            "MRS ROBINSON": { k: "E", c: "" }, "My Babe": { k: "C", c: "" }, "My Darling": { k: "Em", c: "" }, "My Girl": { k: "C", c: "" }, "Mystery Train": { k: "E", c: "" }, "Nagging Blues": { k: "Eb", c: "3" }, 
-            "Nautical disaster": { k: "Em", c: "" }, "Never Put it Down": { k: "C", c: "" }, "New Slang": { k: "C", c: "" }, "THE NIGHT THEY DROVE OLD DIXIE DOWN": { k: "Am", c: "" }, "The Night We Met": { k: "Em", c: "" }, 
-            "No Bright Light": { k: "E", c: "" }, "No Denial": { k: "C", c: "" }, "No Diggity": { k: "Gm", c: "" }, "NORTH TO ALASKA": { k: "G", c: "" }, "Norwegian Wood (This Bird Has Flown)": { k: "D", c: "" }, 
-            "Not done yet": { k: "D", c: "" }, "Not Fade Away": { k: "E", c: "" }, "Nothing Compares 2 U": { k: "C", c: "" }, "Nowhere Man": { k: "G", c: "" }, "Nowhere with you": { k: "A", c: "" }, 
-            "Ob-la-di Ob-la-da": { k: "A", c: "" }, "Obvious Child": { k: "G", c: "" }, "The Obvious Child": { k: "B", c: "" }, "Oh Boy": { k: "A", c: "" }, "Oh my sweet carolina": { k: "D", c: "" }, 
-            "Oh Pretty Woman": { k: "A", c: "" }, "Oh Sweet Nuthin": { k: "C", c: "" }, "Ohio": { k: "Dm", c: "" }, "Old Man": { k: "F", c: "" }, "On Va S'aimer encore": { k: "Bm", c: "" }, 
-            "On Va Saimer Encore": { k: "Am", c: "" }, "One": { k: "Am", c: "" }, "One Drop": { k: "G", c: "" }, "One Great City": { k: "C", c: "" }, "One Headlight": { k: "G", c: "" }, "The One I Love": { k: "Em", c: "" }, 
-            "One Love People Get Ready": { k: "Bb", c: "" }, "One of These Days": { k: "D", c: "" }, "One Tab": { k: "C", c: "" }, "One Tree Hill": { k: "C", c: "" }, "The Only Living Boy In New York": { k: "G", c: "" }, 
-            "Ooh La La": { k: "G", c: "" }, "Ophelia": { k: "C", c: "" }, "Ouvre Tes Yeux Simon": { k: "D", c: "" }, "Over The Hills And Far Away": { k: "G", c: "" }, "Pancho And Lefty": { k: "C", c: "" }, 
-            "Paper Planes": { k: "D", c: "" }, "Paranoid": { k: "Em", c: "" }, "Patience": { k: "C", c: "" }, "Pause": { k: "Bb", c: "" }, "Peaceful Valley": { k: "A", c: "" }, "People Are Strange": { k: "Em", c: "" }, 
-            "Pet Sematary": { k: "Dm", c: "" }, "Pocahontas": { k: "D", c: "" }, "Powderfinger": { k: "G", c: "" }, "Pressure Drop": { k: "Ab", c: "" }, "Pride And Joy": { k: "E", c: "" }, "Proud Mary": { k: "C", c: "" }, 
-            "Puff The Magic Dragon": { k: "C", c: "" }, "Pump It Up": { k: "B", c: "" }, "Purple Rain": { k: "G", c: "" }, "Quarter Of A Man": { k: "Am", c: "" }, "Queen Of Hearts chords": { k: "A", c: "" }, 
-            "Rag Mama Rag": { k: "D", c: "" }, "Rain": { k: "G", c: "" }, "Ramble On Rose": { k: "D", c: "" }, "REAL LOVE BABY": { k: "D", c: "" }, "Rebel Rebel": { k: "D", c: "" }, "Red Headed Stranger-crd": { k: "D", c: "" }, 
-            "Red Hill Mining Town": { k: "G", c: "" }, "Red Red Wine": { k: "G", c: "" }, "Redemption Song": { k: "G", c: "" }, "Refugee": { k: "F#m", c: "" }, "Remember": { k: "Ab", c: "" }, 
-            "Rescue Blues": { k: "C", c: "" }, "Retrace": { k: "C#", c: "" }, "Return Of Grevious Angel-crd": { k: "G", c: "" }, "Rhiannon": { k: "Am", c: "" }, "Ride On": { k: "C", c: "" }, "The Right Way": { k: "G", c: "" }, 
-            "Ring Of Fire": { k: "G", c: "" }, "Ripple": { k: "G", c: "" }, "riptide": { k: "Am", c: "" }, "Road Regrets": { k: "G", c: "6" }, "Robots": { k: "Em", c: "" }, "Rocket Man": { k: "Em", c: "" }, 
-            "ROCKING AROUND THE CHRISTMAS TREE": { k: "B", c: "" }, "Rowboat": { k: "D", c: "" }, "Roxanne": { k: "Gm", c: "" }, "Ruby Tuesday": { k: "Am", c: "" }, "Rudolph The Red-Nosed Reindeer": { k: "C", c: "" }, 
-            "Run Rudolph Run": { k: "C", c: "" }, "Runaround Sue": { k: "D", c: "2" }, "Runaway": { k: "Am", c: "" }, "Sam stone": { k: "G", c: "" }, "Sam Stone": { k: "D", c: "" }, 
-            "Santa Bring My Baby Back To Me": { k: "C", c: "" }, "Santa Claus Is Coming To Town": { k: "Bb", c: "" }, "Santa Monica": { k: "G", c: "" }, "Santeria": { k: "E", c: "" }, "Say It Aint So": { k: "Am", c: "" }, 
-            "Scarlet Begonias": { k: "E", c: "" }, "The Scientist": { k: "Bm", c: "" }, "Sea of Love chords": { k: "G", c: "" }, "Sedona": { k: "D", c: "" }, "SEVEN NATION ARMY": { k: "Em", c: "" }, 
-            "Shallow": { k: "Em", c: "" }, "The Shape Im In": { k: "G", c: "" }, "She Talks To Angels": { k: "E", c: "" }, "She Thinks Youre Ugly": { k: "G", c: "" }, "Shut Up And Dance": { k: "C#", c: "1" }, 
-            "Silent Night": { k: "G", c: "" }, "Silver Bells": { k: "G", c: "" }, "Simple Man": { k: "C", c: "" }, "Sin city": { k: "D", c: "" }, "Sisters Of Mercy": { k: "E", c: "" }, 
-            "Sittin On The Dock Of The Bay": { k: "G", c: "" }, "Six Days On The Road": { k: "B", c: "" }, "Sixteen Tons": { k: "Am", c: "" }, "Sky Blue": { k: "A", c: "" }, "Sledge Hammer": { k: "Ebm", c: "" }, 
-            "Sleeping Sickness": { k: "Em", c: "" }, "Sleigh Ride": { k: "Db", c: "" }, "Slip Sliding Away": { k: "G", c: "" }, "Sob": { k: "F", c: "" }, "Sob": { k: "F", c: "" }, "Somebody": { k: "C", c: "" }, 
-            "Someday": { k: "A", c: "" }, "Something": { k: "C", c: "" }, "SOMETHING IN THE ORANGE": { k: "Em", c: "" }, "Soul Kitchen": { k: "Am", c: "" }, "Sound of Silence": { k: "C", c: "" }, 
-            "SOUTHERN ACCENTS": { k: "F", c: "" }, "SOUTHERN MAN": { k: "Dm", c: "" }, "Space Oddity": { k: "C", c: "" }, "Spark": { k: "C", c: "" }, "Sparrow And The Wolf": { k: "C", c: "" }, 
-            "SPEED OF THE SOUND OF LONELINESS": { k: "G", c: "" }, "Spirits": { k: "F", c: "" }, "Squeezebox": { k: "G", c: "" }, "Start Me Up": { k: "C", c: "" }, "Steal My Kisses": { k: "G", c: "" }, 
-            "Step Into the Light": { k: "G", c: "" }, "Still Crazy After All these Years": { k: "G", c: "" }, "Still Falling": { k: "C", c: "" }, "Still Water": { k: "F", c: "" }, "STIR IT UP": { k: "A", c: "" }, 
-            "Stolen Moments": { k: "A", c: "2" }, "Stop that train": { k: "G", c: "" }, "Stoplight Kisses": { k: "E", c: "" }, "The Story": { k: "G", c: "" }, "Street Fightin' Man": { k: "C", c: "" }, 
-            "Stubborn Love": { k: "F", c: "" }, "Stuck In A Moment You Can't Get Out Of": { k: "E", c: "" }, "Stumbling Through The Dark": { k: "G", c: "" }, "Subterranean Homesick Blues chords": { k: "E", c: "" }, 
-            "SUGAR DADDY": { k: "C", c: "" }, "Sugar Magnolia": { k: "A", c: "" }, "Sugaree": { k: "G", c: "" }, "Sunday Morning Coming Down": { k: "C", c: "" }, "Sundown": { k: "G", c: "" }, 
-            "Sunflower": { k: "D", c: "" }, "Superstition": { k: "Eb", c: "" }, "Suzie Q": { k: "A", c: "" }, "Sway": { k: "A", c: "" }, "Sweet Caroline": { k: "E", c: "" }, "Sweet Child O Mine": { k: "D", c: "" }, 
-            "Sweet Jane": { k: "D", c: "" }, "t:No sugar tonight}capo 4": { k: "E", c: "" }, "Tailspin": { k: "C", c: "" }, "Take Me Home Country Roads": { k: "G", c: "" }, "Take On Me": { k: "Bm", c: "" }, 
-            "Take The Money And Run": { k: "G", c: "" }, "Take This Guitar": { k: "Am", c: "" }, "Talkin' Bout A Revolution": { k: "G", c: "" }, "Tampa To Tulsa": { k: "G", c: "" }, "Tangerine": { k: "C", c: "" }, 
-            "Tangled Up In Blue": { k: "G", c: "" }, "Telephone Road": { k: "Bb", c: "" }, "Tennessee Jed": { k: "C", c: "" }, "Tennessee Whiskey": { k: "E", c: "" }, "Thank You": { k: "D", c: "" }, 
-            "That Was Your Mother": { k: "F", c: "" }, "Thatll Be The Day": { k: "F", c: "" }, "Thats All Right Mama": { k: "A", c: "" }, "Thats Alright Mama": { k: "A", c: "" }, "Thats The Way The World Goes Round": { k: "C", c: "" }, 
-            "Them Kids": { k: "C", c: "" }, "These eyes": { k: "Dm", c: "" }, "These Girls": { k: "G", c: "" }, "This fire": { k: "F", c: "" }, "Those Days": { k: "G", c: "" }, "Three Little Birds": { k: "A", c: "" }, 
-            "The Thrill Is Gone": { k: "Bm", c: "" }, "Thunder Road": { k: "C", c: "" }, "Time": { k: "Am", c: "" }, "Time Is On My Side": { k: "Bb", c: "" }, "Time, time": { k: "E", c: "" }, 
-            "To Be Young Is To Be Sad Is To Be High": { k: "G", c: "" }, "To Find A Friend": { k: "C", c: "" }, "To the Dogs or Whoever": { k: "E", c: "" }, "Tonight in Black and White": { k: "D", c: "" }, 
-            "Too Sweet": { k: "Em", c: "" }, "Torn And Frayed": { k: "D", c: "" }, "Touch of grey": { k: "B", c: "" }, "Travailler, c'est trop dur": { k: "G", c: "" }, "Traveller": { k: "Em", c: "" }, 
-            "Trenchtown Rock": { k: "G", c: "" }, "Truckin'": { k: "E", c: "" }, "Tumbling Dice": { k: "D", c: "" }, "Turn On Your Receiver": { k: "C", c: "" }, "TWIST AND SHOUT CHORDS (ver 2) by The Beatles @ Ultimate-Guitar.Com": { k: "D", c: "" }, 
-            "Twistin The Night Away chords": { k: "G", c: "" }, "Two": { k: "A", c: "" }, "Two Fingers": { k: "E", c: "" }, "Two Of Us": { k: "G", c: "" }, "Un Long Bout de Corde": { k: "G", c: "" }, 
-            "Unknown Legend": { k: "G", c: "" }, "Up on Cripple Creek": { k: "A", c: "" }, "Uptown Girl": { k: "D", c: "" }, "Use Me": { k: "E", c: "" }, "Vinyl Man": { k: "G", c: "" }, "The Voice": { k: "A", c: "" }, 
-            "Voodoo Child": { k: "E", c: "" }, "Wagon Wheel": { k: "G", c: "" }, "Wake Up": { k: "C", c: "" }, "Wake up little susie": { k: "D", c: "" }, "Wake Up Time": { k: "A", c: "" }, 
-            "Walk Away from You": { k: "Ab", c: "" }, "Walk Of Life": { k: "E", c: "" }, "Walk On": { k: "A", c: "" }, "Walk On The Ocean": { k: "G", c: "" }, "Walls": { k: "G", c: "" }, "Want What You Got": { k: "Fm", c: "" }, 
-            "Wanted Dead Or Alive": { k: "C", c: "" }, "Wasn't Born to Follow": { k: "G", c: "" }, "Wasted on Me": { k: "G", c: "" }, "Wasting Time": { k: "D", c: "" }, "Way Down We Go": { k: "Em", c: "" }, 
-            "Way Over Yonder In The Minor Key": { k: "G", c: "" }, "Waymores Blues": { k: "D", c: "" }, "We Found Each Other in the Dark": { k: "C", c: "" }, "We’re Going To Be Friends": { k: "G", c: "" }, 
-            "The Weight": { k: "A", c: "" }, "Weighty Ghost": { k: "A", c: "" }, "Welcome To OnSong": { k: "C", c: "" }, "Werewolves of London chords": { k: "D", c: "" }, "What I Am": { k: "B", c: "" }, 
-            "What’d I Say": { k: "E", c: "" }, "Wheat Kings": { k: "G", c: "" }, "The wheel": { k: "D", c: "" }, "When Doves Cry": { k: "Am", c: "" }, "When The Stars Go Blue": { k: "Am", c: "" }, 
-            "WHEN WILL I BE LOVED": { k: "G", c: "" }, "Where Have All The Good People Gone": { k: "A", c: "" }, "Where’d you go": { k: "G", c: "" }, "While My Guitar Gently Weeps": { k: "Am", c: "" }, 
-            "Whiskey In The Jar": { k: "C", c: "" }, "White Christmas": { k: "A", c: "" }, "White Freightliner Blues": { k: "D", c: "" }, "Who Put The Bomp": { k: "D", c: "" }, "Who's gonna ride your wild horses": { k: "G", c: "" }, 
-            "Wicked Game": { k: "Bm", c: "" }, "Wild horses": { k: "Bm", c: "" }, "The Wild Rover": { k: "G", c: "" }, "Wildflowers": { k: "Bb", c: "5" }, "Willin": { k: "G", c: "" }, 
-            "The Wind Cries Mary": { k: "Eb", c: "" }, "WINTER WONDERLAND": { k: "C", c: "" }, "Wish I Knew You": { k: "Am", c: "" }, "Wish List": { k: "C", c: "" }, "Wish You Were Here": { k: "Em", c: "" }, 
-            "Wishful Apparition": { k: "C", c: "" }, "Wishing Away Today": { k: "C", c: "" }, "With A Little Help": { k: "G", c: "" }, "With A Little Help From My Friends": { k: "E", c: "" }, 
-            "With or without you": { k: "C", c: "" }, "Won't get fooled again": { k: "A", c: "" }, "Wondering Where The Lions Are": { k: "D", c: "" }, "Worries": { k: "G", c: "" }, "Wreck Of The Edmund Fitzgerald": { k: "A", c: "" }, 
-            "Wrecking Ball": { k: "F", c: "" }, "Wrote a Song for Everyone": { k: "G", c: "" }, "Y'a rien de plus beau": { k: "Eb", c: "" }, "Yer So Bad": { k: "Am", c: "" }, "Yoshimi Battles the Pink Robots Part 1": { k: "C", c: "" }, 
-            "You Ain't Goin' Nowhere": { k: "G", c: "" }, "You Are The Best Thing": { k: "Bb", c: "" }, "You Cant Judge A Book By The Cover": { k: "A", c: "" }, "You Don't Have To Cry": { k: "D", c: "" }, 
-            "You Don't Know How It Feels": { k: "E", c: "" }, "You May Be Right": { k: "A", c: "" }, "You Never Can Tell: Chuck Berry": { k: "C", c: "" }, "You Never Know - Wilco": { k: "C", c: "" }, 
-            "You Won't See Me": { k: "D", c: "" }, "You Worry Me": { k: "F#m", c: "" }, "You Wreck Me": { k: "D", c: "" }, "Youll Accompany Me": { k: "A", c: "" }, "Ziggy Stardust": { k: "G", c: "" }, "Zombie": { k: "Em", c: "" }
+            "Zombie": { k: "Em", c: "" }
         };
 
         window.getSongMetadata = (titleStr) => {
@@ -697,10 +582,89 @@
             return null;
         };
 
-        const fullDatabase = Object.keys(songMetadata).sort();
+        // --- INTERNAL BACKUP DATA (For Holiday & Fallback) ---
+        // This is the specific 2.8.5 list the user wanted back as "Active Rotation"
+        const rawBankData = ["A Little Something (Melissa Majeau)", "A Simple Thing (Darren Maltais)", "Ahead By A Century (Tragically Hip)", "All Apologies (Nirvana)", "American Girl (Tom Petty)", "Another Road Home (Jeff McLellan)", "Back To Black (Amy Winehouse)", "Beautiful things (Darren Maltais)", "Before Our Graves (Jeff McLellan)", "Big River (Johnny Cash)", "Blank Space (Ryan Adams)", "Blindman River (Melissa Majeau)", "Blister In The Sun (Violent Femmes)", "Blitzkrieg Bop (The Ramones)", "Blow At High Dough (Tragically Hip)", "Blue Christmas (Elvis Presley)", "Bobcaygeon (Tragically Hip)", "Bottom Feeders (Melissa Majeau)", "Brown Eyed Girl (Van Morrison)", "Cadillac Ranch (Nitty Gritty Dirt Band)", "Can't Let Go (Lucinda Williams)", "Christmas (Baby Please Come Home) (Darlene Love)", "Cleopatra (The Lumineers)", "Colors (Black Pumas)", "Copperhead Road (Steve Earle)", "Creep (Radiohead)", "Cry Me A River (Justin Timberlake)", "Dancing In The Dark (Bruce Springsteen)", "Day Tripper (The Beatles)", "Don't Want to Wait (Darren Maltais)", "Dont Walk Away Eileen (Sam Roberts)", "Dreams (Fleetwood Mac)", "Driving My Life Away (Eddie Rabbitt)", "Faith (Wham)", "Fishin' In The Dark (Nitty Gritty Dirt Band)", "Five Dollar Bill (Corb Lund)", "Flowers (Miley Cyrus)", "Flowers In Your Hair (The Lumineers)", "Folsom Prison Blues (Johnny Cash)", "Friends in Low Places (Garth Brooks)", "Get Back (The Beatles)", "Green River (CCR)", "Guitar Town (Steve Earle)", "Hand it over (Darren Maltais)", "Harvest Moon (Neil Young)", "Heart of Glass (Blondie)", "Hungry Like The Wolf (Duran Duran)", "I Need Never Get Old (Nathaniel Rateliff)", "I Shot To Sheriff (Bob Marley)", "I Walk The Line (Johnny Cash)", "I Wonder (Darren Maltais)", "I'm On Fire (Bruce Springsteen)", "Is Your Heart a Map (Darren Maltais)", "Island In The Sun (Weezer)", "It Takes a Lot to Laugh (Bob Dylan)", "Jambalaya (Hank Williams Sr.)", "Jingle Bell Rock (Bobby Helms)", "Johnny B. Goode (Chuck Berry)", "Jolene (Dolly Parton)", "Just Another Number (Darren Maltais)", "King Of The Road (Dean Martin/Roger Miller)", "Layla (Derek and the Dominos)", "Life Of Sin (Sturgill Simpson)", "Little Bones (Tragically Hip)", "Little Lion Man (Mumford & Sons)", "Lonesome Grave (Darren Maltais)", "Long Ride (Melissa Majeau)", "Looking Out My Back Door", "Memento (Darren Maltais)", "Midnight Rider (Allman Brothers Band)", "My Babe (Willie Dixon / Little Walter)", "No Bright Light (Darren Maltais)", "No Denial (Melissa Majeau)", "No Diggity (Blackstreet)", "Norwegian Wood (The Beatles)", "Oh Boy (Buddy Holly)", "Paper Planes (M.I.A.)", "Paranoid (Black Sabbath)", "Pride And Joy (Stevie Ray Vaughan)", "REAL LOVE BABY (Father John Misty)", "Rhiannon (Fleetwood Mac)", "Ring of Fire (Johnny Cash)", "Rocket Man (Elton John)", "Runaround Sue (Dion)", "Santa Bring My Baby Back To Me (Elvis)", "Santa Claus Is Coming To Town (Bruce Springsteen)", "Seven Nation Army (The White Stripes)", "S.O.B. (Nathaniel Rateliff)", "Something In The Orange (Zach Bryan)", "Spark (Darren Maltais)", "Steal My Kisses (Ben Harper)", "Still Falling (Jeff McLellan)", "Sugar Daddy (Melissa Majeau)", "Tennessee Whiskey (Chris Stapleton)", "That's All Right Mama (Elvis Presley)", "The Thrill Is Gone (BB King)", "Those Days (Darren Maltais)", "Tonight in Black and White (Jeff McLellan)", "Twist and Shout (The Beatles)", "Wagon Wheel (Old Crow Medicine Show)", "What'd I Say (Ray Charles)", "You Can't Judge A Book By The Cover (Bo Diddley)", "You Wreck Me (Tom Petty)", "Zombie (The Cranberries)"];
+        const christmasSongs = ["Baby Its Cold Outside", "Blue Christmas", "Christmas (Baby Please Come Home)", "CHRISTMAS ALL OVER AGAIN CHORDS", "Fairytale of New York...", "Happy Xmas War Is Over", "Here Comes Santa Claus", "Holly Jolly Christmas", "Ill Be Home For Christmas", "It's Beginning To Look A Lot Like Christmas", "It's The Most Wonderful Time Of The Year", "Jingle Bell Rock", "Jingle Bells", "Last Christmas", "Let It Snow", "Marshmallow World", "Mele Kalikimaka", "Rocking Around The Christmas Tree", "Rudolph The Red-Nosed Reindeer", "Run Rudolph Run", "Santa Bring My Baby Back To Me", "Santa Claus Is Coming To Town", "Silent Night", "Silver Bells", "Sleigh Ride", "White Christmas", "Winter Wonderland"];
 
-        const createSongObject = (title, durationStr = "0:00") => ({ title, durationStr });
-        const christmasData = [["Cleopatra (The Lumineers)", "Island In The Sun (Weezer)", "Ahead By A Century (Tragically Hip)", "Blue Christmas (Elvis Presley)", "Dont Walk Away Eileen (Sam Roberts)", "A Little Something (Melissa Majeau)", "Green River (CCR)", "Flowers (Miley Cyrus)", "Dancing In The Dark (Bruce Springsteen)", "Blow At High Dough (Tragically Hip)", "All Apologies (Nirvana)", "I Need Never Get Old (Nathaniel Rateliff)", "Santa Bring My Baby Back To Me (Elvis)", "Dreams (Fleetwood Mac)", "Folsom Prison Blues (Johnny Cash)", "My Babe (Willie Dixon / Little Walter)", "Harvest Moon (Neil Young)", "Jolene (Dolly Parton)", "Colors (Black Pumas)"], ["Something In The Orange (Zach Bryan)", "Christmas (Baby Please Come Home) (Darlene Love)", "Don't Want to Wait (Darren Maltais)", "Layla (Derek and the Dominos)", "I'm On Fire (Bruce Springsteen)", "Those Days (Darren Maltais)", "Jingle Bell Rock (Bobby Helms)", "You Wreck Me (Tom Petty)", "Steal My Kisses (Ben Harper)", "Blank Space (Ryan Adams)", "Pride And Joy (Stevie Ray Vaughan)", "Tonight in Black and White (Jeff McLellan)", "Santa Claus Is Coming To Town (Bruce Springsteen)", "REAL LOVE BABY (Father John Misty)", "Five Dollar Bill (Corb Lund)", "Cadillac Ranch (Nitty Gritty Dirt Band)", "American Girl (Tom Petty)", "Get Back (The Beatles)", "King Of The Road (Dean Martin/Roger Miller)", "Heart of Glass (Blondie)", "Johnny B. Goode (Chuck Berry)", "Rhiannon (Fleetwood Mac)", "No Bright Light (Darren Maltais)", "Blister In The Sun (Violent Femmes)"], ["Cry Me A River (Justin Timberlake)", "Back To Black (Amy Winehouse)", "Can't Let Go (Lucinda Williams)", "No Diggity (Blackstreet)", "I Shot To Sheriff (Bob Marley)", "Hand it over (Darren Maltais)", "That's All Right Mama (Elvis Presley)", "Runaround Sue (Dion)", "Zombie (The Cranberries)", "You Can't Judge A Book By The Cover (Bo Diddley)", "Fishin' In The Dark (Nitty Gritty Dirt Band)", "Paper Planes (M.I.A.)", "Blitzkrieg Bop (The Ramones)", "Day Tripper (The Beatles)", "Driving My Life Away (Eddie Rabbitt)", "Beautiful things (Darren Maltais)", "Blindman River (Melissa Majeau)", "Tennessee Whiskey (Chris Stapleton)", "Another Road Home (Jeff McLellan)", "Oh Boy (Buddy Holly)", "Life Of Sin (Sturgill Simpson)", "Hungry Like The Wolf (Duran Duran)"], ["Paranoid (Black Sabbath)", "It Takes a Lot to Laugh (Bob Dylan)", "Flowers In Your Hair (The Lumineers)", "Faith (Wham)", "Still Falling (Jeff McLellan)", "Driving My Life Away (Reprise?)", "Norwegian Wood (The Beatles)", "Bottom Feeders (Melissa Majeau)", "Creep (Radiohead)", "S.O.B. (Nathaniel Rateliff)", "What'd I Say (Ray Charles)", "Long Ride (Melissa Majeau)", "The Thrill Is Gone (BB King)", "Rocket Man (Elton John)"]].map(set => set.map(t => createSongObject(t)));
+        // --- STATE & INITIALIZATION ---
+        // 1. Load Rotation from LocalStorage OR use Default RawBankData
+        let savedRotation = localStorage.getItem('myActiveRotation');
+        let activeRotationList = savedRotation ? JSON.parse(savedRotation) : rawBankData.sort();
+        
+        let fullSongDatabase = []; // Will be fetched (800+)
+        let holidayBank = rawBankData.filter(s => christmasSongs.some(c => s.toLowerCase().includes(c.toLowerCase()))).sort();
+        let fullDatabaseKeys = Object.keys(songMetadata).sort(); // For quick validation
+
+        // CACHING LOGIC
+        const CACHE_KEY = 'song_db_cache';
+        const CACHE_TIME_KEY = 'song_db_time';
+        const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 Hours
+
+        async function initDatabase() {
+            const loading = document.getElementById('bank-loading');
+            if(loading) loading.classList.remove('hidden');
+            
+            // Check cache for 800+ DB
+            const cachedData = localStorage.getItem(CACHE_KEY);
+            const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
+            const isCacheValid = cachedTime && (Date.now() - parseInt(cachedTime) < CACHE_DURATION);
+
+            if (cachedData && isCacheValid) {
+                console.log("Loading DB from Local Cache");
+                fullSongDatabase = JSON.parse(cachedData).sort();
+                updateFullDB();
+                finishInit(loading);
+                return;
+            }
+
+            console.log("Fetching DB from GitHub...");
+            try {
+                const response = await fetch(MASTER_DB_URL);
+                if(response.ok) {
+                    const fetchedList = await response.json();
+                    if(Array.isArray(fetchedList) && fetchedList.length > 0) {
+                        fullSongDatabase = fetchedList.sort();
+                        // Update Cache
+                        localStorage.setItem(CACHE_KEY, JSON.stringify(fullSongDatabase));
+                        localStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
+                        updateFullDB();
+                        console.log(`Loaded ${fullSongDatabase.length} songs from external DB.`);
+                    }
+                } else {
+                    throw new Error("Fetch failed");
+                }
+            } catch(e) {
+                console.warn("Could not fetch external DB.", e);
+            } finally {
+                finishInit(loading);
+            }
+        }
+
+        function updateFullDB() {
+            fullDatabaseKeys = [...new Set([...fullDatabaseKeys, ...fullSongDatabase])].sort();
+            window.fullDatabase = fullDatabaseKeys; // Global for validation
+        }
+
+        function finishInit(loadingEl) {
+            if(loadingEl) loadingEl.classList.add('hidden');
+            // Re-render bank if visible
+            if(currentTab === 'database' || currentTab !== 'live') renderBank();
+            
+            const audienceInterface = document.getElementById('audience-interface');
+            if(audienceInterface && !audienceInterface.classList.contains('hidden')) {
+                window.renderAudienceBankFallback();
+            }
+        }
+
+        // --- SET DATA ---
+        // 4 Sets from 2.8.5 (Contains mixed content + christmas)
+        const currentSetData = [
+            ["Cleopatra (The Lumineers)", "Island In The Sun (Weezer)", "Ahead By A Century (Tragically Hip)", "Blue Christmas (Elvis Presley)", "Dont Walk Away Eileen (Sam Roberts)", "A Little Something (Melissa Majeau)", "Green River (CCR)", "Flowers (Miley Cyrus)", "Dancing In The Dark (Bruce Springsteen)", "Blow At High Dough (Tragically Hip)", "All Apologies (Nirvana)", "I Need Never Get Old (Nathaniel Rateliff)", "Santa Bring My Baby Back To Me (Elvis)", "Dreams (Fleetwood Mac)", "Folsom Prison Blues (Johnny Cash)", "My Babe (Willie Dixon / Little Walter)", "Harvest Moon (Neil Young)", "Jolene (Dolly Parton)", "Colors (Black Pumas)"], 
+            ["Something In The Orange (Zach Bryan)", "Christmas (Baby Please Come Home) (Darlene Love)", "Don't Want to Wait (Darren Maltais)", "Layla (Derek and the Dominos)", "I'm On Fire (Bruce Springsteen)", "Those Days (Darren Maltais)", "Jingle Bell Rock (Bobby Helms)", "You Wreck Me (Tom Petty)", "Steal My Kisses (Ben Harper)", "Blank Space (Ryan Adams)", "Pride And Joy (Stevie Ray Vaughan)", "Tonight in Black and White (Jeff McLellan)", "Santa Claus Is Coming To Town (Bruce Springsteen)", "REAL LOVE BABY (Father John Misty)", "Five Dollar Bill (Corb Lund)", "Cadillac Ranch (Nitty Gritty Dirt Band)", "American Girl (Tom Petty)", "Get Back (The Beatles)", "King Of The Road (Dean Martin/Roger Miller)", "Heart of Glass (Blondie)", "Johnny B. Goode (Chuck Berry)", "Rhiannon (Fleetwood Mac)", "No Bright Light (Darren Maltais)", "Blister In The Sun (Violent Femmes)"], 
+            ["Cry Me A River (Justin Timberlake)", "Back To Black (Amy Winehouse)", "Can't Let Go (Lucinda Williams)", "No Diggity (Blackstreet)", "I Shot To Sheriff (Bob Marley)", "Hand it over (Darren Maltais)", "That's All Right Mama (Elvis Presley)", "Runaround Sue (Dion)", "Zombie (The Cranberries)", "You Can't Judge A Book By The Cover (Bo Diddley)", "Fishin' In The Dark (Nitty Gritty Dirt Band)", "Paper Planes (M.I.A.)", "Blitzkrieg Bop (The Ramones)", "Day Tripper (The Beatles)", "Driving My Life Away (Eddie Rabbitt)", "Beautiful things (Darren Maltais)", "Blindman River (Melissa Majeau)", "Tennessee Whiskey (Chris Stapleton)", "Another Road Home (Jeff McLellan)", "Oh Boy (Buddy Holly)", "Life Of Sin (Sturgill Simpson)", "Hungry Like The Wolf (Duran Duran)"], 
+            ["Paranoid (Black Sabbath)", "It Takes a Lot to Laugh (Bob Dylan)", "Flowers In Your Hair (The Lumineers)", "Faith (Wham)", "Still Falling (Jeff McLellan)", "Driving My Life Away (Reprise?)", "Norwegian Wood (The Beatles)", "Bottom Feeders (Melissa Majeau)", "Creep (Radiohead)", "S.O.B. (Nathaniel Rateliff)", "What'd I Say (Ray Charles)", "Long Ride (Melissa Majeau)", "The Thrill Is Gone (BB King)", "Rocket Man (Elton John)"]
+        ].map(set => set.map(t => createSongObject(t)));
         
         const originalsData = [[],[],[],[]];
         const jeffSongs = ["Tonight in Black and White (Jeff McLellan)", "Still Fallin' (Jeff McLellan)", "Before Our Graves (Jeff McLellan)", "Another Road Home (Jeff McLellan)", "Havens to Hendrix (Jeff McLellan)", "Blindman River (Jeff McLellan)"];
@@ -708,35 +672,24 @@
         const darrenSongs = ["Spark (Darren Maltais)", "No Bright Light (Darren Maltais)", "Hand it Over (Darren Maltais)", "Beautiful Things (Darren Maltais)", "Don't Want to Wait (Darren Maltais)", "A Simple Thing (Darren Maltais)", "Is Your Heart a Map (Darren Maltais)", "Just Another Number (Darren Maltais)", "Lonesome Grave (Darren Maltais)", "I Wonder (Darren Maltais)", "Memento (Darren Maltais)"];
         originalsData[0] = jeffSongs.map(t => createSongObject(t)); originalsData[1] = melissaSongs.map(t => createSongObject(t)); originalsData[2] = darrenSongs.map(t => createSongObject(t));
 
-        const twostepSongs = ["Folsom Prison Blues (Johnny Cash)", "Fishin' In The Dark (Nitty Gritty Dirt Band)", "Driving My Life Away (Eddie Rabbitt)", "Cadillac Ranch (Nitty Gritty Dirt Band)", "Green River (CCR)", "Ring of Fire (Johnny Cash)", "I Walk The Line (Johnny Cash)", "Jambalaya (Hank Williams Sr.)", "Wagon Wheel (Old Crow Medicine Show)", "Five Dollar Bill (Corb Lund)", "Guitar Town (Steve Earle)", "Looking Out My Back Door", "Midnight Rider (Allman Brothers Band)", "That's All Right Mama (Elvis Presley)", "Copperhead Road (Steve Earle)", "Boot Scootin' Boogie", "Chattahoochee", "Friends in Low Places (Garth Brooks)", "I Shot To Sheriff (Bob Marley)"].map(t => createSongObject(t));
-        const fiftiesSongs = ["Johnny B. Goode (Chuck Berry)", "Runaround Sue (Dion)", "That's All Right Mama (Elvis Presley)", "Oh Boy (Buddy Holly)", "You Can't Judge A Book By The Cover (Bo Diddley)", "My Babe (Willie Dixon / Little Walter)", "Blue Christmas (Elvis Presley)", "Blue Suede Shoes", "Great Balls of Fire", "Hound Dog", "La Bamba", "Twist and Shout (The Beatles)"].map(t => createSongObject(t));
-        const popHitsSongs = ["Flowers (Miley Cyrus)", "Blank Space (Ryan Adams)", "Seven Nation Army (The White Stripes)", "No Diggity (Blackstreet)", "Paper Planes (M.I.A.)", "Steal My Kisses (Ben Harper)", "Zombie (The Cranberries)"].map(t => createSongObject(t));
-        const danceSongs = ["Hungry Like The Wolf (Duran Duran)", "Heart of Glass (Blondie)", "Day Tripper (The Beatles)", "September", "I Feel Good (James Brown)", "Get Down Tonight (KC & The Sunshine Band)"].map(t => createSongObject(t));
-
         let customData = [[], [], [], []];
         if(localStorage.getItem('myCustomSets')) { try { customData = JSON.parse(localStorage.getItem('myCustomSets')); } catch(e) {} }
 
-        let currentTab = 'christmas'; 
+        let currentTab = 'current'; 
         let setCollections = {
-            christmas: JSON.parse(JSON.stringify(christmasData)),
+            current: JSON.parse(JSON.stringify(currentSetData)),
             custom: customData,
             originals: JSON.parse(JSON.stringify(originalsData)),
-            twostep: [twostepSongs, [], [], []],
-            fifties: [fiftiesSongs, [], [], []],
-            pophits: [popHitsSongs, [], [], []],
-            dance: [danceSongs, [], [], []],
             live: [[],[],[],[]],
             database: [[],[],[],[]] 
         };
-        window.setCollections = setCollections; // Global expose
+        window.setCollections = setCollections; 
         
         let sortables = [];
 
-        const rawBankData = ["A Little Something (Melissa Majeau)", "A Simple Thing (Darren Maltais)", "Ahead By A Century (Tragically Hip)", "All Apologies (Nirvana)", "American Girl (Tom Petty)", "Another Road Home (Jeff McLellan)", "Back To Black (Amy Winehouse)", "Beautiful things (Darren Maltais)", "Before Our Graves (Jeff McLellan)", "Big River (Johnny Cash)", "Blank Space (Ryan Adams)", "Blindman River (Melissa Majeau)", "Blister In The Sun (Violent Femmes)", "Blitzkrieg Bop (The Ramones)", "Blow At High Dough (Tragically Hip)", "Blue Christmas (Elvis Presley)", "Bobcaygeon (Tragically Hip)", "Bottom Feeders (Melissa Majeau)", "Brown Eyed Girl (Van Morrison)", "Cadillac Ranch (Nitty Gritty Dirt Band)", "Can't Let Go (Lucinda Williams)", "Christmas (Baby Please Come Home) (Darlene Love)", "Cleopatra (The Lumineers)", "Colors (Black Pumas)", "Copperhead Road (Steve Earle)", "Creep (Radiohead)", "Cry Me A River (Justin Timberlake)", "Dancing In The Dark (Bruce Springsteen)", "Day Tripper (The Beatles)", "Don't Want to Wait (Darren Maltais)", "Dont Walk Away Eileen (Sam Roberts)", "Dreams (Fleetwood Mac)", "Driving My Life Away (Eddie Rabbitt)", "Faith (Wham)", "Fishin' In The Dark (Nitty Gritty Dirt Band)", "Five Dollar Bill (Corb Lund)", "Flowers (Miley Cyrus)", "Flowers In Your Hair (The Lumineers)", "Folsom Prison Blues (Johnny Cash)", "Friends in Low Places (Garth Brooks)", "Get Back (The Beatles)", "Green River (CCR)", "Guitar Town (Steve Earle)", "Hand it over (Darren Maltais)", "Harvest Moon (Neil Young)", "Heart of Glass (Blondie)", "Hungry Like The Wolf (Duran Duran)", "I Need Never Get Old (Nathaniel Rateliff)", "I Shot To Sheriff (Bob Marley)", "I Walk The Line (Johnny Cash)", "I Wonder (Darren Maltais)", "I'm On Fire (Bruce Springsteen)", "Is Your Heart a Map (Darren Maltais)", "Island In The Sun (Weezer)", "It Takes a Lot to Laugh (Bob Dylan)", "Jambalaya (Hank Williams Sr.)", "Jingle Bell Rock (Bobby Helms)", "Johnny B. Goode (Chuck Berry)", "Jolene (Dolly Parton)", "Just Another Number (Darren Maltais)", "King Of The Road (Dean Martin/Roger Miller)", "Layla (Derek and the Dominos)", "Life Of Sin (Sturgill Simpson)", "Little Bones (Tragically Hip)", "Little Lion Man (Mumford & Sons)", "Lonesome Grave (Darren Maltais)", "Long Ride (Melissa Majeau)", "Looking Out My Back Door", "Memento (Darren Maltais)", "Midnight Rider (Allman Brothers Band)", "My Babe (Willie Dixon / Little Walter)", "No Bright Light (Darren Maltais)", "No Denial (Melissa Majeau)", "No Diggity (Blackstreet)", "Norwegian Wood (The Beatles)", "Oh Boy (Buddy Holly)", "Paper Planes (M.I.A.)", "Paranoid (Black Sabbath)", "Pride And Joy (Stevie Ray Vaughan)", "REAL LOVE BABY (Father John Misty)", "Rhiannon (Fleetwood Mac)", "Ring of Fire (Johnny Cash)", "Rocket Man (Elton John)", "Runaround Sue (Dion)", "Santa Bring My Baby Back To Me (Elvis)", "Santa Claus Is Coming To Town (Bruce Springsteen)", "Seven Nation Army (The White Stripes)", "S.O.B. (Nathaniel Rateliff)", "Something In The Orange (Zach Bryan)", "Spark (Darren Maltais)", "Steal My Kisses (Ben Harper)", "Still Falling (Jeff McLellan)", "Sugar Daddy (Melissa Majeau)", "Tennessee Whiskey (Chris Stapleton)", "That's All Right Mama (Elvis Presley)", "The Thrill Is Gone (BB King)", "Those Days (Darren Maltais)", "Tonight in Black and White (Jeff McLellan)", "Twist and Shout (The Beatles)", "Wagon Wheel (Old Crow Medicine Show)", "What'd I Say (Ray Charles)", "You Can't Judge A Book By The Cover (Bo Diddley)", "You Wreck Me (Tom Petty)", "Zombie (The Cranberries)"];
-        const masterBank = rawBankData.sort();
-
         function filterSongsAgainstMasterBank(songList) {
-            const masterTitles = new Set(masterBank.map(s => s.toLowerCase()));
+            // Using activeRotationList for filtering in main view
+            const masterTitles = new Set(activeRotationList.map(s => s.toLowerCase()));
             return {
                 inBank: songList.filter(s => masterTitles.has(s.title.toLowerCase())),
                 notInBank: songList.filter(s => !masterTitles.has(s.title.toLowerCase()))
@@ -766,38 +719,96 @@
         // --- RENDER LOGIC ---
         window.renderBank = () => {
             const searchInput = document.getElementById('bank-search');
+            const bankTitle = document.getElementById('bank-title');
             const search = searchInput ? searchInput.value.toLowerCase() : ''; 
+            const listEl = document.getElementById('bank-list');
+            if(!listEl) return;
             
-            const sourceList = (currentTab === 'database') ? fullDatabase : masterBank;
+            // Determine active source
+            let sourceList;
+            let showHolidaySection = false; 
+            let isDatabaseTab = currentTab === 'database';
+
+            if (isDatabaseTab) {
+                sourceList = fullSongDatabase; // 800+
+                bankTitle.textContent = "Full Song Database (" + fullSongDatabase.length + ")";
+                showHolidaySection = false; 
+            } else {
+                sourceList = activeRotationList; // ~150
+                bankTitle.textContent = "Active Rotation (" + activeRotationList.length + ")";
+                showHolidaySection = true; 
+            }
+
             const filtered = sourceList.filter(s => s.toLowerCase().includes(search));
             
-            document.getElementById('bank-list').innerHTML = filtered.map(s => {
-                const singer = getSinger(s);
-                const badgeHTML = getSingerBadgeHTML(singer);
-                let cleanTitle = s.split('(')[0].trim();
-                const meta = window.getSongMetadata(cleanTitle) || window.getSongMetadata(s);
-                let metaHTML = '';
-                if(meta) {
-                    if(meta.k) metaHTML += `<span class="text-[10px] bg-gray-700 text-yellow-500 border border-yellow-500/30 px-1 rounded ml-2 font-mono">${meta.k}</span>`;
-                    if(meta.c) metaHTML += `<span class="text-[10px] bg-gray-700 text-cyan-400 border border-cyan-500/30 px-1 rounded ml-1 font-mono">Cp ${meta.c}</span>`;
-                }
+            // Render Main List
+            let html = filtered.map(s => renderSongRow(s, isDatabaseTab)).join('');
 
-                return `
-                <div class="bg-gray-800 border border-gray-700 p-2 rounded flex justify-between items-center group hover:bg-gray-750">
-                    <div class="flex items-center overflow-hidden mr-2">
-                        ${badgeHTML}
-                        <span class="text-sm text-gray-300 truncate" title="${s}">${s}</span>
-                        ${metaHTML}
-                    </div>
-                    <div class="flex gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
-                        <button onclick="openLyricsModal('${s.replace(/'/g, "\\'")}', '')" class="text-[10px] bg-gray-700 hover:text-white hover:bg-gray-600 w-6 h-6 rounded flex items-center justify-center" title="View Lyrics">📝</button>
-                        <button onclick="addFromBank('${s.replace(/'/g, "\\'")}', 0)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">1</button>
-                        <button onclick="addFromBank('${s.replace(/'/g, "\\'")}', 1)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">2</button>
-                        <button onclick="addFromBank('${s.replace(/'/g, "\\'")}', 2)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">3</button>
-                        <button onclick="addFromBank('${s.replace(/'/g, "\\'")}', 3)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">4</button>
-                    </div>
-                </div>`
-            }).join('');
+            // Render Holiday Section (Only in Active Rotation view)
+            if (showHolidaySection) {
+                const filteredHoliday = holidayBank.filter(s => s.toLowerCase().includes(search));
+                if (!search || (search && filteredHoliday.length > 0)) {
+                    html += `
+                        <div class="col-span-full mt-6 mb-2 border-b border-gray-700 pb-2">
+                            <h3 class="text-red-400 font-bold uppercase text-xs tracking-wider">Holiday / Seasonal</h3>
+                        </div>
+                    `;
+                    html += filteredHoliday.map(s => renderSongRow(s, false)).join('');
+                }
+            }
+
+            listEl.innerHTML = html;
+        };
+
+        function renderSongRow(s, showAddButton) {
+            const singer = getSinger(s);
+            const badgeHTML = getSingerBadgeHTML(singer);
+            let cleanTitle = s.split('(')[0].trim();
+            const meta = window.getSongMetadata(cleanTitle) || window.getSongMetadata(s);
+            let metaHTML = '';
+            if(meta) {
+                if(meta.k) metaHTML += `<span class="text-[10px] bg-gray-700 text-yellow-500 border border-yellow-500/30 px-1 rounded ml-2 font-mono">${meta.k}</span>`;
+                if(meta.c) metaHTML += `<span class="text-[10px] bg-gray-700 text-cyan-400 border border-cyan-500/30 px-1 rounded ml-1 font-mono">Cp ${meta.c}</span>`;
+            }
+
+            // Database Tab Extra: Add to Rotation Button
+            let addToRotationBtn = '';
+            if (showAddButton) {
+                // Check if already in rotation
+                const inRotation = activeRotationList.includes(s);
+                if (!inRotation) {
+                    addToRotationBtn = `<button onclick="addToRotation('${s.replace(/'/g, "\\'")}')" class="text-[10px] bg-indigo-900 text-indigo-200 border border-indigo-700 hover:bg-indigo-700 w-6 h-6 rounded flex items-center justify-center mr-1" title="Add to Active Rotation">⭐</button>`;
+                } else {
+                    addToRotationBtn = `<span class="text-[10px] text-green-500 w-6 h-6 flex items-center justify-center mr-1">✓</span>`;
+                }
+            }
+
+            return `
+            <div class="bg-gray-800 border border-gray-700 p-2 rounded flex justify-between items-center group hover:bg-gray-750">
+                <div class="flex items-center overflow-hidden mr-2">
+                    ${badgeHTML}
+                    <span class="text-sm text-gray-300 truncate" title="${s}">${s}</span>
+                    ${metaHTML}
+                </div>
+                <div class="flex gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                    ${addToRotationBtn}
+                    <button onclick="openLyricsModal('${s.replace(/'/g, "\\'")}', '')" class="text-[10px] bg-gray-700 hover:text-white hover:bg-gray-600 w-6 h-6 rounded flex items-center justify-center" title="View Lyrics">📝</button>
+                    <button onclick="addFromBank('${s.replace(/'/g, "\\'")}', 0)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">1</button>
+                    <button onclick="addFromBank('${s.replace(/'/g, "\\'")}', 1)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">2</button>
+                    <button onclick="addFromBank('${s.replace(/'/g, "\\'")}', 2)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">3</button>
+                    <button onclick="addFromBank('${s.replace(/'/g, "\\'")}', 3)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">4</button>
+                </div>
+            </div>`;
+        }
+
+        window.addToRotation = (songName) => {
+            if (!activeRotationList.includes(songName)) {
+                activeRotationList.push(songName);
+                activeRotationList.sort();
+                localStorage.setItem('myActiveRotation', JSON.stringify(activeRotationList));
+                showToast("Added to Active Rotation");
+                renderBank(); // Refresh to show checkmark
+            }
         };
 
         window.addFromBank = (t, i) => {
@@ -831,7 +842,6 @@
         };
 
         window.handleDragDrop = (evt) => {
-            // Rebuild state from DOM for the affected list(s)
             for(let i=0; i<4; i++) {
                 const list = document.getElementById(`list-set-${i}`);
                 if(!list) continue;
@@ -843,7 +853,7 @@
             if(currentTab === 'custom') {
                 localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
             }
-            render(); // Re-render to update indices
+            render(); 
         };
 
         function render() {
@@ -851,7 +861,7 @@
             sortables = [];
             
             const activeSets = setCollections[currentTab];
-            const isEmergency = (currentTab === 'twostep' || currentTab === 'fifties' || currentTab === 'pophits' || currentTab === 'dance');
+            const isEmergency = false; 
 
             for(let i=0; i<4; i++) {
                 const listEl = document.getElementById(`list-set-${i}`);
@@ -860,13 +870,12 @@
                 
                 if(!listEl) continue;
 
-                if (isEmergency && i > 0) { container.classList.add('hidden'); continue; }
-                else { container.classList.remove('hidden'); }
+                container.classList.remove('hidden'); 
                 
                 let setSongs = activeSets[i];
                 let notInBank = [];
 
-                if (isEmergency && i === 0) {
+                if (i === 0 && currentTab === 'current') {
                     const filtered = filterSongsAgainstMasterBank(activeSets[i]); 
                     setSongs = filtered.inBank;
                     notInBank = filtered.notInBank;
@@ -888,7 +897,7 @@
                         </div>
                     </div>`;
 
-                if (isEmergency && i === 0 && notInBank.length > 0) {
+                if (currentTab === 'current' && i === 0 && notInBank.length > 0) {
                     const suggestionList = notInBank.map(s => s.title).join(', ');
                     headerContent += `<div class="mt-3 bg-red-900/30 p-2 rounded-lg text-xs text-red-300 border border-red-700"><span class="font-bold">Other Suggestions:</span><p class="italic">${suggestionList}</p></div>`;
                 }
@@ -932,7 +941,7 @@
             
             for(let i=0; i<4; i++) {
                 const el = document.getElementById(`list-set-${i}`);
-                if(el) sortables.push(new Sortable(el, { group: 'shared', animation: 150, handle: '.drag-handle', ghostClass: 'sortable-ghost', onEnd: window.handleDragDrop }));
+                if(el) sortables.push(new Sortable(el, { group: 'shared', animation: 150, handle: '.drag-handle', ghostClass: 'sortable-ghost', onEnd: handleDragDrop }));
             }
         }
 
@@ -961,40 +970,33 @@
                 generateQR();
             }
             
+            // Show Bank in Database OR when viewing sets (except live)
             if(tabId === 'database') {
                 setsArea.classList.add('hidden'); 
                 inputSection.classList.add('hidden'); 
                 songBank.classList.remove('hidden'); 
-                if(bankTitle) bankTitle.textContent = "Full Song Database (300+)";
+                if(bankTitle) bankTitle.textContent = "Full Song Database (800+)";
                 renderBank(); 
-            } else {
-                if(tabId !== 'live') {
-                    songBank.classList.remove('hidden');
-                    if(bankTitle) bankTitle.textContent = "Master Song List (Active Rotation)";
-                    renderBank();
-                }
+            } else if (tabId !== 'live') {
+                songBank.classList.remove('hidden');
+                if(bankTitle) bankTitle.textContent = "Active Rotation";
+                renderBank();
             }
 
-            const tabs = ['christmas', 'custom', 'originals', 'database', 'twostep', 'fifties', 'pophits', 'dance', 'live'];
+            const tabs = ['current', 'custom', 'originals', 'database', 'live'];
             tabs.forEach(t => {
                 const btn = document.getElementById(`tab-${t}`);
                 if(!btn) return;
+                
                 btn.className = "flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none whitespace-nowrap ";
                 
                 if (t === tabId) {
                     if(tabId === 'live') btn.classList.add('bg-yellow-900/50', 'text-yellow-100', 'border', 'border-yellow-500');
                     else if(tabId === 'database') btn.classList.add('bg-indigo-900/50', 'text-indigo-100', 'border', 'border-indigo-500', 'ml-2');
-                    else if(tabId === 'twostep') btn.classList.add('bg-red-900/50', 'text-red-100', 'border', 'border-red-500');
-                    else if(tabId === 'fifties') btn.classList.add('bg-teal-900/50', 'text-teal-100', 'border', 'border-teal-500');
-                    else if(tabId === 'pophits') btn.classList.add('bg-pink-900/50', 'text-pink-100', 'border', 'border-pink-500');
-                    else if(tabId === 'dance') btn.classList.add('bg-blue-900/50', 'text-blue-100', 'border', 'border-blue-500');
                     else btn.classList.add('bg-gray-700', 'text-white', 'shadow');
                 } else {
                     if (t === 'live') btn.classList.add('text-yellow-400', 'hover:text-white', 'hover:bg-gray-750', 'border', 'border-yellow-900/30');
                     else if(t === 'database') btn.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-gray-750', 'border-l', 'border-gray-600', 'ml-2');
-                    else if(t === 'twostep' || t === 'fifties' || t === 'pophits' || t === 'dance') {
-                        btn.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-gray-750', btn.classList.contains('hidden') ? 'hidden' : 'block');
-                    }
                     else btn.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-gray-750');
                 }
             });
@@ -1036,7 +1038,6 @@
                      setCollections.custom = [[],[],[],[]];
                      localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
                  } else {
-                     // Just reload page or re-init data
                      window.location.reload();
                  }
                  render();
@@ -1090,7 +1091,6 @@
             const sourceSongs = setCollections[currentTab][copySourceIndex];
             const target = setCollections.custom[targetIndex];
             
-            // Append songs
             sourceSongs.forEach(s => target.push({...s}));
             localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
             
@@ -1099,8 +1099,9 @@
         };
         
         // QR Code
-        function generateQR() {
+        const generateQR = () => {
             const qrEl = document.getElementById("qrcode");
+            if (!qrEl) return;
             qrEl.innerHTML = "";
             const audienceUrl = window.location.href + (window.location.href.includes('?') ? '&' : '?') + "mode=audience";
             new QRCode(qrEl, {
@@ -1108,14 +1109,18 @@
                 width: 128,
                 height: 128
             });
-        }
+        };
         
-        // Audience Bank (Redefined for Audience Mode)
+        // Audience Bank
         window.renderAudienceBankFallback = () => {
              const list = document.getElementById('audience-bank-list');
              if(!list) return;
-             // Use masterBank defined in global scope
+             // masterBank is now dynamically fetched
              const songs = window.masterBank || []; 
+             if(songs.length === 0) {
+                 list.innerHTML = '<div class="text-gray-500 text-center p-4">Loading song list...</div>';
+                 return;
+             }
              list.innerHTML = songs.map(s => `
                 <button onclick="window.submitBankRequest('${s.replace(/'/g, "\\'")}')" class="w-full text-left bg-gray-800 hover:bg-gray-700 p-2 rounded text-sm text-gray-300 border-b border-gray-700 flex justify-between items-center group">
                     <span>${s}</span>
@@ -1135,10 +1140,22 @@
         window.submitNewRequest = async () => {
             const songInput = document.getElementById('audience-new-song');
             const artistInput = document.getElementById('audience-artist');
-            const song = songInput.value;
+            let song = songInput.value.trim();
             const artist = artistInput.value;
             
             if(!song) return showToast("Please enter a song name", true);
+            if(song.length < 3) return showToast("Song name too short", true);
+            
+            // 1. Gibberish Filter
+            if(/(.)\1{3,}/.test(song)) return showToast("Invalid song name", true);
+            
+            // 2. Database Validation
+            const lowerSong = song.toLowerCase();
+            const isValid = window.fullDatabase.some(dbSong => dbSong.toLowerCase().includes(lowerSong));
+            
+            if (!isValid) {
+                return showToast("Song not found in our database. Please check spelling.", true);
+            }
             
             const success = await window.addAudienceRequest(song, artist, 'new');
             if(success) {
@@ -1151,18 +1168,20 @@
 
         // --- INIT ---
         window.addEventListener('load', () => {
-            const params = new URLSearchParams(window.location.search);
-            // Re-expose masterBank to window for audience mode
-            window.masterBank = masterBank;
-            
-            if(params.get('mode') === 'audience') {
-                document.getElementById('band-interface').classList.add('hidden');
-                document.getElementById('audience-interface').classList.remove('hidden');
-                window.renderAudienceBankFallback();
-            } else {
-                renderBank(); 
-                switchTab('christmas');
-            }
+            initDatabase().then(() => {
+                const params = new URLSearchParams(window.location.search);
+                window.masterBank = activeRotationList; // Expose for audience mode (FIXED HERE)
+                window.fullDatabase = fullDatabaseKeys; // Expose for request validation
+                
+                if(params.get('mode') === 'audience') {
+                    document.getElementById('band-interface').classList.add('hidden');
+                    document.getElementById('audience-interface').classList.remove('hidden');
+                    window.renderAudienceBankFallback();
+                } else {
+                    renderBank(); 
+                    switchTab('current');
+                }
+            });
         });
     </script>
 </body>
