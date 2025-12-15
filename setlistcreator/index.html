@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Setlist Creator 2.9.3</title>
+    <title>Setlist Creator 2.9.4</title>
     
     <!-- Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -252,6 +252,7 @@
                     const statusEl = document.getElementById('firebase-status');
                     if(statusEl) statusEl.innerHTML = '<span class="text-green-400 animate-pulse">● Online</span>';
                     if(!window.location.search.includes('mode=audience')) startRequestListeners();
+                    startCollaborationListener();
                 }
             });
         }
@@ -319,13 +320,48 @@
             });
         }
         
+        // --- COLLABORATION ---
+        let collaborationUnsubscribe = null;
+        
+        function startCollaborationListener() {
+            if (!db) return;
+            // Listening to the shared sets
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'collaboration', 'sets');
+            collaborationUnsubscribe = onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data && Array.isArray(data.sets) && data.sets.length === 4) {
+                        setCollections.collaborate = data.sets;
+                        if (currentTab === 'collaborate') render();
+                    }
+                }
+            });
+        }
+
+        window.updateCollaboration = async () => {
+             if (!db) return;
+             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'collaboration', 'sets');
+             try {
+                 await setDoc(docRef, { sets: setCollections.collaborate, lastUpdated: Date.now() }, { merge: true });
+                 console.log("Collaboration synced");
+             } catch (e) {
+                 console.error("Sync error", e);
+             }
+        };
+
         window.saveRequestToSet = (song, artist, requestId) => {
             const targetSetIndex = 3; 
             const songTitle = artist ? `${song} (${artist})` : song;
             if(window.setCollections) {
-                window.setCollections.custom[targetSetIndex].push({title: songTitle, durationStr: "0:00"});
-                localStorage.setItem('myCustomSets', JSON.stringify(window.setCollections.custom));
-                if(window.switchTab) window.switchTab('custom');
+                // If on collaborate tab, save to collaborate set 4, otherwise custom set 4
+                if(currentTab === 'collaborate') {
+                     window.setCollections.collaborate[targetSetIndex].push({title: songTitle, durationStr: "0:00"});
+                     window.updateCollaboration();
+                } else {
+                     window.setCollections.custom[targetSetIndex].push({title: songTitle, durationStr: "0:00"});
+                     localStorage.setItem('myCustomSets', JSON.stringify(window.setCollections.custom));
+                     if(window.switchTab) window.switchTab('custom');
+                }
                 deleteRequest(requestId);
                 showToast(`Saved to Set 4!`);
             }
@@ -379,7 +415,7 @@
         <!-- Header -->
         <header class="mb-6 text-center flex flex-col md:flex-row justify-between items-end border-b border-gray-700 pb-4 gap-4">
             <div class="text-left">
-                <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">Setlist Creator 2.9.3</h1>
+                <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">Setlist Creator 2.9.4</h1>
                 <h2 class="text-sm font-bold text-indigo-300 opacity-75">Active Rotation & Database</h2>
                 <div class="flex flex-col md:flex-row gap-4 mt-2">
                     <p class="text-gray-400 text-sm mt-1">4 Sets • Active Rotation • Full DB</p>
@@ -405,8 +441,17 @@
             <button onclick="switchTab('current')" id="tab-current" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none text-white bg-gray-700 shadow whitespace-nowrap">Current Sets</button>
             <button onclick="switchTab('live')" id="tab-live" class="flex-1 py-2 px-4 rounded-lg text-sm font-bold transition focus:outline-none text-yellow-400 hover:text-white hover:bg-gray-750 border border-yellow-900/30 whitespace-nowrap flex items-center justify-center gap-2"><span class="animate-pulse">●</span> Live Mode</button>
             <button onclick="switchTab('custom')" id="tab-custom" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none text-gray-400 hover:text-white hover:bg-gray-750 whitespace-nowrap">Create Your Own</button>
+            <button onclick="switchTab('collaborate')" id="tab-collaborate" class="flex-1 py-2 px-4 rounded-lg text-sm font-bold transition focus:outline-none text-purple-400 hover:text-white hover:bg-gray-750 border border-purple-900/30 whitespace-nowrap flex items-center justify-center gap-2">👥 Collaborate</button>
             <button onclick="switchTab('originals')" id="tab-originals" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none text-gray-400 hover:text-white hover:bg-gray-750 whitespace-nowrap">Originals</button>
             <button onclick="switchTab('database')" id="tab-database" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none text-gray-400 hover:text-white hover:bg-gray-750 whitespace-nowrap border-l border-gray-600 ml-2 pl-6">📚 Database (800+)</button>
+        </div>
+
+        <!-- Collaborate Header Info -->
+        <div id="collaborate-info" class="hidden mb-6 bg-purple-900/20 border border-purple-700/50 p-4 rounded-xl flex items-center justify-between">
+            <div class="text-purple-300 text-sm">
+                <span class="font-bold">Live Sync Active:</span> Changes made here update instantly for all band members.
+            </div>
+            <div class="text-xs text-purple-400 animate-pulse">● Syncing</div>
         </div>
 
         <!-- Custom Controls -->
@@ -680,6 +725,7 @@
             current: JSON.parse(JSON.stringify(currentSetData)),
             custom: customData,
             originals: JSON.parse(JSON.stringify(originalsData)),
+            collaborate: [[],[],[],[]], // New Shared Data
             live: [[],[],[],[]],
             database: [[],[],[],[]] 
         };
@@ -812,10 +858,14 @@
         };
 
         window.addFromBank = (t, i) => {
-            setCollections.custom[i].push({title: t, durationStr: "0:00"});
-            localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
+            setCollections[currentTab][i].push({title: t, durationStr: "0:00"});
+            if(currentTab === 'custom') {
+                localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
+            } else if (currentTab === 'collaborate') {
+                window.updateCollaboration();
+            }
             showToast("Added to Set " + (i+1));
-            if (currentTab === 'custom') render();
+            render();
         };
 
         window.addNewSong = () => {
@@ -825,11 +875,15 @@
             const setIdx = parseInt(setSelect.value);
             
             if(title) {
-                setCollections.custom[setIdx].push({title: title, durationStr: "0:00"});
-                localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
+                setCollections[currentTab][setIdx].push({title: title, durationStr: "0:00"});
+                if(currentTab === 'custom') {
+                    localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
+                } else if (currentTab === 'collaborate') {
+                    window.updateCollaboration();
+                }
                 titleInput.value = '';
-                showToast("Custom song added!");
-                if (currentTab === 'custom') render();
+                showToast("Song added!");
+                render();
             }
         };
 
@@ -837,6 +891,8 @@
             setCollections[currentTab][setIndex].splice(songIndex, 1);
             if(currentTab === 'custom') {
                 localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
+            } else if (currentTab === 'collaborate') {
+                window.updateCollaboration();
             }
             render();
         };
@@ -852,6 +908,8 @@
             }
             if(currentTab === 'custom') {
                 localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
+            } else if (currentTab === 'collaborate') {
+                window.updateCollaboration();
             }
             render(); 
         };
@@ -883,7 +941,7 @@
 
                 // Header Logic
                 const title = `Set ${i + 1}`;
-                const copyBtn = currentTab !== 'custom' ? `<button onclick="openCopyModal(${i})" class="text-indigo-400 hover:text-white p-1 ml-2 text-xs font-bold" title="Copy">COPY</button>` : '';
+                const copyBtn = currentTab !== 'custom' && currentTab !== 'collaborate' ? `<button onclick="openCopyModal(${i})" class="text-indigo-400 hover:text-white p-1 ml-2 text-xs font-bold" title="Copy">COPY</button>` : '';
                 
                 let headerContent = `
                     <div class="flex items-center justify-between w-full"> 
@@ -954,14 +1012,17 @@
             const inputSection = document.getElementById('input-section');
             const songBank = document.getElementById('song-bank-section');
             const bankTitle = document.querySelector('#song-bank-section h2');
+            const collabInfo = document.getElementById('collaborate-info');
             
             customControls.classList.add('hidden');
             liveControls.classList.add('hidden');
             setsArea.classList.remove('hidden');
             inputSection.classList.remove('hidden');
             songBank.classList.add('hidden'); 
+            collabInfo.classList.add('hidden');
 
             if(tabId === 'custom') customControls.classList.remove('hidden');
+            if(tabId === 'collaborate') collabInfo.classList.remove('hidden');
             
             if(tabId === 'live') {
                 liveControls.classList.remove('hidden');
@@ -983,26 +1044,33 @@
                 renderBank();
             }
 
-            const tabs = ['current', 'custom', 'originals', 'database', 'live'];
+            const tabs = ['current', 'custom', 'collaborate', 'originals', 'database', 'live'];
             tabs.forEach(t => {
                 const btn = document.getElementById(`tab-${t}`);
                 if(!btn) return;
                 
-                btn.className = "flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none whitespace-nowrap ";
+                // Base Classes
+                let cls = "flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none whitespace-nowrap ";
                 
+                // Active State
                 if (t === tabId) {
-                    if(tabId === 'live') btn.classList.add('bg-yellow-900/50', 'text-yellow-100', 'border', 'border-yellow-500');
-                    else if(tabId === 'database') btn.classList.add('bg-indigo-900/50', 'text-indigo-100', 'border', 'border-indigo-500', 'ml-2');
-                    else btn.classList.add('bg-gray-700', 'text-white', 'shadow');
-                } else {
-                    if (t === 'live') btn.classList.add('text-yellow-400', 'hover:text-white', 'hover:bg-gray-750', 'border', 'border-yellow-900/30');
-                    else if(t === 'database') btn.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-gray-750', 'border-l', 'border-gray-600', 'ml-2');
-                    else btn.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-gray-750');
+                    if(tabId === 'live') cls += 'bg-yellow-900/50 text-yellow-100 border border-yellow-500';
+                    else if(tabId === 'database') cls += 'bg-indigo-900/50 text-indigo-100 border border-indigo-500 ml-2';
+                    else if(tabId === 'collaborate') cls += 'bg-purple-900/50 text-purple-100 border border-purple-500 shadow-lg';
+                    else cls += 'bg-gray-700 text-white shadow';
+                } 
+                // Inactive State
+                else {
+                    if (t === 'live') cls += 'text-yellow-400 hover:text-white hover:bg-gray-750 border border-yellow-900/30';
+                    else if(t === 'database') cls += 'text-gray-400 hover:text-white hover:bg-gray-750 border-l border-gray-600 ml-2';
+                    else if(t === 'collaborate') cls += 'text-purple-400 hover:text-white hover:bg-gray-750 border border-purple-900/30';
+                    else cls += 'text-gray-400 hover:text-white hover:bg-gray-750';
                 }
+                btn.className = cls;
             });
             
             if(tabId !== 'live' && tabId !== 'database') render();
-            showToast(`Switched to ${tabId}`);
+            showToast(`Switched to ${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`);
         }
 
         // --- EXPORT/IMPORT & UTILS ---
@@ -1037,6 +1105,9 @@
                  if(currentTab === 'custom') {
                      setCollections.custom = [[],[],[],[]];
                      localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
+                 } else if (currentTab === 'collaborate') {
+                     setCollections.collaborate = [[],[],[],[]];
+                     window.updateCollaboration();
                  } else {
                      window.location.reload();
                  }
@@ -1049,34 +1120,93 @@
             if(confirm('Clear all songs in this tab?')) {
                 setCollections[currentTab] = [[],[],[],[]];
                 if(currentTab === 'custom') localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
+                else if(currentTab === 'collaborate') window.updateCollaboration();
                 render();
             }
         };
 
-        window.downloadAllImage = () => {
+        // NEW IMAGE CAPTURE LOGIC
+        window.downloadAllImage = async () => {
             showToast("Generating image...");
-            html2canvas(document.getElementById("sets-capture-area"), {
-                backgroundColor: "#111827",
-                scale: 2
-            }).then(canvas => {
+            
+            // Create a clone of the capture area to handle scrolling content
+            const original = document.getElementById("sets-capture-area");
+            const clone = original.cloneNode(true);
+            
+            // Set styles to ensure full capture (no scrollbars, full height)
+            clone.style.width = original.offsetWidth + 'px';
+            clone.style.height = 'auto'; 
+            clone.style.position = 'absolute';
+            clone.style.top = '-10000px';
+            clone.style.left = '0';
+            clone.style.overflow = 'visible'; 
+            
+            // Ensure all lists inside are fully expanded
+            const lists = clone.querySelectorAll('ul');
+            lists.forEach(list => {
+                list.style.maxHeight = 'none';
+                list.style.overflow = 'visible';
+                list.style.height = 'auto';
+            });
+            
+            document.body.appendChild(clone);
+            
+            try {
+                const canvas = await html2canvas(clone, {
+                    backgroundColor: "#111827",
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    windowHeight: clone.scrollHeight + 100 
+                });
+                
                 const link = document.createElement('a');
                 link.download = `setlist-${currentTab}-${new Date().toISOString().slice(0,10)}.png`;
                 link.href = canvas.toDataURL();
                 link.click();
-            });
+            } catch(e) {
+                console.error(e);
+                showToast("Image generation failed", true);
+            } finally {
+                document.body.removeChild(clone);
+            }
         };
         
-        window.downloadSetImage = (setIndex) => {
+        window.downloadSetImage = async (setIndex) => {
             showToast(`Capturing Set ${setIndex+1}...`);
-             html2canvas(document.getElementById(`set-container-${setIndex}`), {
-                backgroundColor: "#1f2937",
-                scale: 2
-            }).then(canvas => {
+            
+            const original = document.getElementById(`set-container-${setIndex}`);
+            const clone = original.cloneNode(true);
+            
+            clone.style.width = original.offsetWidth + 'px';
+            clone.style.height = 'auto';
+            clone.style.position = 'absolute';
+            clone.style.top = '-10000px';
+            clone.style.left = '0';
+            
+            const list = clone.querySelector('ul');
+            if(list) {
+                list.style.maxHeight = 'none';
+                list.style.overflow = 'visible';
+                list.style.height = 'auto';
+            }
+            
+            document.body.appendChild(clone);
+            
+            try {
+                const canvas = await html2canvas(clone, {
+                    backgroundColor: "#1f2937",
+                    scale: 2,
+                    windowHeight: clone.scrollHeight + 50
+                });
+                
                 const link = document.createElement('a');
                 link.download = `set-${setIndex+1}-${new Date().toISOString().slice(0,10)}.png`;
                 link.href = canvas.toDataURL();
                 link.click();
-            });
+            } finally {
+                document.body.removeChild(clone);
+            }
         };
 
         // COPY FUNCTIONALITY
@@ -1145,8 +1275,14 @@
             
             if(!song) return showToast("Please enter a song name", true);
             if(song.length < 3) return showToast("Song name too short", true);
-            if(/(.)\1{3,}/.test(song)) return showToast("Invalid song name", true);
             
+            // --- STRICTER GIBBERISH DETECTION ---
+            // 1. Repeated Characters: Catches "aaaaa", "zzzzz"
+            if(/(.)\1{2,}/.test(song)) return showToast("Invalid song name", true);
+            
+            // 2. Vowel Check: Most English words/names have at least one vowel
+            if(!/[aeiouy]/i.test(song)) return showToast("Please enter a valid song name", true);
+
             // 1. Check Internal Database First (Fastest)
             const lowerSong = song.toLowerCase();
             const inInternalDB = window.fullDatabase.some(dbSong => dbSong.toLowerCase().includes(lowerSong));
