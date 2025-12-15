@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Setlist Creator 2.9.8</title>
+    <title>Setlist Creator 2.9.9</title>
     
     <!-- Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -99,6 +99,8 @@
                 const modalTitle = document.getElementById('lyrics-modal-title');
                 const sourceBadge = document.getElementById('lyrics-source-badge');
                 
+                if(!modal) { console.error("Lyrics modal not found in DOM"); return; }
+
                 modalTitle.textContent = title;
                 modal.classList.remove('hidden');
                 
@@ -540,7 +542,7 @@
         <!-- Header -->
         <header class="mb-6 text-center flex flex-col md:flex-row justify-between items-center md:items-end border-b border-gray-700 pb-4 gap-4">
             <div class="text-left w-full md:w-auto flex flex-col items-center md:items-start">
-                <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">Setlist Creator 2.9.8</h1>
+                <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">Setlist Creator 2.9.9</h1>
                 <h2 class="text-sm font-bold text-indigo-300 opacity-75">Active Rotation & Database</h2>
                 <div class="flex flex-col md:flex-row gap-4 mt-2 items-center md:items-start">
                     <p class="text-gray-400 text-sm mt-1">4 Sets • Active Rotation • Full DB</p>
@@ -671,6 +673,41 @@
         </div>
     </div>
 
+    <!-- === AUDIENCE INTERFACE (Mobile First) === -->
+    <div id="audience-interface" class="hidden min-h-screen bg-gray-900 p-4 pb-20">
+        <div class="max-w-md mx-auto">
+            <header class="text-center mb-6 pt-4">
+                <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 to-red-500">Request A Song</h1>
+                <p class="text-gray-400 text-sm">Tap a song to request it live!</p>
+            </header>
+
+            <!-- Success Message -->
+            <div id="request-success" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-full shadow-xl z-50 flex items-center gap-2 animate-bounce">
+                <span>✅ Request Sent!</span>
+            </div>
+
+            <!-- Custom Request Form -->
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-6">
+                <h3 class="font-bold text-white mb-3">Can't find it? Request something new:</h3>
+                <div class="space-y-3">
+                    <input type="text" id="audience-new-song" placeholder="Song Title" class="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white focus:border-indigo-500 outline-none">
+                    <input type="text" id="audience-artist" placeholder="Artist (Optional)" class="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white focus:border-indigo-500 outline-none">
+                    <button id="btn-submit-new" onclick="submitNewRequest()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg shadow-lg">Send Request</button>
+                </div>
+            </div>
+
+            <!-- Song Bank -->
+            <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                <div class="p-3 bg-gray-750 border-b border-gray-700 font-bold text-gray-400 text-sm uppercase tracking-wide">
+                    Available Songs
+                </div>
+                <div id="audience-bank-list" class="max-h-[60vh] overflow-y-auto">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- PIN Modal -->
     <div id="pin-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center backdrop-blur-sm p-4">
         <div class="bg-gray-800 p-6 rounded-xl border border-gray-600 shadow-2xl w-full max-w-xs text-center">
@@ -687,6 +724,53 @@
     <div id="toast" class="fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 z-50"><span id="toast-message">Action successful</span></div>
     
     <div id="copy-modal" class="fixed inset-0 bg-black/70 z-50 hidden flex items-center justify-center backdrop-blur-sm"><div class="bg-gray-800 p-6 rounded-xl border border-gray-600 shadow-2xl w-full max-w-sm"><h3 class="text-xl font-bold text-white mb-2">Copy Set to "Create Your Own"</h3><div class="grid grid-cols-2 gap-3 mb-4"><button onclick="executeCopy(0)" class="bg-gray-700 hover:bg-indigo-600 hover:text-white p-3 rounded-lg border border-gray-600">Set 1</button><button onclick="executeCopy(1)" class="bg-gray-700 hover:bg-indigo-600 hover:text-white p-3 rounded-lg border border-gray-600">Set 2</button><button onclick="executeCopy(2)" class="bg-gray-700 hover:bg-indigo-600 hover:text-white p-3 rounded-lg border border-gray-600">Set 3</button><button onclick="executeCopy(3)" class="bg-gray-700 hover:bg-indigo-600 hover:text-white p-3 rounded-lg border border-gray-600">Set 4</button></div><button onclick="document.getElementById('copy-modal').classList.add('hidden')" class="w-full text-gray-500 hover:text-gray-300 py-2 text-sm">Cancel</button></div></div>
+
+    <!-- Lyrics Modal -->
+    <div id="lyrics-modal" class="fixed inset-0 bg-black/95 z-50 hidden flex flex-col">
+        <!-- Header -->
+        <div class="bg-gray-800 p-4 border-b border-gray-700 flex justify-between items-center flex-shrink-0 shadow-lg z-10">
+            <div class="flex flex-col">
+                <h3 id="lyrics-modal-title" class="text-xl font-bold text-white leading-tight">Song Title</h3>
+                <div id="lyrics-source-badge" class="mt-1"></div>
+            </div>
+            <button onclick="closeLyricsModal()" class="text-gray-400 hover:text-white text-3xl font-bold px-4 leading-none">&times;</button>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="bg-gray-900 p-2 border-b border-gray-800 flex justify-between items-center flex-shrink-0 overflow-x-auto z-10">
+            <div class="flex items-center gap-2">
+                <!-- Swapped Logic: + makes it faster (less delay), - makes it slower (more delay) -->
+                <button onclick="changeSpeed(10)" class="text-sm bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded font-bold w-10">-</button>
+                <div class="flex flex-col items-center w-16">
+                    <span class="text-[10px] text-gray-500 uppercase tracking-wider">Speed</span>
+                    <span id="scroll-speed-display" class="font-bold text-indigo-400 text-sm">50%</span>
+                </div>
+                <button onclick="changeSpeed(-10)" class="text-sm bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded font-bold w-10">+</button>
+            </div>
+            
+            <div class="flex gap-3">
+                <button id="btn-autoscroll" onclick="toggleAutoScroll()" class="text-xl bg-gray-700 hover:bg-gray-600 text-gray-300 w-12 h-10 rounded flex items-center justify-center transition-colors shadow-sm">▶️</button>
+                <button onclick="toggleEditMode()" class="bg-indigo-900 hover:bg-indigo-800 text-indigo-200 px-4 py-2 rounded text-xs border border-indigo-700 font-bold tracking-wide">EDIT</button>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="flex-grow relative overflow-hidden bg-black">
+            <!-- View Mode -->
+            <div id="lyrics-view-mode" class="absolute inset-0 overflow-y-auto p-4 md:p-8 text-center scroll-smooth">
+                <div id="lyrics-content" class="text-xl md:text-3xl text-gray-200 leading-relaxed font-sans whitespace-pre-wrap pb-[60vh] max-w-3xl mx-auto"></div>
+            </div>
+
+            <!-- Edit Mode -->
+            <div id="lyrics-edit-mode" class="absolute inset-0 hidden flex flex-col p-4 bg-gray-900 z-20">
+                <textarea id="lyrics-textarea" class="flex-grow bg-gray-800 text-white font-mono text-sm p-4 rounded border border-gray-700 focus:border-indigo-500 outline-none resize-none shadow-inner" placeholder="Paste lyrics here..."></textarea>
+                <div class="flex justify-end pt-4 gap-3">
+                    <button onclick="toggleEditMode()" class="text-gray-400 hover:text-white px-4 py-2">Cancel</button>
+                    <button onclick="saveLyrics()" class="bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded font-bold shadow-lg">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         // --- DATA SOURCE CONFIG ---
