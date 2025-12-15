@@ -332,17 +332,25 @@
                     if (data && data.sets) {
                         try {
                             const parsed = typeof data.sets === 'string' ? JSON.parse(data.sets) : data.sets;
-                            // SANITIZER: Ensure we always have 4 sets
-                            if (Array.isArray(parsed)) {
-                                while (parsed.length < 4) parsed.push([]);
-                                setCollections.collaborate = parsed.slice(0, 4); // Clamp to 4
+                            // SANITIZER: Robust Check
+                            if (Array.isArray(parsed) && parsed.length === 4) {
+                                // Ensure all 4 items are actually arrays
+                                setCollections.collaborate = parsed.map(s => Array.isArray(s) ? s : []);
+                                if (currentTab === 'collaborate') render();
+                            } else {
+                                // Data corrupt or partial - Reset default to empty
+                                setCollections.collaborate = [[],[],[],[]];
                                 if (currentTab === 'collaborate') render();
                             }
-                        } catch(e) { console.error("Parse error", e); }
+                        } catch(e) { 
+                            console.error("Parse error", e); 
+                            setCollections.collaborate = [[],[],[],[]]; // Fail safe
+                        }
                     }
                 } else {
                     // Document doesn't exist? Create it to start sync
                     console.log("Initializing Collaboration Doc...");
+                    setCollections.collaborate = [[],[],[],[]]; // Ensure clean state
                     window.updateCollaboration();
                 }
             });
@@ -352,8 +360,10 @@
              if (!db) return;
              const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'collaboration', 'sets');
              try {
-                 // Ensure we have 4 sets before saving
-                 while(setCollections.collaborate.length < 4) setCollections.collaborate.push([]);
+                 // Double check before sending
+                 if(!setCollections.collaborate || setCollections.collaborate.length !== 4) {
+                     setCollections.collaborate = [[],[],[],[]];
+                 }
                  
                  await setDoc(docRef, { 
                      sets: JSON.stringify(setCollections.collaborate), 
@@ -371,6 +381,9 @@
             if(window.setCollections) {
                 // If on collaborate tab, save to collaborate set 4, otherwise custom set 4
                 if(currentTab === 'collaborate') {
+                     // Safety check
+                     if (!window.setCollections.collaborate[targetSetIndex]) window.setCollections.collaborate[targetSetIndex] = [];
+                     
                      window.setCollections.collaborate[targetSetIndex].push({title: songTitle, durationStr: "0:00"});
                      window.updateCollaboration();
                 } else {
@@ -416,10 +429,11 @@
         .sortable-ghost { opacity: 0.4; background: #374151; }
         .drag-handle { 
             cursor: grab; 
-            padding: 8px 12px; /* Increased touch target */
-            font-size: 1.2rem;
+            padding: 10px 16px; /* Greatly increased touch target */
+            font-size: 1.4rem;
+            touch-action: none; /* Prevent scroll on handle */
         }
-        .drag-handle:active { cursor: grabbing; }
+        .drag-handle:active { cursor: grabbing; color: #818cf8; }
         @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
         .spinner { width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s linear infinite; margin-right: 5px; }
@@ -471,7 +485,10 @@
             <div class="text-purple-300 text-sm">
                 <span class="font-bold">Live Sync Active:</span> Changes made here update instantly for all band members.
             </div>
-            <div class="text-xs text-purple-400 animate-pulse">● Syncing</div>
+            <div class="flex items-center gap-2">
+                <button onclick="window.clearAll()" class="text-xs bg-purple-800 hover:bg-purple-700 text-white px-2 py-1 rounded border border-purple-600">Clear All</button>
+                <div class="text-xs text-purple-400 animate-pulse">● Syncing</div>
+            </div>
         </div>
 
         <!-- Custom Controls -->
@@ -878,6 +895,8 @@
         };
 
         window.addFromBank = (t, i) => {
+            if(!setCollections[currentTab] || !setCollections[currentTab][i]) return showToast("Error: Set not available", true);
+            
             setCollections[currentTab][i].push({title: t, durationStr: "0:00"});
             if(currentTab === 'custom') {
                 localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
@@ -895,6 +914,9 @@
             const setIdx = parseInt(setSelect.value);
             
             if(title) {
+                // Safety check
+                if(!setCollections[currentTab] || !setCollections[currentTab][setIdx]) return showToast("Set not available", true);
+
                 setCollections[currentTab][setIdx].push({title: title, durationStr: "0:00"});
                 if(currentTab === 'custom') {
                     localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
@@ -982,9 +1004,9 @@
                 headerDiv.innerHTML = headerContent;
 
                 listEl.innerHTML = '';
-                if(setSongs.length === 0) {
+                if(setSongs && setSongs.length === 0) {
                     listEl.innerHTML = `<li class="p-4 text-gray-500 text-center text-sm italic">Empty Set</li>`;
-                } else {
+                } else if (setSongs) {
                     setSongs.forEach((song, idx) => {
                         const singer = getSinger(song.title);
                         const badgeHTML = getSingerBadgeHTML(singer);
@@ -1022,7 +1044,7 @@
                 if(el) sortables.push(new Sortable(el, { 
                     group: 'shared', 
                     animation: 200, 
-                    delay: 200, 
+                    delay: 250, 
                     delayOnTouchOnly: true,
                     handle: '.drag-handle', 
                     ghostClass: 'sortable-ghost', 
@@ -1331,11 +1353,15 @@
 
                 if (data.resultCount > 0) {
                      // Check if any result actually contains the input string WHOLE WORD
+                     // Escape special regex chars from user input
+                     const escapedInput = window.sanitizeId(lowerSong).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/_/g, ' ');
+                     
                      const validMatch = data.results.find(result => {
                          const track = result.trackName.toLowerCase();
-                         // Match start of string, end of string, or surrounded by whitespace
-                         const regex = new RegExp('(^|\\s)' + window.sanitizeId(lowerSong).replace(/_/g, ' ') + '(\\s|$)', 'i');
-                         return track.includes(lowerSong) || regex.test(track);
+                         // Match start of string, end of string, or surrounded by whitespace/punctuation
+                         // This allows "Snake" to match "Snake" or "Snake (Remix)" but rejects "Rattlesnake"
+                         const regex = new RegExp(`(^|\\s|\\(|\\)|-)${escapedInput}($|\\s|\\(|\\)|-)`, 'i');
+                         return track.includes(lowerSong) && regex.test(track);
                      });
                      
                      if(validMatch) {
