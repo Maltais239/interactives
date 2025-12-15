@@ -65,76 +65,100 @@
             }, 3000);
         };
 
-        // LYRICS
+        // LYRICS CONFIG
         const GITHUB_USER = "Maltais239";
         const GITHUB_REPO = "interactives";
         const GITHUB_BRANCH = "main";
         const GITHUB_PATH = "songfiles";
         const GITHUB_BASE_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${GITHUB_PATH}/`;
 
+        // SCROLLING VARIABLES
+        let scrollTimer = null;
+        let scrollDelay = 50; 
+        const minDelay = 10;
+        const maxDelay = 150; 
+
+        // LYRICS FUNCTIONS - Defined on Window immediately
         window.sanitizeId = (str) => str.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
+        window.stopScroll = () => {
+            if (scrollTimer) clearInterval(scrollTimer);
+            scrollTimer = null;
+            const btn = document.getElementById('btn-autoscroll');
+            if(btn) {
+                btn.innerHTML = '▶️';
+                btn.classList.remove('bg-red-600', 'text-white', 'border-red-500');
+                btn.classList.add('bg-gray-700', 'text-gray-300');
+            }
+        };
+
         window.openLyricsModal = async (title, artist) => {
-            const modal = document.getElementById('lyrics-modal');
-            const contentArea = document.getElementById('lyrics-content');
-            const modalTitle = document.getElementById('lyrics-modal-title');
-            const sourceBadge = document.getElementById('lyrics-source-badge');
-            
-            modalTitle.textContent = title;
-            modal.classList.remove('hidden');
-            window.stopScroll();
+            try {
+                const modal = document.getElementById('lyrics-modal');
+                const contentArea = document.getElementById('lyrics-content');
+                const modalTitle = document.getElementById('lyrics-modal-title');
+                const sourceBadge = document.getElementById('lyrics-source-badge');
+                
+                modalTitle.textContent = title;
+                modal.classList.remove('hidden');
+                
+                if(typeof window.stopScroll === 'function') window.stopScroll();
 
-            contentArea.innerHTML = '<div class="flex items-center justify-center h-40"><div class="spinner"></div><span class="text-gray-400 ml-2">Searching...</span></div>';
-            document.getElementById('lyrics-view-mode').classList.remove('hidden');
-            document.getElementById('lyrics-edit-mode').classList.add('hidden');
-            sourceBadge.innerHTML = '';
-            
-            let lyricsContent = null;
-            let source = 'none';
+                contentArea.innerHTML = '<div class="flex items-center justify-center h-40"><div class="spinner"></div><span class="text-gray-400 ml-2">Searching...</span></div>';
+                document.getElementById('lyrics-view-mode').classList.remove('hidden');
+                document.getElementById('lyrics-edit-mode').classList.add('hidden');
+                sourceBadge.innerHTML = '';
+                
+                let lyricsContent = null;
+                let source = 'none';
 
-            if(db) {
-                try {
-                    const songId = window.sanitizeId(title);
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'songs', songId);
-                    const docSnap = await getDoc(docRef);
-                    if (docSnap.exists() && docSnap.data().content) {
-                        lyricsContent = docSnap.data().content;
-                        source = 'firebase';
-                    }
-                } catch (e) { console.error("Firebase fetch error:", e); }
-            }
-
-            if (!lyricsContent) {
-                try {
-                    const cleanTitle = title.split('(')[0].trim();
-                    let ghUrl = GITHUB_BASE_URL + encodeURIComponent(cleanTitle) + ".txt";
-                    let res = await fetch(ghUrl);
-                    if (!res.ok) {
-                        if (cleanTitle !== title) {
-                            ghUrl = GITHUB_BASE_URL + encodeURIComponent(title) + ".txt";
-                            res = await fetch(ghUrl);
+                if(db) {
+                    try {
+                        const songId = window.sanitizeId(title);
+                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'songs', songId);
+                        const docSnap = await getDoc(docRef);
+                        if (docSnap.exists() && docSnap.data().content) {
+                            lyricsContent = docSnap.data().content;
+                            source = 'firebase';
                         }
-                    }
-                    if (res.ok) {
-                        lyricsContent = await res.text();
-                        source = 'github';
-                    }
-                } catch (e) { console.error("GitHub fetch error:", e); }
-            }
-
-            if (lyricsContent) {
-                renderLyrics(lyricsContent);
-                document.getElementById('lyrics-textarea').value = lyricsContent;
-                if(source === 'firebase') {
-                    sourceBadge.innerHTML = '<span class="text-[10px] bg-indigo-900 text-indigo-300 px-2 py-1 rounded border border-indigo-700">Cloud Saved</span>';
-                } else {
-                    sourceBadge.innerHTML = '<span class="text-[10px] bg-gray-700 text-gray-300 px-2 py-1 rounded border border-gray-600">GitHub</span>';
+                    } catch (e) { console.error("Firebase fetch error:", e); }
                 }
-            } else {
-                contentArea.innerHTML = `<div class="text-gray-500 italic text-center mt-10"><p class="mb-2">No lyrics found for "${title}"</p><button onclick="toggleEditMode()" class="mt-4 text-indigo-400 hover:text-white underline">Write Lyrics Now</button></div>`;
-                document.getElementById('lyrics-textarea').value = '';
+
+                if (!lyricsContent) {
+                    try {
+                        const cleanTitle = title.split('(')[0].trim();
+                        let ghUrl = GITHUB_BASE_URL + encodeURIComponent(cleanTitle) + ".txt";
+                        let res = await fetch(ghUrl);
+                        if (!res.ok) {
+                            if (cleanTitle !== title) {
+                                ghUrl = GITHUB_BASE_URL + encodeURIComponent(title) + ".txt";
+                                res = await fetch(ghUrl);
+                            }
+                        }
+                        if (res.ok) {
+                            lyricsContent = await res.text();
+                            source = 'github';
+                        }
+                    } catch (e) { console.error("GitHub fetch error:", e); }
+                }
+
+                if (lyricsContent) {
+                    window.renderLyrics(lyricsContent);
+                    document.getElementById('lyrics-textarea').value = lyricsContent;
+                    if(source === 'firebase') {
+                        sourceBadge.innerHTML = '<span class="text-[10px] bg-indigo-900 text-indigo-300 px-2 py-1 rounded border border-indigo-700">Cloud Saved</span>';
+                    } else {
+                        sourceBadge.innerHTML = '<span class="text-[10px] bg-gray-700 text-gray-300 px-2 py-1 rounded border border-gray-600">GitHub</span>';
+                    }
+                } else {
+                    contentArea.innerHTML = `<div class="text-gray-500 italic text-center mt-10"><p class="mb-2">No lyrics found for "${title}"</p><button onclick="toggleEditMode()" class="mt-4 text-indigo-400 hover:text-white underline">Write Lyrics Now</button></div>`;
+                    document.getElementById('lyrics-textarea').value = '';
+                }
+                window.currentLyricsSong = { title, artist, id: window.sanitizeId(title) };
+            } catch(err) {
+                console.error("OpenLyrics Error", err);
+                showToast("Error opening lyrics", true);
             }
-            window.currentLyricsSong = { title, artist, id: window.sanitizeId(title) };
         };
 
         window.renderLyrics = (text) => {
@@ -162,18 +186,12 @@
             try {
                 const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'songs', song.id);
                 await setDoc(docRef, { title: song.title, artist: song.artist, content: text, lastUpdated: Date.now() }, { merge: true });
-                renderLyrics(text);
+                window.renderLyrics(text);
                 window.toggleEditMode();
                 showToast("Lyrics saved!");
             } catch (e) { showToast("Error saving lyrics.", true); }
         };
         
-        // AUTO SCROLL
-        let scrollTimer = null;
-        let scrollDelay = 50; 
-        const minDelay = 10;
-        const maxDelay = 150; 
-
         window.toggleAutoScroll = () => {
             const btn = document.getElementById('btn-autoscroll');
             if (scrollTimer) {
@@ -190,17 +208,6 @@
                     if(container.scrollTop + container.clientHeight >= container.scrollHeight) window.stopScroll();
                 };
                 scrollTimer = setInterval(doScroll, scrollDelay);
-            }
-        };
-
-        window.stopScroll = () => {
-            if (scrollTimer) clearInterval(scrollTimer);
-            scrollTimer = null;
-            const btn = document.getElementById('btn-autoscroll');
-            if(btn) {
-                btn.innerHTML = '▶️';
-                btn.classList.remove('bg-red-600', 'text-white', 'border-red-500');
-                btn.classList.add('bg-gray-700', 'text-gray-300');
             }
         };
 
@@ -920,6 +927,9 @@
                 removeBtn = `<button onclick="removeFromRotation('${s.replace(/'/g, "\\'")}')" class="text-[10px] bg-red-900/50 text-red-300 border border-red-800 hover:bg-red-700 w-6 h-6 rounded flex items-center justify-center mr-1" title="Remove from Rotation">🗑️</button>`;
             }
 
+            // Safely escape title for onclick attribute
+            const safeTitle = s.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
             return `
             <div class="bg-gray-800 border border-gray-700 p-2 rounded flex justify-between items-center group hover:bg-gray-750">
                 <div class="flex items-center overflow-hidden mr-2">
@@ -930,11 +940,11 @@
                 <div class="flex gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
                     ${addToRotationBtn}
                     ${removeBtn}
-                    <button onclick="openLyricsModal('${s.replace(/'/g, "\\'")}', '')" class="text-[10px] bg-gray-700 hover:text-white hover:bg-gray-600 w-6 h-6 rounded flex items-center justify-center" title="View Lyrics">📝</button>
-                    <button onclick="addFromBank('${s.replace(/'/g, "\\'")}', 0)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">1</button>
-                    <button onclick="addFromBank('${s.replace(/'/g, "\\'")}', 1)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">2</button>
-                    <button onclick="addFromBank('${s.replace(/'/g, "\\'")}', 2)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">3</button>
-                    <button onclick="addFromBank('${s.replace(/'/g, "\\'")}', 3)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">4</button>
+                    <button onclick="openLyricsModal('${safeTitle}', '')" class="text-[10px] bg-gray-700 hover:text-white hover:bg-gray-600 w-6 h-6 rounded flex items-center justify-center" title="View Lyrics">📝</button>
+                    <button onclick="addFromBank('${safeTitle}', 0)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">1</button>
+                    <button onclick="addFromBank('${safeTitle}', 1)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">2</button>
+                    <button onclick="addFromBank('${safeTitle}', 2)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">3</button>
+                    <button onclick="addFromBank('${safeTitle}', 3)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">4</button>
                 </div>
             </div>`;
         }
@@ -1074,6 +1084,9 @@
                             if(meta.c) metaHTML += `<span class="text-[10px] bg-gray-700 text-cyan-400 border border-cyan-500/30 px-1 rounded ml-1 font-mono">Cp ${meta.c}</span>`;
                         }
 
+                        // Safely escape title for onclick attribute
+                        const safeTitle = song.title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
                         listEl.innerHTML += `
                             <li class="group flex items-center justify-between p-3 hover:bg-gray-750 transition border-l-4 border-transparent hover:border-indigo-500 bg-gray-800 odd:bg-gray-800 even:bg-gray-800/50" data-title="${song.title}">
                                 <div class="flex items-center gap-3 overflow-hidden flex-grow">
@@ -1086,7 +1099,7 @@
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-2 flex-shrink-0 no-print">
-                                    <button onclick="openLyricsModal('${song.title.replace(/'/g, "\\'")}', '')" class="text-gray-500 hover:text-white p-1" title="Lyrics/Chords">📝</button>
+                                    <button onclick="openLyricsModal('${safeTitle}', '')" class="text-gray-500 hover:text-white p-1" title="Lyrics/Chords">📝</button>
                                     <button onclick="deleteSong(${i}, ${idx})" class="p-1 hover:text-red-400 text-gray-600 opacity-0 group-hover:opacity-100 transition">×</button>
                                 </div>
                             </li>`;
