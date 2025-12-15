@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Setlist Creator 2.9.4</title>
+    <title>Setlist Creator 2.9.8</title>
     
     <!-- Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -251,8 +251,11 @@
                     console.log("Connected as", user.uid);
                     const statusEl = document.getElementById('firebase-status');
                     if(statusEl) statusEl.innerHTML = '<span class="text-green-400 animate-pulse">● Online</span>';
-                    if(!window.location.search.includes('mode=audience')) startRequestListeners();
-                    startCollaborationListener();
+                    if(!window.location.search.includes('mode=audience')) {
+                        startRequestListeners();
+                        startCollaborationListener();
+                        startRotationListener();
+                    }
                 }
             });
         }
@@ -320,9 +323,99 @@
             });
         }
         
-        // --- COLLABORATION ---
+        // --- CLOUD ROTATION & COLLABORATION ---
         let collaborationUnsubscribe = null;
+        let rotationUnsubscribe = null;
+        window.managerMode = false; // Default: Locked
+
+        // PIN MODAL LOGIC
+        window.toggleManagerMode = () => {
+            if(window.managerMode) {
+                window.managerMode = false;
+                showToast("Manager Mode Locked");
+                renderBank();
+            } else {
+                document.getElementById('pin-modal').classList.remove('hidden');
+                document.getElementById('manager-pin-input').value = '';
+                document.getElementById('manager-pin-input').focus();
+            }
+        };
+
+        window.checkManagerPin = () => {
+            const input = document.getElementById('manager-pin-input');
+            if(input.value === "1234") {
+                window.managerMode = true;
+                showToast("Manager Mode Unlocked! 🔓");
+                document.getElementById('pin-modal').classList.add('hidden');
+                renderBank();
+            } else {
+                showToast("Incorrect PIN", true);
+                input.value = '';
+            }
+        };
+
+        window.closePinModal = () => {
+            document.getElementById('pin-modal').classList.add('hidden');
+        };
         
+        // 1. ACTIVE ROTATION LISTENER
+        function startRotationListener() {
+            if(!db) return;
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'rotation', 'list');
+            rotationUnsubscribe = onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists() && docSnap.data().songs) {
+                    const cloudSongs = docSnap.data().songs;
+                    if(Array.isArray(cloudSongs)) {
+                        activeRotationList = cloudSongs.sort();
+                        window.activeRotationList = activeRotationList; 
+                        
+                        if (currentTab !== 'database' && currentTab !== 'live') renderBank(); 
+                        if (currentTab === 'database') renderBank();
+                    }
+                } else {
+                    console.log("Initializing Cloud Rotation...");
+                    setDoc(docRef, { songs: rawBankData.sort(), lastUpdated: Date.now() });
+                }
+            });
+        }
+
+        // 2. ADD TO ROTATION
+        window.addToRotation = async (songName) => {
+            if(!db) return;
+            if(!window.managerMode) return showToast("Unlock Manager Mode to edit rotation.", true);
+
+            const currentList = window.activeRotationList || activeRotationList;
+            
+            if (!currentList.includes(songName)) {
+                const newList = [...currentList, songName].sort();
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'rotation', 'list');
+                    await setDoc(docRef, { songs: newList, lastUpdated: Date.now() });
+                    showToast("Added to Cloud Rotation");
+                } catch(e) { console.error(e); showToast("Error saving to cloud", true); }
+            } else {
+                showToast("Song already in rotation");
+            }
+        };
+
+        // 3. REMOVE FROM ROTATION (NEW)
+        window.removeFromRotation = async (songName) => {
+            if(!db) return;
+            if(!window.managerMode) return showToast("Unlock Manager Mode to edit rotation.", true);
+            
+            if(!confirm(`Remove "${songName}" from Active Rotation?`)) return;
+
+            const currentList = window.activeRotationList || activeRotationList;
+            const newList = currentList.filter(s => s !== songName).sort();
+            
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'rotation', 'list');
+                await setDoc(docRef, { songs: newList, lastUpdated: Date.now() });
+                showToast("Removed from Cloud Rotation");
+            } catch(e) { console.error(e); showToast("Error saving to cloud", true); }
+        };
+
+        // 4. COLLABORATION LISTENER
         function startCollaborationListener() {
             if (!db) return;
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'collaboration', 'sets');
@@ -332,25 +425,21 @@
                     if (data && data.sets) {
                         try {
                             const parsed = typeof data.sets === 'string' ? JSON.parse(data.sets) : data.sets;
-                            // SANITIZER: Robust Check
                             if (Array.isArray(parsed) && parsed.length === 4) {
-                                // Ensure all 4 items are actually arrays
                                 setCollections.collaborate = parsed.map(s => Array.isArray(s) ? s : []);
                                 if (currentTab === 'collaborate') render();
                             } else {
-                                // Data corrupt or partial - Reset default to empty
                                 setCollections.collaborate = [[],[],[],[]];
                                 if (currentTab === 'collaborate') render();
                             }
                         } catch(e) { 
                             console.error("Parse error", e); 
-                            setCollections.collaborate = [[],[],[],[]]; // Fail safe
+                            setCollections.collaborate = [[],[],[],[]];
                         }
                     }
                 } else {
-                    // Document doesn't exist? Create it to start sync
                     console.log("Initializing Collaboration Doc...");
-                    setCollections.collaborate = [[],[],[],[]]; // Ensure clean state
+                    setCollections.collaborate = [[],[],[],[]]; 
                     window.updateCollaboration();
                 }
             });
@@ -360,11 +449,9 @@
              if (!db) return;
              const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'collaboration', 'sets');
              try {
-                 // Double check before sending
                  if(!setCollections.collaborate || setCollections.collaborate.length !== 4) {
                      setCollections.collaborate = [[],[],[],[]];
                  }
-                 
                  await setDoc(docRef, { 
                      sets: JSON.stringify(setCollections.collaborate), 
                      lastUpdated: Date.now() 
@@ -379,11 +466,8 @@
             const targetSetIndex = 3; 
             const songTitle = artist ? `${song} (${artist})` : song;
             if(window.setCollections) {
-                // If on collaborate tab, save to collaborate set 4, otherwise custom set 4
                 if(currentTab === 'collaborate') {
-                     // Safety check
                      if (!window.setCollections.collaborate[targetSetIndex]) window.setCollections.collaborate[targetSetIndex] = [];
-                     
                      window.setCollections.collaborate[targetSetIndex].push({title: songTitle, durationStr: "0:00"});
                      window.updateCollaboration();
                 } else {
@@ -449,7 +533,7 @@
         <!-- Header -->
         <header class="mb-6 text-center flex flex-col md:flex-row justify-between items-center md:items-end border-b border-gray-700 pb-4 gap-4">
             <div class="text-left w-full md:w-auto flex flex-col items-center md:items-start">
-                <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">Setlist Creator 2.9.4</h1>
+                <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">Setlist Creator 2.9.8</h1>
                 <h2 class="text-sm font-bold text-indigo-300 opacity-75">Active Rotation & Database</h2>
                 <div class="flex flex-col md:flex-row gap-4 mt-2 items-center md:items-start">
                     <p class="text-gray-400 text-sm mt-1">4 Sets • Active Rotation • Full DB</p>
@@ -556,7 +640,13 @@
         <!-- Master Song Bank -->
         <div id="song-bank-section" class="no-print bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden hidden">
             <div class="p-6 bg-gray-800 border-b border-gray-700 flex flex-col md:flex-row justify-between items-center gap-4">
-                <h2 class="text-2xl font-bold text-indigo-400" id="bank-title">Active Rotation</h2>
+                <div class="flex items-center gap-2">
+                    <h2 class="text-2xl font-bold text-indigo-400" id="bank-title">Active Rotation</h2>
+                    <!-- MANAGER LOCK -->
+                    <button onclick="toggleManagerMode()" class="text-gray-500 hover:text-white text-lg transition-colors" title="Manager Access">
+                        <span id="manager-lock-icon">🔒</span>
+                    </button>
+                </div>
                 <div class="flex items-center gap-2">
                     <span id="bank-loading" class="text-xs text-yellow-400 hidden animate-pulse">Syncing...</span>
                     <input type="text" id="bank-search" oninput="renderBank()" class="w-full md:w-64 bg-gray-900 text-white border border-gray-600 rounded-full py-2 px-4 focus:outline-none focus:border-indigo-500 text-sm" placeholder="Search...">
@@ -574,64 +664,14 @@
         </div>
     </div>
 
-    <!-- === AUDIENCE INTERFACE === -->
-    <div id="audience-interface" class="hidden min-h-screen bg-gray-900 p-6 flex flex-col items-center justify-center">
-        <div class="max-w-md w-full space-y-8 text-center">
-            <div><h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-500">Live Requests</h2><p class="mt-2 text-gray-400">Tell the band what you want to hear!</p></div>
-            <div class="bg-gray-800 p-6 rounded-2xl shadow-xl border border-gray-700">
-                <h3 class="font-bold text-yellow-400 mb-3 text-left">Choose from our Song Bank:</h3>
-                <div class="relative mb-6"><div id="audience-bank-list" class="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto border border-gray-700 p-2 rounded-lg bg-gray-900"></div></div>
-                <div class="text-gray-500 uppercase text-xs font-bold mb-4">OR</div>
-                <h3 class="font-bold text-white mb-3 text-left">Request a New Song:</h3>
-                <input id="audience-new-song" type="text" placeholder="Song Name" class="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white mb-3 focus:border-pink-500 outline-none">
-                <input id="audience-artist" type="text" placeholder="Artist (Optional)" class="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white mb-4 focus:border-pink-500 outline-none">
-                <button id="btn-submit-new" onclick="submitNewRequest()" class="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold py-3 rounded-lg transition transform active:scale-95 flex justify-center items-center">Send Request 🚀</button>
-            </div>
-            <div id="request-success" class="hidden text-green-400 font-bold bg-green-900/30 p-4 rounded-lg">Request Sent!</div>
-        </div>
-    </div>
-
-    <!-- === LYRICS MODAL === -->
-    <div id="lyrics-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center backdrop-blur-sm p-4">
-        <div class="bg-gray-800 w-full max-w-4xl h-[90vh] rounded-xl border border-gray-600 shadow-2xl flex flex-col animate-fade-in relative">
-            <!-- Header -->
-            <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900 rounded-t-xl z-20 relative">
-                <div>
-                    <h3 id="lyrics-modal-title" class="text-xl font-bold text-white">Song Title</h3>
-                    <div class="flex items-center gap-2">
-                        <p class="text-xs text-gray-400">Lyrics & Chords</p>
-                        <div id="lyrics-source-badge"></div>
-                    </div>
-                </div>
-                <!-- Controls -->
-                <div class="flex items-center gap-3">
-                    <!-- Scroll Controls -->
-                    <div class="flex items-center bg-gray-800 rounded-lg p-1 border border-gray-700 mr-2">
-                        <button onclick="changeSpeed(10)" class="text-gray-400 hover:text-white px-2 text-sm" title="Slower">🐢</button>
-                        <span id="scroll-speed-display" class="text-xs font-mono font-bold text-indigo-400 w-8 text-center">70%</span>
-                        <button onclick="changeSpeed(-10)" class="text-gray-400 hover:text-white px-2 text-sm" title="Faster">🐇</button>
-                        <div class="w-px h-4 bg-gray-700 mx-1"></div>
-                        <button id="btn-autoscroll" onclick="toggleAutoScroll()" class="text-gray-300 hover:text-white px-3 py-1 rounded bg-gray-700 text-sm font-bold transition-colors border border-gray-600 flex items-center gap-1">
-                            ▶️
-                        </button>
-                    </div>
-
-                    <button onclick="toggleEditMode()" class="text-indigo-400 hover:text-white px-3 py-1 text-sm border border-indigo-500/30 rounded transition-colors">Edit</button>
-                    <button onclick="window.closeLyricsModal()" class="text-gray-400 hover:text-white text-2xl leading-none px-2">&times;</button>
-                </div>
-            </div>
-            
-            <!-- View Mode -->
-            <div id="lyrics-view-mode" class="flex-grow overflow-y-auto p-6 bg-gray-900/50 text-gray-200 scroll-smooth">
-                <div id="lyrics-content" class="text-lg leading-relaxed font-mono"></div>
-            </div>
-            
-            <!-- Edit Mode -->
-            <div id="lyrics-edit-mode" class="hidden flex-grow flex flex-col p-4 bg-gray-900">
-                <textarea id="lyrics-textarea" class="flex-grow w-full bg-gray-800 text-gray-200 font-mono text-sm p-4 border border-gray-700 rounded-lg focus:outline-none focus:border-indigo-500" placeholder="Paste lyrics and chords here..."></textarea>
-                <div class="mt-4 flex justify-end">
-                    <button onclick="saveLyrics()" class="bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition-transform active:scale-95">Save to Cloud</button>
-                </div>
+    <!-- PIN Modal -->
+    <div id="pin-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center backdrop-blur-sm p-4">
+        <div class="bg-gray-800 p-6 rounded-xl border border-gray-600 shadow-2xl w-full max-w-xs text-center">
+            <h3 class="text-xl font-bold text-white mb-4">Manager Access</h3>
+            <input type="password" id="manager-pin-input" class="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white mb-4 text-center tracking-widest text-xl focus:border-indigo-500 outline-none" placeholder="Enter PIN" maxlength="4">
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="checkManagerPin()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-lg">Unlock</button>
+                <button onclick="closePinModal()" class="bg-gray-700 hover:bg-gray-600 text-gray-300 font-bold py-2 rounded-lg">Cancel</button>
             </div>
         </div>
     </div>
@@ -803,6 +843,10 @@
         window.renderBank = () => {
             const searchInput = document.getElementById('bank-search');
             const bankTitle = document.getElementById('bank-title');
+            const lockIcon = document.getElementById('manager-lock-icon');
+            
+            if(lockIcon) lockIcon.textContent = window.managerMode ? '🔓' : '🔒';
+
             const search = searchInput ? searchInput.value.toLowerCase() : ''; 
             const listEl = document.getElementById('bank-list');
             if(!listEl) return;
@@ -854,16 +898,26 @@
                 if(meta.c) metaHTML += `<span class="text-[10px] bg-gray-700 text-cyan-400 border border-cyan-500/30 px-1 rounded ml-1 font-mono">Cp ${meta.c}</span>`;
             }
 
-            // Database Tab Extra: Add to Rotation Button
+            // Database Tab Extra: Add to Rotation Button (PROTECTED)
             let addToRotationBtn = '';
+            let removeBtn = '';
+
             if (showAddButton) {
                 // Check if already in rotation
                 const inRotation = activeRotationList.includes(s);
                 if (!inRotation) {
-                    addToRotationBtn = `<button onclick="addToRotation('${s.replace(/'/g, "\\'")}')" class="text-[10px] bg-indigo-900 text-indigo-200 border border-indigo-700 hover:bg-indigo-700 w-6 h-6 rounded flex items-center justify-center mr-1" title="Add to Active Rotation">⭐</button>`;
+                    if (window.managerMode) {
+                        addToRotationBtn = `<button onclick="addToRotation('${s.replace(/'/g, "\\'")}')" class="text-[10px] bg-indigo-900 text-indigo-200 border border-indigo-700 hover:bg-indigo-700 w-6 h-6 rounded flex items-center justify-center mr-1" title="Add to Active Rotation">⭐</button>`;
+                    } else {
+                        // Hidden in locked mode
+                        addToRotationBtn = '';
+                    }
                 } else {
                     addToRotationBtn = `<span class="text-[10px] text-green-500 w-6 h-6 flex items-center justify-center mr-1">✓</span>`;
                 }
+            } else if (window.managerMode) {
+                // Only show delete in Active Rotation view (not DB view), and only if manager
+                removeBtn = `<button onclick="removeFromRotation('${s.replace(/'/g, "\\'")}')" class="text-[10px] bg-red-900/50 text-red-300 border border-red-800 hover:bg-red-700 w-6 h-6 rounded flex items-center justify-center mr-1" title="Remove from Rotation">🗑️</button>`;
             }
 
             return `
@@ -875,6 +929,7 @@
                 </div>
                 <div class="flex gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
                     ${addToRotationBtn}
+                    ${removeBtn}
                     <button onclick="openLyricsModal('${s.replace(/'/g, "\\'")}', '')" class="text-[10px] bg-gray-700 hover:text-white hover:bg-gray-600 w-6 h-6 rounded flex items-center justify-center" title="View Lyrics">📝</button>
                     <button onclick="addFromBank('${s.replace(/'/g, "\\'")}', 0)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">1</button>
                     <button onclick="addFromBank('${s.replace(/'/g, "\\'")}', 1)" class="text-[10px] bg-gray-700 hover:bg-indigo-600 w-5 h-5 rounded">2</button>
