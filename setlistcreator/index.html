@@ -329,12 +329,13 @@
             collaborationUnsubscribe = onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    // Fix: Handle stringified JSON to avoid nested array errors
                     if (data && data.sets) {
                         try {
                             const parsed = typeof data.sets === 'string' ? JSON.parse(data.sets) : data.sets;
-                            if (Array.isArray(parsed) && parsed.length === 4) {
-                                setCollections.collaborate = parsed;
+                            // SANITIZER: Ensure we always have 4 sets
+                            if (Array.isArray(parsed)) {
+                                while (parsed.length < 4) parsed.push([]);
+                                setCollections.collaborate = parsed.slice(0, 4); // Clamp to 4
                                 if (currentTab === 'collaborate') render();
                             }
                         } catch(e) { console.error("Parse error", e); }
@@ -351,7 +352,9 @@
              if (!db) return;
              const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'collaboration', 'sets');
              try {
-                 // Fix: Stringify nested arrays before saving to Firestore
+                 // Ensure we have 4 sets before saving
+                 while(setCollections.collaborate.length < 4) setCollections.collaborate.push([]);
+                 
                  await setDoc(docRef, { 
                      sets: JSON.stringify(setCollections.collaborate), 
                      lastUpdated: Date.now() 
@@ -411,7 +414,11 @@
         ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
         .sortable-ghost { opacity: 0.4; background: #374151; }
-        .drag-handle { cursor: grab; }
+        .drag-handle { 
+            cursor: grab; 
+            padding: 8px 12px; /* Increased touch target */
+            font-size: 1.2rem;
+        }
         .drag-handle:active { cursor: grabbing; }
         @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
@@ -1012,7 +1019,15 @@
             
             for(let i=0; i<4; i++) {
                 const el = document.getElementById(`list-set-${i}`);
-                if(el) sortables.push(new Sortable(el, { group: 'shared', animation: 150, handle: '.drag-handle', ghostClass: 'sortable-ghost', onEnd: handleDragDrop }));
+                if(el) sortables.push(new Sortable(el, { 
+                    group: 'shared', 
+                    animation: 200, 
+                    delay: 200, 
+                    delayOnTouchOnly: true,
+                    handle: '.drag-handle', 
+                    ghostClass: 'sortable-ghost', 
+                    onEnd: handleDragDrop 
+                }));
             }
         }
 
@@ -1315,16 +1330,19 @@
                 const data = await res.json();
 
                 if (data.resultCount > 0) {
-                     // Check if any result actually contains the input string
-                     // This prevents "zorbert" from matching "Robert" if fuzzy matching isn't what we want
-                     // We want to ensure at least a partial loose match of the TITLE
-                     const validMatch = data.results.some(result => {
+                     // Check if any result actually contains the input string WHOLE WORD
+                     const validMatch = data.results.find(result => {
                          const track = result.trackName.toLowerCase();
-                         return track.includes(lowerSong) || lowerSong.includes(track);
+                         // Match start of string, end of string, or surrounded by whitespace
+                         const regex = new RegExp('(^|\\s)' + window.sanitizeId(lowerSong).replace(/_/g, ' ') + '(\\s|$)', 'i');
+                         return track.includes(lowerSong) || regex.test(track);
                      });
                      
                      if(validMatch) {
-                         await processRequest(song, artist, 'new');
+                         // If valid match found, use THAT artist if user didn't provide one
+                         // This helps avoid "Snake" looking like nonsense when it's "Snake (Artist Name)"
+                         const finalArtist = artist || validMatch.artistName;
+                         await processRequest(song, finalArtist, 'new');
                      } else {
                          showToast("Could not verify this song exists. Please check spelling.", true);
                      }
