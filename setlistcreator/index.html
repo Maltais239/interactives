@@ -512,6 +512,20 @@
         
         window.deleteRequest = deleteRequest;
         window.clearAllRequests = clearAllRequests;
+        
+        window.copyAudienceLink = () => {
+            const audienceUrl = window.location.href + (window.location.href.includes('?') ? '&' : '?') + "mode=audience";
+            
+            // Temporary input to copy text
+            const tempInput = document.createElement("input");
+            tempInput.value = audienceUrl;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+            
+            showToast("🔗 Link copied to clipboard!");
+        };
     </script>
 
     <style>
@@ -532,6 +546,7 @@
         .spinner { width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s linear infinite; margin-right: 5px; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .audience-song-button:active { transform: scale(0.98); }
+        .glass { background: rgba(31, 41, 55, 0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen font-sans selection:bg-indigo-500 selection:text-white pb-20">
@@ -603,7 +618,10 @@
                 <div class="bg-gray-800 p-6 rounded-xl border border-yellow-500/30 shadow-lg shadow-yellow-900/10 flex flex-col items-center justify-center text-center">
                     <h3 class="text-yellow-400 font-bold text-lg mb-2">Audience Access</h3>
                     <div class="bg-white p-4 rounded-lg mb-4"><div id="qrcode"></div></div>
-                    <p class="text-gray-400 text-xs">Scan to Request Songs</p>
+                    <button onclick="copyAudienceLink()" class="mt-2 bg-yellow-600 hover:bg-yellow-500 text-white text-xs font-bold py-1 px-3 rounded-full transition flex items-center gap-1">
+                        <span>🔗</span> Copy Link
+                    </button>
+                    <p class="text-gray-400 text-xs mt-3">Scan to Request Songs</p>
                 </div>
                 <div class="md:col-span-2 bg-gray-800 p-6 rounded-xl border border-gray-700 flex flex-col h-[400px]">
                     <div class="flex justify-between items-center mb-4 pb-2 border-b border-gray-700">
@@ -674,34 +692,35 @@
     </div>
 
     <!-- === AUDIENCE INTERFACE (Mobile First) === -->
-    <div id="audience-interface" class="hidden min-h-screen bg-gray-900 p-4 pb-20">
+    <div id="audience-interface" class="hidden min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-black p-4 pb-20">
         <div class="max-w-md mx-auto">
-            <header class="text-center mb-6 pt-4">
-                <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 to-red-500">Request A Song</h1>
-                <p class="text-gray-400 text-sm">Tap a song to request it live!</p>
+            <header class="text-center mb-6 pt-6">
+                <h1 class="text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 to-pink-500 drop-shadow-sm">Request A Song</h1>
+                <p class="text-indigo-200 text-sm mt-1 font-medium">Tap a song to request it live!</p>
             </header>
 
             <!-- Success Message -->
-            <div id="request-success" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-full shadow-xl z-50 flex items-center gap-2 animate-bounce">
+            <div id="request-success" class="hidden fixed top-6 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-8 py-4 rounded-full shadow-2xl z-50 flex items-center gap-2 animate-bounce font-bold border-2 border-green-400">
                 <span>✅ Request Sent!</span>
             </div>
 
             <!-- Custom Request Form -->
-            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-6">
-                <h3 class="font-bold text-white mb-3">Can't find it? Request something new:</h3>
+            <div class="glass p-5 rounded-2xl border border-white/10 shadow-xl mb-6">
+                <h3 class="font-bold text-white mb-3 text-sm uppercase tracking-wide opacity-80">Can't find it? Request something new:</h3>
                 <div class="space-y-3">
-                    <input type="text" id="audience-new-song" placeholder="Song Title" class="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white focus:border-indigo-500 outline-none">
-                    <input type="text" id="audience-artist" placeholder="Artist (Optional)" class="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white focus:border-indigo-500 outline-none">
-                    <button id="btn-submit-new" onclick="submitNewRequest()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg shadow-lg">Send Request</button>
+                    <input type="text" id="audience-new-song" placeholder="Song Title" class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white placeholder-gray-500 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 outline-none transition-all">
+                    <input type="text" id="audience-artist" placeholder="Artist (Optional)" class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white placeholder-gray-500 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 outline-none transition-all">
+                    <button id="btn-submit-new" onclick="submitNewRequest()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3.5 rounded-xl shadow-lg transform active:scale-95 transition-all">Send Request</button>
                 </div>
             </div>
 
             <!-- Song Bank -->
-            <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-                <div class="p-3 bg-gray-750 border-b border-gray-700 font-bold text-gray-400 text-sm uppercase tracking-wide">
-                    Available Songs
+            <div class="glass rounded-2xl border border-white/10 overflow-hidden shadow-2xl flex flex-col h-[60vh]">
+                <div class="p-4 bg-black/40 border-b border-white/10 flex justify-between items-center">
+                    <span class="font-bold text-gray-300 text-sm uppercase tracking-wide">Available Songs</span>
+                    <span class="text-xs text-indigo-400 bg-indigo-900/50 px-2 py-1 rounded-full border border-indigo-700/50">Scroll to browse</span>
                 </div>
-                <div id="audience-bank-list" class="max-h-[60vh] overflow-y-auto">
+                <div id="audience-bank-list" class="overflow-y-auto flex-grow p-1 space-y-1">
                     <!-- Populated by JS -->
                 </div>
             </div>
@@ -1546,6 +1565,20 @@
                 setTimeout(() => document.getElementById('request-success').classList.add('hidden'), 3000);
             }
         }
+        
+        window.copyAudienceLink = () => {
+            const audienceUrl = window.location.href + (window.location.href.includes('?') ? '&' : '?') + "mode=audience";
+            
+            // Temporary input to copy text
+            const tempInput = document.createElement("input");
+            tempInput.value = audienceUrl;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+            
+            showToast("🔗 Link copied to clipboard!");
+        };
 
         // --- INIT ---
         window.addEventListener('load', () => {
