@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORE Reading Maze Comprehension Test</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Noto Sans', sans-serif;
+            line-height: 1.5;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+
+        .document-container {
+            max-width: 8.5in;
+            margin: 0 auto;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            padding-bottom: 20px;
+        }
+
+        /* Screen-only instruction banner */
+        .instruction-banner {
+            background-color: #e8f0fe;
+            color: #1a73e8;
+            border: 1px solid #d2e3fc;
+            padding: 15px;
+            margin: 20px auto;
+            max-width: 8.5in;
+            text-align: center;
+            border-radius: 4px;
+            font-family: sans-serif;
+        }
+
+        .page {
+            position: relative;
+            width: 8.5in;
+            min-height: 11in;
+            padding: 0.75in;
+            box-sizing: border-box;
+            background: white;
+            /* CRITICAL: visible overflow ensures pages don't get cut off in print */
+            overflow: visible; 
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+            page-break-after: always;
+        }
+
+        /* Stronger Print Overrides */
+        @media print {
+            @page {
+                margin: 0.5in;
+                size: letter;
+            }
+
+            html, body {
+                height: auto;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                background-color: white !important;
+                overflow: visible !important;
+            }
+
+            /* Hide instructions when printing */
+            .instruction-banner {
+                display: none !important;
+            }
+
+            .document-container {
+                width: 100%;
+                margin: 0;
+                box-shadow: none;
+                background-color: white !important;
+                /* Ensure container doesn't restrict flow */
+                display: block !important; 
+            }
+
+            .page {
+                margin: 0;
+                border: none;
+                width: 100%;
+                min-height: auto;
+                height: auto;
+                padding: 0; 
+                padding-top: 0.25in;
+                page-break-after: always;
+                break-after: page;
+                overflow: visible !important;
+                /* Remove positioning to avoid clipping bugs */
+                position: static !important; 
+            }
+
+            /* Flatten grid for printing to ensure sidebar doesn't get cut */
+            .layout-grid {
+                display: block !important;
+            }
+            .sidebar-info {
+                page-break-inside: avoid;
+                margin-bottom: 20px;
+                border: 1px solid #eee;
+            }
+
+            .footer-number {
+                position: static;
+                margin-top: 20px;
+                page-break-after: always;
+            }
+        }
+
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        
+        h1 { font-size: 24px; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-bottom: 20px; }
+        h2 { font-size: 18px; margin-top: 20px; border-bottom: 1px solid #eee; }
+        h4 { font-size: 16px; margin-bottom: 5px; color: #555; text-transform: uppercase; }
+
+        p { margin-bottom: 15px; text-align: justify; }
+
+        .layout-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 30px;
+        }
+        .sidebar-info {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .sidebar-item { margin-bottom: 15px; }
+        .sidebar-label { font-weight: bold; display: block; color: #555; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 0.9em;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        th { background-color: #f2f2f2; font-weight: bold; }
+
+        .passage-header {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #000;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+        .passage-content {
+            font-size: 1.1em;
+            line-height: 1.8;
+        }
+        .maze-options {
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            background: #eee;
+            padding: 0 4px;
+            border-radius: 4px;
+        }
+        
+        /* Answer Keys Columns */
+        .key-container {
+            column-count: 2;
+            column-gap: 40px;
+        }
+        .key-section {
+            break-inside: avoid;
+            margin-bottom: 20px;
+        }
+        .key-list {
+            list-style: none;
+            padding: 0;
+            font-size: 0.9em;
+        }
+        .key-list li {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px dotted #ccc;
+            padding: 2px 0;
+        }
+
+        .footer-number {
+            position: absolute;
+            bottom: 30px;
+            left: 0; 
+            right: 0;
+            text-align: center;
+            font-size: 0.8em;
+            color: #777;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+            margin: 0 0.75in;
+        }
+        
+        .script-text {
+            font-style: italic;
+            background: #fdfbe6; 
+            padding: 10px;
+            border-left: 3px solid #f1c40f;
+            margin: 10px 0;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="instruction-banner">
+    <strong>Printing Tip:</strong> This document is formatted for print. <br>
+    If you cannot print directly from this window, <strong>copy the code</strong>, save it as an <code>.html</code> file on your computer, and open it in your browser to print.
+</div>
+
+<div class="document-container">
+
+    <!-- PAGE 150 -->
+    <div class="page" id="page-150">
+        <h1>CORE Reading Maze Comprehension Test</h1>
+        
+        <div class="layout-grid">
+            <!-- Left Sidebar Info -->
+            <div class="sidebar-info">
+                <div class="sidebar-item">
+                    <span class="sidebar-label">SKILL ASSESSED</span>
+                    Reading Comprehension
+                </div>
+                <div class="sidebar-item">
+                    <span class="sidebar-label">Grade Level</span>
+                    2-10
+                </div>
+                <div class="sidebar-item">
+                    <span class="sidebar-label">Language</span>
+                    English
+                </div>
+                <div class="sidebar-item">
+                    <span class="sidebar-label">Grouping</span>
+                    Individual/Group
+                </div>
+                <div class="sidebar-item">
+                    <span class="sidebar-label">Time</span>
+                    Approx. 3 Minutes
+                </div>
+                <div class="sidebar-item">
+                    <span class="sidebar-label">Materials</span>
+                    • Appropriate passage<br>
+                    • Stopwatch<br>
+                    • Pencils
+                </div>
+                <div class="sidebar-item">
+                    <span class="sidebar-label">Author</span>
+                    Michael Milone, Ph.D.
+                </div>
+            </div>
+
+            <!-- Right Content -->
+            <div>
+                <h4>► WHAT</h4>
+                <p>A maze reading assessment is a task that measures how well students understand text they read silently. The maze task differs from traditional comprehension in that it is based completely on the text. After the first sentence, every seventh word in the passage is replaced with the correct word and two distracters. Students choose the word from among the three choices that fits best with the rest of the passage.</p>
+
+                <h4>► WHY</h4>
+                <p>Capable readers understand the syntax of what they read and the meanings of the words as they are used in the text. Some students with reading difficulties can't comprehend what they read well enough to choose words based on semantic and syntactic accuracy. A maze reading assessment can identify these students and measure changes in their reading behaviors as the result of instruction or practice.</p>
+
+                <h4>► HOW</h4>
+                <p>Students read one passage that has been modified in a specific way. The first sentence of the passage is left intact to provide a meaningful start to the reading. For the rest of the passage, every seventh word is replaced with parentheses in which are found the correct word from the passage and two distracters arranged randomly. The student circles one word within the parentheses that makes sense with the rest of the passage.</p>
+                <p>Neither of the distracters maintains the meaning of the passage. One is a near distracter that is the same part of speech or otherwise resembles the correct word. The other is a far distracter that is chosen randomly from a pool of words that are comparable to the words in the passage.</p>
+                <p>The length of the passages varies from around 150 to 400 words; the passage is chosen depending on the grade placement or reading ability of the student.</p>
+            </div>
+        </div>
+        
+        <div class="footer-number">150 CORE READING MAZE COMPREHENSION TEST</div>
+    </div>
+
+    <!-- PAGE 151 -->
+    <div class="page" id="page-151">
+        <p>The student has three minutes to complete the task (reading the passage). The student's score is the number of correct words circled in three minutes. The grade levels and titles of the passages are shown below. For each grade, two equivalent passages (A and B) are provided; these may be used for pre- / post-testing and/or progress monitoring. Passages are provided starting on page 158.</p>
+
+        <p>A Teaching Passage is also provided (on page 156) to use with students who may not understand the task initially; you may use that passage (and that passage only) to teach the task if necessary. Administration instructions to be used with the teaching passage are on page 155.</p>
+
+        <h3>List of Passages at each Grade Level</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Grade</th>
+                    <th>A</th>
+                    <th>B</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>2</td><td>A City Walk</td><td>Rabbits in the Garden</td></tr>
+                <tr><td>3</td><td>Their First Train Ride</td><td>The Fish Kite</td></tr>
+                <tr><td>4</td><td>Playing the Game</td><td>The Best Picture</td></tr>
+                <tr><td>5</td><td>The Big Move</td><td>A Great Day</td></tr>
+                <tr><td>6</td><td>Not So Boring</td><td>The Morning News</td></tr>
+                <tr><td>7</td><td>The People at the Top of the Hill</td><td>The Islanders</td></tr>
+                <tr><td>8</td><td>Basketball Saturday</td><td>The Perfect Trip</td></tr>
+                <tr><td>9</td><td>A Circle of Friends</td><td>A Strange Place to Practice</td></tr>
+                <tr><td>10</td><td>Their First Century</td><td>College Girl</td></tr>
+            </tbody>
+        </table>
+
+        <p>Give each student a copy of the appropriate maze passage. Be sure each student has a pencil. Have the students write their names and the date on the page. Ask the students to put the passage face-down on the desk. Read the directions below to the students.</p>
+
+        <div class="script-text">
+            <strong>Say:</strong> "For this activity you will read a special kind of story. Some of the words in the story have been replaced with a group of three words. You are to decide which word in each group fits best in the story. You will circle the word you think is best."
+        </div>
+
+        <div class="footer-number">CORE READING MAZE COMPREHENSION TEST 151</div>
+    </div>
+
+    <!-- PAGE 152 -->
+    <div class="page" id="page-152">
+        <p>Be sure the students understand the task. (You may restate the directions, if necessary).</p>
+
+        <div class="script-text">
+            <strong>Say:</strong> "When I tell you to begin, read the story to yourself. When you come to each group of three words, circle the word that fits best with the rest of the story. Work quickly, but not so fast that you make mistakes. Think about the word in each group that is correct. Circle this word and continue working. If you see the words GO ON at the bottom of a page, go on to the next page.<br><br>
+            You will have three minutes. After three minutes, I will say 'Stop working.' If you finish before the three minutes are up, you can check your work. Do you have any questions?" (Answer any questions the students have.) "Turn your papers over. You may begin."
+        </div>
+
+        <p>Start timing and allow three minutes. Check the students as they work to be sure the students understand the task, but do not help them choose any answers. For passages that are more than one page long, remind the students to go on to the next page when they see the words "GO ON".</p>
+
+        <div class="script-text">
+            When three minutes have elapsed, <strong>say:</strong> "Stop working now. Thank you for completing the activity."
+        </div>
+
+        <p>Collect the completed maze assessments.</p>
+
+        <h3>Scoring the Maze Reading Assessment</h3>
+        <p>Compare the student's responses to the answer key (provided on pages 176-180) for the passage. Count any correct answer that is circled, underlined, or otherwise indicated. Put a check beside each correct response and a line through each incorrect response. Record the number of correct responses and number of errors on the corresponding lines at the bottom of the page.<br>
+        For ninth and tenth grade students, use eighth grade scoring.<br>
+        An example of a scored passage is provided on page 157.</p>
+
+        <div class="footer-number">152 CORE READING MAZE COMPREHENSION TEST</div>
+    </div>
+
+    <!-- PAGE 153 -->
+    <div class="page" id="page-153">
+        <h3>Normative Data</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Grade</th>
+                    <th>Performance</th>
+                    <th>Fall</th>
+                    <th>Winter</th>
+                    <th>Spring</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><strong>2</strong></td><td>Benchmark</td><td>4</td><td>10</td><td>13</td></tr>
+                <tr><td></td><td>Strategic</td><td>2</td><td>6</td><td>9</td></tr>
+                <tr><td></td><td>Intensive</td><td>1</td><td>3</td><td>5</td></tr>
+                <tr><td><strong>3</strong></td><td>Benchmark</td><td>11</td><td>13</td><td>15</td></tr>
+                <tr><td></td><td>Strategic</td><td>8</td><td>9</td><td>10</td></tr>
+                <tr><td></td><td>Intensive</td><td>5</td><td>6</td><td>7</td></tr>
+                <tr><td><strong>4</strong></td><td>Benchmark</td><td>13</td><td>16</td><td>19</td></tr>
+                <tr><td></td><td>Strategic</td><td>10</td><td>12</td><td>14</td></tr>
+                <tr><td></td><td>Intensive</td><td>5</td><td>8</td><td>9</td></tr>
+                <tr><td><strong>5</strong></td><td>Benchmark</td><td>15</td><td>17</td><td>20</td></tr>
+                <tr><td></td><td>Strategic</td><td>12</td><td>15</td><td>18</td></tr>
+                <tr><td></td><td>Intensive</td><td>8</td><td>10</td><td>12</td></tr>
+                <tr><td><strong>6</strong></td><td>Benchmark</td><td>16</td><td>18</td><td>21</td></tr>
+                <tr><td></td><td>Strategic</td><td>10</td><td>13</td><td>14</td></tr>
+                <tr><td></td><td>Intensive</td><td>7</td><td>9</td><td>10</td></tr>
+                <tr><td><strong>7</strong></td><td>Benchmark</td><td>17</td><td>19</td><td>22</td></tr>
+                <tr><td></td><td>Strategic</td><td>13</td><td>14</td><td>15</td></tr>
+                <tr><td></td><td>Intensive</td><td>9</td><td>10</td><td>12</td></tr>
+                <tr><td><strong>8</strong></td><td>Benchmark</td><td>18</td><td>20</td><td>22</td></tr>
+                <tr><td></td><td>Strategic</td><td>14</td><td>15</td><td>17</td></tr>
+                <tr><td></td><td>Intensive</td><td>10</td><td>11</td><td>13</td></tr>
+            </tbody>
+        </table>
+
+        <h4>► WHAT IT MEANS</h4>
+        <p>The results of the maze assessment are reported as the number of correct replacements. This measure is consistent across assessment passages and grades, so a student's understanding of the text can be compared to prior or subsequent assessments and with other students in the same grade. A student with few correct responses may be experiencing reading difficulties, so the measure can be used for screening. Over time, the number of correct responses should increase as the student is able to read more text in the same period of time and understand it better.</p>
+
+        <div class="footer-number">153 CORE READING MAZE COMPREHENSION TEST</div>
+    </div>
+
+    <!-- PAGE 154 -->
+    <div class="page" id="page-154">
+        <p>The scoring table on p.153 shows typical grade-level expectations for the number of correct replacements in a maze assessment. If the assessment is used for screening purposes, a reasonable guideline is that students whose score is significantly lower than expected (about half of the values shown in the table), will probably be having reading difficulties. If scores fall between those shown on the scoring table, teachers should take into account other sources of information in order to make instructional decisions.</p>
+        
+        <p>For progress monitoring purposes, the maze assessment may be used more than once if the students receive no feedback about their responses. Goal setting can be accomplished using the information in the table. Typical students will show a score increase from the beginning to the end of the school year.</p>
+
+        <h4>► WHAT'S NEXT?</h4>
+        <p>A useful strategy to improve students' understanding of text is to pair reading with comprehension checks through peer questions, summarization, or retelling. Another good strategy is to create practice maze passages or have the students create the passages. Have the students collaborate to read the passages and choose the correct words. Ask the students to explain to one another why the correct answer fits best with the rest of the selection. If capable cross-age or adult readers are available, they can discuss why certain words don't fit because they are the wrong part of speech and why others don't match the meaning of the text.</p>
+
+        <div class="footer-number">154 CORE READING MAZE COMPREHENSION TEST</div>
+    </div>
+
+    <!-- PAGE 155 -->
+    <div class="page" id="page-155">
+        <h3>Teaching Passage Administration (Optional)</h3>
+        <p>Use this passage to teach the task to some younger students or older students with reading difficulties who may need a practice (teaching) activity before attempting the maze assessment. For these students, duplicate the teaching passage on page 156 and distribute it to the student/s. Be sure each student has a pencil. The directions are below.</p>
+
+        <div class="script-text">
+            <strong>Say:</strong> "For this activity, you will read a special kind of story. Some of the words in the story have been replaced with a group of three words. You are to decide which word in each group fits best in the story. You will circle the word you think is best."
+        </div>
+
+        <div class="script-text">
+            "We will begin with the practice story I gave you. Read the first sentence to yourself while I read it out loud."<br>
+            <em>The bird landed on the ground.</em>
+        </div>
+
+        <div class="script-text">
+            "Now read the second sentence."<br>
+            <em>It picked up a piece of (book, grass, tired) in its bill.</em><br>
+            "The word grass fits best with the rest of the story. Draw a circle around the word grass." (Check to be sure the students have circled the correct word.)
+        </div>
+
+        <div class="script-text">
+            "Let's read the next sentence."<br>
+            <em>The bird flew (back, when, shirt) to its nest.</em><br>
+            "Which word fits best in the sentence?" (Encourage a volunteer to choose the correct answer.) "Yes, the word back is correct. Draw a circle around the word back."
+        </div>
+
+        <div class="script-text">
+            "For the last sentence, I want you to read it to yourself and circle the word that fits best in the sentence. Work quickly, but not so fast that you make mistakes. Now read the sentence and circle the word." (Allow time for the students to read the sentence and circle the word.)
+        </div>
+
+        <div class="script-text">
+            "The third word, the, is correct. If you circled another word, cross out your answer and circle the now."
+        </div>
+
+        <p>Check to be sure the students have circled the correct answer. It may be helpful to read the passage aloud with the correct words in place to ensure that the students understand the task.</p>
+        
+        <div class="footer-number">155 CORE READING MAZE COMPREHENSION TEST</div>
+    </div>
+
+    <!-- PAGE 156: TEACHING PASSAGE -->
+    <div class="page" id="page-156">
+        <h1>Teaching Passage</h1>
+        <br><br>
+        <div class="passage-content" style="font-size: 1.4em; line-height: 2;">
+            <p>The bird landed on the ground.</p>
+            <p>It picked up a piece of (book, grass, tired) in its bill.</p>
+            <p>The bird flew (back, when, shirt) to its nest with the grass.</p>
+            <p>(Rug, So, The) nest was in a tall pine tree.</p>
+        </div>
+        
+        <div class="footer-number">156 CORE READING MAZE COMPREHENSION TEST</div>
+    </div>
+
+    <!-- PAGE 157: EXAMPLE SCORED -->
+    <div class="page" id="page-157">
+        <h2>Example of a Scored Passage</h2>
+        <h3>A City Walk</h3>
+        <div class="passage-content">
+            <p>The light changed to green, and Ted and his mother walked across the street. They were on their way to (<span style="text-decoration: line-through;">for</span>, <strong>the</strong>, <span style="text-decoration: line-through;">met</span>) food store.</p>
+            <p>Ted liked walking to (<span style="text-decoration: line-through;">and</span>, <span style="text-decoration: line-through;">is</span>, <strong>the</strong>) store. The city was a busy (<strong>place</strong>, <span style="text-decoration: line-through;">hat</span>, <span style="text-decoration: line-through;">want</span>). He saw lots of different things. (<span style="text-decoration: line-through;">Them</span>, <strong>He</strong>, <span style="text-decoration: line-through;">Say</span>) also saw many of the people (<span style="text-decoration: line-through;">bad</span>, <span style="text-decoration: line-through;">fat</span>, <strong>who</strong>) worked near his house.</p>
+            <p>"Hello Ted, (<span style="text-decoration: line-through;">once</span>, <strong>hello</strong>, <span style="text-decoration: line-through;">you</span>) Mrs. Gomez," said Mr. Hill. He (<span style="text-decoration: line-through;">grow</span>, <strong>happy</strong>, <strong>was</strong>) standing outside his store. He sold (<strong>books</strong>, <span style="text-decoration: line-through;">name</span>, <span style="text-decoration: line-through;">stay</span>). On rainy days after school, Ted (<span style="text-decoration: line-through;">bark</span>, <strong>would</strong>, <span style="text-decoration: line-through;">cold</span>) visit the store. Mr. Hill would (<strong>show</strong>, <span style="text-decoration: line-through;">ride</span>, <span style="text-decoration: line-through;">frog</span>) him books that he thought Ted (<span style="text-decoration: line-through;">got</span>, <span style="text-decoration: line-through;">glad</span>, <strong>would</strong>) like.</p>
+            <p>A little bit later, the (<span style="text-decoration: line-through;">mat</span>, <strong>two</strong>, <span style="text-decoration: line-through;">soon</span>) of them reached the food store. (<strong>Mrs.</strong>, <span style="text-decoration: line-through;">How</span>, <span style="text-decoration: line-through;">Noise</span>) King ran the store, and she (<span style="text-decoration: line-through;">but</span>, <span style="text-decoration: line-through;">truck</span>, <strong>always</strong>) had a special treat for Ted. (<strong>Today</strong>, <span style="text-decoration: line-through;">Little</span>, <span style="text-decoration: line-through;">Paint</span>), she gave him some fresh grapes. (<span style="text-decoration: line-through;">day</span>, <span style="text-decoration: line-through;">be</span>, <strong>Ted</strong>) thanked her and shared the grapes (<span style="text-decoration: line-through;">out</span>, <strong>with</strong>, <span style="text-decoration: line-through;">fish</span>) his mother. She said they were (<span style="text-decoration: line-through;">just</span>, <strong>the</strong>, <span style="text-decoration: line-through;">chair</span>) best grapes she had ever tasted. (<strong>Ted</strong>, <span style="text-decoration: line-through;">Girl</span>, <span style="text-decoration: line-through;">See</span>) thought they were really good, too. (<span style="text-decoration: line-through;">Let</span>, <span style="text-decoration: line-through;">Cry</span>, <strong>Then</strong>) Ted and his mother got a (<span style="text-decoration: line-through;">duck</span>, <strong>cart</strong>, <span style="text-decoration: line-through;">late</span>) and started their shopping.</p>
+        </div>
+        
+        <div style="margin-top: 40px; font-weight: bold;">
+            Number Correct: 11<br>
+            Number of Errors: 3
+        </div>
+
+        <div class="footer-number">157 CORE READING MAZE COMPREHENSION TEST</div>
+    </div>
+
+    <!-- PAGE 158: 2-A -->
+    <div class="page" id="page-158">
+        <div class="passage-header">
+            <div>Name ________________________</div>
+            <div>CORE Reading Maze Comprehension 2-A</div>
+        </div>
+        <div class="passage-header">
+            <div>Grade ______</div>
+            <div>Date ______</div>
+        </div>
+        
+        <h2 style="text-align: center;">A City Walk</h2>
+        
+        <div class="passage-content">
+            <p>The light changed to green, and Ted and his mother walked across the street. They were on their way to (for, the, met) food store.</p>
+            <p>Ted liked walking to (and, is, the) store. The city was a busy (place, hat, want). He saw lots of different things. (Them, He, Say) also saw many of the people (bad, fat, who) worked near his house.</p>
+            <p>"Hello Ted, (once, hello, you) Mrs. Gomez," said Mr. Hill. He (grow, happy, was) standing outside his store. He sold (books, name, stay). On rainy days after school, Ted (bark, would, cold) visit the store. Mr. Hill would (show, ride, frog) him books that he thought Ted (got, glad, would) like.</p>
+            <p>A little bit later, the (mat, two, soon) of them reached the food store. (Mrs., How, Noise) King ran the store, and she (but, truck, always) had a special treat for Ted. (Today, Little, Paint), she gave him some fresh grapes. (Day, Be, Ted) thanked her and shared the grapes (out, with, fish) his mother. She said they were (just, the, chair) best grapes she had ever tasted. (Ted, Girl, See) thought they were really good, too. (Let, Cry, Then) Ted and his mother got a (duck, cart, late) and started their shopping.</p>
+        </div>
+
+        <div style="margin-top: 50px;">
+            Number Correct ______<br>
+            Number of Errors ______
+        </div>
+        <div class="footer-number">158 CORE READING MAZE COMPREHENSION TEST</div>
+    </div>
+
+    <!-- PAGE 159: 2-B -->
+    <div class="page" id="page-159">
+        <div class="passage-header">
+            <div>Name ________________________</div>
+            <div>CORE Reading Maze Comprehension 2-B</div>
+        </div>
+        <div class="passage-header">
+            <div>Grade ______</div>
+            <div>Date ______</div>
+        </div>
+        
+        <h2 style="text-align: center;">Rabbits in the Garden</h2>
+        
+        <div class="passage-content">
+            <p>The rabbit hopped across the lawn. It looked around carefully. Then it (following, hopped, shorter) to the garden. Fred and his (pen, full, mother) sat on the porch. They didn't (sent, quick, move) at all. They were watching the (rabbit, balloon, fight).</p>
+            <p>"Won't the rabbit eat your plants?" (drown, whispered, tricky) Fred.</p>
+            <p>"Maybe," said Mother. "But I (splash, nest, have) lots of plants. I don't mind (so, if, band) the rabbit eats a few leaves." (By, At, Two) now, the rabbit had reached the (lunch, garden, seven). It sniffed the air before hopping (with, over, flied) to a plant. The plant had (pretty, glad, keep) green leaves and purple flowers. The (dinner, clip, rabbit) nibbled some of the leaves.</p>
+            <p>Mother (bought, tapped, thing) Fred on the arm. She pointed (to, until, duck) the lawn. Two baby rabbits were (thanked, hopping, book) across the grass. Soon they reached (the, shiny, mail) garden and hurried over to the (many, card, big) rabbit. Each of the little rabbits (whisper, sniffed, gold) the big rabbit's nose.</p>
+            <p>"I'm glad (them, duck, you) didn't chase the big rabbit away," (said, climb, truck) Fred.</p>
+        </div>
+
+        <div style="margin-top: 50px;">
+            Number Correct ______<br>
+            Number of Errors ______
+        </div>
+        <div class="footer-number">159 CORE READING MAZE COMPREHENSION TEST</div>
+    </div>
+
+    <!-- PAGE 176: KEYS -->
+    <div class="page" id="page-176">
+        <h2>CORE READING MAZE COMPREHENSION KEY</h2>
+        
+        <div class="key-container">
+            <!-- 2-A -->
+            <div class="key-section">
+                <h3>2-A</h3>
+                <ul class="key-list">
+                    <li><span>Line 3</span> <strong>the</strong></li>
+                    <li><span>Line 5</span> <strong>the</strong></li>
+                    <li><span>Line 6</span> <strong>place</strong></li>
+                    <li><span>Line 7</span> <strong>who</strong></li>
+                    <li><span>Line 9</span> <strong>hello</strong></li>
+                    <li><span>Line 10</span> <strong>was</strong></li>
+                    <li><span>Line 11</span> <strong>would</strong></li>
+                    <li><span>Line 12</span> <strong>show</strong></li>
+                    <li><span>Line 13</span> <strong>would</strong></li>
+                    <li><span>Line 14</span> <strong>two</strong></li>
+                    <li><span>Line 15</span> <strong>Mrs.</strong></li>
+                    <li><span>Line 16</span> <strong>always</strong></li>
+                    <li><span>Line 17</span> <strong>Ted</strong></li>
+                    <li><span>Line 18</span> <strong>with</strong></li>
+                    <li><span>Line 19</span> <strong>the</strong></li>
+                    <li><span>Line 20</span> <strong>Then</strong></li>
+                    <li><span>Line 21</span> <strong>cart</strong></li>
+                </ul>
+            </div>
+
+            <!-- 2-B -->
+            <div class="key-section">
+                <h3>2-B</h3>
+                <ul class="key-list">
+                    <li><span>Line 3</span> <strong>hopped</strong></li>
+                    <li><span>Line 4</span> <strong>mother</strong></li>
+                    <li><span>Line 5</span> <strong>move</strong></li>
+                    <li><span>Line 6</span> <strong>rabbit</strong></li>
+                    <li><span>Line 7</span> <strong>whispered</strong></li>
+                    <li><span>Line 9</span> <strong>have</strong></li>
+                    <li><span>Line 10</span> <strong>if</strong></li>
+                    <li><span>Line 11</span> <strong>By</strong></li>
+                    <li><span>Line 12</span> <strong>garden</strong></li>
+                    <li><span>Line 13</span> <strong>pretty</strong></li>
+                    <li><span>Line 14</span> <strong>rabbit</strong></li>
+                    <li><span>Line 16</span> <strong>tapped</strong></li>
+                    <li><span>Line 17</span> <strong>to</strong></li>
+                    <li><span>Line 18</span> <strong>hopping</strong></li>
+                    <li><span>Line 19</span> <strong>the</strong></li>
+                    <li><span>Line 20</span> <strong>big</strong>, <strong>sniffed</strong></li>
+                    <li><span>Line 22</span> <strong>you</strong></li>
+                    <li><span>Line 23</span> <strong>said</strong></li>
+                </ul>
+            </div>
+
+            <!-- 3-A -->
+            <div class="key-section">
+                <h3>3-A</h3>
+                <ul class="key-list">
+                    <li><span>Line 3</span> <strong>her</strong></li>
+                    <li><span>Line 4</span> <strong>onto</strong></li>
+                    <li><span>Line 5</span> <strong>brother</strong></li>
+                    <li><span>Line 6</span> <strong>first</strong></li>
+                    <li><span>Line 7</span> <strong>brother</strong>, <strong>the</strong></li>
+                    <li><span>Line 9</span> <strong>their</strong>, <strong>but</strong></li>
+                    <li><span>Line 10</span> <strong>would</strong></li>
+                    <li><span>Line 11</span> <strong>four</strong></li>
+                    <li><span>Line 12</span> <strong>of</strong></li>
+                    <li><span>Line 13</span> <strong>seats</strong></li>
+                    <li><span>Line 14</span> <strong>few</strong></li>
+                    <li><span>Line 15</span> <strong>Martha</strong>, <strong>but</strong></li>
+                    <li><span>Line 16</span> <strong>the</strong></li>
+                    <li><span>Line 17</span> <strong>as</strong></li>
+                    <li><span>Line 18</span> <strong>Martha</strong></li>
+                    <li><span>Line 19</span> <strong>walk</strong></li>
+                    <li><span>Line 20</span> <strong>can</strong></li>
+                    <li><span>Line 21</span> <strong>I</strong></li>
+                    <li><span>Line 22</span> <strong>I</strong></li>
+                    <li><span>Line 23</span> <strong>without</strong>, <strong>the</strong></li>
+                    <li><span>Line 25</span> <strong>said</strong></li>
+                    <li><span>Line 26</span> <strong>all</strong></li>
+                </ul>
+            </div>
+
+            <!-- 3-B -->
+            <div class="key-section">
+                <h3>3-B</h3>
+                <ul class="key-list">
+                    <li><span>Line 3</span> <strong>kites</strong></li>
+                    <li><span>Line 4</span> <strong>she</strong>, <strong>a</strong></li>
+                    <li><span>Line 6</span> <strong>kite</strong></li>
+                    <li><span>Line 7</span> <strong>an</strong></li>
+                    <li><span>Line 8</span> <strong>fish</strong></li>
+                    <li><span>Line 9</span> <strong>it</strong></li>
+                    <li><span>Line 10</span> <strong>Uncle</strong></li>
+                    <li><span>Line 11</span> <strong>told</strong>, <strong>wind</strong></li>
+                    <li><span>Line 12</span> <strong>away</strong></li>
+                    <li><span>Line 14</span> <strong>had</strong></li>
+                    <li><span>Line 15</span> <strong>before</strong></li>
+                    <li><span>Line 16</span> <strong>She</strong></li>
+                    <li><span>Line 17</span> <strong>and</strong></li>
+                    <li><span>Line 18</span> <strong>hold</strong></li>
+                    <li><span>Line 19</span> <strong>When</strong></li>
+                    <li><span>Line 20</span> <strong>string</strong>, <strong>moment</strong></li>
+                    <li><span>Line 22</span> <strong>air</strong></li>
+                    <li><span>Line 23</span> <strong>the</strong></li>
+                    <li><span>Line 24</span> <strong>high</strong></li>
+                    <li><span>Line 25</span> <strong>asked</strong></li>
+                    <li><span>Line 26</span> <strong>Marian</strong>, <strong>thing</strong>, <strong>in</strong></li>
+                </ul>
+            </div>
+
+        </div>
+        <div class="footer-number">176 CORE READING MAZE COMPREHENSION TEST</div>
+    </div>
+    
+</div>
+
+</body>
+</html>
