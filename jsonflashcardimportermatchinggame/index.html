@@ -404,8 +404,68 @@
         const copyHtmlButton = document.getElementById('copy-html-btn');
         const jsonImporter = document.getElementById('json-importer');
         
-        // Game Containers
-// ... existing code ... -->
+        // --- DATA & STATE ---
+        // /* DATA_START */
+        const DEFAULT_MATCH_VOCAB = [
+            { term: "Apple", definition: "A red or green fruit", imageSrc: "https://img.icons8.com/color/96/apple.png" },
+            { term: "Car", definition: "A vehicle with 4 wheels", imageSrc: "https://img.icons8.com/color/96/car.png" },
+            { term: "Sun", definition: "Star at center of solar system", imageSrc: "https://img.icons8.com/color/96/sun.png" },
+            { term: "Book", definition: "Pages with stories or info", imageSrc: "https://img.icons8.com/color/96/book.png" },
+            { term: "Tree", definition: "Tall plant with trunk", imageSrc: "https://img.icons8.com/color/96/tree.png" },
+            { term: "Dog", definition: "Loyal pet, barks", imageSrc: "https://img.icons8.com/color/96/dog.png" },
+            { term: "Computer", definition: "Electronic device for data", imageSrc: "https://img.icons8.com/color/96/computer.png" },
+            { term: "Music", definition: "Sounds combined in harmony", imageSrc: "https://img.icons8.com/color/96/musical-notes.png" }
+        ];
+        // /* DATA_END */
+
+        let MASTER_VOCABULARY = JSON.parse(JSON.stringify(DEFAULT_MATCH_VOCAB));
+        let IS_CUSTOM_SET_LOADED = false;
+
+        // --- NAVIGATION ---
+        const containers = {
+            start: document.getElementById('start-screen'),
+            match: document.getElementById('match-game-container'),
+            quiz: document.getElementById('quiz-game-container'),
+            swipe: document.getElementById('swipe-game-container'),
+            scramble: document.getElementById('scramble-game-container'),
+            flashcard: document.getElementById('flashcard-game-container')
+        };
+
+        function showStartScreen() {
+            Object.values(containers).forEach(c => c.classList.add('hidden'));
+            containers.start.classList.remove('hidden');
+            document.getElementById('app-header').classList.remove('hidden');
+        }
+
+        function startGame(type) {
+            // Hide Header for immersion
+            document.getElementById('app-header').classList.add('hidden');
+            
+            // Hide all containers
+            Object.values(containers).forEach(c => c.classList.add('hidden'));
+            
+            // Show selected container
+            containers[type].classList.remove('hidden');
+            
+            // Initialize specific game
+            if (type === 'match') matchGame.init();
+            if (type === 'quiz') quizGame.init();
+            if (type === 'swipe') swipeGame.init();
+            if (type === 'scramble') scrambleGame.init();
+            if (type === 'flashcard') flashcardGame.init();
+        }
+
+        // --- EVENT LISTENERS ---
+        document.getElementById('start-match-game-btn').onclick = () => startGame('match');
+        document.getElementById('start-quiz-game-btn').onclick = () => startGame('quiz');
+        document.getElementById('start-swipe-game-btn').onclick = () => startGame('swipe');
+        document.getElementById('start-scramble-game-btn').onclick = () => startGame('scramble');
+        document.getElementById('start-flashcard-game-btn').onclick = () => startGame('flashcard');
+
+        document.querySelectorAll('.main-menu-btn').forEach(btn => {
+            btn.onclick = showStartScreen;
+        });
+
         // --- Import / Export ---
         importJsonButton.addEventListener('click', () => jsonImporter.click());
         jsonImporter.addEventListener('change', (event) => {
@@ -429,21 +489,40 @@
 
         const getSelfContainedHtml = () => {
             const vocabToSave = IS_CUSTOM_SET_LOADED ? MASTER_VOCABULARY : DEFAULT_MATCH_VOCAB;
-            // Clean data to ensure consistency
+            
+            // 1. Clean data to ensure consistency
             const cleanVocab = vocabToSave.map(item => ({
                 term: item.term,
                 definition: item.definition,
                 imageSrc: item.imageSrc || item.image 
             }));
             
-            // Create the injection script that forces the game to use this data
-            const script = `const DEFAULT_MATCH_VOCAB = ${JSON.stringify(cleanVocab)};\n        const DEFAULT_QUIZ_VOCAB = [];\n        MASTER_VOCABULARY = DEFAULT_MATCH_VOCAB; IS_CUSTOM_SET_LOADED = true;`;
+            // 2. Generate the new script block with markers
+            const newScriptData = `
+        /* DATA_START */
+        const DEFAULT_MATCH_VOCAB = ${JSON.stringify(cleanVocab)};
+        /* DATA_END */
+            `;
             
-            // Replace the initial variable declarations with our populated ones
-            return document.documentElement.outerHTML.replace(
-                /const DEFAULT_MATCH_VOCAB = \[[\s\S]*?\];\s*const DEFAULT_QUIZ_VOCAB = \[[\s\S]*?\];/, 
-                script
-            );
+            // 3. Get the current HTML
+            let html = document.documentElement.outerHTML;
+
+            // 4. Robust Replacement using explicit markers
+            // We use a regex that finds everything between /* DATA_START */ and /* DATA_END */
+            // including newlines and the markers themselves.
+            const markerRegex = /\/\*\s*DATA_START\s*\*\/[\s\S]*?\/\*\s*DATA_END\s*\*\//;
+            
+            if (markerRegex.test(html)) {
+                return html.replace(markerRegex, newScriptData);
+            } else {
+                console.warn("Markers not found, falling back to basic replace (less reliable)");
+                // Fallback (only if user somehow deleted markers)
+                 const script = `const DEFAULT_MATCH_VOCAB = ${JSON.stringify(cleanVocab)};\n        MASTER_VOCABULARY = DEFAULT_MATCH_VOCAB; IS_CUSTOM_SET_LOADED = true;`;
+                 return html.replace(
+                    /const DEFAULT_MATCH_VOCAB = \[[\s\S]*?\];/, 
+                    script
+                );
+            }
         };
 
         copyHtmlButton.addEventListener('click', () => {
@@ -515,13 +594,26 @@
                 
                 this.startRound();
                 
-                // Bind Events
-                this.canvas.onmousedown = this.onDown.bind(this);
-                this.canvas.onmousemove = this.onMove.bind(this);
-                this.canvas.onmouseup = this.onUp.bind(this);
-                this.canvas.ontouchstart = this.onDown.bind(this);
-                this.canvas.ontouchmove = this.onMove.bind(this);
-                this.canvas.ontouchend = this.onUp.bind(this);
+                // Bind Events - Robust Touch Support
+                const canvas = this.canvas;
+                
+                // Clean up any old listeners
+                canvas.onmousedown = null;
+                canvas.onmousemove = null;
+                canvas.onmouseup = null;
+                canvas.ontouchstart = null;
+                canvas.ontouchmove = null;
+                canvas.ontouchend = null;
+
+                // Mouse Listeners
+                canvas.addEventListener('mousedown', (e) => this.onDown(e));
+                canvas.addEventListener('mousemove', (e) => this.onMove(e));
+                window.addEventListener('mouseup', (e) => this.onUp(e)); // Catch release outside canvas
+
+                // Touch Listeners (Passive: false prevents scrolling)
+                canvas.addEventListener('touchstart', (e) => this.onDown(e), { passive: false });
+                canvas.addEventListener('touchmove', (e) => this.onMove(e), { passive: false });
+                window.addEventListener('touchend', (e) => this.onUp(e));
             },
             
             startRound: function() {
@@ -613,16 +705,19 @@
             },
             
             onDown: function(e) {
-                e.preventDefault();
+                if (e.cancelable) e.preventDefault(); // Prevent scrolling on touch
                 const rect = this.canvas.getBoundingClientRect();
                 const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
                 const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+                
                 for (let i = this.gameObjects.length - 1; i >= 0; i--) {
                     const o = this.gameObjects[i];
                     if (!o.isMatched && x > o.x && x < o.x + o.width && y > o.y && y < o.y + o.height) {
                         this.draggedObject = o;
                         this.dragOffset = { x: x - o.x, y: y - o.y };
+                        // Move to top of stack
                         this.gameObjects.push(this.gameObjects.splice(i, 1)[0]);
+                        this.draw(); // Instant feedback
                         return;
                     }
                 }
@@ -630,10 +725,15 @@
             
             onMove: function(e) {
                 if (!this.draggedObject) return;
-                e.preventDefault();
+                if (e.cancelable) e.preventDefault();
+                
                 const rect = this.canvas.getBoundingClientRect();
-                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-                const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                
+                const x = clientX - rect.left;
+                const y = clientY - rect.top;
+                
                 this.draggedObject.x = x - this.dragOffset.x;
                 this.draggedObject.y = y - this.dragOffset.y;
                 this.draw();
@@ -641,13 +741,27 @@
             
             onUp: function(e) {
                 if (!this.draggedObject) return;
-                const target = this.gameObjects.find(o => o !== this.draggedObject && !o.isMatched && o.term === this.draggedObject.term && this.isOverlapping(this.draggedObject, o));
+                
+                // Check collisions
+                const target = this.gameObjects.find(o => 
+                    o !== this.draggedObject && 
+                    !o.isMatched && 
+                    o.term === this.draggedObject.term && 
+                    this.isOverlapping(this.draggedObject, o)
+                );
+
                 if (target) {
                     this.draggedObject.isMatched = true;
                     target.isMatched = true;
+                    
+                    // Snap to target for neatness
+                    this.draggedObject.x = target.x + 10;
+                    this.draggedObject.y = target.y + 10;
                 }
+                
                 this.draggedObject = null;
                 this.draw();
+                
                 if (this.gameObjects.every(o => o.isMatched)) {
                     clearInterval(this.timerInterval);
                     setTimeout(() => this.startRound(), 1000);
@@ -803,33 +917,41 @@
 
             init: function() {
                 this.queue = [];
+                const deck = [...MASTER_VOCABULARY];
                 
-                // Create a FULL deck of questions for EVERY term
-                // Shuffle MASTER_VOCABULARY first to randomize order
-                const deck = [...MASTER_VOCABULARY].sort(() => Math.random() - 0.5);
-                
-                deck.forEach(correct => {
-                    // 50% chance of match vs mismatch
-                    const isMatch = Math.random() > 0.5;
-                    let displayedTerm = correct.term;
-                    
-                    if (!isMatch && MASTER_VOCABULARY.length > 1) {
-                        let wrong;
-                        // Pick a random WRONG term
-                        do { 
-                            wrong = MASTER_VOCABULARY[Math.floor(Math.random() * MASTER_VOCABULARY.length)]; 
-                        } while (wrong.term === correct.term);
-                        
-                        displayedTerm = wrong.term;
-                    }
-                    
-                    this.queue.push({ 
-                        imageSrc: correct.imageSrc, 
-                        term: displayedTerm, 
-                        isMatch: isMatch,
-                        correctTerm: correct.term 
+                // Phase 1: GUARANTEED Correct Matches (Review Every Term)
+                deck.forEach(item => {
+                    this.queue.push({
+                        imageSrc: item.imageSrc,
+                        term: item.term,
+                        isMatch: true,
+                        correctTerm: item.term
                     });
                 });
+
+                // Phase 2: Add Distractors (Incorrect Matches)
+                // We add distractors equal to 60% of the deck size to keep it unpredictable
+                const distractorCount = Math.ceil(deck.length * 0.6);
+                for(let i = 0; i < distractorCount; i++) {
+                    const correct = deck[i % deck.length];
+                    let wrong;
+                    // Find a wrong term (ensure we don't accidentally pick the same one)
+                    let attempts = 0;
+                    do { 
+                        wrong = deck[Math.floor(Math.random() * deck.length)]; 
+                        attempts++;
+                    } while (wrong.term === correct.term && attempts < 10);
+                    
+                    this.queue.push({
+                        imageSrc: correct.imageSrc, // Show correct image
+                        term: wrong.term,           // But wrong label
+                        isMatch: false,
+                        correctTerm: correct.term
+                    });
+                }
+
+                // Shuffle the entire queue so matches and mismatches are mixed
+                this.queue.sort(() => Math.random() - 0.5);
 
                 this.loadCard();
                 this.bindEvents();
