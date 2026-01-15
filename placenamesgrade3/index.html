@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Place Names of Alberta v2.1: Identity & Origins</title>
+
+    <!-- Leaflet CSS and JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+
+    <!-- Phosphor Icons (for cultural symbols) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, h4 { font-family: 'Poppins', sans-serif; }
+        
+        /* Custom scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+        
+        #map { width: 100%; height: 100%; min-height: 500px; z-index: 10; }
+        
+        /* Animation classes */
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Marker Styles */
+        .legend-icon { width: 12px; height: 12px; display: inline-block; margin-right: 8px; border: 1px solid rgba(0,0,0,0.1); }
+        .legend-circle { border-radius: 50%; }
+        .legend-diamond { transform: rotate(45deg); margin: 4px 8px 4px 4px; }
+        
+        /* Modal Overlay */
+        .modal-open { overflow: hidden; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 flex flex-col min-h-screen relative">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto py-3 px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="bg-indigo-600 text-white p-2 rounded-lg">
+                        <i class="ph ph-map-trifold text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl md:text-2xl font-bold text-slate-900 tracking-tight leading-none">Who are Albertans?</h1>
+                        <p class="text-xs md:text-sm text-slate-600 mt-1">Exploring Identity through Place Names</p>
+                    </div>
+                </div>
+                
+                <!-- Filter Controls -->
+                <div class="flex flex-wrap justify-center gap-2 text-xs md:text-sm">
+                    <button onclick="filterMap('all')" id="btn-all" class="filter-btn px-3 py-1.5 rounded-full bg-slate-800 text-white font-medium hover:bg-slate-700 transition-colors shadow-sm">
+                        All Origins
+                    </button>
+                    <button onclick="filterMap('First Nation')" id="btn-fn" class="filter-btn px-3 py-1.5 rounded-full bg-white text-slate-600 border border-slate-300 font-medium hover:bg-green-50 hover:text-green-700 hover:border-green-200 transition-colors">
+                        First Nation
+                    </button>
+                    <button onclick="filterMap('Métis')" id="btn-metis" class="filter-btn px-3 py-1.5 rounded-full bg-white text-slate-600 border border-slate-300 font-medium hover:bg-orange-50 hover:text-orange-700 hover:border-orange-200 transition-colors">
+                        Métis
+                    </button>
+                    <button onclick="filterMap('Francophone')" id="btn-fr" class="filter-btn px-3 py-1.5 rounded-full bg-white text-slate-600 border border-slate-300 font-medium hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-colors">
+                        Francophone
+                    </button>
+                </div>
+
+                <button onclick="toggleModal()" class="text-slate-500 hover:text-indigo-600 transition-colors" title="Learning Outcomes">
+                    <i class="ph ph-info text-2xl"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-140px)] min-h-[600px]">
+            
+            <!-- Map Container -->
+            <div class="lg:col-span-8 xl:col-span-8 bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden relative group">
+                <div id="map"></div>
+                <!-- Reset View Button -->
+                <button onclick="resetMap()" class="absolute top-4 left-4 z-[400] bg-white text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-md shadow-md border border-slate-300 text-xs font-bold uppercase tracking-wide flex items-center gap-2">
+                    <i class="ph ph-arrows-out"></i> Reset View
+                </button>
+            </div>
+
+            <!-- Info Panel -->
+            <div class="lg:col-span-4 xl:col-span-4 bg-white rounded-2xl shadow-lg border border-slate-200 flex flex-col overflow-hidden h-full">
+                <!-- Scrollable Content Area -->
+                <div class="flex-grow overflow-y-auto p-6 custom-scrollbar" id="info-container">
+                    
+                    <!-- Default Empty State -->
+                    <div id="default-state" class="flex flex-col items-center justify-center h-full text-center text-slate-400 py-10">
+                        <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                            <i class="ph ph-hand-pointing text-3xl text-slate-300"></i>
+                        </div>
+                        <p class="text-lg font-bold text-slate-600">Explore Our History</p>
+                        <p class="text-sm mt-2 max-w-[240px] text-slate-500">Click a marker to learn how First Nations, Métis, and Francophone communities shaped Alberta's identity.</p>
+                    </div>
+
+                    <!-- Details State -->
+                    <div id="details-state" class="hidden fade-in">
+                        <!-- Header Tags -->
+                        <div class="flex flex-wrap gap-2 mb-3">
+                            <span id="detail-type" class="px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded bg-slate-100 text-slate-500">
+                                Community
+                            </span>
+                            <span id="detail-lang" class="px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded bg-indigo-50 text-indigo-600 border border-indigo-100">
+                                Language
+                            </span>
+                        </div>
+
+                        <h2 id="detail-title" class="text-3xl font-bold text-slate-900 mb-1 leading-tight"></h2>
+                        <div class="flex items-center gap-2 mb-6">
+                            <span class="text-sm text-slate-500">Origin:</span>
+                            <span id="detail-origin" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold">
+                                First Nation
+                            </span>
+                        </div>
+                        
+                        <!-- The Story -->
+                        <div class="prose prose-slate prose-sm mb-8">
+                            <h3 class="text-xs uppercase tracking-wide text-slate-400 font-bold mb-2 flex items-center gap-2">
+                                <i class="ph ph-book-open"></i> The Story
+                            </h3>
+                            <p id="detail-story" class="text-base leading-relaxed text-slate-700"></p>
+                        </div>
+
+                        <!-- Cultural Context Card (Dynamic) -->
+                        <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-5 border border-slate-200 shadow-sm">
+                            <h3 class="text-xs uppercase tracking-wide text-indigo-900/60 font-bold mb-3 flex items-center gap-2">
+                                <i class="ph ph-lightbulb"></i> Did You Know?
+                            </h3>
+                            <div class="flex gap-4">
+                                <div id="context-icon" class="text-3xl opacity-80 shrink-0 pt-1"></div>
+                                <div>
+                                    <h4 id="context-title" class="text-sm font-bold text-slate-800 mb-1"></h4>
+                                    <p id="context-text" class="text-sm text-slate-600 leading-snug"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Footer (Restored Sources) -->
+                <div class="p-4 bg-slate-50 border-t border-slate-200">
+                     <div class="text-[10px] text-slate-500">
+                        <strong class="block text-slate-700 mb-1 uppercase tracking-wider">Sources</strong>
+                        <ul class="list-disc list-inside space-y-0.5 pl-1 opacity-80">
+                            <li><i>Place-Names of Alberta</i> (1928)</li>
+                            <li><i>Geographic Names of Alberta</i> (1993)</li>
+                            <li><i>Alberta Place Names</i> (Harrison, 2006)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Context Modal -->
+    <div id="info-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[1000] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
+                <h2 class="text-xl font-bold text-slate-900">Learning Context</h2>
+                <button onclick="toggleModal()" class="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 prose prose-slate max-w-none">
+                <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-6">
+                    <h3 class="text-indigo-900 text-sm font-bold uppercase m-0 mb-2">Guiding Question</h3>
+                    <p class="text-indigo-700 text-lg font-medium m-0">"Who are Albertans?"</p>
+                </div>
+                
+                <h3 class="text-sm font-bold uppercase tracking-wide text-slate-400">Outcomes & Knowledge</h3>
+                <ul class="grid grid-cols-1 md:grid-cols-2 gap-4 list-none p-0 mt-4">
+                    <li class="bg-white border border-slate-200 p-4 rounded-lg m-0 shadow-sm">
+                        <strong class="block text-green-700 mb-1 flex items-center gap-2"><i class="ph ph-users-three"></i> First Nations</strong>
+                        <span class="text-sm">48 distinct communities. Languages include Cree (Nehiyaw), Blackfoot (Niitsitapi), and Dené. Symbols include the Tipi Ring and Standing Bear.</span>
+                    </li>
+                    <li class="bg-white border border-slate-200 p-4 rounded-lg m-0 shadow-sm">
+                        <strong class="block text-orange-700 mb-1 flex items-center gap-2"><i class="ph ph-infinity"></i> Métis Settlements</strong>
+                        <span class="text-sm">Communities with self-governance. Distinct culture blending traditions. Languages include Michif. Symbols: The Sash and Red River Cart.</span>
+                    </li>
+                    <li class="bg-white border border-slate-200 p-4 rounded-lg m-0 shadow-sm">
+                        <strong class="block text-blue-700 mb-1 flex items-center gap-2"><i class="ph ph-globe-hemisphere-east"></i> Francophone</strong>
+                        <span class="text-sm">French was the first European language spoken in Alberta. Origins in missionaries and global immigration. Symbol: The Fleur-de-lis.</span>
+                    </li>
+                    <li class="bg-white border border-slate-200 p-4 rounded-lg m-0 shadow-sm">
+                        <strong class="block text-slate-700 mb-1 flex items-center gap-2"><i class="ph ph-clock"></i> Time & Place</strong>
+                        <span class="text-sm">Exploring relationships between people, place, and time helps us understand diverse perspectives and make meaning of our world.</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA ---
+        // Added 'specificFact' where possible to reduce repetition
+        const placeNameData = [
+            // FIRST NATIONS
+            { 
+                name: "Athabasca", type: "Community", coords: [54.7250, -113.2825], origin: "First Nation", lang: "Cree (Nehiyaw)", 
+                story: "From the Woods Cree word 'aðapaskāw', meaning '[where] there are reeds one after another'. Originally describing the delta.",
+                specificFact: { title: "A Vital Trade Route", text: "The Athabasca River was a crucial transportation corridor for the fur trade, linking the prairies to the Arctic.", icon: "ph-canoe" }
+            },
+            { 
+                name: "Atikameg", type: "Community", coords: [55.85, -115.65], origin: "First Nation", lang: "Cree (Nehiyaw)", 
+                story: "From the Cree word 'atikamek', meaning 'whitefish'. Located on the shores of Utikuma Lake." 
+            },
+            { 
+                name: "Fort Chipewyan", type: "Community", coords: [58.7142, -111.1557], origin: "First Nation", lang: "Cree / Dené", 
+                story: "'Chipewyan' is a Cree exonym for the Denesuline people, meaning 'pointed skins'. One of Alberta's oldest settlements.",
+                specificFact: { title: "Oldest Settlement", text: "Established in 1788, Fort Chipewyan is Alberta's oldest continuously inhabited European settlement.", icon: "ph-house-line" }
+            },
+            { 
+                name: "Maskwacis", type: "Community", coords: [52.8833, -113.4500], origin: "First Nation", lang: "Cree (Nehiyaw)", 
+                story: "Maskwacis is the Cree word for 'Bear Hills' (maskwa-wachi). Formerly known as Hobbema.",
+                specificFact: { title: "Four Nations", text: "Maskwacis is home to four distinct Cree nations: Samson, Ermineskin, Louis Bull, and Montana.", icon: "ph-users-four" }
+            },
+            { 
+                name: "Medicine Hat", type: "Community", coords: [50.0421, -110.6775], origin: "First Nation", lang: "Blackfoot (Niitsitapi)", 
+                story: "Translation of the Blackfoot 'Saamis', referring to the eagle tail feather headdress of a medicine man lost in the river.",
+                specificFact: { title: "Clay & Pottery", text: "Historically, the area was known for its clay deposits, leading to a thriving pottery and brick industry.", icon: "ph-hexagon" }
+            },
+            { 
+                name: "Okotoks", type: "Community", coords: [50.7258, -113.9789], origin: "First Nation", lang: "Blackfoot (Niitsitapi)", 
+                story: "From 'Okatok', meaning 'rock'. Refers to the Big Rock, a massive glacial erratic and significant Blackfoot landmark.",
+                specificFact: { title: "The Big Rock", text: "The 'Big Rock' is the world's largest known glacial erratic, carried by ice from the Rocky Mountains.", icon: "ph-mountains" }
+            },
+            { 
+                name: "Wetaskiwin", type: "Community", coords: [52.9697, -113.3732], origin: "First Nation", lang: "Cree (Nehiyaw)", 
+                story: "From 'wītaskīwin-ispatinaw', meaning 'the hills where peace was made'. Commemorates a peace treaty between Cree and Blackfoot." 
+            },
+            { 
+                name: "Ponoka", type: "Community", coords: [52.6797, -113.5786], origin: "First Nation", lang: "Blackfoot (Niitsitapi)", 
+                story: "From 'Ponoká', meaning 'Elk'. The area was a major hunting ground." 
+            },
+            { 
+                name: "Kananaskis", type: "Geological Feature", coords: [51.0825, -115.0292], origin: "First Nation", lang: "Cree (Nehiyaw)", 
+                story: "Named after 'Kin-e-ah-kis', a Cree man who survived an axe blow to the head, a story recorded by Captain Palliser." 
+            },
+            { 
+                name: "Calgary (Mohkínstsis)", type: "Community", coords: [51.0447, -114.0719], origin: "First Nation", lang: "Blackfoot (Niitsitapi)", 
+                story: "While 'Calgary' is Scottish, the area is 'Mohkínstsis' (Elbow) to the Blackfoot, referring to the river bend.",
+                specificFact: { title: "A Meeting Place", text: "Before the city existed, this area was a traditional gathering place for the Blackfoot, Tsuut'ina, and Stoney Nakoda peoples.", icon: "ph-campfire" }
+            },
+            
+            // MÉTIS
+            { 
+                name: "Paddle Prairie", type: "Métis Settlement", coords: [57.95, -117.5], origin: "Métis", lang: "Michif / Cree", 
+                story: "One of the eight Métis Settlements in Alberta, which are unique in Canada as the only legislated Métis land base.",
+                specificFact: { title: "Largest Settlement", text: "Paddle Prairie is the largest of the eight Métis Settlements by land area.", icon: "ph-map-pin" }
+            },
+            { 
+                name: "Buffalo Lake", type: "Métis Settlement", coords: [54.6, -112.5], origin: "Métis", lang: "Michif / Cree", 
+                story: "A historic Métis Settlement. The Métis people here have a distinct history of blending First Nations and European farming and trapping." 
+            },
+            { 
+                name: "Kikino", type: "Métis Settlement", coords: [54.3, -111.7], origin: "Métis", lang: "Michif / Cree", 
+                story: "'Kikino' means 'our home' in Cree. It is one of the distinct communities where Métis self-governance is practiced." 
+            },
+            { 
+                name: "Fishing Lake", type: "Métis Settlement", coords: [53.9, -110.3], origin: "Métis", lang: "Michif / Cree", 
+                story: "Established as a Métis Settlement in 1938. The Red River Cart was a primary mode of transport for early Métis families in this region." 
+            },
+            { 
+                name: "Métis Crossing", type: "Cultural Site", coords: [54.08, -112.45], origin: "Métis", lang: "Michif", 
+                story: "A major cultural interpretive centre. It sits on river lots originally settled by Métis families, showcasing the ribbon-like land division system.",
+                specificFact: { title: "River Lots", text: "Métis settlers used a 'river lot' system (long, narrow strips) so every family had access to water.", icon: "ph-waves" }
+            },
+            { 
+                name: "Lac Ste. Anne", type: "Community", coords: [53.7142, -114.3986], origin: "Métis", lang: "Michif / Cree", 
+                story: "A site of profound spiritual significance. Originally 'Manito Sakahigan', it became a pilgrimage site for Métis and First Nations peoples.",
+                specificFact: { title: "The Pilgrimage", text: "Every July, thousands of pilgrims gather here, a tradition dating back to 1889.", icon: "ph-users-three" }
+            },
+            { 
+                name: "Grande Prairie", type: "Community", coords: [55.1709, -118.7967], origin: "Métis", lang: "French / Cree", 
+                story: "Named by Métis traders who marvelled at the 'grande prairie'. It reflects the blend of French and Indigenous perspectives." 
+            },
+
+            // FRANCOPHONE
+            { 
+                name: "Beaumont", type: "Community", coords: [53.3554, -113.4144], origin: "Francophone", lang: "French", 
+                story: "Meaning 'beautiful hill'. Named in 1895 by colonists for the hill where St. Vital church was built. French was the first Euro language here.",
+                specificFact: { title: "St. Vital Church", text: "The St. Vital Church, built in 1919, is a designated historic site and the heart of the community.", icon: "ph-church" }
+            },
+            { 
+                name: "Falher", type: "Community", coords: [55.7333, -117.2000], origin: "Francophone", lang: "French", 
+                story: "Known as the 'Honey Capital of Canada'. Named after Father Falher, a missionary from France. It highlights Francophone immigration.",
+                specificFact: { title: "Honey Capital", text: "Falher is famous for its massive honey production and features a giant bee statue in town.", icon: "ph-bug" }
+            },
+            { 
+                name: "Bonnyville", type: "Community", coords: [54.2642, -110.7397], origin: "Francophone", lang: "French", 
+                story: "Named for Father Bonnin. The area drew many French-Canadian settlers, establishing a lasting Francophone identity." 
+            },
+            { 
+                name: "St. Paul", type: "Community", coords: [53.9833, -111.2833], origin: "Francophone", lang: "French", 
+                story: "Founded as Saint-Paul-des-Métis in 1896 by Father Lacombe. It represents the complex history of Métis and Francophone relations." 
+            },
+            { 
+                name: "Legal", type: "Community", coords: [53.9536, -113.5936], origin: "Francophone", lang: "French", 
+                story: "Named for Bishop Legal. As the 'French Mural Capital', it uses art to display its Francophone roots and the Fleur-de-lis.",
+                specificFact: { title: "Mural Capital", text: "Legal features over 35 murals celebrating its history, earning it the title 'French Mural Capital of Canada'.", icon: "ph-paint-brush" }
+            },
+            { 
+                name: "Morinville", type: "Community", coords: [53.7992, -113.6511], origin: "Francophone", lang: "French", 
+                story: "Founded by Father Morin, who brought French-Canadian and German settlers. Shows the diversity within the Francophone community." 
+            },
+            { 
+                name: "Trochu", type: "Community", coords: [51.82, -113.16], origin: "Francophone", lang: "French", 
+                story: "Named after Armand Trochu, a French cavalry officer. It represents the 'Old Country' French immigrants, distinct from Quebecois settlers." 
+            },
+            
+            // MIXED / OTHER
+            { 
+                name: "Peace River", type: "Geological Feature", coords: [56.234, -117.29], origin: "First Nation", lang: "Cree / Dane-zaa", 
+                story: "Commemorates the 'Peace Point' treaty between Cree and Dane-zaa (Beaver) peoples. A lesson in conflict resolution and history.",
+                specificFact: { title: "Making Peace", text: "The river's name serves as a permanent reminder of the truce that ended decades of conflict.", icon: "ph-handshake" }
+            },
+            { 
+                name: "Red Deer", type: "Community", coords: [52.269, -113.8115], origin: "First Nation", lang: "Cree (Translation)", 
+                story: "Mistranslation of 'Waskasoo Seepee' (Elk River). European traders confused Elk for Red Deer, showing the language barrier in history." 
+            },
+        ];
+
+        // --- CONTEXT DATA (Expanded to reduce repetition) ---
+        const contextData = {
+            'First Nation': [
+                { title: "48 Distinct Nations", text: "Alberta is home to 48 distinct First Nations, each with unique histories.", icon: "ph-users-three" },
+                { title: "Languages", text: "First Nations languages spoken here include Cree (Nehiyaw), Blackfoot (Niitsitapi), and Dené.", icon: "ph-chat-circle-text" },
+                { title: "Symbols", text: "Symbols like the Tipi Ring and Standing Bear represent unique cultures.", icon: "ph-star" },
+                { title: "Treaty Land", text: "Most of Alberta is covered by Treaties 6, 7, and 8, agreements between the Crown and First Nations.", icon: "ph-scroll" },
+                { title: "Traditional Names", text: "Many Alberta towns have official names that are anglicized versions of their original Indigenous names.", icon: "ph-tag" },
+                { title: "Stoney Nakoda", text: "The Stoney Nakoda are known as the 'People of the Mountains' and have a deep connection to the Rockies.", icon: "ph-mountains" }
+            ],
+            'Métis': [
+                { title: "Self-Governance", text: "Alberta is the only province with land-based Métis Settlements with self-governance rights.", icon: "ph-gavel" },
+                { title: "The Sash", text: "The Métis Sash is a symbol of identity, used historically as a tool, rope, and for warmth.", icon: "ph-infinity" },
+                { title: "Michif Language", text: "Michif is a unique language of the Métis that blends Cree verbs with French nouns.", icon: "ph-translate" },
+                { title: "Red River Cart", text: "The Red River cart, made entirely of wood, was a primary tool for trade and travel.", icon: "ph-wheel" },
+                { title: "Fiddling", text: "Fiddle music is central to Métis culture, often accompanied by the Red River Jig.", icon: "ph-music-notes" },
+                { title: "Beadwork", text: "The Métis were often called the 'Flower Beadwork People' due to their intricate floral designs.", icon: "ph-flower" }
+            ],
+            'Francophone': [
+                { title: "First European Language", text: "French was the first European language spoken in the land now known as Alberta.", icon: "ph-chat-teardrop" },
+                { title: "The Fleur-de-lis", text: "The fleur-de-lis is a key symbol of La Francophonie, representing French heritage.", icon: "ph-plant" },
+                { title: "Global Origins", text: "Alberta's Francophone population includes immigrants from Africa, Europe, and Asia.", icon: "ph-globe-stand" },
+                { title: "Education", text: "Alberta has a strong Francophone education system, preserving the language for future generations.", icon: "ph-student" },
+                { title: "Flying Canoe", text: "The legend of the 'Chasse-galerie' (Flying Canoe) is a popular French-Canadian folk tale told in Alberta.", icon: "ph-canoe" }
+            ]
+        };
+
+        // --- STATE ---
+        let markers = [];
+        const INITIAL_VIEW = { lat: 54.5, lng: -115.0, zoom: 5.5 };
+
+        // --- MAP SETUP ---
+        const map = L.map('map', { zoomControl: false }).setView([INITIAL_VIEW.lat, INITIAL_VIEW.lng], INITIAL_VIEW.zoom);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+
+        // --- ICON GENERATOR ---
+        function createDivIcon(color, shape) {
+            const transform = shape === 'diamond' ? 'transform: rotate(45deg);' : '';
+            // Inner icon based on color type
+            
+            const html = `
+                <div style="background-color: ${color}; ${transform} width: 100%; height: 100%; box-shadow: 0 2px 5px rgba(0,0,0,0.3);" 
+                     class="border-2 border-white hover:scale-125 transition-transform flex items-center justify-center">
+                </div>`;
+
+            return L.divIcon({
+                html: html,
+                className: 'bg-transparent',
+                iconSize: [16, 16],
+                iconAnchor: [8, 8],
+                popupAnchor: [0, -10]
+            });
+        }
+
+        const icons = {
+            'First Nation': createDivIcon('#16a34a', 'circle'), // Green
+            'Francophone': createDivIcon('#2563eb', 'circle'),  // Blue
+            'Métis': createDivIcon('#f97316', 'diamond'),       // Orange (Distinct shape)
+            'Mixed': createDivIcon('#8b5cf6', 'circle')         // Purple
+        };
+
+        // --- APP LOGIC ---
+
+        function getContextItem(origin, placeSpecificFact) {
+            // Priority 1: Use specific fact if available
+            if (placeSpecificFact) return placeSpecificFact;
+
+            // Priority 2: Generic fallback
+            let key = origin;
+            if (origin.includes('Métis')) key = 'Métis';
+            else if (origin.includes('Francophone')) key = 'Francophone';
+            else if (origin.includes('First Nation')) key = 'First Nation';
+
+            const pool = contextData[key] || contextData['First Nation'];
+            // Return a random item from the pool for variety
+            return pool[Math.floor(Math.random() * pool.length)];
+        }
+
+        function updateInfoPanel(place) {
+            document.getElementById('default-state').classList.add('hidden');
+            const details = document.getElementById('details-state');
+            details.classList.remove('hidden');
+            
+            // Re-trigger animation
+            details.classList.remove('fade-in');
+            void details.offsetWidth; // trigger reflow
+            details.classList.add('fade-in');
+
+            // Basic Info
+            document.getElementById('detail-title').innerText = place.name;
+            document.getElementById('detail-story').innerText = place.story;
+            document.getElementById('detail-type').innerText = place.type;
+            
+            // Language
+            const langEl = document.getElementById('detail-lang');
+            if (place.lang) {
+                langEl.innerText = place.lang;
+                langEl.classList.remove('hidden');
+            } else {
+                langEl.classList.add('hidden');
+            }
+
+            // Origin Badge Styling
+            const originBadge = document.getElementById('detail-origin');
+            originBadge.innerText = place.origin;
+            originBadge.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border";
+            
+            let contextKey = 'First Nation';
+
+            if (place.origin === 'Métis') {
+                originBadge.classList.add('bg-orange-50', 'text-orange-700', 'border-orange-200');
+                contextKey = 'Métis';
+            } else if (place.origin.includes('Francophone')) {
+                originBadge.classList.add('bg-blue-50', 'text-blue-700', 'border-blue-200');
+                contextKey = 'Francophone';
+            } else {
+                originBadge.classList.add('bg-green-50', 'text-green-700', 'border-green-200');
+            }
+
+            // Dynamic Context Card
+            const contextItem = getContextItem(contextKey, place.specificFact);
+            document.getElementById('context-title').innerText = contextItem.title;
+            document.getElementById('context-text').innerText = contextItem.text;
+            document.getElementById('context-icon').innerHTML = `<i class="ph ${contextItem.icon} text-${contextKey === 'Métis' ? 'orange' : contextKey === 'Francophone' ? 'blue' : 'green'}-600"></i>`;
+            
+            // Mobile scroll handling
+            if (window.innerWidth < 1024) {
+                 document.getElementById('info-container').scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        function renderMarkers(filter = 'all') {
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+
+            placeNameData.forEach(place => {
+                if (filter !== 'all' && !place.origin.includes(filter)) return;
+
+                // Determine icon
+                let icon = icons['First Nation'];
+                if (place.origin === 'Métis') icon = icons['Métis'];
+                else if (place.origin === 'Francophone') icon = icons['Francophone'];
+                else if (place.origin.includes('Francophone') && place.origin.includes('First Nation')) icon = icons['Mixed'];
+
+                const marker = L.marker(place.coords, { icon }).addTo(map);
+                
+                marker.bindTooltip(place.name, {
+                    direction: 'top',
+                    offset: [0, -10],
+                    className: 'px-2 py-1 bg-white border border-slate-200 shadow-sm rounded text-xs font-bold text-slate-700'
+                });
+
+                marker.on('click', () => {
+                    updateInfoPanel(place);
+                    map.flyTo(place.coords, 9, { animate: true, duration: 1 });
+                });
+
+                markers.push(marker);
+            });
+        }
+
+        function filterMap(type) {
+            // Reset buttons
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.className = 'filter-btn px-3 py-1.5 rounded-full bg-white text-slate-600 border border-slate-300 font-medium hover:bg-slate-50 transition-colors';
+            });
+
+            // Active State
+            const ids = { 'all': 'btn-all', 'First Nation': 'btn-fn', 'Métis': 'btn-metis', 'Francophone': 'btn-fr' };
+            const activeId = ids[type];
+            const btn = document.getElementById(activeId);
+            
+            if (type === 'all') btn.className = 'filter-btn px-3 py-1.5 rounded-full bg-slate-800 text-white font-medium shadow-sm';
+            else if (type === 'Métis') btn.className = 'filter-btn px-3 py-1.5 rounded-full bg-orange-100 text-orange-800 border border-orange-300 font-bold shadow-inner';
+            else if (type === 'Francophone') btn.className = 'filter-btn px-3 py-1.5 rounded-full bg-blue-100 text-blue-800 border border-blue-300 font-bold shadow-inner';
+            else btn.className = 'filter-btn px-3 py-1.5 rounded-full bg-green-100 text-green-800 border border-green-300 font-bold shadow-inner';
+
+            renderMarkers(type);
+            if (map.getZoom() > 6) resetMap();
+        }
+
+        function resetMap() {
+            map.flyTo([INITIAL_VIEW.lat, INITIAL_VIEW.lng], INITIAL_VIEW.zoom, { duration: 1.5 });
+        }
+        
+        function toggleModal() {
+            const modal = document.getElementById('info-modal');
+            modal.classList.toggle('hidden');
+            document.body.classList.toggle('modal-open');
+        }
+
+        // --- LEGEND ---
+        const legend = L.control({position: 'bottomright'});
+        legend.onAdd = function (map) {
+            const div = L.DomUtil.create('div', 'bg-white/95 backdrop-blur-sm p-3 rounded-lg shadow-lg border border-slate-200 text-xs text-slate-600 mb-6 mr-4');
+            div.innerHTML = `
+                <div class="font-bold mb-2 text-slate-800 uppercase tracking-wider">Identity Legend</div>
+                <div class="space-y-1.5">
+                    <div class="flex items-center"><i class="legend-icon legend-circle bg-green-600"></i> First Nation</div>
+                    <div class="flex items-center"><i class="legend-icon legend-diamond bg-orange-500"></i> Métis Settlement</div>
+                    <div class="flex items-center"><i class="legend-icon legend-circle bg-blue-600"></i> Francophone</div>
+                    <div class="flex items-center"><i class="legend-icon legend-circle bg-purple-500"></i> Shared History</div>
+                </div>
+            `;
+            return div;
+        };
+        legend.addTo(map);
+
+        // --- INIT ---
+        renderMarkers();
+    </script>
+</body>
+</html>
