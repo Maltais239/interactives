@@ -1,1 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set List Creator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <style>
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        
+        /* Dragging Styles */
+        .sortable-ghost { opacity: 0.4; background: #374151; }
+        .sortable-drag { cursor: grabbing; }
+        .drag-handle { cursor: grab; }
+        .drag-handle:active { cursor: grabbing; }
 
+        /* Print Logic */
+        @media print {
+            .no-print { display: none !important; }
+            body { background-color: white; color: black; }
+            .print-black { color: black !important; }
+            
+            /* Default Print (CTRL+P): Show all sets in grid */
+            .set-container { break-inside: avoid; border: 1px solid #ccc !important; box-shadow: none !important; margin-bottom: 20px; }
+            .bg-gray-800 { background-color: white !important; color: black !important; }
+            .text-gray-400 { color: #666 !important; }
+            .text-green-400 { color: black !important; font-weight: bold; border-bottom: 2px solid #ccc; display: block; width: 100%; }
+            .text-cyan-400 { color: black !important; font-weight: bold; }
+            .text-pink-400 { color: black !important; font-weight: bold; }
+            
+            /* Singer Badges in Print */
+            .singer-badge { 
+                border: 1px solid #ccc; 
+                color: black !important; 
+                background: none !important; 
+                font-weight: bold;
+            }
+
+            #song-bank-section, .tab-nav, header, #add-song-form, #custom-controls { display: none !important; } 
+
+            /* Single Set Print Mode */
+            body.print-single-mode > :not(#print-area-wrapper) { display: none !important; }
+            body.print-single-mode #print-area-wrapper { 
+                display: block !important; 
+                position: absolute; 
+                top: 0; 
+                left: 0; 
+                width: 100%; 
+            }
+            body.print-single-mode #print-area-wrapper .set-container {
+                width: 100% !important;
+                border: none !important;
+            }
+        }
+        
+        #print-area-wrapper { display: none; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans selection:bg-indigo-500 selection:text-white pb-20">
+
+    <div class="container mx-auto max-w-6xl p-4 md:p-8">
+        
+        <!-- Header -->
+        <header class="mb-6 text-center flex flex-col md:flex-row justify-between items-end border-b border-gray-700 pb-4 gap-4">
+            <div class="text-left">
+                <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">Set List Creator</h1>
+                <div class="flex flex-col md:flex-row gap-4 mt-2">
+                    <p class="text-gray-400 text-sm mt-1">4 Sets • Total Time: <span id="grand-total-time" class="text-white font-mono">0:00:00</span></p>
+                    
+                    <!-- Singer Legend -->
+                    <div class="flex gap-2 items-center text-xs font-bold bg-gray-800 px-3 py-1 rounded-full border border-gray-700">
+                        <span class="text-gray-500 uppercase tracking-wide mr-1">Vocals:</span>
+                        <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500"></span> <span class="text-green-400">Darren</span></div>
+                        <div class="flex items-center gap-1 ml-2"><span class="w-2 h-2 rounded-full bg-blue-500"></span> <span class="text-blue-400">Jeff</span></div>
+                        <div class="flex items-center gap-1 ml-2"><span class="w-2 h-2 rounded-full bg-pink-500"></span> <span class="text-pink-400">Melissa</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-3 no-print items-center flex-wrap justify-end">
+                <!-- Emergency Buttons -->
+                <button onclick="activateTwoStep()" class="bg-red-600 hover:bg-red-500 text-white px-3 py-2 rounded-lg transition text-xs md:text-sm flex items-center gap-2 border border-red-500 shadow-lg shadow-red-900/20 font-bold animate-pulse hover:animate-none">
+                    🚨 Emergency Two Step
+                </button>
+                <button onclick="activate50s()" class="bg-teal-600 hover:bg-teal-500 text-white px-3 py-2 rounded-lg transition text-xs md:text-sm flex items-center gap-2 border border-teal-500 shadow-lg shadow-teal-900/20 font-bold animate-pulse hover:animate-none">
+                    🎸 Emergency 50s
+                </button>
+                <button onclick="activatePopHits()" class="bg-pink-600 hover:bg-pink-500 text-white px-3 py-2 rounded-lg transition text-xs md:text-sm flex items-center gap-2 border border-pink-500 shadow-lg shadow-pink-900/20 font-bold animate-pulse hover:animate-none">
+                    🎤 Emergency Pop
+                </button>
+                <div class="w-px h-8 bg-gray-700 mx-2 hidden md:block"></div>
+                <button onclick="downloadAllImage()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg transition text-sm flex items-center gap-2 border border-indigo-500 shadow-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    Save Image
+                </button>
+                <button onclick="window.print()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg transition text-sm flex items-center gap-2 border border-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                    Print
+                </button>
+            </div>
+        </header>
+
+        <!-- Tabs -->
+        <div class="mb-6 flex space-x-1 bg-gray-800 p-1 rounded-xl no-print tab-nav overflow-x-auto">
+            <button onclick="switchTab('christmas')" id="tab-christmas" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none text-white bg-gray-700 shadow whitespace-nowrap">Christmas Party 2025</button>
+            <button onclick="switchTab('custom')" id="tab-custom" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none text-gray-400 hover:text-white hover:bg-gray-750 whitespace-nowrap">Create Your Own</button>
+            <button onclick="switchTab('originals')" id="tab-originals" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none text-gray-400 hover:text-white hover:bg-gray-750 whitespace-nowrap">Band Originals</button>
+            <button onclick="switchTab('twostep')" id="tab-twostep" class="hidden flex-1 py-2 px-4 rounded-lg text-sm font-bold transition focus:outline-none text-red-400 hover:text-white hover:bg-gray-750 border border-red-900/30 whitespace-nowrap">🚨 Two Step</button>
+            <button onclick="switchTab('fifties')" id="tab-fifties" class="hidden flex-1 py-2 px-4 rounded-lg text-sm font-bold transition focus:outline-none text-teal-400 hover:text-white hover:bg-gray-750 border border-teal-900/30 whitespace-nowrap">🎸 50s</button>
+            <button onclick="switchTab('pophits')" id="tab-pophits" class="hidden flex-1 py-2 px-4 rounded-lg text-sm font-bold transition focus:outline-none text-pink-400 hover:text-white hover:bg-gray-750 border border-pink-900/30 whitespace-nowrap">🎤 Pop Hits</button>
+        </div>
+
+        <!-- Custom Tab Controls (Only shows on Custom Tab) -->
+        <div id="custom-controls" class="no-print mb-6 hidden">
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 flex flex-wrap gap-4 items-center justify-between">
+                <div class="text-sm text-gray-400">
+                    <span class="text-indigo-400 font-bold">Auto-Save:</span> Your changes are saved to this browser automatically.
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="exportCustomData()" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Save to File
+                    </button>
+                    <label class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition cursor-pointer">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        Load from File
+                        <input type="file" id="import-file" class="hidden" accept=".json" onchange="importCustomData(this)">
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Section -->
+        <div class="no-print bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 mb-8">
+            <h3 class="text-sm uppercase tracking-wide text-gray-400 font-bold mb-4 border-b border-gray-700 pb-2">Add New / Custom Song</h3>
+            <form id="add-song-form" class="flex flex-col md:flex-row gap-4 items-end">
+                <div class="flex-grow w-full">
+                    <label class="block text-xs uppercase tracking-wide text-gray-500 font-bold mb-2" for="song-title">Song Title & Artist</label>
+                    <input type="text" id="song-title" class="w-full bg-gray-900 text-white border border-gray-600 rounded-lg py-3 px-4 focus:outline-none focus:border-indigo-500 transition" placeholder="e.g. White Christmas - Bing Crosby" required>
+                </div>
+                <div class="w-full md:w-32">
+                    <label class="block text-xs uppercase tracking-wide text-gray-500 font-bold mb-2" for="song-duration">Time</label>
+                    <input type="text" id="song-duration" class="w-full bg-gray-900 text-white border border-gray-600 rounded-lg py-3 px-4 focus:outline-none focus:border-indigo-500 transition text-center" placeholder="3:30">
+                </div>
+                <div class="w-full md:w-40">
+                    <label class="block text-xs uppercase tracking-wide text-gray-500 font-bold mb-2" for="target-set">Add To</label>
+                    <select id="target-set" class="w-full bg-gray-900 text-white border border-gray-600 rounded-lg py-3 px-4 focus:outline-none focus:border-indigo-500 transition">
+                        <option value="0">Set 1</option>
+                        <option value="1">Set 2</option>
+                        <option value="2">Set 3</option>
+                        <option value="3">Set 4</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-lg transition shadow-lg flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Add
+                </button>
+            </form>
+        </div>
+
+        <!-- Sets Grid -->
+        <div id="sets-capture-area" class="p-2 -m-2 bg-gray-900">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+                
+                <!-- Set 1 -->
+                <div id="set-container-0" class="set-container bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-700 flex flex-col">
+                    <div class="p-4 bg-gray-750 border-b border-gray-700 flex justify-between items-center bg-gray-800">
+                        <h2 class="text-xl font-bold text-green-400">Set 1</h2>
+                        <!-- Header populated in JS -->
+                    </div>
+                    <ul id="list-set-0" class="divide-y divide-gray-700 overflow-y-auto max-h-[600px] flex-grow min-h-[50px]"></ul>
+                </div>
+
+                <!-- Set 2 -->
+                <div id="set-container-1" class="set-container bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-700 flex flex-col">
+                    <div class="p-4 bg-gray-750 border-b border-gray-700 flex justify-between items-center bg-gray-800">
+                        <h2 class="text-xl font-bold text-green-400">Set 2</h2>
+                    </div>
+                    <ul id="list-set-1" class="divide-y divide-gray-700 overflow-y-auto max-h-[600px] flex-grow min-h-[50px]"></ul>
+                </div>
+
+                <!-- Set 3 -->
+                <div id="set-container-2" class="set-container bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-700 flex flex-col">
+                    <div class="p-4 bg-gray-750 border-b border-gray-700 flex justify-between items-center bg-gray-800">
+                        <h2 class="text-xl font-bold text-green-400">Set 3</h2>
+                    </div>
+                    <ul id="list-set-2" class="divide-y divide-gray-700 overflow-y-auto max-h-[600px] flex-grow min-h-[50px]"></ul>
+                </div>
+
+                <!-- Set 4 -->
+                <div id="set-container-3" class="set-container bg-gray-800 rounded-xl shadow-xl overflow-hidden border border-gray-700 flex flex-col">
+                    <div class="p-4 bg-gray-750 border-b border-gray-700 flex justify-between items-center bg-gray-800">
+                        <h2 class="text-xl font-bold text-green-400">Set 4</h2>
+                    </div>
+                    <ul id="list-set-3" class="divide-y divide-gray-700 overflow-y-auto max-h-[600px] flex-grow min-h-[50px]"></ul>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Master Song Bank -->
+        <div id="song-bank-section" class="no-print bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden">
+            <div class="p-6 bg-gray-800 border-b border-gray-700 flex flex-col md:flex-row justify-between items-center gap-4">
+                <h2 class="text-2xl font-bold text-indigo-400 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                    Master Song Bank
+                </h2>
+                <div class="relative w-full md:w-64">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    </div>
+                    <input type="text" id="bank-search" oninput="renderBank()" class="w-full bg-gray-900 text-white border border-gray-600 rounded-full py-2 pl-10 pr-4 focus:outline-none focus:border-indigo-500 text-sm" placeholder="Search song bank...">
+                </div>
+            </div>
+            
+            <div class="p-6 bg-gray-850">
+                <div id="bank-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <!-- Bank items render here -->
+                </div>
+            </div>
+        </div>
+
+
+        <div class="mt-8 text-center no-print">
+            <button onclick="resetToDefault()" class="text-indigo-400 hover:text-indigo-300 text-sm underline transition mr-4">Reset Current Tab</button>
+            <button onclick="clearAll()" class="text-red-400 hover:text-red-300 text-sm underline transition">Clear Current Tab</button>
+        </div>
+
+        <!-- Hidden Wrapper for Single Set Printing -->
+        <div id="print-area-wrapper"></div>
+
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center gap-2">
+        <span id="toast-message">Action successful</span>
+    </div>
+
+    <!-- Copy Modal -->
+    <div id="copy-modal" class="fixed inset-0 bg-black/70 z-50 hidden flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-gray-800 p-6 rounded-xl border border-gray-600 shadow-2xl w-full max-w-sm">
+            <h3 class="text-xl font-bold text-white mb-2">Copy Set to "Create Your Own"</h3>
+            <p class="text-gray-400 text-sm mb-4">Select which Custom Set (1-4) you want to copy these songs into.</p>
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <button onclick="executeCopy(0)" class="bg-gray-700 hover:bg-indigo-600 hover:text-white p-3 rounded-lg transition border border-gray-600">Custom Set 1</button>
+                <button onclick="executeCopy(1)" class="bg-gray-700 hover:bg-indigo-600 hover:text-white p-3 rounded-lg transition border border-gray-600">Custom Set 2</button>
+                <button onclick="executeCopy(2)" class="bg-gray-700 hover:bg-indigo-600 hover:text-white p-3 rounded-lg transition border border-gray-600">Custom Set 3</button>
+                <button onclick="executeCopy(3)" class="bg-gray-700 hover:bg-indigo-600 hover:text-white p-3 rounded-lg transition border border-gray-600">Custom Set 4</button>
+            </div>
+            <button onclick="closeCopyModal()" class="w-full text-gray-500 hover:text-gray-300 py-2 text-sm">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Data ---
+        // 1. Christmas Data (UPDATED to match screenshots)
+        const christmasData = [
+            // Set 1
+            [
+                { title: "Cleopatra (The Lumineers)", durationStr: "0:00" },
+                { title: "Island In The Sun (Weezer)", durationStr: "0:00" },
+                { title: "Ahead By A Century (Tragically Hip)", durationStr: "0:00" },
+                { title: "Blue Christmas (Elvis Presley)", durationStr: "0:00" },
+                { title: "Dont Walk Away Eileen (Sam Roberts)", durationStr: "0:00" },
+                { title: "A Little Something (Melissa Majeau)", durationStr: "0:00" },
+                { title: "Green River (CCR)", durationStr: "0:00" },
+                { title: "Flowers (Miley Cyrus)", durationStr: "0:00" },
+                { title: "Dancing In The Dark (Bruce Springsteen)", durationStr: "0:00" },
+                { title: "Blow At High Dough (Tragically Hip)", durationStr: "0:00" },
+                { title: "ALL APOLOGIES (Nirvana)", durationStr: "0:00" },
+                { title: "I Need Never Get Old (Nathaniel Rateliff)", durationStr: "0:00" },
+                { title: "Santa Bring My Baby Back To Me (Elvis)", durationStr: "0:00" },
+                { title: "Dreams (Fleetwood Mac)", durationStr: "0:00" },
+                { title: "Folsom Prison Blues (Johnny Cash)", durationStr: "0:00" },
+                { title: "My Babe (Willie Dixon / Little Walter)", durationStr: "0:00" },
+                { title: "Harvest Moon (Neil Young)", durationStr: "0:00" },
+                { title: "Jolene (Dolly Parton)", durationStr: "0:00" },
+                { title: "Colors (Black Pumas)", durationStr: "0:00" }
+            ],
+            // Set 2
+            [
+                { title: "SOMETHING IN THE ORANGE (Zach Bryan)", durationStr: "0:00" },
+                { title: "Christmas (Baby Please Come Home) (Darlene Love)", durationStr: "0:00" },
+                { title: "Don't Want to Wait (Darren Maltais)", durationStr: "0:00" },
+                { title: "Layla (Derek and the Dominos)", durationStr: "0:00" },
+                { title: "I'm On Fire (Bruce Springsteen)", durationStr: "0:00" },
+                { title: "Those Days (Darren Maltais)", durationStr: "0:00" },
+                { title: "Jingle Bell Rock (Bobby Helms)", durationStr: "0:00" },
+                { title: "You Wreck Me (Tom Petty)", durationStr: "0:00" },
+                { title: "Steal My Kisses (Ben Harper)", durationStr: "0:00" },
+                { title: "Blank Space (Ryan Adams)", durationStr: "0:00" },
+                { title: "Pride And Joy (Stevie Ray Vaughan)", durationStr: "0:00" },
+                { title: "Tonight in Black and White (Jeff McLellan)", durationStr: "0:00" },
+                { title: "Santa Claus Is Coming To Town (Bruce Springsteen)", durationStr: "0:00" },
+                { title: "REAL LOVE BABY (Father John Misty)", durationStr: "0:00" },
+                { title: "Five Dollar Bill (Corb Lund)", durationStr: "0:00" },
+                { title: "Cadillac Ranch (Bruce Springsteen)", durationStr: "0:00" },
+                { title: "American Girl (Tom Petty)", durationStr: "0:00" },
+                { title: "Get Back (The Beatles)", durationStr: "0:00" },
+                { title: "King Of The Road (Dean Martin/Roger Miller)", durationStr: "0:00" },
+                { title: "Heart of Glass (Blondie)", durationStr: "0:00" },
+                { title: "Johnny B. Goode (Chuck Berry)", durationStr: "0:00" },
+                { title: "Rhiannon (Fleetwood Mac)", durationStr: "0:00" },
+                { title: "No Bright Light (Darren Maltais)", durationStr: "0:00" },
+                { title: "Blister In The Sun (Violent Femmes)", durationStr: "0:00" }
+            ],
+            // Set 3
+            [
+                { title: "Cry Me A River (Justin Timberlake)", durationStr: "0:00" },
+                { title: "Back To Black (Amy Winehouse)", durationStr: "0:00" },
+                { title: "Can't Let Go (Lucinda Williams)", durationStr: "0:00" },
+                { title: "No Diggity (Blackstreet)", durationStr: "0:00" },
+                { title: "I Shot The Sheriff (Bob Marley)", durationStr: "0:00" },
+                { title: "Hand it over (Darren Maltais)", durationStr: "0:00" },
+                { title: "That's All Right Mama (Elvis Presley)", durationStr: "0:00" },
+                { title: "Runaround Sue (Dion)", durationStr: "0:00" },
+                { title: "Zombie (The Cranberries)", durationStr: "0:00" },
+                { title: "You Can't Judge A Book By The Cover (Bo Diddley)", durationStr: "0:00" },
+                { title: "Fishin' In The Dark (Nitty Gritty Dirt Band)", durationStr: "0:00" },
+                { title: "Paper Planes (M.I.A.)", durationStr: "0:00" },
+                { title: "Blitzkrieg Bop (The Ramones)", durationStr: "0:00" },
+                { title: "Day Tripper (The Beatles)", durationStr: "0:00" },
+                { title: "Driving My Life Away (Eddie Rabbitt)", durationStr: "0:00" },
+                { title: "Beautiful things (Darren Maltais)", durationStr: "0:00" },
+                { title: "Blindman River (Melissa Majeau)", durationStr: "0:00" },
+                { title: "Tennessee Whiskey (Chris Stapleton)", durationStr: "0:00" },
+                { title: "Another Road Home (Jeff McLellan)", durationStr: "0:00" },
+                { title: "Oh Boy (Buddy Holly)", durationStr: "0:00" },
+                { title: "Life Of Sin (Sturgill Simpson)", durationStr: "0:00" },
+                { title: "Hungry Like The Wolf (Duran Duran)", durationStr: "0:00" }
+            ],
+            // Set 4
+            [
+                { title: "Paranoid (Black Sabbath)", durationStr: "0:00" },
+                { title: "It Takes a Lot to Laugh (Bob Dylan)", durationStr: "0:00" },
+                { title: "Flowers In Your Hair (The Lumineers)", durationStr: "0:00" },
+                { title: "Faith (Wham)", durationStr: "0:00" },
+                { title: "Still Falling (Jeff McLellan)", durationStr: "0:00" },
+                { title: "Driving My Life Away (Reprise?)", durationStr: "0:00" },
+                { title: "Norwegian Wood (The Beatles)", durationStr: "0:00" },
+                { title: "Bottom Feeders (Melissa Majeau)", durationStr: "0:00" },
+                { title: "Creep (Radiohead)", durationStr: "0:00" },
+                { title: "S.O.B. (Nathaniel Rateliff)", durationStr: "0:00" },
+                { title: "What'd I Say (Ray Charles)", durationStr: "0:00" },
+                { title: "Long Ride (Melissa Majeau)", durationStr: "0:00" },
+                { title: "The Thrill Is Gone (BB King)", durationStr: "0:00" },
+                { title: "Rocket Man (Elton John)", durationStr: "0:00" }
+            ]
+        ];
+
+        // 2. Band Originals Data (Filtered)
+        const originalsData = [
+            [], [], [], [] // 4 empty sets to fill
+        ];
+
+        const jeffSongs = ["Tonight in Black and White (Jeff McLellan)", "Still Fallin' (Jeff McLellan)", "Before Our Graves (Jeff McLellan)", "Another Road Home (Jeff McLellan)", "Havens to Hendrix (Jeff McLellan)", "Spark (Jeff McLellan)", "Blindman River (Jeff McLellan)"];
+        const melissaSongs = ["A Little Something (Melissa Majeau)", "Blindman River (Melissa Majeau)", "Bottom Feeders (Melissa Majeau)", "Long Ride (Melissa Majeau)", "No Denial (Melissa Majeau)", "Sugar Daddy (Melissa Majeau)"];
+        const darrenSongs = ["No Bright Light (Darren Maltais)", "Hand it Over (Darren Maltais)", "Beautiful Things (Darren Maltais)", "Don't Want to Wait (Darren Maltais)", "A Simple Thing (Darren Maltais)", "Is Your Heart a Map (Darren Maltais)", "Just Another Number (Darren Maltais)", "Lonesome Grave (Darren Maltais)", "I Wonder (Darren Maltais)", "Memento (Darren Maltais)"];
+
+        // Pre-populate Originals Tab
+        originalsData[0] = jeffSongs.map(t => ({ title: t, durationStr: "0:00" }));
+        originalsData[1] = melissaSongs.map(t => ({ title: t, durationStr: "0:00" }));
+        originalsData[2] = darrenSongs.map(t => ({ title: t, durationStr: "0:00" }));
+
+        // 3. Two Step Emergency Data (Strictly Filtered)
+        // Songs verified in rawBankData
+        const twoStepCore1 = [
+            "Folsom Prison Blues (Johnny Cash)",
+            "Fishin' in the Dark (Nitty Gritty Dirt Band)",
+            "Driving My Life Away (Eddie Rabbitt)",
+            "Cadillac Ranch (Bruce Springsteen)",
+            "Green River (CCR)",
+            "Ring of Fire",
+            "I Walk the Line"
+        ];
+        const twoStepCore2 = [
+            "Jambalaya",
+            "Wagon Wheel",
+            "Five Dollar Bill (Corb Lund)",
+            "Guitar Town",
+            "Looking Out My Back Door",
+            "Midnight Rider",
+            "That's Alright",
+            "Galway Girl",
+            "Tennessee Whiskey"
+        ];
+        // Ideas NOT in bank
+        const twoStepOptions = [
+            "Copperhead Road", 
+            "Boot Scootin' Boogie",
+            "Chattahoochee",
+            "Neon Moon",
+            "Friends in Low Places",
+            "Chicken Fried",
+            "Take Me Home, Country Roads",
+            "On the Road Again"
+        ];
+
+        const twoStepData = [
+            twoStepCore1.map(t => ({ title: t, durationStr: "0:00" })),
+            twoStepCore2.map(t => ({ title: t, durationStr: "0:00" })),
+            twoStepOptions.map(t => ({ title: t, durationStr: "0:00" })),
+            [] 
+        ];
+
+        // 4. 50s Emergency Data (Strictly Filtered)
+        // Songs verified in rawBankData
+        const fiftiesCore1 = [
+            "Johnny B. Goode (Chuck Berry)",
+            "Runaround Sue (Dion)",
+            "That's Alright (Elvis)",
+            "Oh Boy (Buddy Holly)"
+        ];
+        // Filling Set 2 with other upbeat/oldies from bank since strictly 50s list is short
+        const fiftiesCore2 = [
+            "You Can't Judge a Book (Bo Diddley)",
+            "My Babe",
+            "Blue Christmas",
+            "Santa Bring My Baby Back To Me"
+        ];
+        // Ideas NOT in bank
+        const fiftiesOptions = [
+             "Blue Suede Shoes",
+             "Great Balls of Fire",
+             "Hound Dog",
+             "La Bamba",
+             "Jailhouse Rock",
+             "Rock Around the Clock",
+             "Whole Lotta Shakin'",
+             "Wake Up Little Susie",
+             "That'll Be The Day",
+             "Peggy Sue",
+             "Summertime Blues",
+             "Twist and Shout",
+             "Tequila",
+             "Chantilly Lace",
+             "At the Hop",
+             "Yakety Yak"
+        ];
+
+        const fiftiesData = [
+            fiftiesCore1.map(t => ({ title: t, durationStr: "0:00" })),
+            fiftiesCore2.map(t => ({ title: t, durationStr: "0:00" })),
+            fiftiesOptions.map(t => ({ title: t, durationStr: "0:00" })),
+            [] 
+        ];
+
+        // 5. Pop Emergency Data (Strictly Filtered)
+        // Songs verified in rawBankData
+        const popCore1 = [
+            "Flowers (Miley Cyrus)",
+            "Blank Space (Ryan Adams/Taylor Swift)",
+            "Hey Ya",
+            "Seven Nation Army",
+            "Valerie",
+            "Cleopatra (The Lumineers)",
+            "Little Lion Man"
+        ];
+        const popCore2 = [
+            "No Diggity",
+            "Paper Planes",
+            "Steal My Kisses",
+            "Zombie",
+            "Use Somebody",
+            "Rolling in the Deep",
+            "Cry Me a River",
+            "Faith",
+            "Heart of Glass"
+        ];
+        // Ideas NOT in bank
+        const popOptions = [
+            "Uptown Funk",
+            "Mr. Brightside",
+            "Shut Up and Dance",
+            "I Gotta Feeling",
+            "Shake It Off",
+            "Party in the U.S.A.",
+            "Call Me Maybe",
+            "Sweet Caroline"
+        ];
+
+        const popHitsData = [
+            popCore1.map(t => ({ title: t, durationStr: "0:00" })),
+            popCore2.map(t => ({ title: t, durationStr: "0:00" })),
+            popOptions.map(t => ({ title: t, durationStr: "0:00" })),
+            []
+        ];
+
+        // 6. Custom Data
+        let customData = [[], [], [], []];
+
+        // State Management
+        let currentTab = 'christmas'; 
+        let setCollections = {
+            christmas: JSON.parse(JSON.stringify(christmasData)),
+            custom: customData,
+            originals: JSON.parse(JSON.stringify(originalsData)),
+            twostep: JSON.parse(JSON.stringify(twoStepData)),
+            fifties: JSON.parse(JSON.stringify(fiftiesData)),
+            pophits: JSON.parse(JSON.stringify(popHitsData))
+        };
+        
+        let sortables = [];
+
+        // Load custom data from LocalStorage if available
+        if(localStorage.getItem('myCustomSets')) {
+            try {
+                setCollections.custom = JSON.parse(localStorage.getItem('myCustomSets'));
+            } catch(e) {
+                console.error("Could not load saved sets");
+            }
+        }
+
+        // The Master Bank List
+        const rawBankData = [
+            "A Little Something (Melissa Majeau)", "A Simple Thing (Darren Maltais)", "Ahead by a Century", "All Apologies", 
+            "American Girl (Tom Petty)", "Another Road Home", "Auld Lang Syne", 
+            "Baby It's Cold Outside", "Baby What You Want", "Baby What you Want me to Do?", "Back to Black", "Beautiful Things", 
+            "Before our Graves", "Big Change", "Big River", "Blank Space (Ryan Adams)", "Blindman River", 
+            "Blister in the Sun", "Blitzkrieg Bop", "Blow at High Dough", "Blue Christmas", 
+            "Bobcaygeon", "Bottom Feeders", "Brown Eyed Girl", "Cadillac Ranch", "California Stars", 
+            "Can't Let Go", "Christmas (Baby Please Come Home)", "Christmas All Over Again", "Cleopatra", "Cold Shot", 
+            "Colors (The Black Pumas)", "Creep", "Cry Me a River", "Cry to Me", "Dancing in the Dark", 
+            "Day Tripper", "Dirty Old Town", "Don't Walk Away Eileen", "Don't Want to Wait (Darren Maltais)", "Dreams", 
+            "Drivin' my Life Away", "Faith", "Fishin' in the Dark", "Five Dollar Bill", "Flowers", 
+            "Flowers in your Hair", "Folsom Prison Blues", "Galway Girl", "Get Back", "Green River", 
+            "Guitar Town", "Hand it Over", "Hard Sun", "Harlem River Blues (JTE)", "Harvest Moon", 
+            "Hasn't Hit Me Yet", "Havens to Hendrix (Jeff McLellan)", "Heart of Glass", "Here Comes Santa Claus", "Hey Ya", 
+            "Holly Jolly Christmas", "Honey Bee (Tom Petty)", "Hungry Like the Wolf", "I Shot the Sheriff", "I Walk the Line", 
+            "I Wonder (Darren Maltais)", "I'm on Fire", "Is Your Heart a Map (Darren Maltais)", "Island In The Sun", "It Takes a lot to Laugh", 
+            "It's Beginning to Look a Lot Like Christmas", "Jambalaya", "Jingle Bell Rock", "Jingle Bells", "Johnny B. Goode", "Jolene", "Joy of my Life", 
+            "Just Another Number (Darren Maltais)", "Just What I Needed", "KD and Lunch Meat (Boy Golden)", "Keep on Rockin in the Free World", 
+            "King of the Road", "Layla", "Learning to Fly", "Let it Snow", "Life of Sin", 
+            "Little Lion Man", "Lonesome Grave (Darren Maltais)", "Long Ride", "Looking Out My Back Door", 
+            "Lost Together (Blue Rodeo)", "Marshmallow World", "Mary Mac", "Mele Kalikimaka", "Memento (Darren Maltais)", "Midnight Rider", "My Babe", 
+            "Need Never Get Old", "No Bright Light", "No Denial (Melissa Majeau)", "No Diggity", "Norwegian Wood", 
+            "Oh Boy", "Ophelia (The Band)", "Paper Planes", "Paranoid", "Pride and Joy", 
+            "Real Love Baby", "Rhiannon", "Ring of Fire", "Rockin' Around the Christmas Tree", "Rocket Man", "Rudolph", "Runaround Sue", 
+            "Santa Bring My Baby Back To Me", "Santa Claus Is Coming To Town", "Seven Nation Army", 
+            "Silver Bells", "SOB", "Something in the Orange", "Spark (Darren Maltais)", 
+            "Steal My Kisses", "Still Fallin'", "Sugar Daddy (Melissa Majeau)", "Sunflower", "Tennessee Whiskey", 
+            "That's Alright", "The Man Who Sold the World", "The One I Love (REM)", "The Thrill is Gone", 
+            "The Weight", "Those Days", "Tonight in Black and White", "Too Sweet", "Valerie", 
+            "Wagon Wheel", "What'd I say?", "When Doves Cry", "White Christmas", "Wild Rover", "Winter Wonderland", "You Can't Judge a Book", 
+            "You Wreck Me", "Zombie", "Rolling in the Deep", "Use Somebody"
+        ];
+
+        // Sort Bank Alphabetically
+        const masterBank = rawBankData.sort();
+
+        // --- Logic ---
+
+        // Singer Assignments (Simplified for brevity, logic remains same)
+        const singerMap = {
+            "Ahead By A Century": "Jeff",
+            "Blow At High Dough": "Jeff",
+            "All Apologies": "Jeff",
+            "ALL APOLOGIES": "Jeff",
+            "I'm On Fire": "D/M", 
+            "Dreams": "Melissa",
+            "Jolene": "Melissa",
+            "Heart of Glass": "Melissa",
+            "Rhiannon": "Melissa",
+            "Blister In The Sun": "Jeff",
+            "Can't Let Go": "Melissa",
+            "Cant Let Go": "Melissa",
+            "I Shot The Sheriff": "Jeff",
+            "You Wreck Me": "Jeff",
+            "Norwegian Wood": "Jeff",
+            "Johnny B. Goode": "Jeff",
+            "Johnny B Goode": "Jeff",
+            "Brown Eyed Girl": "Jeff",
+            "Cadillac Ranch": "Jeff",
+            "Flowers": "Melissa",
+            "Valerie": "Melissa",
+            "Layla": "Jeff",
+            "Blindman River": "Melissa",
+            "Zombie": "Melissa"
+        };
+
+        function getSinger(titleStr) {
+            const cleanTitle = titleStr.toLowerCase();
+            for (const [key, value] of Object.entries(singerMap)) {
+                if (cleanTitle.includes(key.toLowerCase())) {
+                    return value;
+                }
+            }
+            if (cleanTitle.includes("jeff mclellan")) return "Jeff";
+            if (cleanTitle.includes("melissa majeau")) return "Melissa";
+            if (cleanTitle.includes("darren maltais")) return "Darren";
+            return "Darren";
+        }
+
+        function activateTwoStep() {
+            document.getElementById('tab-twostep').classList.remove('hidden');
+            switchTab('twostep');
+            showToast("🚨 Emergency Two-Step Protocol Activated!");
+        }
+
+        function activate50s() {
+            document.getElementById('tab-fifties').classList.remove('hidden');
+            switchTab('fifties');
+            showToast("🎸 50s Rock 'n' Roll Protocol Activated!");
+        }
+
+        function activatePopHits() {
+            document.getElementById('tab-pophits').classList.remove('hidden');
+            switchTab('pophits');
+            showToast("🎤 Pop Hits Protocol Activated!");
+        }
+
+        function getSingerBadgeHTML(singer) {
+            if (singer === 'Jeff') {
+                return `<span class="singer-badge inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 text-xs font-bold mr-2 no-print flex-shrink-0" title="Jeff">J</span>`;
+            } else if (singer === 'Melissa') {
+                return `<span class="singer-badge inline-flex items-center justify-center w-6 h-6 rounded-full bg-pink-500/20 text-pink-400 text-xs font-bold mr-2 no-print flex-shrink-0" title="Melissa">M</span>`;
+            } else if (singer === 'D/M') {
+                return `<span class="singer-badge inline-flex items-center justify-center w-8 h-6 rounded-full bg-gradient-to-r from-green-500/20 to-pink-500/20 text-white text-[10px] font-bold mr-2 no-print flex-shrink-0" title="Duet (Darren/Melissa)">D/M</span>`;
+            } else {
+                return `<span class="singer-badge inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500/20 text-green-400 text-xs font-bold mr-2 no-print flex-shrink-0" title="Darren">D</span>`;
+            }
+        }
+
+        function switchTab(tabId) {
+            currentTab = tabId;
+            const controls = document.getElementById('custom-controls');
+            
+            if(tabId === 'custom') {
+                controls.classList.remove('hidden');
+            } else {
+                controls.classList.add('hidden');
+            }
+
+            ['christmas', 'custom', 'originals', 'twostep', 'fifties', 'pophits'].forEach(t => {
+                const btn = document.getElementById(`tab-${t}`);
+                
+                // Reset styling base
+                btn.className = "flex-1 py-2 px-4 rounded-lg text-sm font-medium transition focus:outline-none whitespace-nowrap ";
+                
+                if (t === tabId) {
+                    // Active Styles
+                    if(tabId === 'twostep') {
+                        btn.classList.add('bg-red-900/50', 'text-red-100', 'shadow', 'border', 'border-red-500');
+                    } else if (tabId === 'fifties') {
+                        btn.classList.add('bg-teal-900/50', 'text-teal-100', 'shadow', 'border', 'border-teal-500');
+                    } else if (tabId === 'pophits') {
+                        btn.classList.add('bg-pink-900/50', 'text-pink-100', 'shadow', 'border', 'border-pink-500');
+                    } else {
+                        btn.classList.add('text-white', 'bg-gray-700', 'shadow');
+                    }
+                } else {
+                    // Inactive Styles
+                    if(t === 'twostep') {
+                         btn.classList.add('text-red-400', 'hover:text-white', 'hover:bg-gray-750', 'border', 'border-red-900/30', document.getElementById('tab-twostep').classList.contains('hidden') ? 'hidden' : 'block');
+                    } else if (t === 'fifties') {
+                         btn.classList.add('text-teal-400', 'hover:text-white', 'hover:bg-gray-750', 'border', 'border-teal-900/30', document.getElementById('tab-fifties').classList.contains('hidden') ? 'hidden' : 'block');
+                    } else if (t === 'pophits') {
+                         btn.classList.add('text-pink-400', 'hover:text-white', 'hover:bg-gray-750', 'border', 'border-pink-900/30', document.getElementById('tab-pophits').classList.contains('hidden') ? 'hidden' : 'block');
+                    } else {
+                        btn.classList.add('text-gray-400', 'hover:text-white', 'hover:bg-gray-750');
+                    }
+                }
+            });
+            render();
+            const tabName = document.getElementById(`tab-${tabId}`).innerText.replace(/🚨|🎸|🎤/g, '').trim();
+            showToast(`Switched to ${tabName}`);
+        }
+
+        function saveCustomData() {
+            if (currentTab === 'custom') {
+                localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
+            }
+        }
+
+        // --- Copy to Custom Logic ---
+        let sourceSetToCopy = null;
+
+        function openCopyModal(setIdx) {
+            sourceSetToCopy = setIdx;
+            document.getElementById('copy-modal').classList.remove('hidden');
+        }
+
+        function closeCopyModal() {
+            document.getElementById('copy-modal').classList.add('hidden');
+            sourceSetToCopy = null;
+        }
+
+        function executeCopy(targetSetIdx) {
+            if(sourceSetToCopy === null) return;
+            const sourceSongs = setCollections[currentTab][sourceSetToCopy];
+            const songsToCopy = JSON.parse(JSON.stringify(sourceSongs));
+            setCollections.custom[targetSetIdx] = setCollections.custom[targetSetIdx].concat(songsToCopy);
+            localStorage.setItem('myCustomSets', JSON.stringify(setCollections.custom));
+            closeCopyModal();
+            showToast(`Copied ${songsToCopy.length} songs to Custom Set ${targetSetIdx + 1}`);
+        }
+
+        // --- Export / Import ---
+
+        function exportCustomData() {
+            const dataStr = JSON.stringify(setCollections.custom, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', 'my_setlists.json');
+            linkElement.click();
+            showToast("Setlist file saved to downloads!");
+        }
+
+        function importCustomData(input) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const loadedData = JSON.parse(e.target.result);
+                    if(Array.isArray(loadedData) && loadedData.length === 4) {
+                        if(confirm("This will overwrite your current 'Create Your Own' sets. Continue?")) {
+                            setCollections.custom = loadedData;
+                            saveCustomData();
+                            render();
+                            showToast("Setlists loaded successfully!");
+                        }
+                    } else {
+                        alert("Invalid file format.");
+                    }
+                } catch(err) {
+                    alert("Error reading file.");
+                }
+                input.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function timeToSeconds(str) {
+            if(!str) return 0;
+            const p = str.split(':').reverse();
+            let s = 0;
+            if(p[0]) s += parseInt(p[0]) || 0;
+            if(p[1]) s += (parseInt(p[1]) || 0) * 60;
+            return s;
+        }
+
+        function secondsToTime(s) {
+            const h = Math.floor(s/3600);
+            const m = Math.floor((s%3600)/60);
+            const sec = s%60;
+            const secStr = sec.toString().padStart(2, '0');
+            if(h > 0) {
+                const mStr = m.toString().padStart(2, '0');
+                return `${h}:${mStr}:${secStr}`;
+            }
+            return `${m}:${secStr}`;
+        }
+
+        function render() {
+            sortables.forEach(s => s.destroy());
+            sortables = [];
+
+            let grandTotalSeconds = 0;
+            const activeSets = setCollections[currentTab];
+
+            for(let i=0; i<4; i++) {
+                const container = document.getElementById(`set-container-${i}`);
+                const listEl = document.getElementById(`list-set-${i}`);
+                const setSongs = activeSets[i];
+                
+                const headerDiv = container.querySelector('.p-4');
+                let title = `Set ${i+1}`;
+                let titleClass = "text-xl font-bold text-green-400";
+
+                if(currentTab === 'originals') {
+                    const titles = ["Jeff's Originals", "Melissa's Originals", "Darren's Originals", "Other / Unassigned"];
+                    title = titles[i];
+                }
+                if(currentTab === 'twostep') {
+                    const titles = ["🚨 Two Step Set 1", "🚨 Two Step Set 2", "💡 Other Options", "Requests"];
+                    title = titles[i];
+                    titleClass = "text-xl font-bold text-red-400";
+                    if(i===2) titleClass = "text-xl font-bold text-yellow-400";
+                }
+                if(currentTab === 'fifties') {
+                    const titles = ["🎸 50s Set 1", "🎸 50s Set 2", "💡 Other Options", "Requests"];
+                    title = titles[i];
+                    titleClass = "text-xl font-bold text-teal-400";
+                    if(i===2) titleClass = "text-xl font-bold text-yellow-400";
+                }
+                if(currentTab === 'pophits') {
+                    const titles = ["🎤 Pop Set 1", "🎤 Pop Set 2", "💡 Other Options", "Requests"];
+                    title = titles[i];
+                    titleClass = "text-xl font-bold text-pink-400";
+                    if(i===2) titleClass = "text-xl font-bold text-yellow-400";
+                }
+
+                let setSeconds = 0;
+                setSongs.forEach(s => setSeconds += timeToSeconds(s.durationStr));
+                grandTotalSeconds += setSeconds;
+
+                const copyBtn = currentTab !== 'custom' ? `
+                    <button onclick="openCopyModal(${i})" class="text-indigo-400 hover:text-white p-1 hover:bg-gray-600 rounded flex items-center gap-1 text-xs font-bold border border-transparent hover:border-gray-500" title="Copy to 'Create Your Own'">
+                        COPY
+                    </button>
+                    <div class="w-px h-4 bg-gray-600 mx-1"></div>
+                ` : '';
+
+                headerDiv.innerHTML = `
+                    <h2 class="${titleClass}">${title}</h2>
+                    <div class="flex items-center gap-3">
+                        <span class="font-mono text-gray-400 bg-gray-900 px-2 py-1 rounded text-sm">${secondsToTime(setSeconds)}</span>
+                        <div class="flex gap-1 no-print items-center" data-html2canvas-ignore>
+                            ${copyBtn}
+                            <button onclick="downloadSetImage(${i})" class="text-gray-400 hover:text-white p-1 hover:bg-gray-600 rounded" title="Save Image">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                            </button>
+                            <button onclick="printSingleSet(${i})" class="text-gray-400 hover:text-white p-1 hover:bg-gray-600 rounded" title="Print Set">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                listEl.innerHTML = '';
+
+                if(setSongs.length === 0) {
+                    listEl.innerHTML = `<li class="p-4 text-gray-500 text-center text-sm italic">Empty Set</li>`;
+                } else {
+                    setSongs.forEach((song, idx) => {
+                        const safeTitle = song.title.replace(/"/g, '&quot;');
+                        const singer = getSinger(song.title);
+                        const badgeHTML = getSingerBadgeHTML(singer);
+                        
+                        listEl.innerHTML += `
+                            <li class="group flex items-center justify-between p-3 hover:bg-gray-750 transition border-l-4 border-transparent hover:border-indigo-500 bg-gray-800 odd:bg-gray-800 even:bg-gray-800/50" data-title="${safeTitle}">
+                                <div class="flex items-center gap-3 overflow-hidden">
+                                    <div class="drag-handle cursor-grab text-gray-600 hover:text-gray-400 no-print" title="Drag to reorder">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+                                    </div>
+                                    <span class="text-gray-500 font-mono text-xs w-5 text-right no-print select-none">${idx + 1}.</span>
+                                    <div class="truncate pr-2 flex-grow flex items-center">
+                                        ${badgeHTML}
+                                        <div class="text-gray-200 text-sm md:text-base print-black truncate" title="${song.title}">${song.title}</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    <input type="text" 
+                                        value="${song.durationStr === '0:00' ? '' : song.durationStr}" 
+                                        placeholder="0:00"
+                                        class="duration-input w-12 bg-transparent text-right text-cyan-400 font-mono text-sm focus:outline-none focus:text-white placeholder-gray-600 no-print"
+                                        onchange="updateDuration(${i}, ${idx}, this.value)"
+                                    >
+                                    <span class="hidden print-block text-sm font-mono text-black">${song.durationStr}</span>
+                                    
+                                    <!-- Controls -->
+                                    <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity no-print">
+                                        <button onclick="deleteSong(${i}, ${idx})" class="p-1 hover:text-red-400 text-gray-600">×</button>
+                                    </div>
+                                </div>
+                            </li>
+                        `;
+                    });
+                }
+            }
+            document.getElementById('grand-total-time').textContent = secondsToTime(grandTotalSeconds);
+            initDragAndDrop();
+        }
+
+        function initDragAndDrop() {
+            for(let i=0; i<4; i++) {
+                const el = document.getElementById(`list-set-${i}`);
+                if(el) {
+                    sortables.push(new Sortable(el, {
+                        group: 'shared',
+                        animation: 150,
+                        handle: '.drag-handle',
+                        ghostClass: 'sortable-ghost',
+                        dragClass: 'sortable-drag',
+                        onEnd: handleDragDrop
+                    }));
+                }
+            }
+        }
+        
+        function handleDragDrop() {
+            const newSets = [[], [], [], []];
+            for(let i=0; i<4; i++) {
+                const listEl = document.getElementById(`list-set-${i}`);
+                const items = listEl.querySelectorAll('li[data-title]');
+                items.forEach(item => {
+                    const title = item.getAttribute('data-title');
+                    const durationInput = item.querySelector('.duration-input');
+                    let durationStr = durationInput ? durationInput.value : "0:00";
+                    if(!durationStr) durationStr = "0:00";
+                    newSets[i].push({ title, durationStr });
+                });
+            }
+            setCollections[currentTab] = newSets;
+            saveCustomData();
+            render();
+        }
+
+        function renderBank() {
+            const container = document.getElementById('bank-list');
+            const searchVal = document.getElementById('bank-search').value.toLowerCase();
+            const filtered = masterBank.filter(s => s.toLowerCase().includes(searchVal));
+
+            if(filtered.length === 0) {
+                container.innerHTML = `<div class="col-span-3 text-center text-gray-500 py-4">No songs found</div>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map(song => {
+                const singer = getSinger(song);
+                const badgeHTML = getSingerBadgeHTML(singer);
+                return `
+                <div class="bg-gray-800 border border-gray-700 p-2 rounded flex justify-between items-center group hover:bg-gray-750">
+                    <div class="flex items-center overflow-hidden mr-2">
+                        ${badgeHTML}
+                        <span class="text-sm text-gray-300 truncate" title="${song}">${song}</span>
+                    </div>
+                    <div class="flex gap-1 opacity-50 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                        <button onclick="addFromBank('${song.replace(/'/g, "\\'")}', 0)" class="text-[10px] font-bold bg-gray-700 hover:bg-indigo-600 text-gray-300 hover:text-white w-5 h-5 rounded flex items-center justify-center transition" title="Add to Set 1">1</button>
+                        <button onclick="addFromBank('${song.replace(/'/g, "\\'")}', 1)" class="text-[10px] font-bold bg-gray-700 hover:bg-indigo-600 text-gray-300 hover:text-white w-5 h-5 rounded flex items-center justify-center transition" title="Add to Set 2">2</button>
+                        <button onclick="addFromBank('${song.replace(/'/g, "\\'")}', 2)" class="text-[10px] font-bold bg-gray-700 hover:bg-indigo-600 text-gray-300 hover:text-white w-5 h-5 rounded flex items-center justify-center transition" title="Add to Set 3">3</button>
+                        <button onclick="addFromBank('${song.replace(/'/g, "\\'")}', 3)" class="text-[10px] font-bold bg-gray-700 hover:bg-indigo-600 text-gray-300 hover:text-white w-5 h-5 rounded flex items-center justify-center transition" title="Add to Set 4">4</button>
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        // --- Actions ---
+        const form = document.getElementById('add-song-form');
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const title = document.getElementById('song-title').value.trim();
+            const duration = document.getElementById('song-duration').value.trim() || "0:00";
+            const setIndex = parseInt(document.getElementById('target-set').value);
+            setCollections[currentTab][setIndex].push({ title, durationStr: duration });
+            saveCustomData();
+            render();
+            document.getElementById('song-title').value = '';
+            document.getElementById('song-duration').value = '';
+            showToast('Song Added to Set ' + (setIndex + 1));
+        });
+
+        function addFromBank(title, setIdx) {
+            setCollections[currentTab][setIdx].push({ title: title, durationStr: "0:00" });
+            saveCustomData();
+            render();
+            showToast(`${title} added to Set ${setIdx + 1}`);
+        }
+
+        function updateDuration(setIdx, songIdx, newVal) {
+            let cleanVal = newVal.trim();
+             if (cleanVal.length === 3 && !cleanVal.includes(':') && !isNaN(cleanVal)) {
+                cleanVal = cleanVal.charAt(0) + ':' + cleanVal.substring(1);
+            } else if (cleanVal.length === 4 && !cleanVal.includes(':') && !isNaN(cleanVal)) {
+                cleanVal = cleanVal.substring(0,2) + ':' + cleanVal.substring(2);
+            }
+            setCollections[currentTab][setIdx][songIdx].durationStr = cleanVal || "0:00";
+            saveCustomData();
+            render();
+        }
+
+        function deleteSong(setIdx, songIdx) {
+            setCollections[currentTab][setIdx].splice(songIdx, 1);
+            saveCustomData();
+            render();
+        }
+
+        function clearAll() {
+            if(confirm("Clear all songs from the CURRENT tab?")) {
+                setCollections[currentTab] = [[], [], [], []];
+                saveCustomData();
+                render();
+            }
+        }
+
+        function resetToDefault() {
+            if(confirm("Reset the CURRENT tab to its default state?")) {
+                if(currentTab === 'christmas') setCollections.christmas = JSON.parse(JSON.stringify(christmasData));
+                if(currentTab === 'custom') setCollections.custom = [[],[],[],[]];
+                if(currentTab === 'originals') setCollections.originals = JSON.parse(JSON.stringify(originalsData));
+                if(currentTab === 'twostep') setCollections.twostep = JSON.parse(JSON.stringify(twoStepData));
+                if(currentTab === 'fifties') setCollections.fifties = JSON.parse(JSON.stringify(fiftiesData));
+                if(currentTab === 'pophits') setCollections.pophits = JSON.parse(JSON.stringify(popHitsData));
+                saveCustomData();
+                render();
+            }
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-message').textContent = msg;
+            t.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => t.classList.add('translate-y-20', 'opacity-0'), 3000);
+        }
+
+        function downloadSetImage(index) {
+            const element = document.getElementById(`set-container-${index}`);
+            showToast("Processing image...");
+            html2canvas(element, {
+                scale: 2,
+                backgroundColor: "#1f2937",
+                useCORS: true,
+                onclone: (clonedDoc) => {
+                    const container = clonedDoc.getElementById(`set-container-${index}`);
+                    const list = clonedDoc.getElementById(`list-set-${index}`);
+                    if (container) {
+                        container.style.height = 'auto';
+                        container.style.overflow = 'visible';
+                        container.style.paddingBottom = '40px';
+                    }
+                    if (list) {
+                        list.style.maxHeight = 'none';
+                        list.style.overflow = 'visible';
+                    }
+                    const overflowHidden = container.querySelectorAll('.overflow-hidden');
+                    overflowHidden.forEach(el => { el.style.overflow = 'visible'; el.style.height = 'auto'; });
+                    const textItems = container.querySelectorAll('.truncate');
+                    textItems.forEach(el => {
+                        el.style.whiteSpace = 'normal'; el.style.overflow = 'visible'; el.style.textOverflow = 'clip'; el.style.lineHeight = '1.5'; el.style.paddingBottom = '5px'; el.style.display = 'block';
+                    });
+                }
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `set-${index+1}-${currentTab}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+                showToast("Set saved!");
+            }).catch(err => {
+                console.error(err);
+                showToast("Error generating image");
+            });
+        }
+
+        function downloadAllImage() {
+            window.scrollTo(0,0);
+            const element = document.getElementById('sets-capture-area');
+            showToast("Processing full image...");
+            html2canvas(element, { 
+                backgroundColor: "#111827",
+                scale: 2,
+                onclone: (clonedDoc) => {
+                    const containers = clonedDoc.querySelectorAll('.set-container');
+                    containers.forEach(container => { container.style.height = 'auto'; container.style.overflow = 'visible'; container.style.marginBottom = '40px'; });
+                    const lists = clonedDoc.querySelectorAll('ul[id^="list-set-"]');
+                    lists.forEach(list => { list.style.maxHeight = 'none'; list.style.overflow = 'visible'; });
+                    const overflowHidden = clonedDoc.querySelectorAll('.overflow-hidden');
+                    overflowHidden.forEach(el => { el.style.overflow = 'visible'; el.style.height = 'auto'; });
+                    const textItems = clonedDoc.querySelectorAll('.truncate');
+                    textItems.forEach(el => {
+                        el.style.whiteSpace = 'normal'; el.style.overflow = 'visible'; el.style.textOverflow = 'clip'; el.style.lineHeight = '1.5'; el.style.paddingBottom = '5px'; el.style.display = 'block';
+                    });
+                }
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `setlist-full-${currentTab}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+                showToast("Image downloaded!");
+            }).catch(err => {
+                console.error(err);
+                showToast("Error generating image");
+            });
+        }
+
+        function printSingleSet(index) {
+            const content = document.getElementById(`set-container-${index}`).innerHTML;
+            const wrapper = document.getElementById('print-area-wrapper');
+            wrapper.innerHTML = `<div class="set-container print-black border p-4 bg-white text-black">${content}</div>`;
+            document.body.classList.add('print-single-mode');
+            window.print();
+            setTimeout(() => {
+                 document.body.classList.remove('print-single-mode');
+                 wrapper.innerHTML = '';
+            }, 1000);
+        }
+
+        // Init
+        switchTab('christmas');
+        renderBank();
+
+    </script>
+</body>
+</html>
