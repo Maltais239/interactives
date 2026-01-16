@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MacGregor Magic Writer Spark 1.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -86,9 +87,36 @@
                 check: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"/></svg>,
                 grip: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>,
                 copy: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>,
-                download: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                download: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+                camera: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
+                save: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+                upload: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
             };
             return icons[name] || null;
+        };
+
+        // --- Helper: Save as Image ---
+        const saveAsImage = async (elementId, title) => {
+            const element = document.getElementById(elementId);
+            if(!element) return;
+            try {
+                const canvas = await window.html2canvas(element, { 
+                    scale: 2, // Better resolution
+                    backgroundColor: '#ffffff',
+                    logging: false,
+                    useCORS: true
+                });
+                
+                const link = document.createElement('a');
+                link.download = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.png`;
+                link.href = canvas.toDataURL();
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (err) {
+                console.error("Image capture failed:", err);
+                alert("Couldn't save image. Please try again.");
+            }
         };
 
         // --- Data ---
@@ -146,12 +174,9 @@
 
             const addIdea = () => {
                 if (newIdea.trim()) {
-                    // Polar coordinates to avoid center
-                    // Center is 50%, 50%.
-                    // Increased radius to prevent overlap with the central node
                     const angle = Math.random() * Math.PI * 2;
-                    const minRadius = 30; // Increased from 18 to 30
-                    const maxRadius = 45; // Increased from 42 to 45
+                    const minRadius = 30; 
+                    const maxRadius = 45; 
                     const radius = minRadius + Math.random() * (maxRadius - minRadius);
                     
                     const x = 50 + radius * Math.cos(angle);
@@ -178,17 +203,14 @@
                 e.stopPropagation();
                 e.preventDefault(); 
                 
-                // Find the specific item to get its current X/Y
                 const item = ideas.find(i => i.id === id);
                 if(!item || !containerRef.current) return;
 
                 const containerRect = containerRef.current.getBoundingClientRect();
                 
-                // Calculate mouse position relative to container in percentage
                 const mouseXPercent = ((e.clientX - containerRect.left) / containerRect.width) * 100;
                 const mouseYPercent = ((e.clientY - containerRect.top) / containerRect.height) * 100;
 
-                // Store offset so the element doesn't "snap" to the mouse cursor center
                 setDraggingId(id);
                 dragOffset.current = {
                     x: mouseXPercent - item.x,
@@ -202,11 +224,9 @@
 
                 const containerRect = containerRef.current.getBoundingClientRect();
                 
-                // Calculate new position
                 let newX = ((e.clientX - containerRect.left) / containerRect.width) * 100 - dragOffset.current.x;
                 let newY = ((e.clientY - containerRect.top) / containerRect.height) * 100 - dragOffset.current.y;
 
-                // Simple boundaries to keep it mostly inside
                 newX = Math.max(2, Math.min(90, newX)); 
                 newY = Math.max(2, Math.min(90, newY));
 
@@ -217,6 +237,10 @@
 
             const handleMouseUp = () => {
                 setDraggingId(null);
+            };
+
+            const handleSnapshot = () => {
+                saveAsImage("mind-web-capture", "My_Mind_Web");
             };
 
             return (
@@ -235,83 +259,90 @@
                         </button>
                     </div>
 
-                    <div 
-                        ref={containerRef}
-                        className="relative w-full h-[500px] bg-slate-50 border border-slate-200 rounded-3xl overflow-hidden mb-4 select-none"
-                        onMouseMove={handleMouseMove}
-                        onMouseUp={handleMouseUp}
-                        onMouseLeave={handleMouseUp}
-                    >
-                        {/* Background Grid */}
-                        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
-                            backgroundImage: 'radial-gradient(#4f46e5 1px, transparent 1px)',
-                            backgroundSize: '24px 24px'
-                        }}></div>
+                    <div id="mind-web-capture" className="relative p-2 rounded-3xl bg-white">
+                        <div 
+                            ref={containerRef}
+                            className="relative w-full h-[500px] bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden mb-4 select-none"
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={handleMouseUp}
+                            onMouseLeave={handleMouseUp}
+                        >
+                            <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
+                                backgroundImage: 'radial-gradient(#4f46e5 1px, transparent 1px)',
+                                backgroundSize: '24px 24px'
+                            }}></div>
 
-                        {/* Center Node */}
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none">
-                            <div className="bg-white border-4 border-indigo-100 p-8 rounded-full shadow-2xl flex items-center justify-center w-48 h-48 animate-float">
-                                <div className="text-center">
-                                    <span className="block text-4xl mb-2">🧠</span>
-                                    <span className="font-heading font-bold text-indigo-900 text-xl">Main Idea</span>
+                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                                <div className="bg-white border-4 border-indigo-100 p-8 rounded-full shadow-2xl flex items-center justify-center w-48 h-48 animate-float">
+                                    <div className="text-center">
+                                        <span className="block text-4xl mb-2">🧠</span>
+                                        <span className="font-heading font-bold text-indigo-900 text-xl">Main Idea</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Idea Nodes */}
-                        {ideas.map((idea, index) => (
-                            <div 
-                                key={idea.id}
-                                onMouseDown={(e) => handleMouseDown(e, idea.id)}
-                                className={`absolute ${idea.color} p-4 rounded-lg shadow-md border border-black/5 max-w-[180px] cursor-move transition-transform ${draggingId === idea.id ? 'z-50 scale-105 shadow-xl' : 'hover:scale-110 hover:z-20'}`}
-                                style={{ 
-                                    top: `${idea.y}%`, 
-                                    left: `${idea.x}%`,
-                                    transform: `rotate(${idea.rotate}deg)`
-                                }}
-                            >
-                                <div className="handwritten text-xl leading-tight text-slate-800 pointer-events-none">{idea.text}</div>
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); removeIdea(idea.id); }}
-                                    className="absolute -top-2 -right-2 bg-white text-rose-500 rounded-full p-1 shadow-sm hover:bg-rose-50 border border-rose-100 cursor-pointer"
+                            {ideas.map((idea, index) => (
+                                <div 
+                                    key={idea.id}
+                                    onMouseDown={(e) => handleMouseDown(e, idea.id)}
+                                    className={`absolute ${idea.color} p-4 rounded-lg shadow-md border border-black/5 max-w-[180px] cursor-move transition-transform ${draggingId === idea.id ? 'z-50 scale-105 shadow-xl' : 'hover:scale-110 hover:z-20'}`}
+                                    style={{ 
+                                        top: `${idea.y}%`, 
+                                        left: `${idea.x}%`,
+                                        transform: `rotate(${idea.rotate}deg)`
+                                    }}
                                 >
-                                    <Icon name="plus" size={12} className="rotate-45" />
+                                    <div className="handwritten text-xl leading-tight text-slate-800 pointer-events-none">{idea.text}</div>
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); removeIdea(idea.id); }}
+                                        className="absolute -top-2 -right-2 bg-white text-rose-500 rounded-full p-1 shadow-sm hover:bg-rose-50 border border-rose-100 cursor-pointer"
+                                    >
+                                        <Icon name="plus" size={12} className="rotate-45" />
+                                    </button>
+                                </div>
+                            ))}
+                            
+                            {ideas.length === 0 && (
+                                <div className="absolute bottom-4 left-0 right-0 text-center text-slate-400 text-sm pointer-events-none">
+                                    Start adding ideas to populate your web!
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {/* Action Bar */}
+                    <div className="flex justify-between items-center mt-2">
+                        <button 
+                            onClick={handleSnapshot}
+                            className="bg-white text-slate-600 font-bold py-3 px-6 rounded-2xl shadow-sm border border-slate-200 hover:bg-slate-50 hover:text-indigo-600 transition-all flex items-center gap-2"
+                            title="Save as Image"
+                        >
+                            <Icon name="camera" size={20} /> <span className="hidden sm:inline">Save Image</span>
+                        </button>
+
+                        {ideas.length > 0 && (
+                            <div className="animate-bounce-subtle">
+                                <button 
+                                    onClick={onOrganize}
+                                    className="bg-amber-400 text-amber-950 font-bold py-3 px-8 rounded-2xl shadow-lg hover:bg-amber-300 hover:shadow-amber-200/50 transition-all flex items-center gap-2 text-lg transform hover:-translate-y-1"
+                                >
+                                    <Icon name="check" size={24} /> Save & Organize Ideas
                                 </button>
-                            </div>
-                        ))}
-                        
-                        {ideas.length === 0 && (
-                            <div className="absolute bottom-4 left-0 right-0 text-center text-slate-400 text-sm pointer-events-none">
-                                Start adding ideas to populate your web!
                             </div>
                         )}
                     </div>
-                    
-                    {/* Organize Button */}
-                    {ideas.length > 0 && (
-                        <div className="flex justify-end animate-bounce-subtle">
-                            <button 
-                                onClick={onOrganize}
-                                className="bg-amber-400 text-amber-950 font-bold py-3 px-8 rounded-2xl shadow-lg hover:bg-amber-300 hover:shadow-amber-200/50 transition-all flex items-center gap-2 text-lg transform hover:-translate-y-1"
-                            >
-                                <Icon name="check" size={24} /> Save & Organize Ideas
-                            </button>
-                        </div>
-                    )}
                 </div>
             );
         };
 
-        // Optimized Block Component to prevent re-renders causing scroll jumps
+        // Optimized Block Component
         const StoryBlock = memo(({ block, index, onUpdate, onDragOver, onDragLeave, onDrop, isDragOver, total }) => {
             return (
                 <div className="group relative pl-8">
-                    {/* Connecting Line */}
                     {index !== total - 1 && (
                         <div className="absolute left-[15px] top-10 bottom-[-40px] w-0.5 bg-slate-200 group-hover:bg-indigo-200 transition-colors"></div>
                     )}
                     
-                    {/* Number Bubble */}
                     <div className="absolute left-0 top-0 w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 font-bold flex items-center justify-center border-2 border-white shadow-sm z-10 group-hover:scale-110 transition-transform">
                         {index + 1}
                     </div>
@@ -347,7 +378,6 @@
             const [dragOverBlock, setDragOverBlock] = useState(null);
             const [notification, setNotification] = useState(null);
 
-            // Use Callback to ensure function stability for memoized child
             const handleUpdateBlock = useCallback((id, text) => {
                 setBlocks(prevBlocks => prevBlocks.map(b => b.id === id ? { ...b, content: text } : b));
             }, [setBlocks]);
@@ -379,7 +409,6 @@
                 setDraggedIdea(null);
             }, [setBlocks]);
 
-            // Generate full text function
             const getFullStory = () => {
                 return blocks
                     .filter(b => b.content.trim() !== '')
@@ -393,8 +422,6 @@
                     showNotification("Write something first!", "error");
                     return;
                 }
-                
-                // Fallback for iFrame environments where navigator.clipboard might be restricted
                 const textArea = document.createElement("textarea");
                 textArea.value = text;
                 document.body.appendChild(textArea);
@@ -414,7 +441,6 @@
                     showNotification("Write something first!", "error");
                     return;
                 }
-                
                 const element = document.createElement("a");
                 const file = new Blob([text], {type: 'text/plain'});
                 element.href = URL.createObjectURL(file);
@@ -422,7 +448,11 @@
                 document.body.appendChild(element); 
                 element.click();
                 document.body.removeChild(element);
-                showNotification("Story downloaded!", "success");
+                showNotification("Story downloaded as text!", "success");
+            };
+
+            const handleSnapshot = () => {
+                saveAsImage("story-builder-capture", "My_Story_Organizer");
             };
 
             const showNotification = (msg, type) => {
@@ -432,7 +462,6 @@
 
             return (
                 <div className="space-y-8 max-w-4xl mx-auto relative">
-                    {/* Notification Toast */}
                     {notification && (
                         <div className={`fixed top-24 right-8 z-50 px-6 py-3 rounded-xl shadow-2xl font-bold animate-float ${notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
                             {notification.msg}
@@ -445,17 +474,24 @@
                             <h3 className="text-2xl font-heading font-bold text-slate-800">Story Organizer</h3>
                             <p className="text-slate-500 text-sm">Drag ideas or write freely.</p>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
+                            <button 
+                                onClick={handleSnapshot}
+                                className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold shadow-sm transition-all"
+                                title="Save as Image"
+                            >
+                                <Icon name="camera" size={18} /> <span className="hidden sm:inline">Image</span>
+                            </button>
                             <button 
                                 onClick={handleCopy}
-                                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold shadow-sm transition-all"
+                                className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold shadow-sm transition-all"
                                 title="Copy to Clipboard"
                             >
                                 <Icon name="copy" size={18} /> <span className="hidden sm:inline">Copy</span>
                             </button>
                             <button 
                                 onClick={handleExport}
-                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold shadow-sm transition-all"
+                                className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold shadow-sm transition-all"
                                 title="Download Text File"
                             >
                                 <Icon name="download" size={18} /> <span className="hidden sm:inline">Export .txt</span>
@@ -463,58 +499,82 @@
                         </div>
                     </div>
                     
-                    {/* Idea Bank */}
-                    {ideas.length > 0 && (
-                        <div className="bg-indigo-50/80 p-5 rounded-2xl border border-indigo-100 shadow-sm mb-8">
-                            <div className="flex items-center gap-2 mb-3">
-                                <span className="text-2xl">🧠</span>
-                                <h4 className="font-heading font-bold text-indigo-900 text-lg">Your Idea Bank</h4>
-                                <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wide ml-auto bg-white px-2 py-1 rounded-md border border-indigo-100">Drag to insert</span>
+                    <div id="story-builder-capture" className="bg-white p-4 -m-4 mt-1 rounded-xl">
+                        {ideas.length > 0 && (
+                            <div className="bg-indigo-50/80 p-5 rounded-2xl border border-indigo-100 shadow-sm mb-8">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="text-2xl">🧠</span>
+                                    <h4 className="font-heading font-bold text-indigo-900 text-lg">Your Idea Bank</h4>
+                                    <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wide ml-auto bg-white px-2 py-1 rounded-md border border-indigo-100">Drag to insert</span>
+                                </div>
+                                <div className="flex flex-wrap gap-3">
+                                    {ideas.map(idea => (
+                                        <div 
+                                            key={idea.id} 
+                                            draggable="true"
+                                            onDragStart={(e) => handleDragStart(e, idea.text)}
+                                            className="bg-white px-4 py-2 rounded-xl shadow-sm text-slate-700 border border-indigo-100 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-indigo-300 transition-all flex items-center gap-2 group"
+                                        >
+                                            <Icon name="grip" size={14} className="text-slate-300 group-hover:text-indigo-400" />
+                                            <span className="handwritten text-lg">{idea.text}</span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                            <div className="flex flex-wrap gap-3">
-                                {ideas.map(idea => (
-                                    <div 
-                                        key={idea.id} 
-                                        draggable="true"
-                                        onDragStart={(e) => handleDragStart(e, idea.text)}
-                                        className="bg-white px-4 py-2 rounded-xl shadow-sm text-slate-700 border border-indigo-100 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-indigo-300 transition-all flex items-center gap-2 group"
-                                    >
-                                        <Icon name="grip" size={14} className="text-slate-300 group-hover:text-indigo-400" />
-                                        <span className="handwritten text-lg">{idea.text}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
+                        )}
 
-                    {blocks.map((block, index) => (
-                        <StoryBlock 
-                            key={block.id}
-                            block={block}
-                            index={index}
-                            total={blocks.length}
-                            onUpdate={handleUpdateBlock}
-                            onDragOver={handleDragOver}
-                            onDragLeave={handleDragLeave}
-                            onDrop={handleDrop}
-                            isDragOver={dragOverBlock === block.id}
-                        />
-                    ))}
+                        {blocks.map((block, index) => (
+                            <StoryBlock 
+                                key={block.id}
+                                block={block}
+                                index={index}
+                                total={blocks.length}
+                                onUpdate={handleUpdateBlock}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                                isDragOver={dragOverBlock === block.id}
+                            />
+                        ))}
+                    </div>
                 </div>
             );
         };
 
         const App = () => {
-            const [view, setView] = useState('home'); // home, prompts, workspace
+            const [view, setView] = useState('home'); 
             const [selectedPrompt, setSelectedPrompt] = useState(null);
             
-            // Workspace State - defaulted to 'web' since funnel is gone
+            const [isCustomPrompt, setIsCustomPrompt] = useState(false);
+            const [customPromptText, setCustomPromptText] = useState("");
+
             const [activeTab, setActiveTab] = useState('web');
             const [ideas, setIdeas] = useState([]);
             const [blocks, setBlocks] = useState(storyBlocks.map(b => ({ ...b, content: '' })));
+            
+            // To track unsaved changes
+            const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-            // Prompt Bank State
             const [promptIndex, setPromptIndex] = useState(0);
+
+            // Effect to track changes for warning
+            useEffect(() => {
+                if (ideas.length > 0 || blocks.some(b => b.content.trim() !== '')) {
+                    setHasUnsavedChanges(true);
+                }
+            }, [ideas, blocks]);
+
+            // Unload warning listener
+            useEffect(() => {
+                const handleBeforeUnload = (e) => {
+                    if (hasUnsavedChanges) {
+                        e.preventDefault();
+                        e.returnValue = '';
+                    }
+                };
+                window.addEventListener('beforeunload', handleBeforeUnload);
+                return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+            }, [hasUnsavedChanges]);
 
             const handlePromptSelect = (prompt) => {
                 setSelectedPrompt(prompt);
@@ -532,41 +592,94 @@
             const randomPrompt = () => {
                 const rnd = Math.floor(Math.random() * prompts.length);
                 setPromptIndex(rnd);
+                setIsCustomPrompt(false);
             };
 
             const goToOrganizer = () => {
                 setActiveTab('blocks');
             };
 
+            // --- Project Save/Load Logic ---
+            const saveProject = () => {
+                const projectData = {
+                    version: "1.0",
+                    date: new Date().toISOString(),
+                    prompt: selectedPrompt,
+                    ideas: ideas,
+                    blocks: blocks
+                };
+                
+                const blob = new Blob([JSON.stringify(projectData, null, 2)], {type: "application/json"});
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `story_project_${new Date().toISOString().split('T')[0]}.spark`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setHasUnsavedChanges(false); // Reset warning
+            };
+
+            const loadProject = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (data.prompt) setSelectedPrompt(data.prompt);
+                        if (data.ideas) setIdeas(data.ideas);
+                        if (data.blocks) setBlocks(data.blocks);
+                        setView('workspace');
+                        setHasUnsavedChanges(false);
+                        alert("Project loaded successfully!");
+                    } catch (err) {
+                        alert("Error loading file. Make sure it's a valid .spark file.");
+                    }
+                };
+                reader.readAsText(file);
+            };
+
             return (
                 <div className="min-h-screen text-slate-800 selection:bg-indigo-100 selection:text-indigo-900">
-                    {/* Header */}
                     <header className="glass-panel sticky top-0 z-50 px-6 py-4 border-b border-white/40">
                         <div className="max-w-7xl mx-auto flex justify-between items-center">
-                            <div 
-                                className="flex items-center gap-3 cursor-pointer group" 
-                                onClick={() => setView('home')}
-                            >
+                            <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setView('home')}>
                                 <div className="bg-gradient-to-br from-indigo-600 to-violet-600 p-2.5 rounded-xl text-white shadow-lg group-hover:shadow-indigo-500/30 transition-all duration-300 group-hover:scale-105">
                                     <Icon name="sparkles" size={20} />
                                 </div>
                                 <h1 className="text-2xl font-heading font-extrabold text-slate-800 tracking-tight">MacGregor Magic Writer Spark</h1>
                             </div>
                             
-                            {view === 'workspace' && (
-                                <button 
-                                    onClick={() => setView('prompts')}
-                                    className="text-sm font-semibold text-slate-500 hover:text-indigo-600 flex items-center gap-2 bg-slate-100 px-4 py-2 rounded-lg transition-colors"
-                                >
-                                    <Icon name="refresh" size={16} /> Change Prompt
-                                </button>
-                            )}
+                            <div className="flex items-center gap-3">
+                                {/* Global Save/Load Buttons */}
+                                <label className="cursor-pointer bg-white text-indigo-600 px-4 py-2 rounded-lg font-bold border border-indigo-100 hover:bg-indigo-50 transition flex items-center gap-2 shadow-sm text-sm">
+                                    <Icon name="upload" size={16} /> Load Project
+                                    <input type="file" accept=".spark,.json" className="hidden" onChange={loadProject} />
+                                </label>
+
+                                {view === 'workspace' && (
+                                    <>
+                                        <button 
+                                            onClick={saveProject}
+                                            className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700 transition flex items-center gap-2 shadow-md text-sm"
+                                        >
+                                            <Icon name="save" size={16} /> Save Project
+                                        </button>
+                                        <button 
+                                            onClick={() => setView('prompts')}
+                                            className="text-sm font-semibold text-slate-500 hover:text-indigo-600 flex items-center gap-2 bg-slate-100 px-4 py-2 rounded-lg transition-colors"
+                                        >
+                                            <Icon name="refresh" size={16} /> New Prompt
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </header>
 
                     <main className="max-w-7xl mx-auto p-4 md:p-8">
-                        
-                        {/* HOME VIEW */}
                         {view === 'home' && (
                             <div className="py-12 md:py-20">
                                 <div className="text-center space-y-8 max-w-4xl mx-auto">
@@ -581,7 +694,7 @@
                                         Don't let the blank page scare you. Spin the wheel, map your mind, and build your story block by block.
                                     </p>
                                     
-                                    <div className="pt-8">
+                                    <div className="pt-8 flex justify-center gap-4">
                                         <button 
                                             onClick={() => setView('prompts')}
                                             className="group bg-slate-900 text-white text-xl font-bold py-5 px-10 rounded-full shadow-2xl hover:bg-slate-800 hover:shadow-slate-900/30 hover:-translate-y-1 transition-all duration-300 inline-flex items-center gap-3"
@@ -590,7 +703,6 @@
                                         </button>
                                     </div>
 
-                                    {/* Feature Cards */}
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-20 text-left">
                                         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
                                             <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-2xl mb-6">🤔</div>
@@ -612,70 +724,107 @@
                             </div>
                         )}
 
-                        {/* PROMPT BANK VIEW */}
                         {view === 'prompts' && (
                             <div className="max-w-5xl mx-auto py-8">
                                 <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-4">
                                     <h2 className="text-4xl font-heading font-bold text-slate-800">Choose Your Adventure</h2>
-                                    <button onClick={randomPrompt} className="bg-yellow-400 text-yellow-950 px-6 py-3 rounded-xl font-bold hover:bg-yellow-300 shadow-lg shadow-yellow-400/20 transition-colors flex items-center gap-2">
-                                        <Icon name="sparkles" size={18} /> Surprise Me!
-                                    </button>
+                                    <div className="flex gap-3">
+                                        <button 
+                                            onClick={() => setIsCustomPrompt(!isCustomPrompt)}
+                                            className={`px-6 py-3 rounded-xl font-bold transition-all border-2 border-indigo-100 ${isCustomPrompt ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-600 hover:bg-indigo-50'}`}
+                                        >
+                                            {isCustomPrompt ? "Back to List" : "Write My Own"}
+                                        </button>
+                                        {!isCustomPrompt && (
+                                            <button onClick={randomPrompt} className="bg-yellow-400 text-yellow-950 px-6 py-3 rounded-xl font-bold hover:bg-yellow-300 shadow-lg shadow-yellow-400/20 transition-colors flex items-center gap-2">
+                                                <Icon name="sparkles" size={18} /> Surprise Me!
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="bg-white rounded-[2rem] shadow-2xl overflow-hidden min-h-[500px] flex flex-col md:flex-row border border-slate-100">
-                                    {/* Sidebar List (Desktop) */}
-                                    <div className="hidden md:block w-1/3 bg-slate-50 border-r border-slate-200 overflow-y-auto max-h-[600px] scrollbar-thin">
-                                        {prompts.map((p, i) => (
-                                            <div 
-                                                key={i} 
-                                                onClick={() => setPromptIndex(i)}
-                                                className={`p-6 cursor-pointer border-b border-slate-200/50 hover:bg-white transition-all ${i === promptIndex ? 'bg-white border-l-4 border-l-indigo-600 shadow-sm' : 'border-l-4 border-l-transparent text-slate-500'}`}
-                                            >
-                                                <div className="flex justify-between items-center mb-1">
-                                                    <span className={`text-xs font-bold uppercase tracking-wider ${i === promptIndex ? 'text-indigo-600' : 'text-slate-400'}`}>Prompt {i + 1}</span>
-                                                    {i === promptIndex && <Icon name="chevronRight" size={14} className="text-indigo-600" />}
+                                    {!isCustomPrompt && (
+                                        <div className="hidden md:block w-1/3 bg-slate-50 border-r border-slate-200 overflow-y-auto max-h-[600px] scrollbar-thin">
+                                            {prompts.map((p, i) => (
+                                                <div 
+                                                    key={i} 
+                                                    onClick={() => setPromptIndex(i)}
+                                                    className={`p-6 cursor-pointer border-b border-slate-200/50 hover:bg-white transition-all ${i === promptIndex ? 'bg-white border-l-4 border-l-indigo-600 shadow-sm' : 'border-l-4 border-l-transparent text-slate-500'}`}
+                                                >
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <span className={`text-xs font-bold uppercase tracking-wider ${i === promptIndex ? 'text-indigo-600' : 'text-slate-400'}`}>Prompt {i + 1}</span>
+                                                        {i === promptIndex && <Icon name="chevronRight" size={14} className="text-indigo-600" />}
+                                                    </div>
+                                                    <p className={`text-sm line-clamp-2 ${i === promptIndex ? 'text-slate-800 font-medium' : ''}`}>{p}</p>
                                                 </div>
-                                                <p className={`text-sm line-clamp-2 ${i === promptIndex ? 'text-slate-800 font-medium' : ''}`}>{p}</p>
-                                            </div>
-                                        ))}
-                                    </div>
+                                            ))}
+                                        </div>
+                                    )}
 
-                                    {/* Main Card */}
                                     <div className="flex-1 p-8 md:p-12 flex flex-col justify-center items-center relative">
                                         <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:20px_20px] opacity-50"></div>
                                         
                                         <div className="relative bg-white p-10 md:p-16 rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 max-w-xl w-full text-center">
-                                            <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-indigo-600 text-white text-sm font-bold px-4 py-1.5 rounded-full shadow-lg">
-                                                Prompt #{promptIndex + 1}
-                                            </div>
-                                            <p className="text-3xl md:text-4xl font-heading font-bold text-slate-800 leading-snug">
-                                                "{prompts[promptIndex]}"
-                                            </p>
+                                            {isCustomPrompt ? (
+                                                <div className="space-y-6">
+                                                     <div className="bg-indigo-50 text-indigo-800 font-bold px-4 py-2 rounded-full inline-block text-sm">
+                                                        ✏️ Your Creative Idea
+                                                    </div>
+                                                    <h3 className="text-2xl font-heading font-bold text-slate-800">What's on your mind?</h3>
+                                                    <textarea 
+                                                        className="w-full p-4 border-2 border-slate-200 rounded-xl text-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all min-h-[150px] font-medium text-slate-700"
+                                                        placeholder="Type your story idea here..."
+                                                        value={customPromptText}
+                                                        onChange={(e) => setCustomPromptText(e.target.value)}
+                                                        autoFocus
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-indigo-600 text-white text-sm font-bold px-4 py-1.5 rounded-full shadow-lg">
+                                                        Prompt #{promptIndex + 1}
+                                                    </div>
+                                                    <p className="text-3xl md:text-4xl font-heading font-bold text-slate-800 leading-snug">
+                                                        "{prompts[promptIndex]}"
+                                                    </p>
+                                                </>
+                                            )}
                                         </div>
 
                                         <div className="flex gap-4 mt-12 relative z-10">
-                                            <button onClick={prevPrompt} className="p-4 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-800 hover:border-slate-300 transition-colors shadow-sm">
-                                                <Icon name="arrowRight" className="rotate-180" />
-                                            </button>
+                                            {!isCustomPrompt && (
+                                                <button onClick={prevPrompt} className="p-4 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-800 hover:border-slate-300 transition-colors shadow-sm">
+                                                    <Icon name="arrowRight" className="rotate-180" />
+                                                </button>
+                                            )}
+                                            
                                             <button 
-                                                onClick={() => handlePromptSelect(prompts[promptIndex])}
+                                                onClick={() => {
+                                                    if (isCustomPrompt && !customPromptText.trim()) {
+                                                        alert("Please write an idea first!");
+                                                        return;
+                                                    }
+                                                    handlePromptSelect(isCustomPrompt ? customPromptText : prompts[promptIndex]);
+                                                }}
                                                 className="bg-slate-900 text-white font-bold py-4 px-10 rounded-full shadow-xl hover:bg-slate-800 hover:scale-105 transition-all duration-300 flex items-center gap-2"
                                             >
                                                 Start Writing <Icon name="pencil" size={18} />
                                             </button>
-                                            <button onClick={nextPrompt} className="p-4 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-800 hover:border-slate-300 transition-colors shadow-sm">
-                                                <Icon name="arrowRight" />
-                                            </button>
+
+                                            {!isCustomPrompt && (
+                                                <button onClick={nextPrompt} className="p-4 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-800 hover:border-slate-300 transition-colors shadow-sm">
+                                                    <Icon name="arrowRight" />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* WORKSPACE VIEW */}
                         {view === 'workspace' && (
                             <div className="pb-20">
-                                {/* Selected Prompt Banner */}
                                 <div className="bg-slate-900 text-white p-8 md:p-10 rounded-3xl shadow-xl mb-10 relative overflow-hidden group">
                                     <div className="absolute top-0 right-0 opacity-5 transform translate-x-20 -translate-y-10 group-hover:scale-110 transition-transform duration-700">
                                         <Icon name="book" size={300} />
@@ -689,7 +838,6 @@
                                 </div>
 
                                 <div className="flex flex-col md:flex-row gap-8">
-                                    {/* Sidebar Navigation */}
                                     <div className="md:w-64 flex-shrink-0">
                                         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 sticky top-24">
                                             <button 
@@ -713,7 +861,6 @@
                                         </div>
                                     </div>
 
-                                    {/* Main Workspace Area */}
                                     <div className="flex-1">
                                         <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-8 min-h-[600px] border border-slate-100">
                                             {activeTab === 'web' && <MindWeb ideas={ideas} setIdeas={setIdeas} onOrganize={goToOrganizer} />}
@@ -725,7 +872,6 @@
                         )}
                     </main>
 
-                    {/* Footer */}
                     <footer className="text-center text-slate-400 py-10 text-sm border-t border-slate-200/50 mt-10">
                         <p>© 2024 Writer Spark. Created for storytellers everywhere.</p>
                     </footer>
