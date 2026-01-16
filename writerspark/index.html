@@ -90,7 +90,10 @@
                 download: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
                 camera: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
                 save: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
-                upload: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                upload: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+                user: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+                map: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>,
+                trash: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             };
             return icons[name] || null;
         };
@@ -335,6 +338,258 @@
             );
         };
 
+        // --- NEW COMPONENT: Character Builder ---
+        const CharacterBuilder = ({ characters, setCharacters }) => {
+            const [newName, setNewName] = useState("");
+            const [newRole, setNewRole] = useState("Hero");
+            const [newTraits, setNewTraits] = useState("");
+            const [newDesc, setNewDesc] = useState("");
+
+            const addCharacter = () => {
+                if (!newName.trim()) return;
+                const newChar = {
+                    id: Date.now(),
+                    name: newName,
+                    role: newRole,
+                    traits: newTraits,
+                    description: newDesc
+                };
+                setCharacters([...characters, newChar]);
+                setNewName("");
+                setNewRole("Hero");
+                setNewTraits("");
+                setNewDesc("");
+            };
+
+            const removeCharacter = (id) => {
+                setCharacters(characters.filter(c => c.id !== id));
+            };
+
+             const handleSnapshot = () => {
+                saveAsImage("character-capture", "My_Characters");
+            };
+
+            return (
+                <div className="space-y-8 max-w-4xl mx-auto">
+                     <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6">
+                        <div className="text-left">
+                            <h3 className="text-2xl font-heading font-bold text-slate-800">Character Cast</h3>
+                            <p className="text-slate-500 text-sm">Build your team of heroes and villains.</p>
+                        </div>
+                         <button 
+                            onClick={handleSnapshot}
+                            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold shadow-sm transition-all"
+                            title="Save as Image"
+                        >
+                            <Icon name="camera" size={18} /> <span className="hidden sm:inline">Image</span>
+                        </button>
+                    </div>
+
+                    {/* Add Form */}
+                    <div className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 shadow-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label className="block text-xs font-bold uppercase text-indigo-500 mb-1">Name</label>
+                                <input 
+                                    className="w-full p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none" 
+                                    placeholder="Character Name"
+                                    value={newName}
+                                    onChange={e => setNewName(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold uppercase text-indigo-500 mb-1">Role</label>
+                                <select 
+                                    className="w-full p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none bg-white"
+                                    value={newRole}
+                                    onChange={e => setNewRole(e.target.value)}
+                                >
+                                    <option>Hero / Protagonist</option>
+                                    <option>Villain / Antagonist</option>
+                                    <option>Sidekick</option>
+                                    <option>Mentor</option>
+                                    <option>Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-xs font-bold uppercase text-indigo-500 mb-1">Traits (comma separated)</label>
+                            <input 
+                                className="w-full p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none" 
+                                placeholder="Brave, Shy, Funny..."
+                                value={newTraits}
+                                onChange={e => setNewTraits(e.target.value)}
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-xs font-bold uppercase text-indigo-500 mb-1">Description</label>
+                            <textarea 
+                                className="w-full p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none h-20"
+                                placeholder="What do they look like? How do they act?"
+                                value={newDesc}
+                                onChange={e => setNewDesc(e.target.value)}
+                            />
+                        </div>
+                        <button 
+                            onClick={addCharacter}
+                            className="bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-indigo-700 transition w-full md:w-auto"
+                        >
+                            Add Character
+                        </button>
+                    </div>
+
+                    {/* Character List */}
+                    <div id="character-capture" className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-4 -m-4 rounded-xl">
+                        {characters.length === 0 && <p className="text-slate-400 text-center col-span-full py-8">No characters yet. Create one above!</p>}
+                        {characters.map(char => (
+                            <div key={char.id} className="bg-white border-2 border-slate-100 rounded-xl p-5 shadow-sm hover:shadow-md transition relative group">
+                                <button 
+                                    onClick={() => removeCharacter(char.id)}
+                                    className="absolute top-3 right-3 text-slate-300 hover:text-rose-500 transition"
+                                >
+                                    <Icon name="trash" size={18} />
+                                </button>
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="bg-orange-100 p-2 rounded-full text-orange-600">
+                                        <Icon name="user" size={20} />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-heading font-bold text-xl text-slate-800 leading-none">{char.name}</h4>
+                                        <span className="text-xs font-bold uppercase text-indigo-500 tracking-wide">{char.role}</span>
+                                    </div>
+                                </div>
+                                {char.traits && (
+                                    <div className="flex flex-wrap gap-2 mb-3">
+                                        {char.traits.split(',').map((trait, i) => (
+                                            trait.trim() && <span key={i} className="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-full font-medium">{trait.trim()}</span>
+                                        ))}
+                                    </div>
+                                )}
+                                <p className="text-slate-600 text-sm italic border-t border-slate-100 pt-3 mt-2">{char.description}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- NEW COMPONENT: Setting Builder ---
+        const SettingBuilder = ({ settings, setSettings }) => {
+            const [newName, setNewName] = useState("");
+            const [sights, setSights] = useState("");
+            const [sounds, setSounds] = useState("");
+            const [smells, setSmells] = useState("");
+            const [feelings, setFeelings] = useState("");
+
+            const addSetting = () => {
+                if (!newName.trim()) return;
+                const newSetting = {
+                    id: Date.now(),
+                    name: newName,
+                    sights,
+                    sounds,
+                    smells,
+                    feelings
+                };
+                setSettings([...settings, newSetting]);
+                setNewName("");
+                setSights("");
+                setSounds("");
+                setSmells("");
+                setFeelings("");
+            };
+
+            const removeSetting = (id) => {
+                setSettings(settings.filter(s => s.id !== id));
+            };
+
+            const handleSnapshot = () => {
+                saveAsImage("setting-capture", "My_Settings");
+            };
+
+            return (
+                <div className="space-y-8 max-w-4xl mx-auto">
+                    <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6">
+                        <div className="text-left">
+                            <h3 className="text-2xl font-heading font-bold text-slate-800">World Building</h3>
+                            <p className="text-slate-500 text-sm">Describe your settings with sensory details.</p>
+                        </div>
+                        <button 
+                            onClick={handleSnapshot}
+                            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold shadow-sm transition-all"
+                            title="Save as Image"
+                        >
+                            <Icon name="camera" size={18} /> <span className="hidden sm:inline">Image</span>
+                        </button>
+                    </div>
+
+                    {/* Add Form */}
+                    <div className="bg-teal-50/50 p-6 rounded-2xl border border-teal-100 shadow-sm">
+                        <div className="mb-4">
+                            <label className="block text-xs font-bold uppercase text-teal-600 mb-1">Setting Name</label>
+                            <input 
+                                className="w-full p-2 rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 outline-none font-bold text-lg" 
+                                placeholder="e.g., The Haunted Forest"
+                                value={newName}
+                                onChange={e => setNewName(e.target.value)}
+                            />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">👀 What do you SEE?</label>
+                                <textarea className="w-full p-2 rounded-lg border border-slate-200 focus:border-teal-500 outline-none h-20 text-sm" placeholder="Tall trees, dark shadows..." value={sights} onChange={e => setSights(e.target.value)} />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">👂 What do you HEAR?</label>
+                                <textarea className="w-full p-2 rounded-lg border border-slate-200 focus:border-teal-500 outline-none h-20 text-sm" placeholder="Howling wind, snapping twigs..." value={sounds} onChange={e => setSounds(e.target.value)} />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">👃 What do you SMELL/TASTE?</label>
+                                <textarea className="w-full p-2 rounded-lg border border-slate-200 focus:border-teal-500 outline-none h-20 text-sm" placeholder="Damp earth, pine needles..." value={smells} onChange={e => setSmells(e.target.value)} />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">✋ What do you FEEL?</label>
+                                <textarea className="w-full p-2 rounded-lg border border-slate-200 focus:border-teal-500 outline-none h-20 text-sm" placeholder="Cold breeze, sticky webs..." value={feelings} onChange={e => setFeelings(e.target.value)} />
+                            </div>
+                        </div>
+                        <button 
+                            onClick={addSetting}
+                            className="bg-teal-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-teal-700 transition w-full md:w-auto"
+                        >
+                            Add Setting
+                        </button>
+                    </div>
+
+                    {/* Settings List */}
+                    <div id="setting-capture" className="space-y-4 bg-white p-4 -m-4 rounded-xl">
+                         {settings.length === 0 && <p className="text-slate-400 text-center py-8">No settings created yet.</p>}
+                         {settings.map(setting => (
+                            <div key={setting.id} className="bg-white border-2 border-slate-100 rounded-xl p-5 shadow-sm hover:shadow-md transition relative">
+                                <button 
+                                    onClick={() => removeSetting(setting.id)}
+                                    className="absolute top-3 right-3 text-slate-300 hover:text-rose-500 transition"
+                                >
+                                    <Icon name="trash" size={18} />
+                                </button>
+                                <div className="flex items-center gap-3 mb-4 border-b border-slate-100 pb-2">
+                                    <div className="bg-teal-100 p-2 rounded-full text-teal-600">
+                                        <Icon name="map" size={20} />
+                                    </div>
+                                    <h4 className="font-heading font-bold text-xl text-slate-800">{setting.name}</h4>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                    <div className="bg-slate-50 p-3 rounded-lg"><strong className="block text-slate-500 text-xs uppercase mb-1">👀 Sight</strong> {setting.sights || "—"}</div>
+                                    <div className="bg-slate-50 p-3 rounded-lg"><strong className="block text-slate-500 text-xs uppercase mb-1">👂 Sound</strong> {setting.sounds || "—"}</div>
+                                    <div className="bg-slate-50 p-3 rounded-lg"><strong className="block text-slate-500 text-xs uppercase mb-1">👃 Smell/Taste</strong> {setting.smells || "—"}</div>
+                                    <div className="bg-slate-50 p-3 rounded-lg"><strong className="block text-slate-500 text-xs uppercase mb-1">✋ Touch/Feel</strong> {setting.feelings || "—"}</div>
+                                </div>
+                            </div>
+                         ))}
+                    </div>
+                </div>
+            );
+        };
+
         // Optimized Block Component
         const StoryBlock = memo(({ block, index, onUpdate, onDragOver, onDragLeave, onDrop, isDragOver, total }) => {
             return (
@@ -552,6 +807,10 @@
             const [ideas, setIdeas] = useState([]);
             const [blocks, setBlocks] = useState(storyBlocks.map(b => ({ ...b, content: '' })));
             
+            // New States for Characters and Settings
+            const [characters, setCharacters] = useState([]);
+            const [settings, setSettings] = useState([]);
+
             // To track unsaved changes
             const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -559,10 +818,10 @@
 
             // Effect to track changes for warning
             useEffect(() => {
-                if (ideas.length > 0 || blocks.some(b => b.content.trim() !== '')) {
+                if (ideas.length > 0 || blocks.some(b => b.content.trim() !== '') || characters.length > 0 || settings.length > 0) {
                     setHasUnsavedChanges(true);
                 }
-            }, [ideas, blocks]);
+            }, [ideas, blocks, characters, settings]);
 
             // Unload warning listener
             useEffect(() => {
@@ -602,11 +861,13 @@
             // --- Project Save/Load Logic ---
             const saveProject = () => {
                 const projectData = {
-                    version: "1.0",
+                    version: "1.1",
                     date: new Date().toISOString(),
                     prompt: selectedPrompt,
                     ideas: ideas,
-                    blocks: blocks
+                    blocks: blocks,
+                    characters: characters,
+                    settings: settings
                 };
                 
                 const blob = new Blob([JSON.stringify(projectData, null, 2)], {type: "application/json"});
@@ -631,6 +892,8 @@
                         if (data.prompt) setSelectedPrompt(data.prompt);
                         if (data.ideas) setIdeas(data.ideas);
                         if (data.blocks) setBlocks(data.blocks);
+                        if (data.characters) setCharacters(data.characters);
+                        if (data.settings) setSettings(data.settings);
                         setView('workspace');
                         setHasUnsavedChanges(false);
                         alert("Project loaded successfully!");
@@ -850,6 +1113,24 @@
                                                 Mind Web
                                             </button>
                                             <button 
+                                                onClick={() => setActiveTab('characters')}
+                                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all mt-1 ${activeTab === 'characters' ? 'bg-orange-50 text-orange-700' : 'text-slate-500 hover:bg-slate-50'}`}
+                                            >
+                                                <div className={`p-2 rounded-lg ${activeTab === 'characters' ? 'bg-orange-200 text-orange-700' : 'bg-slate-100 text-slate-400'}`}>
+                                                    <Icon name="user" size={18} /> 
+                                                </div>
+                                                Characters
+                                            </button>
+                                            <button 
+                                                onClick={() => setActiveTab('settings')}
+                                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all mt-1 ${activeTab === 'settings' ? 'bg-teal-50 text-teal-700' : 'text-slate-500 hover:bg-slate-50'}`}
+                                            >
+                                                <div className={`p-2 rounded-lg ${activeTab === 'settings' ? 'bg-teal-200 text-teal-700' : 'bg-slate-100 text-slate-400'}`}>
+                                                    <Icon name="map" size={18} /> 
+                                                </div>
+                                                Settings
+                                            </button>
+                                            <button 
                                                 onClick={() => setActiveTab('blocks')}
                                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all mt-1 ${activeTab === 'blocks' ? 'bg-amber-50 text-amber-700' : 'text-slate-500 hover:bg-slate-50'}`}
                                             >
@@ -864,6 +1145,8 @@
                                     <div className="flex-1">
                                         <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-8 min-h-[600px] border border-slate-100">
                                             {activeTab === 'web' && <MindWeb ideas={ideas} setIdeas={setIdeas} onOrganize={goToOrganizer} />}
+                                            {activeTab === 'characters' && <CharacterBuilder characters={characters} setCharacters={setCharacters} />}
+                                            {activeTab === 'settings' && <SettingBuilder settings={settings} setSettings={setSettings} />}
                                             {activeTab === 'blocks' && <StoryBuilder blocks={blocks} setBlocks={setBlocks} ideas={ideas} />}
                                         </div>
                                     </div>
