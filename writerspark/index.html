@@ -84,6 +84,7 @@
                 pencil: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>,
                 plus: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
                 chevronRight: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>,
+                chevronDown: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>,
                 refresh: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>,
                 check: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"/></svg>,
                 grip: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>,
@@ -609,8 +610,18 @@
             );
         };
 
-        // Optimized Block Component
+        // Optimized Block Component with Accordion Logic
         const StoryBlock = memo(({ block, index, onUpdate, onDragOver, onDragLeave, onDrop, isDragOver, total }) => {
+            const [isExpanded, setIsExpanded] = useState(false);
+
+            // Auto-expand if something is dragged over this specific block
+            useEffect(() => {
+                if (isDragOver) setIsExpanded(true);
+            }, [isDragOver]);
+
+            // Auto-expand if it has content initially or whenever content changes significantly? 
+            // For now, let's stick to user controlled or drag controlled to save real estate.
+
             return (
                 <div className="group relative pl-0 md:pl-8">
                     {index !== total - 1 && (
@@ -622,29 +633,38 @@
                     </div>
 
                     <div 
-                        className={`bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition-all mb-6 md:mb-0 ${isDragOver ? 'drag-target-active border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-100'}`}
+                        className={`bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition-all mb-4 ${isDragOver ? 'drag-target-active border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-100'}`}
                         onDragOver={(e) => onDragOver(e, block.id)}
                         onDragLeave={onDragLeave}
                         onDrop={(e) => onDrop(e, block.id)}
                     >
-                        <div className="bg-slate-50/50 p-3 md:p-4 border-b border-slate-100 flex flex-col md:flex-row md:justify-between md:items-center gap-2">
-                            <div className="flex items-center gap-2">
+                        <div 
+                            onClick={() => setIsExpanded(!isExpanded)}
+                            className="bg-slate-50/50 p-3 md:p-4 border-b border-slate-100 flex flex-row justify-between items-center gap-2 cursor-pointer select-none hover:bg-slate-100 transition-colors"
+                        >
+                            <div className="flex items-center gap-2 flex-1">
                                 <span className="md:hidden w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 font-bold flex items-center justify-center text-xs border border-indigo-200">{index + 1}</span>
                                 <div>
                                     <h4 className="font-heading font-bold text-slate-800 text-base md:text-lg">{block.title}</h4>
                                     <p className="text-xs md:text-sm text-slate-500">{block.hint}</p>
                                 </div>
                             </div>
-                            <Icon name="pencil" size={16} className="text-slate-300 hidden md:block" />
+                            <div className={`text-slate-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                                <Icon name="chevronDown" size={20} />
+                            </div>
                         </div>
-                        <div className="p-1">
-                            <textarea 
-                                className="w-full min-h-[120px] p-4 bg-white block w-full border-0 focus:ring-0 resize-y handwritten text-lg md:text-xl text-slate-700 placeholder-slate-300"
-                                placeholder="Start writing or drop an idea here..."
-                                value={block.content || ''}
-                                onChange={(e) => onUpdate(block.id, e.target.value)}
-                            />
-                        </div>
+                        
+                        {isExpanded && (
+                            <div className="p-1 animate-fadeIn">
+                                <textarea 
+                                    className="w-full min-h-[120px] p-4 bg-white block w-full border-0 focus:ring-0 resize-y handwritten text-lg md:text-xl text-slate-700 placeholder-slate-300"
+                                    placeholder="Start writing or drop an idea here..."
+                                    value={block.content || ''}
+                                    onChange={(e) => onUpdate(block.id, e.target.value)}
+                                    autoFocus
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
             );
@@ -1222,49 +1242,51 @@
                                     </div>
                                 </div>
 
-                                <div className="flex flex-col md:flex-row gap-6 md:gap-8">
-                                    <div className="md:w-64 flex-shrink-0">
-                                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 sticky top-24 grid grid-cols-2 md:grid-cols-1 gap-2">
+                                <div className="flex flex-col gap-6">
+                                    {/* Horizontal Tabs */}
+                                    <div className="w-full">
+                                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-2 md:grid-cols-4 gap-2">
                                             <button 
                                                 onClick={() => setActiveTab('web')}
-                                                className={`w-full flex flex-col md:flex-row items-center md:gap-3 px-2 md:px-4 py-2 md:py-3 rounded-xl font-bold transition-all ${activeTab === 'web' ? 'bg-pink-50 text-pink-700' : 'text-slate-500 hover:bg-slate-50'}`}
+                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'web' ? 'bg-pink-50 text-pink-700' : 'text-slate-500 hover:bg-slate-50'}`}
                                             >
-                                                <div className={`p-2 rounded-lg ${activeTab === 'web' ? 'bg-pink-200 text-pink-700' : 'bg-slate-100 text-slate-400'}`}>
-                                                    <Icon name="brain" size={18} /> 
+                                                <div className={`p-1.5 rounded-lg ${activeTab === 'web' ? 'bg-pink-200 text-pink-700' : 'bg-slate-100 text-slate-400'}`}>
+                                                    <Icon name="brain" size={16} /> 
                                                 </div>
-                                                <span className="text-xs md:text-base mt-1 md:mt-0">Mind Web</span>
+                                                <span className="text-sm md:text-base">Mind Web</span>
                                             </button>
                                             <button 
                                                 onClick={() => setActiveTab('characters')}
-                                                className={`w-full flex flex-col md:flex-row items-center md:gap-3 px-2 md:px-4 py-2 md:py-3 rounded-xl font-bold transition-all ${activeTab === 'characters' ? 'bg-orange-50 text-orange-700' : 'text-slate-500 hover:bg-slate-50'}`}
+                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'characters' ? 'bg-orange-50 text-orange-700' : 'text-slate-500 hover:bg-slate-50'}`}
                                             >
-                                                <div className={`p-2 rounded-lg ${activeTab === 'characters' ? 'bg-orange-200 text-orange-700' : 'bg-slate-100 text-slate-400'}`}>
-                                                    <Icon name="user" size={18} /> 
+                                                <div className={`p-1.5 rounded-lg ${activeTab === 'characters' ? 'bg-orange-200 text-orange-700' : 'bg-slate-100 text-slate-400'}`}>
+                                                    <Icon name="user" size={16} /> 
                                                 </div>
-                                                <span className="text-xs md:text-base mt-1 md:mt-0">Characters</span>
+                                                <span className="text-sm md:text-base">Characters</span>
                                             </button>
                                             <button 
                                                 onClick={() => setActiveTab('settings')}
-                                                className={`w-full flex flex-col md:flex-row items-center md:gap-3 px-2 md:px-4 py-2 md:py-3 rounded-xl font-bold transition-all ${activeTab === 'settings' ? 'bg-teal-50 text-teal-700' : 'text-slate-500 hover:bg-slate-50'}`}
+                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'settings' ? 'bg-teal-50 text-teal-700' : 'text-slate-500 hover:bg-slate-50'}`}
                                             >
-                                                <div className={`p-2 rounded-lg ${activeTab === 'settings' ? 'bg-teal-200 text-teal-700' : 'bg-slate-100 text-slate-400'}`}>
-                                                    <Icon name="map" size={18} /> 
+                                                <div className={`p-1.5 rounded-lg ${activeTab === 'settings' ? 'bg-teal-200 text-teal-700' : 'bg-slate-100 text-slate-400'}`}>
+                                                    <Icon name="map" size={16} /> 
                                                 </div>
-                                                <span className="text-xs md:text-base mt-1 md:mt-0">Settings</span>
+                                                <span className="text-sm md:text-base">Settings</span>
                                             </button>
                                             <button 
                                                 onClick={() => setActiveTab('blocks')}
-                                                className={`w-full flex flex-col md:flex-row items-center md:gap-3 px-2 md:px-4 py-2 md:py-3 rounded-xl font-bold transition-all ${activeTab === 'blocks' ? 'bg-amber-50 text-amber-700' : 'text-slate-500 hover:bg-slate-50'}`}
+                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'blocks' ? 'bg-amber-50 text-amber-700' : 'text-slate-500 hover:bg-slate-50'}`}
                                             >
-                                                <div className={`p-2 rounded-lg ${activeTab === 'blocks' ? 'bg-amber-200 text-amber-700' : 'bg-slate-100 text-slate-400'}`}>
-                                                    <Icon name="book" size={18} /> 
+                                                <div className={`p-1.5 rounded-lg ${activeTab === 'blocks' ? 'bg-amber-200 text-amber-700' : 'bg-slate-100 text-slate-400'}`}>
+                                                    <Icon name="book" size={16} /> 
                                                 </div>
-                                                <span className="text-xs md:text-base mt-1 md:mt-0">Story Org.</span>
+                                                <span className="text-sm md:text-base">Story Org.</span>
                                             </button>
                                         </div>
                                     </div>
 
-                                    <div className="flex-1">
+                                    {/* Main Workspace */}
+                                    <div className="w-full">
                                         <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-4 md:p-8 min-h-[50vh] border border-slate-100">
                                             {activeTab === 'web' && <MindWeb ideas={ideas} setIdeas={setIdeas} onOrganize={goToOrganizer} />}
                                             {activeTab === 'characters' && <CharacterBuilder characters={characters} setCharacters={setCharacters} />}
