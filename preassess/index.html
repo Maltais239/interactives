@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Building & Breaking Numbers App</title>
+    <style>
+        :root {
+            --primary: #4a90e2;
+            --primary-dark: #357abd;
+            --success: #2ecc71;
+            --warning: #f39c12;
+            --error: #e74c3c;
+            --block-color: #f1c40f; 
+            --block-border: #d4ac0d;
+            --bg-color: #f0f4f8;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            /* UPDATED: Clean, modern, accessible font stack. No Comic Sans. */
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        h1 { 
+            text-align: center; 
+            color: var(--primary); 
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+
+        h2 { 
+            border-bottom: 2px solid #eee; 
+            padding-bottom: 10px; 
+            margin-top: 0;
+            font-size: 1.4rem; 
+            color: #444;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .level-badge {
+            font-size: 0.8rem;
+            padding: 4px 12px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+        .level-medium { background: #e3f2fd; color: #1976d2; }
+        .level-easy { background: #e8f5e9; color: #2e7d32; }
+        .level-hard { background: #fff3e0; color: #ef6c00; }
+
+        /* --- VISUAL BLOCKS STYLES --- */
+        .block-area {
+            background: #fafafa;
+            border: 2px dashed #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 15px 0;
+            display: flex;
+            justify-content: center;
+            min-height: 100px;
+        }
+
+        .block-container {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .cube-100 {
+            width: 80px; height: 80px;
+            background: var(--block-color);
+            border: 2px solid var(--block-border);
+            background-image: 
+                linear-gradient(var(--block-border) 1px, transparent 1px), 
+                linear-gradient(90deg, var(--block-border) 1px, transparent 1px);
+            background-size: 8px 8px;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.15);
+        }
+
+        .rod-10 {
+            width: 15px; height: 80px;
+            background: var(--block-color);
+            border: 2px solid var(--block-border);
+            display: flex; flex-direction: column;
+            box-shadow: 3px 3px 0px rgba(0,0,0,0.15);
+        }
+        .rod-segment { flex: 1; border-bottom: 1px solid rgba(0,0,0,0.1); }
+        .rod-segment:last-child { border-bottom: none; }
+
+        .unit-1 {
+            width: 15px; height: 15px;
+            background: var(--block-color);
+            border: 2px solid var(--block-border);
+            box-shadow: 2px 2px 0px rgba(0,0,0,0.15);
+        }
+
+        .ones-group {
+            display: grid;
+            grid-template-columns: repeat(5, 15px);
+            gap: 4px;
+            align-self: flex-end;
+            padding-left: 10px;
+        }
+
+        /* --- QUESTION CONTAINERS --- */
+        .question-wrapper {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 40px;
+            border: 1px solid #eee;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+            transition: all 0.3s ease;
+        }
+
+        /* Q1 Circles */
+        .bond-wrapper {
+            display: flex; justify-content: space-around; flex-wrap: wrap; gap: 20px;
+        }
+        .bond-container { 
+            display: flex; align-items: center; justify-content: center; gap: 15px; 
+            background: #fff; padding: 20px; border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid #eee;
+        }
+        .circle {
+            width: 60px; height: 60px; border-radius: 50%; border: 3px solid #333;
+            display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.4rem;
+            background: white;
+        }
+        .main-circle { background: #eee; }
+        .arrow { font-size: 30px; color: #bbb; }
+        
+        /* Inputs */
+        input[type="number"] {
+            width: 70px; padding: 10px; font-size: 1.2rem; 
+            border: 2px solid #ddd; border-radius: 10px; text-align: center;
+            outline: none; transition: 0.3s;
+        }
+        input[type="number"]:focus {
+            border-color: var(--primary); box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+        }
+        input.correct { border-color: var(--success); background: #e8f8f5; color: var(--success); font-weight: bold;}
+        input.wrong { border-color: var(--error); background: #fdedec; color: var(--error); }
+
+        /* Q3 Selection */
+        .selection-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .selectable-model {
+            border: 3px solid transparent; padding: 15px; cursor: pointer;
+            transition: 0.2s; border-radius: 15px; background: white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); text-align: center;
+        }
+        .selectable-model:hover { transform: translateY(-3px); box-shadow: 0 6px 15px rgba(0,0,0,0.1); }
+        .selectable-model.selected { border-color: var(--primary); background-color: #f0f7ff; }
+        .selectable-model.correct-selection { border-color: var(--success); background-color: #e8f8f5; }
+        .selectable-model.wrong-selection { border-color: var(--error); background-color: #fdedec; }
+
+        /* Buttons */
+        .btn-check {
+            background: var(--primary); color: white; border: none; padding: 10px 20px;
+            border-radius: 8px; font-size: 1rem; cursor: pointer; transition: 0.2s;
+        }
+        .btn-check:hover { background: var(--primary-dark); }
+        
+        .feedback-area {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            display: none; /* Hidden by default */
+        }
+        .feedback-area.show { display: block; animation: fadeIn 0.5s; }
+        .fb-correct { background: #e8f8f5; color: #27ae60; border: 1px solid #a9dfbf; }
+        .fb-wrong { background: #fdedec; color: #c0392b; border: 1px solid #fadbd8; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🏗️ Building & Breaking Numbers</h1>
+    <p class="subtitle">Nelson Math Preassessment Review - Page 5 (Adaptive)</p>
+
+    <!-- Q1 Container -->
+    <div id="q1-wrapper" class="question-wrapper"></div>
+
+    <!-- Q2 Container -->
+    <div id="q2-wrapper" class="question-wrapper"></div>
+
+    <!-- Q3 Container -->
+    <div id="q3-wrapper" class="question-wrapper"></div>
+
+    <!-- Q4 Container -->
+    <div id="q4-wrapper" class="question-wrapper"></div>
+
+    <!-- Q5 Container -->
+    <div id="q5-wrapper" class="question-wrapper"></div>
+
+</div>
+
+<script>
+    /* * CENTRAL DATA STRUCTURE FOR ADAPTIVE QUESTIONS
+     * Each question has 'easy', 'medium', 'hard' configurations.
+     */
+    const questionsData = {
+        q1: {
+            title: "1. Decomposing Numbers (Number Bonds)",
+            levels: {
+                easy: { target: 5, label: "Easy" },
+                medium: { target: 10, label: "Standard" },
+                hard: { target: 20, label: "Challenge" }
+            }
+        },
+        q2: {
+            title: "2. Building with Cubes",
+            levels: {
+                easy: { tens: 1, ones: 2, label: "Easy" },      // 10 + 2 = 12
+                medium: { tens: 3, ones: 2, label: "Standard" }, // 30 + 2 = 32
+                hard: { tens: 5, ones: 12, label: "Challenge" }  // 50 + 12 = 62 (regrouping)
+            }
+        },
+        q3: {
+            title: "3. Which model is correct?",
+            levels: {
+                easy: { target: 23, correct: {t:2, o:3}, wrong: {t:5, o:3}, label: "Easy" },
+                medium: { target: 185, correct: {t:18, o:5}, wrong: {t:5, o:25}, label: "Standard" },
+                hard: { target: 305, correct: {h:3, t:0, o:5}, wrong: {h:0, t:3, o:5}, label: "Challenge" }
+            }
+        },
+        q4: {
+            title: "4. Count the blocks",
+            levels: {
+                easy: { h:0, t:2, o:3, label: "Easy" },   // 23
+                medium: { h:0, t:4, o:13, label: "Standard" }, // 53 (regroup)
+                hard: { h:0, t:6, o:24, label: "Challenge" }   // 84 (double regroup)
+            }
+        },
+        q5: {
+            title: "5. Count the big number",
+            levels: {
+                easy: { h:1, t:1, o:1, label: "Easy" },       // 111
+                medium: { h:1, t:5, o:20, label: "Standard" },    // 170
+                hard: { h:2, t:12, o:5, label: "Challenge" }      // 325 (regroup tens to hundreds)
+            }
+        }
+    };
+
+    // Current state of difficulty for each question
+    const state = {
+        q1: 'medium',
+        q2: 'medium',
+        q3: 'medium',
+        q4: 'medium',
+        q5: 'medium'
+    };
+
+    // --- INITIALIZATION ---
+    window.onload = function() {
+        renderAll();
+    };
+
+    function renderAll() {
+        renderQ1();
+        renderQ2();
+        renderQ3();
+        renderQ4();
+        renderQ5();
+    }
+
+    // --- HELPER: Block Generator ---
+    function generateBlocksHTML(h, t, o) {
+        let html = '<div class="block-container">';
+        
+        // Hundreds
+        for(let i=0; i<h; i++) html += `<div class="cube-100"></div>`;
+        
+        // Tens
+        for(let i=0; i<t; i++) {
+            html += `<div class="rod-10">`;
+            for(let j=0; j<10; j++) html += `<div class="rod-segment"></div>`;
+            html += `</div>`;
+        }
+
+        // Ones (Grouped for readability if > 5)
+        if(o > 0) {
+            html += `<div class="ones-group" style="display:grid; grid-template-columns: repeat(${Math.min(5, o)}, 15px);">`;
+            for(let i=0; i<o; i++) html += `<div class="unit-1"></div>`;
+            html += `</div>`;
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    // --- RENDERERS ---
+
+    function renderHeader(id, title, levelKey) {
+        const levelData = questionsData[id].levels[levelKey];
+        const badgeClass = `level-${levelKey}`;
+        return `<h2>${title} <span class="level-badge ${badgeClass}">${levelData.label}</span></h2>`;
+    }
+
+    function renderFeedbackArea(id) {
+        return `<div id="fb-${id}" class="feedback-area"></div>`;
+    }
+
+    // Question 1: Number Bonds
+    function renderQ1() {
+        const id = 'q1';
+        const level = state[id];
+        const data = questionsData[id].levels[level];
+        const wrapper = document.getElementById(`${id}-wrapper`);
+
+        let html = renderHeader(id, questionsData[id].title, level);
+        html += `<p>Find two numbers that add up to <strong>${data.target}</strong>.</p>`;
+        
+        html += `
+        <div class="bond-wrapper">
+            <div class="bond-container">
+                <div class="circle main-circle">${data.target}</div>
+                <div class="arrow">➞</div>
+                <input type="number" id="${id}a" placeholder="?">
+                <span style="font-size: 24px; font-weight:bold;">+</span>
+                <input type="number" id="${id}b" placeholder="?">
+            </div>
+        </div>
+        <div style="text-align:center; margin-top:20px;">
+            <button class="btn-check" onclick="checkQ1()">Check Answer</button>
+        </div>
+        ${renderFeedbackArea(id)}
+        `;
+        wrapper.innerHTML = html;
+    }
+
+    // Question 2: Fill in blanks
+    function renderQ2() {
+        const id = 'q2';
+        const level = state[id];
+        const data = questionsData[id].levels[level];
+        const wrapper = document.getElementById(`${id}-wrapper`);
+
+        let html = renderHeader(id, questionsData[id].title, level);
+        html += `<div class="block-area">${generateBlocksHTML(0, data.tens, data.ones)}</div>`;
+        
+        html += `
+        <p style="text-align: center; font-size: 1.1rem;">
+            ${data.tens} groups of ten + <input type="number" id="${id}a" style="width:50px;"> ones = <input type="number" id="${id}b" style="width:80px;">
+        </p>
+        <div style="text-align:center;">
+            <button class="btn-check" onclick="checkQ2()">Check Answer</button>
+        </div>
+        ${renderFeedbackArea(id)}
+        `;
+        wrapper.innerHTML = html;
+    }
+
+    // Question 3: Selection
+    // Global variable to track selection for Q3
+    let q3Selection = null; 
+    window.selectQ3 = function(choice) {
+        q3Selection = choice;
+        document.querySelectorAll('.selectable-model').forEach(el => el.classList.remove('selected'));
+        document.getElementById(`model-${choice}`).classList.add('selected');
+    };
+
+    function renderQ3() {
+        const id = 'q3';
+        const level = state[id];
+        const data = questionsData[id].levels[level];
+        const wrapper = document.getElementById(`${id}-wrapper`);
+        q3Selection = null; // Reset selection
+
+        // Randomize position of correct answer (A or B)
+        // We'll store which one is correct in a data attribute
+        const isACorrect = Math.random() < 0.5;
+        const modelA = isACorrect ? data.correct : data.wrong;
+        const modelB = isACorrect ? data.wrong : data.correct;
+        
+        // Store the correct answer key ('a' or 'b') globally for the checker
+        wrapper.dataset.correctModel = isACorrect ? 'a' : 'b';
+
+        let html = renderHeader(id, questionsData[id].title, level);
+        html += `<p>Click the box that shows <strong>${data.target}</strong>.</p>`;
+        
+        html += `
+        <div class="selection-grid">
+            <div class="selectable-model" id="model-a" onclick="selectQ3('a')">
+                <strong>Model A</strong>
+                <div class="block-area" style="background:none; border:none; padding:10px; min-height:auto;">
+                    ${generateBlocksHTML(modelA.h || 0, modelA.t, modelA.o)}
+                </div>
+            </div>
+            <div class="selectable-model" id="model-b" onclick="selectQ3('b')">
+                <strong>Model B</strong>
+                <div class="block-area" style="background:none; border:none; padding:10px; min-height:auto;">
+                    ${generateBlocksHTML(modelB.h || 0, modelB.t, modelB.o)}
+                </div>
+            </div>
+        </div>
+        <div style="text-align:center; margin-top:20px;">
+            <button class="btn-check" onclick="checkQ3()">Check Answer</button>
+        </div>
+        ${renderFeedbackArea(id)}
+        `;
+        wrapper.innerHTML = html;
+    }
+
+    // Question 4 & 5: Count total
+    function renderCountQuestion(id) {
+        const level = state[id];
+        const data = questionsData[id].levels[level];
+        const wrapper = document.getElementById(`${id}-wrapper`);
+
+        let html = renderHeader(id, questionsData[id].title, level);
+        html += `<div class="block-area">${generateBlocksHTML(data.h, data.t, data.o)}</div>`;
+        
+        html += `
+        <p style="text-align:center;">What is the total number?</p>
+        <div style="text-align:center;">
+            <input type="number" id="${id}a" placeholder="Total">
+        </div>
+        <div style="text-align:center; margin-top:15px;">
+            <button class="btn-check" onclick="checkStandard('${id}', ${calculateTotal(data)})">Check Answer</button>
+        </div>
+        ${renderFeedbackArea(id)}
+        `;
+        wrapper.innerHTML = html;
+    }
+
+    function renderQ4() { renderCountQuestion('q4'); }
+    function renderQ5() { renderCountQuestion('q5'); }
+
+    function calculateTotal(data) {
+        return (data.h||0)*100 + (data.t||0)*10 + (data.o||0);
+    }
+
+    // --- CHECKING LOGIC & ADAPTIVITY ---
+
+    function handleResult(id, isCorrect, correctMsg, errorMsg) {
+        const fb = document.getElementById(`fb-${id}`);
+        fb.className = `feedback-area show ${isCorrect ? 'fb-correct' : 'fb-wrong'}`;
+        
+        if (isCorrect) {
+            fb.innerHTML = `<strong>Correct!</strong> ${correctMsg}`;
+            
+            // Logic for Level Up
+            if (state[id] === 'easy') changeLevel(id, 'medium', 1500);
+            else if (state[id] === 'medium') changeLevel(id, 'hard', 1500);
+            else fb.innerHTML += " <br>🌟 You've mastered the hardest level!";
+
+        } else {
+            fb.innerHTML = `<strong>Not quite.</strong> ${errorMsg}`;
+            
+            // Logic for Level Down
+            if (state[id] === 'hard') changeLevel(id, 'medium', 2000);
+            else if (state[id] === 'medium') changeLevel(id, 'easy', 2000);
+            else fb.innerHTML += " <br>Keep trying! You can do it.";
+        }
+    }
+
+    function changeLevel(id, newLevel, delay) {
+        const fb = document.getElementById(`fb-${id}`);
+        const msg = newLevel === 'easy' ? "Let's try simpler numbers..." : "Leveling up to a Challenge!";
+        
+        setTimeout(() => {
+            fb.innerHTML += `<br><em>${msg}</em>`;
+        }, 1000);
+
+        setTimeout(() => {
+            state[id] = newLevel;
+            // Re-render specific question
+            if(id === 'q1') renderQ1();
+            if(id === 'q2') renderQ2();
+            if(id === 'q3') renderQ3();
+            if(id === 'q4') renderQ4();
+            if(id === 'q5') renderQ5();
+        }, delay);
+    }
+
+    // Q1 Checker
+    function checkQ1() {
+        const id = 'q1';
+        const a = parseInt(document.getElementById(`${id}a`).value);
+        const b = parseInt(document.getElementById(`${id}b`).value);
+        const target = questionsData[id].levels[state[id]].target;
+
+        const isCorrect = (a + b === target) && (a > 0 && b > 0);
+        handleResult(id, isCorrect, 
+            `${a} + ${b} = ${target}. Great job!`, 
+            `Those numbers don't add up to ${target}.`
+        );
+    }
+
+    // Q2 Checker
+    function checkQ2() {
+        const id = 'q2';
+        const a = parseInt(document.getElementById(`${id}a`).value);
+        const b = parseInt(document.getElementById(`${id}b`).value);
+        const data = questionsData[id].levels[state[id]];
+        
+        const correctOnes = data.ones;
+        const total = (data.tens * 10) + data.ones;
+
+        const isCorrect = (a === correctOnes && b === total);
+        handleResult(id, isCorrect, 
+            `Excellent building!`, 
+            `Check the number of single cubes again.`
+        );
+    }
+
+    // Q3 Checker
+    function checkQ3() {
+        const id = 'q3';
+        const wrapper = document.getElementById(`${id}-wrapper`);
+        const correctKey = wrapper.dataset.correctModel;
+        
+        if (!q3Selection) {
+            alert("Please select a model first.");
+            return;
+        }
+
+        const isCorrect = (q3Selection === correctKey);
+        handleResult(id, isCorrect, 
+            "You picked the right model!", 
+            "Count the blocks carefully."
+        );
+    }
+
+    // Standard Checker (Q4, Q5)
+    function checkStandard(id, correctTotal) {
+        const val = parseInt(document.getElementById(`${id}a`).value);
+        const isCorrect = (val === correctTotal);
+        handleResult(id, isCorrect, 
+            "Spot on!", 
+            "Try counting the tens and ones again. Did you regroup?"
+        );
+    }
+
+</script>
+
+</body>
+</html>
