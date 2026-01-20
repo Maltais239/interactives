@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MacGregor Maltais Magic Writer Spark 2.1</title>
+    <title>MacGregor Maltais Magic Writer Spark 2.2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
@@ -670,6 +670,134 @@
             );
         });
 
+        // Sidebar Card Components (Extracted for better performance & reliability)
+        const CharacterMiniCard = ({ char, onDragStart }) => {
+            const handleCopyData = (e) => {
+                e.stopPropagation(); 
+                const text = `Character Name: ${char.name}\nRole: ${char.role}\nTraits: ${char.details.map(d => d.text).join(', ')}`;
+                
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert(`Copied ${char.name} data!`);
+                } catch (err) {
+                    // Fail silently or log
+                }
+                document.body.removeChild(textArea);
+            };
+
+            return (
+                <div 
+                    draggable="true"
+                    onDragStart={(e) => onDragStart(e, char.name)}
+                    className="bg-white border border-orange-100 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-orange-300 cursor-grab active:cursor-grabbing group transition-all relative"
+                >
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="bg-orange-100 text-orange-600 p-1.5 rounded-lg">
+                            <Icon name="user" size={14} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <h5 className="font-heading font-bold text-slate-800 text-sm truncate leading-tight">{char.name}</h5>
+                            <span className="text-[10px] uppercase font-bold text-orange-400 tracking-wide">{char.role}</span>
+                        </div>
+                        {/* Copy Button */}
+                        <button 
+                            onClick={handleCopyData}
+                            className="text-slate-300 hover:text-indigo-600 p-1 hover:bg-indigo-50 rounded transition-colors"
+                            title="Copy for AI Image Gen"
+                        >
+                            <Icon name="copy" size={14} />
+                        </button>
+                        <Icon name="grip" size={14} className="text-slate-300 group-hover:text-orange-300" />
+                    </div>
+                    {(char.details || []).length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                            {char.details.map(d => (
+                                <span 
+                                    key={d.id} 
+                                    draggable="true"
+                                    onDragStart={(e) => {
+                                        e.stopPropagation(); // Critical: Stop the card itself from dragging
+                                        e.dataTransfer.effectAllowed = "copy"; // Be explicit about copy action
+                                        onDragStart(e, d.text);
+                                    }}
+                                    className="text-[10px] bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded-md border border-orange-100/50 break-words max-w-full cursor-grab active:cursor-grabbing hover:bg-orange-100 hover:border-orange-200 transition-colors pointer-events-auto"
+                                >
+                                    {d.text}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const SettingMiniCard = ({ set, onDragStart }) => {
+                const handleCopyData = (e) => {
+                e.stopPropagation(); 
+                const text = `Setting Name: ${set.name}\nDetails: ${set.details.map(d => d.text).join(', ')}`;
+                
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert(`Copied ${set.name} data!`);
+                } catch (err) {
+                    // Fail silently
+                }
+                document.body.removeChild(textArea);
+            };
+
+            return (
+                <div 
+                    draggable="true"
+                    onDragStart={(e) => onDragStart(e, set.name)}
+                    className="bg-white border border-teal-100 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-teal-300 cursor-grab active:cursor-grabbing group transition-all relative"
+                >
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="bg-teal-100 text-teal-600 p-1.5 rounded-lg">
+                            <Icon name="map" size={14} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <h5 className="font-heading font-bold text-slate-800 text-sm truncate leading-tight">{set.name}</h5>
+                        </div>
+                            {/* Copy Button */}
+                        <button 
+                            onClick={handleCopyData}
+                            className="text-slate-300 hover:text-indigo-600 p-1 hover:bg-indigo-50 rounded transition-colors"
+                            title="Copy for AI Image Gen"
+                        >
+                            <Icon name="copy" size={14} />
+                        </button>
+                        <Icon name="grip" size={14} className="text-slate-300 group-hover:text-teal-300" />
+                    </div>
+                    {(set.details || []).length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                            {set.details.map(d => (
+                                <span 
+                                    key={d.id} 
+                                    draggable="true"
+                                    onDragStart={(e) => {
+                                        e.stopPropagation(); // Critical: Stop the card itself from dragging
+                                        e.dataTransfer.effectAllowed = "copy";
+                                        onDragStart(e, d.text);
+                                    }}
+                                    className="text-[10px] bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded-md border border-teal-100/50 break-words max-w-full cursor-grab active:cursor-grabbing hover:bg-teal-100 hover:border-teal-200 transition-colors pointer-events-auto"
+                                >
+                                    {d.text}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
         // StoryBuilder component start
         const StoryBuilder = ({ blocks, setBlocks, ideas, characters, settings }) => {
             const [draggedIdea, setDraggedIdea] = useState(null);
@@ -682,6 +810,7 @@
 
             const handleDragStart = (e, text) => {
                 e.dataTransfer.setData('text/plain', text);
+                e.dataTransfer.effectAllowed = "copy"; // Ensure copy cursor shows
                 setDraggedIdea(text);
             };
 
@@ -756,132 +885,6 @@
             const showNotification = (msg, type) => {
                 setNotification({ msg, type });
                 setTimeout(() => setNotification(null), 3000);
-            };
-
-            // Sidebar Card Components
-            const CharacterMiniCard = ({ char }) => {
-                const handleCopyData = (e) => {
-                    e.stopPropagation(); 
-                    const text = `Character Name: ${char.name}\nRole: ${char.role}\nTraits: ${char.details.map(d => d.text).join(', ')}`;
-                    
-                    const textArea = document.createElement("textarea");
-                    textArea.value = text;
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    try {
-                        document.execCommand('copy');
-                        showNotification(`Copied ${char.name} for AI generation!`, "success");
-                    } catch (err) {
-                        showNotification("Failed to copy.", "error");
-                    }
-                    document.body.removeChild(textArea);
-                };
-
-                return (
-                    <div 
-                        draggable="true"
-                        onDragStart={(e) => handleDragStart(e, char.name)}
-                        className="bg-white border border-orange-100 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-orange-300 cursor-grab active:cursor-grabbing group transition-all relative"
-                    >
-                        <div className="flex items-center gap-2 mb-2">
-                            <div className="bg-orange-100 text-orange-600 p-1.5 rounded-lg">
-                                <Icon name="user" size={14} />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <h5 className="font-heading font-bold text-slate-800 text-sm truncate leading-tight">{char.name}</h5>
-                                <span className="text-[10px] uppercase font-bold text-orange-400 tracking-wide">{char.role}</span>
-                            </div>
-                            {/* Copy Button */}
-                            <button 
-                                onClick={handleCopyData}
-                                className="text-slate-300 hover:text-indigo-600 p-1 hover:bg-indigo-50 rounded transition-colors"
-                                title="Copy for AI Image Gen"
-                            >
-                                <Icon name="copy" size={14} />
-                            </button>
-                            <Icon name="grip" size={14} className="text-slate-300 group-hover:text-orange-300" />
-                        </div>
-                        {(char.details || []).length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                                {char.details.map(d => (
-                                    <span 
-                                        key={d.id} 
-                                        draggable="true"
-                                        onDragStart={(e) => {
-                                            e.stopPropagation();
-                                            handleDragStart(e, d.text);
-                                        }}
-                                        className="text-[10px] bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded-md border border-orange-100/50 break-words max-w-full cursor-grab active:cursor-grabbing hover:bg-orange-100 hover:border-orange-200 transition-colors"
-                                    >
-                                        {d.text}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                );
-            };
-
-            const SettingMiniCard = ({ set }) => {
-                 const handleCopyData = (e) => {
-                    e.stopPropagation(); 
-                    const text = `Setting Name: ${set.name}\nDetails: ${set.details.map(d => d.text).join(', ')}`;
-                    
-                    const textArea = document.createElement("textarea");
-                    textArea.value = text;
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    try {
-                        document.execCommand('copy');
-                        showNotification(`Copied ${set.name} for AI generation!`, "success");
-                    } catch (err) {
-                        showNotification("Failed to copy.", "error");
-                    }
-                    document.body.removeChild(textArea);
-                };
-
-                return (
-                    <div 
-                        draggable="true"
-                        onDragStart={(e) => handleDragStart(e, set.name)}
-                        className="bg-white border border-teal-100 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-teal-300 cursor-grab active:cursor-grabbing group transition-all relative"
-                    >
-                        <div className="flex items-center gap-2 mb-2">
-                            <div className="bg-teal-100 text-teal-600 p-1.5 rounded-lg">
-                                <Icon name="map" size={14} />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <h5 className="font-heading font-bold text-slate-800 text-sm truncate leading-tight">{set.name}</h5>
-                            </div>
-                             {/* Copy Button */}
-                            <button 
-                                onClick={handleCopyData}
-                                className="text-slate-300 hover:text-indigo-600 p-1 hover:bg-indigo-50 rounded transition-colors"
-                                title="Copy for AI Image Gen"
-                            >
-                                <Icon name="copy" size={14} />
-                            </button>
-                            <Icon name="grip" size={14} className="text-slate-300 group-hover:text-teal-300" />
-                        </div>
-                        {(set.details || []).length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                                {set.details.map(d => (
-                                    <span 
-                                        key={d.id} 
-                                        draggable="true"
-                                        onDragStart={(e) => {
-                                            e.stopPropagation();
-                                            handleDragStart(e, d.text);
-                                        }}
-                                        className="text-[10px] bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded-md border border-teal-100/50 break-words max-w-full cursor-grab active:cursor-grabbing hover:bg-teal-100 hover:border-teal-200 transition-colors"
-                                    >
-                                        {d.text}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                );
             };
 
             return (
@@ -962,7 +965,7 @@
                                 </h5>
                                 {characters.length > 0 ? (
                                     <div className="space-y-2 max-h-[300px] overflow-y-auto scrollbar-thin pr-1">
-                                        {characters.map(char => <CharacterMiniCard key={char.id} char={char} />)}
+                                        {characters.map(char => <CharacterMiniCard key={char.id} char={char} onDragStart={handleDragStart} />)}
                                     </div>
                                 ) : (
                                     <p className="text-xs text-slate-400 italic">No characters yet. Go to Characters!</p>
@@ -976,7 +979,7 @@
                                 </h5>
                                 {settings.length > 0 ? (
                                     <div className="space-y-2 max-h-[300px] overflow-y-auto scrollbar-thin pr-1">
-                                        {settings.map(set => <SettingMiniCard key={set.id} set={set} />)}
+                                        {settings.map(set => <SettingMiniCard key={set.id} set={set} onDragStart={handleDragStart} />)}
                                     </div>
                                 ) : (
                                     <p className="text-xs text-slate-400 italic">No settings yet. Go to Settings!</p>
@@ -1122,7 +1125,7 @@
                                 <div className="bg-gradient-to-br from-indigo-600 to-violet-600 p-2.5 rounded-xl text-white shadow-lg group-hover:shadow-indigo-500/30 transition-all duration-300 group-hover:scale-105">
                                     <Icon name="sparkles" size={20} />
                                 </div>
-                                <h1 className="text-2xl font-heading font-extrabold text-slate-800 tracking-tight">MacGregor Maltais Magic Writer Spark 2.1</h1>
+                                <h1 className="text-2xl font-heading font-extrabold text-slate-800 tracking-tight">MacGregor Maltais Magic Writer Spark 2.2</h1>
                             </div>
                             
                             <div className="flex items-center gap-3">
