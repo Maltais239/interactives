@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fur Trade Adventure: Barter & Trade</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Animation Styles -->
+    <style>
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        .slide-up { animation: slideUp 0.5s ease-out; }
+        .bounce { animation: bounce 1s infinite; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+        /* Custom Scrollbar for Inventory */
+        .inventory-scroll::-webkit-scrollbar { width: 6px; }
+        .inventory-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
+        .inventory-scroll::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
+    </style>
+</head>
+<body class="bg-amber-50 min-h-screen font-sans text-slate-800 selection:bg-amber-200">
+
+    <!-- APP CONTAINER -->
+    <div id="app" class="min-h-screen flex flex-col items-center justify-center p-4">
+        <!-- Content injects here -->
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // --- CONSTANTS & DATA ---
+        
+        // Asymmetric Value System (Reflecting PDF: "Different Value Systems")
+        const ITEMS = {
+            // FURS (High Value to Trader, Low to Trapper)
+            beaver: { name: "Beaver Pelt", icon: "squirrel", type: "fur", traderValue: 20, trapperValue: 2, color: "text-amber-700" },
+            fox: { name: "Silver Fox", icon: "dog", type: "fur", traderValue: 25, trapperValue: 3, color: "text-slate-500" },
+            bear: { name: "Bear Skin", icon: "paw-print", type: "fur", traderValue: 15, trapperValue: 5, color: "text-stone-800" },
+            
+            // GOODS (High Value to Trapper, Low to Trader)
+            musket: { name: "Musket", icon: "crosshair", type: "good", traderValue: 5, trapperValue: 25, color: "text-slate-800" },
+            kettle: { name: "Copper Kettle", icon: "cooking-pot", type: "good", traderValue: 3, trapperValue: 15, color: "text-orange-700" },
+            blanket: { name: "Wool Blanket", icon: "scroll", type: "good", traderValue: 2, trapperValue: 12, color: "text-red-700" },
+            beads: { name: "Glass Beads", icon: "gem", type: "good", traderValue: 1, trapperValue: 10, color: "text-blue-600" }
+        };
+
+        const ROLES = {
+            trader: {
+                title: "Travelling Merchant",
+                objective: "Become the Richest",
+                desc: "Buy cheap goods in Montreal, trade them for valuable furs.",
+                scoring: "Wealth (£)",
+                opponent: "trapper",
+                startLocation: "Montreal",
+                gatherVerb: "Purchase Goods",
+                theme: "bg-red-900",
+                lightTheme: "bg-red-50",
+                icon: "ship"
+            },
+            trapper: {
+                title: "First Nations Trapper",
+                objective: "Become Most Prestigious",
+                desc: "Gather furs from the land, trade for goods that help your community.",
+                scoring: "Prestige (Pts)",
+                opponent: "trader",
+                startLocation: "The North Country",
+                gatherVerb: "Gather Furs",
+                theme: "bg-emerald-800",
+                lightTheme: "bg-emerald-50",
+                icon: "tent"
+            }
+        };
+
+        // Dice Roll Outcomes (PDF: "Roll die... decide what to take")
+        const DICE_TABLES = {
+            trader: [
+                { id: 'musket', count: 1, label: "1 Musket" },
+                { id: 'kettle', count: 2, label: "2 Kettles" },
+                { id: 'blanket', count: 3, label: "3 Blankets" },
+                { id: 'beads', count: 5, label: "Box of Beads" },
+                { id: 'musket', count: 2, label: "2 Muskets" }, // Lucky roll
+                { id: 'blanket', count: 5, label: "5 Blankets" }
+            ],
+            trapper: [
+                { id: 'beaver', count: 2, label: "2 Beavers" },
+                { id: 'fox', count: 1, label: "1 Silver Fox" },
+                { id: 'bear', count: 1, label: "1 Bear Skin" },
+                { id: 'beaver', count: 3, label: "3 Beavers" },
+                { id: 'fox', count: 2, label: "2 Foxes" },
+                { id: 'beaver', count: 1, label: "1 Beaver" }
+            ]
+        };
+
+        // --- STATE ---
+        let state = {
+            screen: 'start',
+            role: null,
+            inventory: [],
+            opponentInventory: [],
+            rollsLeft: 3,
+            tradeStage: 'offer', // offer, review, result
+            playerOffer: [],
+            opponentOffer: [],
+            score: 0,
+            log: []
+        };
+
+        // --- DOM ELEMENTS ---
+        const app = document.getElementById('app');
+
+        // --- RENDERER ---
+        function render() {
+            app.innerHTML = '';
+            
+            switch(state.screen) {
+                case 'start': renderStart(); break;
+                case 'role_select': renderRoleSelect(); break;
+                case 'gathering': renderGathering(); break;
+                case 'travel': renderTravel(); break;
+                case 'trading': renderTrading(); break;
+                case 'summary': renderSummary(); break;
+            }
+            
+            lucide.createIcons();
+        }
+
+        // --- SCREENS ---
+
+        function renderStart() {
+            app.innerHTML = `
+                <div class="max-w-2xl text-center space-y-8 fade-in">
+                    <div class="flex justify-center mb-6">
+                        <div class="bg-amber-900 p-6 rounded-full shadow-2xl">
+                            <i data-lucide="scale" class="w-20 h-20 text-amber-100"></i>
+                        </div>
+                    </div>
+                    <h1 class="text-6xl font-extrabold text-amber-900 tracking-tight">The Fur Trade Game</h1>
+                    <p class="text-xl text-amber-800/80 max-w-lg mx-auto">
+                        Experience the economic history of 1750. 
+                        Understand the <strong>Value of Exchange</strong> between First Nations and Europeans.
+                    </p>
+                    <button onclick="setScreen('role_select')" class="px-10 py-5 bg-amber-700 hover:bg-amber-800 text-white text-2xl font-bold rounded-2xl shadow-xl transform transition hover:scale-105">
+                        Start Game
+                    </button>
+                </div>
+            `;
+        }
+
+        function renderRoleSelect() {
+            app.innerHTML = `
+                <div class="flex flex-col items-center w-full max-w-5xl fade-in">
+                    <h2 class="text-4xl font-bold text-amber-900 mb-10">Who will you play?</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+                        <!-- Merchant Card -->
+                        <button onclick="selectRole('trader')" class="group relative overflow-hidden bg-white p-8 rounded-3xl shadow-lg border-4 border-transparent hover:border-red-700 transition-all text-left">
+                            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                                <i data-lucide="ship" class="w-32 h-32 text-red-900"></i>
+                            </div>
+                            <div class="relative z-10">
+                                <div class="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mb-6">
+                                    <i data-lucide="coins" class="w-8 h-8 text-red-700"></i>
+                                </div>
+                                <h3 class="text-3xl font-bold text-slate-800 mb-2">Travelling Merchant</h3>
+                                <p class="text-red-700 font-bold mb-4 uppercase tracking-wider text-sm">Goal: Wealth</p>
+                                <p class="text-slate-600 leading-relaxed">
+                                    Start in Montreal. Buy trade goods (guns, beads). Travel west to trade for furs.
+                                    <br><br>
+                                    <span class="text-sm bg-slate-100 p-1 px-2 rounded">Strategy: Trade cheap goods for expensive furs.</span>
+                                </p>
+                            </div>
+                        </button>
+
+                        <!-- Trapper Card -->
+                        <button onclick="selectRole('trapper')" class="group relative overflow-hidden bg-white p-8 rounded-3xl shadow-lg border-4 border-transparent hover:border-emerald-700 transition-all text-left">
+                            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                                <i data-lucide="trees" class="w-32 h-32 text-emerald-900"></i>
+                            </div>
+                            <div class="relative z-10">
+                                <div class="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mb-6">
+                                    <i data-lucide="feather" class="w-8 h-8 text-emerald-700"></i>
+                                </div>
+                                <h3 class="text-3xl font-bold text-slate-800 mb-2">First Nations Trapper</h3>
+                                <p class="text-emerald-700 font-bold mb-4 uppercase tracking-wider text-sm">Goal: Prestige</p>
+                                <p class="text-slate-600 leading-relaxed">
+                                    Start in the North Country. Hunt for furs. Travel to the post to trade for useful tools.
+                                    <br><br>
+                                    <span class="text-sm bg-slate-100 p-1 px-2 rounded">Strategy: Trade abundant furs for rare tools.</span>
+                                </p>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderGathering() {
+            const role = ROLES[state.role];
+            
+            // Generate Inventory List HTML
+            const invHtml = state.inventory.map(item => `
+                <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex items-center gap-3 slide-up">
+                    <i data-lucide="${ITEMS[item.id].icon}" class="${ITEMS[item.id].color}"></i>
+                    <span class="font-bold text-slate-700">${item.name}</span>
+                </div>
+            `).join('');
+
+            // Dice UI
+            const diceHtml = state.rollsLeft > 0 
+                ? `<button onclick="rollDice()" class="mt-8 bg-slate-800 text-white px-12 py-6 rounded-2xl text-2xl font-bold shadow-xl hover:bg-slate-700 transition flex items-center gap-4 bounce">
+                     <i data-lucide="dices"></i> Roll the Die (${state.rollsLeft} Left)
+                   </button>`
+                : `<button onclick="setScreen('travel')" class="mt-8 ${role.theme} text-white px-12 py-6 rounded-2xl text-2xl font-bold shadow-xl hover:opacity-90 transition flex items-center gap-4 animate-pulse">
+                     <i data-lucide="arrow-right"></i> Go to Trade Post
+                   </button>`;
+
+            app.innerHTML = `
+                <div class="max-w-4xl w-full flex flex-col items-center fade-in">
+                    <div class="${role.lightTheme} w-full p-8 rounded-t-3xl border-b border-slate-200 text-center">
+                        <h2 class="text-3xl font-bold text-slate-800 mb-2">${role.startLocation}</h2>
+                        <p class="text-slate-600">${role.gatherVerb} phase</p>
+                    </div>
+                    
+                    <div class="bg-white w-full p-8 rounded-b-3xl shadow-xl min-h-[400px] flex flex-col items-center">
+                        
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 w-full mb-6">
+                            ${invHtml || '<div class="col-span-4 text-center text-slate-400 italic py-10">Your inventory is empty... Roll to gather supplies!</div>'}
+                        </div>
+
+                        ${state.log.length > 0 ? `<div class="text-amber-600 font-bold mb-4 fade-in">${state.log[state.log.length-1]}</div>` : ''}
+
+                        ${diceHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderTravel() {
+            // Brief interlude screen
+            app.innerHTML = `
+                <div class="text-center fade-in">
+                    <i data-lucide="waves" class="w-24 h-24 text-blue-500 animate-pulse mb-6 mx-auto"></i>
+                    <h2 class="text-3xl font-bold text-slate-800 mb-4">Travelling...</h2>
+                    <p class="text-xl text-slate-600">The journey is long, but the ${state.role === 'trader' ? 'furs' : 'goods'} are waiting.</p>
+                </div>
+            `;
+            setTimeout(() => {
+                initOpponentInventory();
+                setScreen('trading');
+            }, 3000);
+        }
+
+        function renderTrading() {
+            const role = ROLES[state.role];
+            const oppRole = ROLES[role.opponent];
+            
+            // Calculate Value of current offer (How opponent sees it)
+            const offerValueToOpponent = state.playerOffer.reduce((sum, item) => sum + (state.role === 'trader' ? ITEMS[item.id].trapperValue : ITEMS[item.id].traderValue), 0);
+            
+            // Helper to render an item card
+            const renderItem = (item, source, idx) => `
+                <button onclick="${source === 'player' ? `toggleOffer(${idx})` : ''}" 
+                    class="p-2 rounded-lg border-2 flex items-center gap-2 w-full mb-2 transition
+                    ${source === 'player' && state.playerOffer.includes(item) ? 'bg-amber-100 border-amber-500' : 'bg-white border-slate-200 hover:border-amber-300'}
+                    ${source === 'opponent' ? 'opacity-70 cursor-default' : ''}
+                ">
+                    <i data-lucide="${ITEMS[item.id].icon}" class="${ITEMS[item.id].color}"></i>
+                    <div class="text-left">
+                        <div class="font-bold text-sm text-slate-700">${item.name}</div>
+                        <div class="text-xs text-slate-400">
+                           Val to You: ${role.opponent === 'trader' ? ITEMS[item.id].trapperValue : ITEMS[item.id].traderValue} | 
+                           Val to Them: ${role.opponent === 'trader' ? ITEMS[item.id].traderValue : ITEMS[item.id].trapperValue}
+                        </div>
+                    </div>
+                </button>
+            `;
+
+            // Player Inventory List (excluding items already in offer)
+            const playerInvHtml = state.inventory.map((item, i) => renderItem(item, 'player', i)).join('');
+            
+            // Opponent Offer HTML
+            const opponentOfferHtml = state.opponentOffer.length > 0 
+                ? state.opponentOffer.map(item => `
+                    <div class="bg-green-100 p-2 rounded border border-green-300 flex items-center gap-2 mb-2 fade-in">
+                        <i data-lucide="${ITEMS[item.id].icon}"></i>
+                        <span class="font-bold text-green-900">${item.name}</span>
+                    </div>`).join('')
+                : '<div class="text-slate-400 italic text-center py-4">Waiting for your offer...</div>';
+
+            app.innerHTML = `
+                <div class="w-full max-w-6xl h-[90vh] flex flex-col fade-in">
+                    
+                    <!-- HEADER -->
+                    <div class="bg-amber-900 text-amber-50 p-4 rounded-t-xl flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-white/10 p-2 rounded-full"><i data-lucide="handshake" class="w-6 h-6"></i></div>
+                            <div>
+                                <h2 class="text-xl font-bold">The Trading Post</h2>
+                                <p class="text-sm opacity-80">Negotiate with the ${oppRole.title}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs uppercase tracking-wide opacity-70">Your Goal</div>
+                            <div class="font-bold text-lg">${role.scoring}</div>
+                        </div>
+                    </div>
+
+                    <!-- MAIN AREA -->
+                    <div class="flex-1 bg-amber-50 border-x-4 border-amber-900 flex overflow-hidden">
+                        
+                        <!-- LEFT: YOUR INVENTORY -->
+                        <div class="w-1/3 p-4 bg-white border-r border-slate-200 overflow-y-auto inventory-scroll">
+                            <h3 class="font-bold text-slate-500 uppercase text-xs mb-4">Your Inventory</h3>
+                            ${playerInvHtml}
+                        </div>
+
+                        <!-- CENTER: THE TABLE -->
+                        <div class="w-1/3 p-4 flex flex-col bg-slate-50 relative">
+                            
+                            <!-- Opponent Half -->
+                            <div class="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-2 overflow-y-auto">
+                                <h3 class="text-center text-xs font-bold text-slate-400 uppercase mb-2">They Offer</h3>
+                                ${opponentOfferHtml}
+                            </div>
+
+                            <!-- Interaction Zone -->
+                            <div class="h-32 flex flex-col items-center justify-center space-y-2">
+                                ${state.tradeStage === 'offer' ? `
+                                    <div class="text-sm text-slate-500 mb-2">Select items to offer</div>
+                                    <button onclick="makeOffer()" class="bg-slate-800 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-slate-700 transition disabled:opacity-50" ${state.playerOffer.length === 0 ? 'disabled' : ''}>
+                                        Make Offer
+                                    </button>
+                                ` : ''}
+
+                                ${state.tradeStage === 'review' ? `
+                                    <div class="text-sm font-bold text-slate-700 mb-2">${state.log[state.log.length-1]}</div>
+                                    <div class="flex gap-2">
+                                        <button onclick="acceptTrade()" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-700 shadow">Accept</button>
+                                        <button onclick="rejectTrade()" class="bg-red-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-red-700 shadow">Reject</button>
+                                    </div>
+                                ` : ''}
+                            </div>
+
+                            <!-- Player Half -->
+                            <div class="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 p-4 mt-2 overflow-y-auto">
+                                <h3 class="text-center text-xs font-bold text-slate-400 uppercase mb-2">You Offer</h3>
+                                ${state.playerOffer.map(item => `
+                                    <div class="bg-amber-100 p-2 rounded border border-amber-300 flex items-center gap-2 mb-2 fade-in">
+                                        <i data-lucide="${ITEMS[item.id].icon}"></i>
+                                        <span class="font-bold text-amber-900">${item.name}</span>
+                                    </div>
+                                `).join('')}
+                                ${state.playerOffer.length === 0 ? '<div class="text-slate-300 italic text-center text-sm">Click items on left to add</div>' : ''}
+                            </div>
+
+                        </div>
+
+                        <!-- RIGHT: OPPONENT (Visual only) -->
+                        <div class="w-1/3 bg-slate-100 flex flex-col items-center justify-center p-8 text-center border-l border-slate-200">
+                             <div class="w-32 h-32 rounded-full bg-white shadow-lg flex items-center justify-center mb-4 border-4 ${state.role === 'trader' ? 'border-emerald-200' : 'border-red-200'}">
+                                <i data-lucide="${oppRole.icon}" class="w-16 h-16 text-slate-400"></i>
+                             </div>
+                             <h3 class="text-xl font-bold text-slate-800">${oppRole.title}</h3>
+                             <p class="text-sm text-slate-500 mt-2 italic">
+                                "${state.role === 'trader' ? "I need sturdy goods for winter." : "My warehouse needs fine furs for London."}"
+                             </p>
+                             <div class="mt-8 p-4 bg-white rounded-lg shadow-sm w-full">
+                                <p class="text-xs uppercase font-bold text-slate-400">Their Inventory Size</p>
+                                <p class="text-2xl font-bold text-slate-700">${state.opponentInventory.length} Items</p>
+                             </div>
+                             
+                             <button onclick="finishGame()" class="mt-auto text-slate-400 hover:text-red-500 text-sm underline">Leave Trading Post (End Game)</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSummary() {
+            const role = ROLES[state.role];
+            // Calculate final score
+            // Trader Score = Value of Furs held. Trapper Score = Value of Goods held.
+            let finalScore = 0;
+            let breakdown = '';
+            
+            state.inventory.forEach(item => {
+                let val = 0;
+                if(state.role === 'trader' && item.type === 'fur') val = item.traderValue;
+                else if(state.role === 'trapper' && item.type === 'good') val = item.trapperValue;
+                
+                if(val > 0) {
+                    finalScore += val;
+                    breakdown += `<div class="flex justify-between text-sm mb-1"><span>${item.name}</span> <span>+${val}</span></div>`;
+                }
+            });
+
+            let feedback = "";
+            if(finalScore > 50) feedback = "Incredible trading! You are a master of the exchange.";
+            else if(finalScore > 30) feedback = "A solid profit. You've done well.";
+            else feedback = "A meager haul. Perhaps hold out for better deals next time.";
+
+            app.innerHTML = `
+                <div class="max-w-md w-full bg-white p-8 rounded-3xl shadow-2xl text-center fade-in">
+                    <div class="mb-6 flex justify-center">
+                         <div class="p-4 bg-amber-100 rounded-full">
+                            <i data-lucide="trophy" class="w-16 h-16 text-amber-600"></i>
+                         </div>
+                    </div>
+                    <h2 class="text-3xl font-bold text-slate-800 mb-2">Trading Complete</h2>
+                    <p class="text-slate-600 mb-6">${feedback}</p>
+                    
+                    <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 mb-8">
+                        <div class="text-sm uppercase tracking-wide text-slate-500 font-bold mb-2">Final ${role.scoring}</div>
+                        <div class="text-5xl font-extrabold text-amber-600 mb-4">${finalScore}</div>
+                        <div class="text-left border-t border-slate-200 pt-4 text-slate-500">
+                            ${breakdown || '<div class="text-center italic">No valuable items retained.</div>'}
+                        </div>
+                    </div>
+
+                    <button onclick="setScreen('start')" class="w-full py-4 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition">Play Again</button>
+                </div>
+            `;
+        }
+
+
+        // --- LOGIC ---
+
+        function setScreen(s) {
+            state.screen = s;
+            state.log = [];
+            if(s === 'start') resetGame();
+            render();
+        }
+
+        function resetGame() {
+            state = {
+                screen: 'start',
+                role: null,
+                inventory: [],
+                opponentInventory: [],
+                rollsLeft: 3,
+                tradeStage: 'offer',
+                playerOffer: [],
+                opponentOffer: [],
+                score: 0,
+                log: []
+            };
+        }
+
+        function selectRole(r) {
+            state.role = r;
+            state.screen = 'gathering';
+            render();
+        }
+
+        function rollDice() {
+            if(state.rollsLeft <= 0) return;
+            
+            // Random index from dice table
+            const table = DICE_TABLES[state.role];
+            const rollIndex = Math.floor(Math.random() * table.length);
+            const result = table[rollIndex];
+
+            // Add items to inventory
+            for(let i=0; i<result.count; i++) {
+                state.inventory.push({ ...ITEMS[result.id], id: result.id, uniqueId: Math.random() });
+            }
+
+            state.rollsLeft--;
+            state.log.push(`Rolled a ${rollIndex + 1}! Added ${result.label}.`);
+            render();
+        }
+
+        function initOpponentInventory() {
+            // Generate items for the AI based on the opposite role
+            const oppRoleKey = ROLES[state.role].opponent;
+            const table = DICE_TABLES[oppRoleKey];
+            
+            // Give AI 4 rolls worth of stuff (slightly richer than player to allow deals)
+            for(let r=0; r<4; r++) {
+                const result = table[Math.floor(Math.random() * table.length)];
+                for(let i=0; i<result.count; i++) {
+                    state.opponentInventory.push({ ...ITEMS[result.id], id: result.id, uniqueId: Math.random() });
+                }
+            }
+        }
+
+        function toggleOffer(idx) {
+            const item = state.inventory[idx];
+            
+            // Check if already in offer
+            const offerIdx = state.playerOffer.findIndex(i => i.uniqueId === item.uniqueId);
+            
+            if(offerIdx >= 0) {
+                // Remove from offer
+                state.playerOffer.splice(offerIdx, 1);
+            } else {
+                // Add to offer
+                state.playerOffer.push(item);
+            }
+            render();
+        }
+
+        function makeOffer() {
+            // AI LOGIC
+            // 1. Calculate Value of Player's Offer TO THE AI
+            let valueToAI = 0;
+            state.playerOffer.forEach(item => {
+                if(state.role === 'trader') {
+                    // AI is Trapper. Values Goods.
+                    valueToAI += item.trapperValue;
+                } else {
+                    // AI is Trader. Values Furs.
+                    valueToAI += item.traderValue;
+                }
+            });
+
+            // 2. AI decides what to offer back
+            // AI tries to offer items that sum up to roughly equal value (+/- 10% randomness)
+            // AI calculates value of ITS items based on WHAT THE PLAYER WANTS
+            // Wait, per PDF: "Everyone benefits... European liquidates cheap stock... for furs providing huge profit."
+            // The AI should basically look at "ValueToAI" and give back roughly equal "ValueToAI" worth of items from its stock.
+            // Example: Player gives Musket (Val 25 to Trapper). Trapper (AI) sees 25 value. Trapper is willing to part with 25 "Worth" of furs. 
+            // But wait, Trapper thinks Furs are cheap (Val 2-5). So Trapper might give 5 Beavers (5 * 2 = 10 Val to Trapper) for that Musket?
+            // NO. The trade must be "Fair" in negotiation terms. Usually in games, 1:1 value matching prevents exploiting.
+            // Let's use a "Trade Power" metric.
+            
+            let targetValue = valueToAI * (0.9 + Math.random() * 0.3); // AI variance
+            
+            let currentOfferValue = 0;
+            state.opponentOffer = [];
+            
+            // Sort AI inventory by lowest value to self first (easiest to part with)
+            let aiStock = [...state.opponentInventory];
+            if(state.role === 'trader') {
+                 // AI is Trapper. Wants to keep Goods (High Val), give Furs (Low Val).
+                 aiStock.sort((a,b) => a.trapperValue - b.trapperValue);
+            } else {
+                 // AI is Trader. Wants to keep Furs (High Val), give Goods (Low Val).
+                 aiStock.sort((a,b) => a.traderValue - b.traderValue);
+            }
+
+            // Pick items
+            for(let item of aiStock) {
+                // Determine value of this item to the Player (to see if it satisfies the trade)
+                // Actually, AI just matches "Points".
+                // Let's simpify: AI gives items until the "Value To Player" roughly matches "Value To AI" of received goods.
+                
+                // Let's use the Universal Market Value for the calculation to ensure gameplay flow
+                // Or stick to the PDF asymmetry:
+                // Trader gives Musket (Cost 5). Trapper sees Value 25.
+                // Trapper gives Beaver (Cost 20). Trader sees Value 20.
+                // If Trader gives Musket, Trapper is VERY happy (Gains 25). Trapper should be willing to give ~25 points of Furs (as valued by Trader?? No, as valued by Trapper?)
+                
+                // Simpler Logic: 
+                // AI evaluates Player Offer. 
+                // AI offers items from its inventory until the subjective value matches.
+                
+                let itemValToAI = (state.role === 'trader') ? item.trapperValue : item.traderValue;
+                
+                if (currentOfferValue + itemValToAI <= targetValue + 5) { // Buffer
+                    state.opponentOffer.push(item);
+                    currentOfferValue += itemValToAI;
+                }
+            }
+
+            state.log.push("The opponent has reviewed your goods and made a counter-offer.");
+            state.tradeStage = 'review';
+            render();
+        }
+
+        function acceptTrade() {
+            // Execute Swap
+            // Remove offered items from Player Inventory
+            state.playerOffer.forEach(offerItem => {
+                const idx = state.inventory.findIndex(i => i.uniqueId === offerItem.uniqueId);
+                if(idx > -1) state.inventory.splice(idx, 1);
+            });
+
+            // Remove offered items from AI Inventory
+            state.opponentOffer.forEach(offerItem => {
+                const idx = state.opponentInventory.findIndex(i => i.uniqueId === offerItem.uniqueId);
+                if(idx > -1) state.opponentInventory.splice(idx, 1);
+            });
+
+            // Add AI items to Player Inventory
+            state.inventory.push(...state.opponentOffer);
+
+            // Reset
+            state.playerOffer = [];
+            state.opponentOffer = [];
+            state.tradeStage = 'offer';
+            state.log.push("Trade accepted! Do you have more to trade?");
+            render();
+        }
+
+        function rejectTrade() {
+            state.opponentOffer = [];
+            state.tradeStage = 'offer';
+            state.log.push("Trade rejected. Try offering different items.");
+            render();
+        }
+
+        function finishGame() {
+            setScreen('summary');
+        }
+
+        // Init
+        render();
+
+    </script>
+</body>
+</html>
