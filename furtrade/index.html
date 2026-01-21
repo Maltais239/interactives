@@ -16,10 +16,12 @@
         .fade-in { animation: fadeIn 0.5s ease-in; }
         .slide-up { animation: slideUp 0.5s ease-out; }
         .bounce { animation: bounce 1s infinite; }
+        .pulse-subtle { animation: pulseSubtle 2s infinite; }
         
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes pulseSubtle { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
 
         /* Custom Scrollbar for Inventory */
         .inventory-scroll::-webkit-scrollbar { width: 6px; }
@@ -109,9 +111,9 @@
             inventory: [],
             opponentInventory: [],
             rollsLeft: 3,
-            tradeStage: 'offer', // offer, review, result
+            tradeStage: 'constructing', // constructing, accepted, rejected
             playerOffer: [],
-            opponentOffer: [],
+            playerRequest: [], // Items player wants from opponent
             score: 0,
             log: [],
             showHelp: false
@@ -175,7 +177,7 @@
                         </div>
 
                         <p class="text-slate-600 italic text-sm border-t pt-4">
-                            <strong>Tip:</strong> Buy low, sell high. Trade items that are cheap for you but expensive for them.
+                            <strong>Tip:</strong> Look for the "Demand" tags on your items. High Demand means the opponent really wants it!
                         </p>
                     </div>
                 </div>
@@ -190,13 +192,13 @@
                     <div class="flex justify-center mb-6">
                         <div class="bg-amber-900 p-6 rounded-full shadow-2xl relative">
                             <i data-lucide="scale" class="w-20 h-20 text-amber-100"></i>
-                            <div class="absolute -top-2 -right-2 bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full animate-bounce">v1.0</div>
+                            <div class="absolute -top-2 -right-2 bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full animate-bounce">v1.1</div>
                         </div>
                     </div>
                     <h1 class="text-6xl font-extrabold text-amber-900 tracking-tight">The Fur Trade</h1>
                     <p class="text-xl text-amber-800/80 max-w-lg mx-auto leading-relaxed">
-                        A game of asymmetrical value. <br>
-                        Negotiate trades over <strong>3 Years</strong> to maximize your fortune.
+                        A game of negotiation and value. <br>
+                        Construct the perfect deal over <strong>3 Years</strong> to maximize your fortune.
                     </p>
                     
                     <div class="flex flex-col gap-4 max-w-xs mx-auto">
@@ -351,64 +353,73 @@
             `;
         }
 
+        function getDemandBadge(item) {
+            const oppRole = ROLES[state.role].opponent;
+            const valueToOpponent = oppRole === 'trader' ? item.traderValue : item.trapperValue;
+            
+            if (valueToOpponent >= 20) return `<span class="bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded ml-auto border border-green-200">High Demand</span>`;
+            if (valueToOpponent >= 10) return `<span class="bg-blue-50 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded ml-auto border border-blue-200">Med Demand</span>`;
+            return `<span class="bg-slate-100 text-slate-400 text-[10px] px-1.5 py-0.5 rounded ml-auto">Low Demand</span>`;
+        }
+
         function renderTrading() {
             const role = ROLES[state.role];
             const oppRole = ROLES[role.opponent];
             
-            // Render Player Items (No fade-in on individual items to prevent flash)
+            // --- LEFT: PLAYER INVENTORY ---
             const playerInvHtml = state.inventory.map((item, i) => `
-                <button onclick="toggleOffer(${i})" 
-                    class="p-2 rounded-lg border flex items-center gap-3 w-full mb-2 transition-colors duration-100
+                <button onclick="togglePlayerOffer(${i})" 
+                    class="p-2 rounded-lg border flex items-center gap-2 w-full mb-2 transition-colors duration-100 text-left group
                     ${state.playerOffer.some(o => o.uniqueId === item.uniqueId) 
-                        ? 'bg-amber-100 border-amber-500 ring-1 ring-amber-500' 
-                        : 'bg-white border-slate-200 hover:bg-slate-50'}
+                        ? 'bg-amber-100 border-amber-500 ring-1 ring-amber-500 opacity-50' 
+                        : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-amber-300'}
                 ">
                     <i data-lucide="${ITEMS[item.id].icon}" class="${ITEMS[item.id].color} w-5 h-5"></i>
-                    <div class="text-left flex-1">
-                        <div class="font-bold text-sm text-slate-700">${item.name}</div>
-                        <div class="text-[10px] text-slate-400 uppercase tracking-wide">
-                           Value to Them: <span class="${role.opponent === 'trader' ? 'text-green-600 font-bold' : 'text-slate-500'}">${role.opponent === 'trader' ? ITEMS[item.id].traderValue : ITEMS[item.id].trapperValue}</span>
-                        </div>
+                    <div class="flex-1">
+                        <div class="font-bold text-sm text-slate-700 flex items-center">${item.name}</div>
                     </div>
+                    ${getDemandBadge(item)}
                 </button>
             `).join('');
             
-            const opponentOfferHtml = state.opponentOffer.length > 0 
-                ? state.opponentOffer.map(item => `
-                    <div class="bg-emerald-50 p-2 rounded border border-emerald-200 flex items-center gap-2 mb-2">
-                        <i data-lucide="${ITEMS[item.id].icon}" class="${ITEMS[item.id].color} w-4 h-4"></i>
-                        <div class="flex-1">
-                             <span class="font-bold text-emerald-900 text-sm">${item.name}</span>
-                             <div class="text-[10px] text-slate-500">Value to You: ${role.role === 'trader' ? ITEMS[item.id].traderValue : ITEMS[item.id].trapperValue}</div>
-                        </div>
-                    </div>`).join('')
-                : '<div class="text-slate-400 italic text-center py-10 text-sm">Waiting for negotiation...</div>';
+            // --- RIGHT: OPPONENT INVENTORY (MARKET) ---
+            const opponentInvHtml = state.opponentInventory.map((item, i) => `
+                <button onclick="togglePlayerRequest(${i})"
+                    class="p-2 rounded-lg border flex items-center gap-2 w-full mb-2 transition-colors duration-100 text-left
+                    ${state.playerRequest.some(o => o.uniqueId === item.uniqueId) 
+                        ? 'bg-emerald-100 border-emerald-500 ring-1 ring-emerald-500 opacity-50' 
+                        : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-emerald-300'}
+                ">
+                    <i data-lucide="${ITEMS[item.id].icon}" class="${ITEMS[item.id].color} w-5 h-5"></i>
+                    <span class="font-bold text-sm text-slate-700 flex-1">${item.name}</span>
+                    <i data-lucide="plus-circle" class="w-4 h-4 text-slate-300"></i>
+                </button>
+            `).join('');
 
-            // Animation class only applied if transitioning
+            // Animation class
             const containerClass = state.previousScreen !== 'trading' ? 'fade-in' : '';
 
             return `
-                <div class="w-full max-w-6xl h-[90vh] flex flex-col ${containerClass}">
+                <div class="w-full max-w-7xl h-[95vh] flex flex-col ${containerClass} overflow-hidden">
                     
                     <!-- HEADER -->
-                    <div class="bg-amber-900 text-amber-50 px-6 py-4 rounded-t-2xl flex justify-between items-center shadow-lg z-10">
+                    <div class="bg-amber-900 text-amber-50 px-6 py-4 rounded-t-2xl flex justify-between items-center shadow-lg z-20 shrink-0">
                         <div class="flex items-center gap-4">
                             <div class="bg-white/10 p-2 rounded-lg"><i data-lucide="handshake" class="w-6 h-6"></i></div>
                             <div>
                                 <h2 class="text-xl font-bold">Trading Post - Year ${state.year}</h2>
-                                <p class="text-sm text-amber-200/80">Goal: Trade for high value items.</p>
+                                <p class="text-sm text-amber-200/80">Select items from both sides to build a deal.</p>
                             </div>
                         </div>
                         <div class="flex items-center gap-6">
-                            <div class="text-right hidden md:block">
-                                <div class="text-xs uppercase tracking-wide opacity-70">Opponent Wants</div>
-                                <div class="font-bold text-amber-200">${state.role === 'trader' ? 'Furs' : 'Tools/Goods'}</div>
-                            </div>
                              <div class="text-right">
                                 <div class="text-xs uppercase tracking-wide opacity-70">Your Wealth</div>
                                 <div class="font-bold text-xl">${calculateScore()}</div>
                             </div>
                             <button onclick="toggleHelp()" class="bg-white/10 hover:bg-white/20 p-2 rounded-full transition"><i data-lucide="info"></i></button>
+                            <button onclick="nextPhase()" class="bg-red-500/20 hover:bg-red-500/40 text-red-100 px-4 py-2 rounded-lg text-sm font-bold border border-red-500/30 transition">
+                                ${state.year < state.maxYears ? 'End Year' : 'End Game'}
+                            </button>
                         </div>
                     </div>
 
@@ -416,94 +427,95 @@
                     <div class="flex-1 bg-amber-50 border-x border-b border-amber-900/10 rounded-b-2xl shadow-2xl flex overflow-hidden relative">
                         
                         <!-- LEFT: YOUR INVENTORY -->
-                        <div class="w-1/3 bg-white border-r border-slate-200 flex flex-col">
-                            <div class="p-3 bg-slate-50 border-b border-slate-100 font-bold text-xs uppercase text-slate-500 text-center sticky top-0">Your Inventory</div>
-                            <div class="p-4 overflow-y-auto inventory-scroll flex-1">
+                        <div class="w-1/4 bg-white border-r border-slate-200 flex flex-col">
+                            <div class="p-3 bg-slate-50 border-b border-slate-100 font-bold text-xs uppercase text-slate-500 text-center sticky top-0 flex items-center justify-center gap-2">
+                                <i data-lucide="backpack" class="w-3 h-3"></i> Your Inventory
+                            </div>
+                            <div class="p-3 overflow-y-auto inventory-scroll flex-1">
                                 ${state.inventory.length === 0 ? '<div class="text-center text-slate-400 text-sm mt-10">Empty.</div>' : playerInvHtml}
                             </div>
                         </div>
 
-                        <!-- CENTER: THE TABLE -->
-                        <div class="w-1/3 flex flex-col bg-slate-50/50">
+                        <!-- CENTER: THE DEAL TABLE -->
+                        <div class="w-2/4 flex flex-col bg-slate-100 relative">
                             
-                            <!-- Opponent Offers -->
-                            <div class="flex-1 p-4 overflow-y-auto border-b border-slate-200 bg-white">
-                                <div class="text-center text-xs font-bold text-emerald-600 uppercase mb-3">Opponent Offers</div>
-                                ${opponentOfferHtml}
+                            <!-- Messages Area -->
+                             <div class="h-12 flex items-center justify-center bg-white border-b border-slate-200 px-4">
+                                ${state.log.length > 0 ? `<div class="text-sm font-bold ${state.tradeStage === 'rejected' ? 'text-red-600' : 'text-emerald-600'} animate-bounce">${state.log[state.log.length-1]}</div>` : '<div class="text-xs text-slate-400">Construct a deal below...</div>'}
                             </div>
 
-                            <!-- Interaction Zone -->
-                            <div class="min-h-[160px] p-4 bg-slate-100 border-y border-white shadow-inner flex flex-col items-center justify-center space-y-3 z-10">
-                                ${renderTradeControls()}
-                            </div>
-
-                            <!-- Your Offers -->
-                            <div class="flex-1 p-4 overflow-y-auto bg-white border-t border-slate-200">
-                                <div class="text-center text-xs font-bold text-amber-600 uppercase mb-3">You Offer</div>
-                                ${state.playerOffer.map(item => `
-                                    <div class="bg-amber-50 p-2 rounded border border-amber-200 flex items-center gap-2 mb-2">
-                                        <i data-lucide="${ITEMS[item.id].icon}" class="${ITEMS[item.id].color} w-4 h-4"></i>
-                                        <span class="font-bold text-amber-900 text-sm flex-1">${item.name}</span>
-                                        <button onclick="toggleOffer(${state.inventory.findIndex(i => i.uniqueId === item.uniqueId)})" class="text-slate-400 hover:text-red-500"><i data-lucide="x" class="w-3 h-3"></i></button>
+                            <div class="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
+                                
+                                <!-- REQUEST BOX (Top) -->
+                                <div class="flex-1 bg-white rounded-xl border-2 border-dashed border-emerald-200 p-4 flex flex-col overflow-hidden relative">
+                                    <div class="text-xs font-bold text-emerald-600 uppercase mb-2 flex items-center gap-2"><i data-lucide="download" class="w-3 h-3"></i> You Get</div>
+                                    <div class="overflow-y-auto flex-1 pr-2">
+                                        ${state.playerRequest.length === 0 
+                                            ? '<div class="h-full flex items-center justify-center text-slate-300 text-sm italic">Select items from Merchant (Right)</div>' 
+                                            : state.playerRequest.map(item => `
+                                                <div class="bg-emerald-50 p-2 rounded border border-emerald-200 flex items-center gap-2 mb-2 slide-up">
+                                                    <i data-lucide="${ITEMS[item.id].icon}" class="${ITEMS[item.id].color} w-4 h-4"></i>
+                                                    <span class="font-bold text-emerald-900 text-sm flex-1">${item.name}</span>
+                                                    <button onclick="togglePlayerRequest(${state.opponentInventory.findIndex(i => i.uniqueId === item.uniqueId)})" class="text-slate-400 hover:text-red-500"><i data-lucide="x" class="w-3 h-3"></i></button>
+                                                </div>
+                                            `).join('')}
                                     </div>
-                                `).join('')}
-                                ${state.playerOffer.length === 0 ? '<div class="text-slate-300 italic text-center text-xs">Select items on left...</div>' : ''}
+                                </div>
+
+                                <!-- ARROW -->
+                                <div class="flex justify-center -my-2 z-10">
+                                    <div class="bg-slate-200 rounded-full p-1"><i data-lucide="arrow-up-down" class="w-4 h-4 text-slate-500"></i></div>
+                                </div>
+
+                                <!-- OFFER BOX (Bottom) -->
+                                <div class="flex-1 bg-white rounded-xl border-2 border-dashed border-amber-200 p-4 flex flex-col overflow-hidden relative">
+                                    <div class="text-xs font-bold text-amber-600 uppercase mb-2 flex items-center gap-2"><i data-lucide="upload" class="w-3 h-3"></i> You Give</div>
+                                    <div class="overflow-y-auto flex-1 pr-2">
+                                        ${state.playerOffer.length === 0 
+                                            ? '<div class="h-full flex items-center justify-center text-slate-300 text-sm italic">Select items from Inventory (Left)</div>' 
+                                            : state.playerOffer.map(item => `
+                                                <div class="bg-amber-50 p-2 rounded border border-amber-200 flex items-center gap-2 mb-2 slide-up">
+                                                    <i data-lucide="${ITEMS[item.id].icon}" class="${ITEMS[item.id].color} w-4 h-4"></i>
+                                                    <span class="font-bold text-amber-900 text-sm flex-1">${item.name}</span>
+                                                    <button onclick="togglePlayerOffer(${state.inventory.findIndex(i => i.uniqueId === item.uniqueId)})" class="text-slate-400 hover:text-red-500"><i data-lucide="x" class="w-3 h-3"></i></button>
+                                                </div>
+                                            `).join('')}
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <!-- ACTION BAR -->
+                            <div class="p-4 bg-white border-t border-slate-200 flex justify-center pb-8">
+                                <button onclick="proposeTrade()" 
+                                    class="bg-slate-800 text-white px-10 py-3 rounded-xl font-bold shadow-lg hover:bg-slate-700 transition disabled:opacity-50 flex items-center gap-2" 
+                                    ${state.playerOffer.length === 0 && state.playerRequest.length === 0 ? 'disabled' : ''}>
+                                    Propose Deal
+                                </button>
                             </div>
 
                         </div>
 
-                        <!-- RIGHT: OPPONENT STATUS -->
-                        <div class="w-1/3 bg-slate-50 flex flex-col items-center border-l border-slate-200 relative">
-                             
-                             <div class="flex-1 flex flex-col items-center justify-center p-6 text-center">
-                                 <div class="relative mb-4">
-                                     <div class="w-24 h-24 rounded-full bg-white shadow-md flex items-center justify-center border-4 ${state.role === 'trader' ? 'border-emerald-200' : 'border-red-200'}">
-                                        <i data-lucide="${oppRole.icon}" class="w-12 h-12 text-slate-700"></i>
-                                     </div>
-                                     <div class="absolute -bottom-2 -right-2 bg-slate-800 text-white text-xs px-2 py-1 rounded-full font-bold">
-                                        ${state.opponentInventory.length} Items
-                                     </div>
-                                 </div>
-                                 <h3 class="text-lg font-bold text-slate-800">${oppRole.title}</h3>
-                                 <div class="mt-2 text-xs bg-white border border-slate-200 p-2 rounded-lg text-slate-500 max-w-[200px] shadow-sm">
-                                    "I have goods. I need what you have. Make me a fair offer."
-                                 </div>
-                             </div>
-
-                             <!-- LEAVE BUTTON -->
-                             <div class="w-full p-6 border-t border-slate-200 bg-white">
-                                <button onclick="nextPhase()" class="w-full py-3 border-2 border-slate-200 rounded-xl font-bold text-slate-500 hover:border-slate-800 hover:text-slate-800 transition text-sm">
-                                    ${state.year < state.maxYears ? 'Finish Trading (Next Year)' : 'End Game (Final Score)'}
-                                </button>
+                        <!-- RIGHT: OPPONENT INVENTORY -->
+                        <div class="w-1/4 bg-white border-l border-slate-200 flex flex-col">
+                             <div class="p-3 bg-slate-50 border-b border-slate-100 font-bold text-xs uppercase text-slate-500 text-center sticky top-0 flex items-center justify-center gap-2">
+                                <i data-lucide="store" class="w-3 h-3"></i> Merchant's Wares
+                            </div>
+                            <div class="p-3 overflow-y-auto inventory-scroll flex-1">
+                                ${opponentInvHtml}
+                            </div>
+                             <div class="p-4 border-t border-slate-100 bg-slate-50 text-center">
+                                <div class="flex justify-center mb-2">
+                                    <div class="w-12 h-12 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center">
+                                         <i data-lucide="${oppRole.icon}" class="w-6 h-6 text-slate-700"></i>
+                                    </div>
+                                </div>
+                                <div class="text-xs text-slate-500 italic">"I have goods. I need yours. Make a fair offer."</div>
                              </div>
                         </div>
                     </div>
                 </div>
             `;
-        }
-
-        function renderTradeControls() {
-            if (state.tradeStage === 'offer') {
-                return `
-                    <div class="text-xs text-slate-500">Select items to propose a trade</div>
-                    <button onclick="makeOffer()" class="w-full max-w-[200px] bg-slate-800 text-white py-2 rounded-lg font-bold shadow hover:bg-slate-700 transition disabled:opacity-50 text-sm" ${state.playerOffer.length === 0 ? 'disabled' : ''}>
-                        Propose Trade
-                    </button>
-                `;
-            } else if (state.tradeStage === 'review') {
-                return `
-                    <div class="text-sm font-bold text-slate-800 text-center px-2 animate-pulse">${state.log[state.log.length-1]}</div>
-                    <div class="flex gap-2 w-full justify-center">
-                        <button onclick="acceptTrade()" class="flex-1 max-w-[100px] bg-emerald-600 text-white py-2 rounded-lg font-bold hover:bg-emerald-700 shadow text-sm">Accept</button>
-                        <button onclick="rejectTrade()" class="flex-1 max-w-[100px] bg-red-100 text-red-700 py-2 rounded-lg font-bold hover:bg-red-200 shadow text-sm">Decline</button>
-                    </div>
-                `;
-            } else if (state.tradeStage === 'rejected') {
-                 return `
-                    <div class="text-sm font-bold text-red-600 text-center px-2">${state.log[state.log.length-1]}</div>
-                    <button onclick="resetTradeState()" class="mt-2 text-slate-500 underline text-xs">Try a different offer</button>
-                `;
-            }
         }
 
         function renderSummary() {
@@ -548,7 +560,6 @@
         function calculateScore() {
             let score = 0;
             state.inventory.forEach(item => {
-                // Score depends on WHO you are.
                 if(state.role === 'trader') score += item.traderValue;
                 if(state.role === 'trapper') score += item.trapperValue;
             });
@@ -556,7 +567,7 @@
         }
 
         function setScreen(s) {
-            state.previousScreen = state.screen; // Track previous screen to manage animations
+            state.previousScreen = state.screen; 
             state.screen = s;
             state.log = [];
             if(s === 'start') resetGame();
@@ -572,9 +583,9 @@
                 inventory: [],
                 opponentInventory: [],
                 rollsLeft: 3,
-                tradeStage: 'offer',
+                tradeStage: 'constructing',
                 playerOffer: [],
-                opponentOffer: [],
+                playerRequest: [],
                 score: 0,
                 log: [],
                 showHelp: false
@@ -593,7 +604,6 @@
             const rollIndex = Math.floor(Math.random() * table.length);
             const result = table[rollIndex];
 
-            // Add unique IDs to items so we can track them individually
             for(let i=0; i<result.count; i++) {
                 state.inventory.push({ ...ITEMS[result.id], id: result.id, uniqueId: Math.random().toString(36).substr(2, 9) });
             }
@@ -607,7 +617,6 @@
             const oppRoleKey = ROLES[state.role].opponent;
             const table = DICE_TABLES[oppRoleKey];
             
-            // AI gets replenished every time you visit
             state.opponentInventory = [];
             
             // Give AI a good stock (5 rolls worth)
@@ -619,7 +628,7 @@
             }
         }
 
-        function toggleOffer(idx) {
+        function togglePlayerOffer(idx) {
             const item = state.inventory[idx];
             const offerIdx = state.playerOffer.findIndex(i => i.uniqueId === item.uniqueId);
             
@@ -628,102 +637,112 @@
             } else {
                 state.playerOffer.push(item);
             }
-            // Do NOT change state.screen, just re-render to update UI
+            state.tradeStage = 'constructing';
+            state.log = [];
             render(); 
         }
 
-        function makeOffer() {
-            // 1. Calculate Value of Player's Offer TO THE AI
-            // This is the core mechanic. AI only cares about what IT values.
-            let valueToAI = 0;
+        function togglePlayerRequest(idx) {
+            const item = state.opponentInventory[idx];
+            const reqIdx = state.playerRequest.findIndex(i => i.uniqueId === item.uniqueId);
+            
+            if(reqIdx >= 0) {
+                state.playerRequest.splice(reqIdx, 1);
+            } else {
+                state.playerRequest.push(item);
+            }
+            state.tradeStage = 'constructing';
+            state.log = [];
+            render(); 
+        }
+
+        function proposeTrade() {
+            // Logic: Does the AI think this is a good deal?
+            // AI evaluates: Value of Items It Gets vs Value of Items It Loses
+            
+            let valueGainedByAI = 0;
+            let valueLostByAI = 0;
+
+            // 1. Calculate Gain (What Player is giving AI)
             state.playerOffer.forEach(item => {
-                if(state.role === 'trader') valueToAI += item.trapperValue; // AI is Trapper
-                else valueToAI += item.traderValue; // AI is Trader
+                // AI Value Logic:
+                // If AI is Trapper (Player is Trader), AI values Goods (trapperValue)
+                // If AI is Trader (Player is Trapper), AI values Furs (traderValue)
+                if (state.role === 'trader') valueGainedByAI += item.trapperValue;
+                else valueGainedByAI += item.traderValue;
             });
 
-            // 2. Reject Lowball
-            if(valueToAI < 5) {
-                state.log = ["That offers me nothing of value."];
+            // 2. Calculate Loss (What Player is taking from AI)
+            state.playerRequest.forEach(item => {
+                if (state.role === 'trader') valueLostByAI += item.trapperValue;
+                else valueLostByAI += item.traderValue;
+            });
+
+            // 3. Evaluation
+            if (state.playerOffer.length === 0 && state.playerRequest.length === 0) {
+                state.log = ["We are just staring at each other..."];
+                return;
+            }
+
+            if (state.playerOffer.length === 0) {
+                state.log = ["You want my goods for free? I think not."];
                 state.tradeStage = 'rejected';
                 render();
                 return;
             }
 
-            // 3. AI Counter Offer
-            // AI is willing to give items up to `valueToAI` + small bonus
-            let targetValue = valueToAI * (0.9 + Math.random() * 0.2); // Random fairness
-            let currentOfferValue = 0;
-            state.opponentOffer = [];
+            // AI Fairness Threshold (Can be tweaked for difficulty)
+            // AI wants at least equal value, maybe a slight profit (margin)
+            const margin = 0.9; // AI is generous, accepts 90% value match to facilitate trade
             
-            // Sort AI inventory: It gives away items it values LEAST first? 
-            // Actually, for better gameplay, it should give items the PLAYER values MOST?
-            // Let's mix it. It creates a bundle.
-            let aiStock = [...state.opponentInventory];
-            
-            // Shuffle stock for variety
-            aiStock.sort(() => Math.random() - 0.5);
-
-            for(let item of aiStock) {
-                // Value calculation
-                let itemValToAI = (state.role === 'trader') ? item.trapperValue : item.traderValue;
-                
-                // If adding this item keeps us under the "Fair Trade" limit
-                if (currentOfferValue + itemValToAI <= targetValue + 2) {
-                    state.opponentOffer.push(item);
-                    currentOfferValue += itemValToAI;
-                }
-            }
-
-            if(state.opponentOffer.length === 0) {
-                 state.log = ["I have nothing to trade for that."];
-                 state.tradeStage = 'rejected';
+            if (valueGainedByAI >= (valueLostByAI * margin)) {
+                // ACCEPT
+                performTrade();
+                state.log = ["Agreed. That is a fair trade."];
+                state.tradeStage = 'accepted';
             } else {
-                 state.log = ["I offer this in exchange."];
-                 state.tradeStage = 'review';
+                // REJECT
+                // Provide hint
+                if (valueGainedByAI < (valueLostByAI * 0.5)) {
+                    state.log = ["That is an insult! I need much more."];
+                } else {
+                    state.log = ["Close, but I need a little more value."];
+                }
+                state.tradeStage = 'rejected';
             }
             render();
         }
 
-        function acceptTrade() {
-            // Player loses offered items
+        function performTrade() {
+            // Remove from Player
             state.playerOffer.forEach(offerItem => {
                 const idx = state.inventory.findIndex(i => i.uniqueId === offerItem.uniqueId);
                 if(idx > -1) state.inventory.splice(idx, 1);
             });
 
-            // AI loses offered items
-            state.opponentOffer.forEach(offerItem => {
-                const idx = state.opponentInventory.findIndex(i => i.uniqueId === offerItem.uniqueId);
+            // Remove from AI
+            state.playerRequest.forEach(reqItem => {
+                const idx = state.opponentInventory.findIndex(i => i.uniqueId === reqItem.uniqueId);
                 if(idx > -1) state.opponentInventory.splice(idx, 1);
             });
 
-            // Player gains AI items
-            state.inventory.push(...state.opponentOffer);
+            // Add to Player
+            state.inventory.push(...state.playerRequest);
 
-            resetTradeState();
-            state.log = ["Trade successful!"];
-            render();
-        }
-
-        function rejectTrade() {
-            state.opponentOffer = []; // Clear what they showed
-            state.tradeStage = 'offer'; // Back to selection
-            state.log = ["Offer declined."];
-            render();
-        }
-
-        function resetTradeState() {
+            // Add to AI (Optional, but keeps conservation of mass if we tracked AI inventory rigorously)
+            // For now, AI items just disappear into the market
+            
+            // Clear selections
             state.playerOffer = [];
-            state.opponentOffer = [];
-            state.tradeStage = 'offer';
+            state.playerRequest = [];
         }
 
         function nextPhase() {
             if(state.year < state.maxYears) {
                 state.year++;
-                state.rollsLeft = 3; // Reset rolls for next year
+                state.rollsLeft = 3; 
                 state.playerOffer = [];
-                state.opponentOffer = [];
+                state.playerRequest = [];
                 setScreen('gathering');
             } else {
                 setScreen('summary');
