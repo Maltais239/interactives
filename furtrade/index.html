@@ -3,93 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fur Trade Adventure: Barter & Trade</title>
-    
-    <!-- Tailwind CSS -->
+    <title>Fur Trade Game</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    
-    <!-- Animation Styles -->
     <style>
         .fade-in { animation: fadeIn 0.5s ease-in; }
         .slide-up { animation: slideUp 0.5s ease-out; }
         .bounce { animation: bounce 1s infinite; }
-        .pulse-subtle { animation: pulseSubtle 2s infinite; }
-        
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-        @keyframes pulseSubtle { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
-
-        /* Custom Scrollbar for Inventory */
         .inventory-scroll::-webkit-scrollbar { width: 6px; }
         .inventory-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
         .inventory-scroll::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
+        /* Prevent layout shift during icon loading */
+        .lucide { width: 1.5rem; height: 1.5rem; display: inline-block; vertical-align: middle; }
     </style>
 </head>
 <body class="bg-amber-50 min-h-screen font-sans text-slate-800 selection:bg-amber-200">
 
-    <!-- APP CONTAINER -->
-    <div id="app" class="min-h-screen flex flex-col items-center justify-center p-4">
-        <!-- Content injects here -->
-    </div>
+    <div id="app" class="min-h-screen flex flex-col items-center justify-center p-4"></div>
 
-    <!-- JAVASCRIPT LOGIC -->
     <script>
-        // --- CONSTANTS & DATA ---
-        
-        // Asymmetric Value System (Based on uploaded Cards)
-        // traderValue = Gold Pieces (Value to Merchant)
-        // trapperValue = Prestige Points (Value to First Nations)
-        // cost = The "perceived cost" to the owner (used for AI logic to ensure they don't give away too much)
-        
+        // --- DATA & VALUES ---
         const ITEMS = {
-            // FURS (Merchant wants these for Gold)
-            beaver: { name: "Beaver Pelt", icon: "squirrel", type: "fur", traderValue: 10, trapperValue: 2, color: "text-amber-800", desc: "10 Gold Pieces" },
-            otter: { name: "Otter Pelt", icon: "waves", type: "fur", traderValue: 5, trapperValue: 1, color: "text-slate-600", desc: "5 Gold Pieces" },
-            bear: { name: "Bear Skin", icon: "paw-print", type: "fur", traderValue: 4, trapperValue: 2, color: "text-stone-900", desc: "4 Gold Pieces" },
-            deer: { name: "Deerskin", icon: "venetian-mask", type: "fur", traderValue: 3, trapperValue: 1, color: "text-orange-900", desc: "3 Gold Pieces" }, // Icon approx
-            mink: { name: "Mink Pelt", icon: "cat", type: "fur", traderValue: 2, trapperValue: 0.5, color: "text-slate-500", desc: "2 Gold Pieces" },
-            muskrat: { name: "Muskrat Pelt", icon: "rat", type: "fur", traderValue: 1, trapperValue: 0.2, color: "text-stone-500", desc: "1 Gold Piece" },
+            // FURS (Gold)
+            beaver: { name: "Beaver Pelt", icon: "squirrel", type: "fur", value: 10, color: "text-amber-800", desc: "10 Gold" },
+            otter: { name: "Otter Pelt", icon: "waves", type: "fur", value: 5, color: "text-slate-600", desc: "5 Gold" },
+            bear: { name: "Bear Skin", icon: "paw-print", type: "fur", value: 4, color: "text-stone-900", desc: "4 Gold" },
+            deer: { name: "Deerskin", icon: "venetian-mask", type: "fur", value: 3, color: "text-orange-900", desc: "3 Gold" }, 
+            mink: { name: "Mink Pelt", icon: "cat", type: "fur", value: 2, color: "text-slate-500", desc: "2 Gold" },
+            muskrat: { name: "Muskrat Pelt", icon: "rat", type: "fur", value: 1, color: "text-stone-500", desc: "1 Gold" },
             
-            // GOODS (First Nations want these for Prestige)
-            musket: { name: "Musket", icon: "crosshair", type: "good", traderValue: 2, trapperValue: 10, color: "text-slate-800", desc: "10 Prestige Points" },
-            cauldron: { name: "Cauldron", icon: "cooking-pot", type: "good", traderValue: 1.5, trapperValue: 5, color: "text-orange-700", desc: "5 Prestige Points" },
-            shirt: { name: "Shirt", icon: "shirt", type: "good", traderValue: 1, trapperValue: 4, color: "text-blue-700", desc: "4 Prestige Points" },
-            blanket: { name: "Blanket", icon: "scroll", type: "good", traderValue: 1, trapperValue: 3, color: "text-red-700", desc: "3 Prestige Points" },
-            silver: { name: "Trade Silver", icon: "gem", type: "good", traderValue: 0.5, trapperValue: 2, color: "text-gray-400", desc: "2 Prestige Points" },
-            tools: { name: "Metal Tools", icon: "hammer", type: "good", traderValue: 0.2, trapperValue: 1, color: "text-slate-600", desc: "1 Prestige Point" }
+            // GOODS (Prestige)
+            musket: { name: "Musket", icon: "crosshair", type: "good", value: 10, color: "text-slate-800", desc: "10 Pts" },
+            cauldron: { name: "Cauldron", icon: "cooking-pot", type: "good", value: 5, color: "text-orange-700", desc: "5 Pts" },
+            shirt: { name: "Shirt", icon: "shirt", type: "good", value: 4, color: "text-blue-700", desc: "4 Pts" },
+            blanket: { name: "Blanket", icon: "scroll", type: "good", value: 3, color: "text-red-700", desc: "3 Pts" },
+            silver: { name: "Trade Silver", icon: "gem", type: "good", value: 2, color: "text-gray-400", desc: "2 Pts" },
+            tools: { name: "Metal Tools", icon: "hammer", type: "good", value: 1, color: "text-slate-600", desc: "1 Pt" }
         };
 
         const ROLES = {
             trader: {
-                title: "Travelling Merchant",
+                title: "Fort Merchant",
                 objective: "Accumulate Wealth",
-                desc: "You come from Montreal with manufactured goods.",
-                goalText: "Buy Furs cheaply to sell for Gold in Europe.",
+                desc: "You manage a remote trading post.",
                 scoring: "Gold Pieces",
                 opponent: "trapper",
-                startLocation: "Montreal Warehouse",
-                gatherVerb: "Stock Up",
+                opponentLabel: "Visiting Trapper",
+                startLocation: "Trading Post",
+                gatherVerb: "Stock Shelves",
+                travelText: "The river thaws. Canoes approach your post.",
+                travelIcon: "tent",
                 theme: "bg-red-900",
                 lightTheme: "bg-red-50",
-                icon: "ship"
+                bankLabel: "Ship to Europe",
+                bankIcon: "ship"
             },
             trapper: {
-                title: "First Nations Trapper",
+                title: "Cree Trapper",
                 objective: "Gain Prestige",
-                desc: "You live on the land and hunt skilled game.",
-                goalText: "Trade abundant furs for rare tools to help your village.",
+                desc: "You are a skilled hunter from the Cree Nation.",
                 scoring: "Prestige Points",
                 opponent: "trader",
+                opponentLabel: "Company Store",
                 startLocation: "Winter Hunting Grounds",
                 gatherVerb: "Hunt & Gather",
+                travelText: "Paddling downriver to the Trading Post.",
+                travelIcon: "ship",
                 theme: "bg-emerald-800",
                 lightTheme: "bg-emerald-50",
-                icon: "tent"
+                bankLabel: "Back to Village",
+                bankIcon: "tent"
             }
+        };
+
+        const COMPANIES = {
+            hbc: { name: "Hudson's Bay Co.", location: "York Factory", color: "text-blue-900", bg: "bg-blue-900", strictness: "strict" },
+            nwc: { name: "North West Co.", location: "Fort William", color: "text-red-900", bg: "bg-red-900", strictness: "relaxed" }
         };
 
         const DICE_TABLES = {
@@ -117,83 +109,84 @@
             year: 1,
             maxYears: 3,
             role: null,
-            inventory: [],
+            company: 'hbc',
+            companyChosenThisTurn: false,
+            inventory: [], // Items currently held for trading
+            bankedItems: [], // Items secured/shipped/sent home
             opponentInventory: [],
             rollsLeft: 3,
-            tradeStage: 'constructing', // constructing, accepted, rejected
+            tradeStage: 'constructing', 
             playerOffer: [],
-            playerRequest: [], // Items player wants from opponent
-            score: 0,
+            playerRequest: [],
             log: [],
             showHelp: false
         };
 
-        // --- DOM ELEMENTS ---
         const app = document.getElementById('app');
 
-        // --- RENDERER ---
+        // --- CORE FUNCTIONS ---
+
         function render() {
             app.innerHTML = '';
-            
-            // Modal Overlay for Help
-            let helpModal = '';
-            if (state.showHelp) {
-                helpModal = renderHelpModal();
-            }
-
             let content = '';
+            
+            if (state.showHelp) content += renderHelpModal();
+            
             switch(state.screen) {
-                case 'start': content = renderStart(); break;
-                case 'role_select': content = renderRoleSelect(); break;
-                case 'gathering': content = renderGathering(); break;
-                case 'travel': content = renderTravel(); break;
-                case 'trading': content = renderTrading(); break;
-                case 'summary': content = renderSummary(); break;
+                case 'start': content += renderStart(); break;
+                case 'role_select': content += renderRoleSelect(); break;
+                case 'gathering': content += renderGathering(); break;
+                case 'travel': content += renderTravel(); break;
+                case 'trading': content += renderTrading(); break;
+                case 'summary': content += renderSummary(); break;
             }
-
-            app.innerHTML = content + helpModal;
+            app.innerHTML = content;
             lucide.createIcons();
         }
 
-        // --- COMPONENTS ---
+        function getGroupedItems(itemArray) {
+            const counts = {};
+            itemArray.forEach(item => {
+                if (!counts[item.id]) {
+                    counts[item.id] = { ...ITEMS[item.id], id: item.id, count: 0, instances: [] };
+                }
+                counts[item.id].count++;
+                counts[item.id].instances.push(item);
+            });
+            return Object.values(counts).sort((a,b) => b.value - a.value); 
+        }
+
+        // --- SCREENS ---
 
         function renderHelpModal() {
             return `
                 <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="toggleHelp()">
-                    <div class="bg-white rounded-2xl max-w-2xl w-full p-8 shadow-2xl relative" onclick="event.stopPropagation()">
+                    <div class="bg-white rounded-2xl max-w-4xl w-full p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
                         <button onclick="toggleHelp()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-800"><i data-lucide="x"></i></button>
-                        <h2 class="text-2xl font-bold text-amber-900 mb-4">The Value of Exchange</h2>
-                        
-                        <div class="grid grid-cols-2 gap-8 mb-6">
-                            <div class="bg-red-50 p-4 rounded-xl">
-                                <h3 class="font-bold text-red-900 mb-2 flex items-center gap-2"><i data-lucide="ship" class="w-4 h-4"></i> The Merchant (Gold)</h3>
-                                <div class="space-y-1 text-sm text-slate-600">
-                                    <div class="flex justify-between border-b border-red-100 py-1"><span>Beaver Pelt</span> <span class="font-bold">10 Gold</span></div>
-                                    <div class="flex justify-between border-b border-red-100 py-1"><span>Otter Pelt</span> <span class="font-bold">5 Gold</span></div>
-                                    <div class="flex justify-between border-b border-red-100 py-1"><span>Bear Skin</span> <span class="font-bold">4 Gold</span></div>
-                                    <div class="flex justify-between border-b border-red-100 py-1"><span>Deerskin</span> <span class="font-bold">3 Gold</span></div>
+                        <h2 class="text-3xl font-bold text-amber-900 mb-4 text-center">Value Guide</h2>
+                        <p class="text-center text-slate-600 mb-6 text-lg">1 Gold Coin = 1 Prestige Point.<br>Try to match the values!</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div>
+                                <h3 class="font-bold text-emerald-800 border-b border-emerald-100 pb-2 mb-2">Goods (Prestige)</h3>
+                                <div class="space-y-2 text-sm">
+                                    ${Object.values(ITEMS).filter(i => i.type === 'good').sort((a,b) => b.value - a.value).map(i => 
+                                        `<div class="flex justify-between p-2 bg-slate-50 rounded"><span class="flex gap-2"><i data-lucide="${i.icon}"></i> ${i.name}</span> <span class="font-bold">${i.desc}</span></div>`
+                                    ).join('')}
                                 </div>
                             </div>
-                            <div class="bg-emerald-50 p-4 rounded-xl">
-                                <h3 class="font-bold text-emerald-900 mb-2 flex items-center gap-2"><i data-lucide="tent" class="w-4 h-4"></i> The Trapper (Prestige)</h3>
-                                <div class="space-y-1 text-sm text-slate-600">
-                                    <div class="flex justify-between border-b border-emerald-100 py-1"><span>Musket</span> <span class="font-bold">10 Pts</span></div>
-                                    <div class="flex justify-between border-b border-emerald-100 py-1"><span>Cauldron</span> <span class="font-bold">5 Pts</span></div>
-                                    <div class="flex justify-between border-b border-emerald-100 py-1"><span>Shirt</span> <span class="font-bold">4 Pts</span></div>
-                                    <div class="flex justify-between border-b border-emerald-100 py-1"><span>Blanket</span> <span class="font-bold">3 Pts</span></div>
+                            <div>
+                                <h3 class="font-bold text-amber-800 border-b border-amber-100 pb-2 mb-2">Furs (Gold)</h3>
+                                <div class="space-y-2 text-sm">
+                                    ${Object.values(ITEMS).filter(i => i.type === 'fur').sort((a,b) => b.value - a.value).map(i => 
+                                        `<div class="flex justify-between p-2 bg-slate-50 rounded"><span class="flex gap-2"><i data-lucide="${i.icon}"></i> ${i.name}</span> <span class="font-bold">${i.desc}</span></div>`
+                                    ).join('')}
                                 </div>
                             </div>
                         </div>
-
-                        <p class="text-slate-600 italic text-sm border-t pt-4">
-                            <strong>Fair Trade:</strong> 1 Gold roughly equals 1 Prestige Point. A Musket (10 Pts) is a fair swap for a Beaver (10 Gold).
-                        </p>
                     </div>
                 </div>
             `;
         }
-
-        // --- SCREENS ---
 
         function renderStart() {
             return `
@@ -201,22 +194,14 @@
                     <div class="flex justify-center mb-6">
                         <div class="bg-amber-900 p-6 rounded-full shadow-2xl relative">
                             <i data-lucide="scale" class="w-20 h-20 text-amber-100"></i>
-                            <div class="absolute -top-2 -right-2 bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full animate-bounce">v2.0</div>
+                            <div class="absolute -top-2 -right-2 bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full animate-bounce">v3.1</div>
                         </div>
                     </div>
-                    <h1 class="text-6xl font-extrabold text-amber-900 tracking-tight">The Fur Trade</h1>
-                    <p class="text-xl text-amber-800/80 max-w-lg mx-auto leading-relaxed">
-                        Step back to 1750. <br>
-                        Negotiate fair trades to earn <strong>Gold</strong> or <strong>Prestige</strong>.
-                    </p>
-                    
+                    <h1 class="text-6xl font-extrabold text-amber-900 tracking-tight">Fur Trade Game</h1>
+                    <p class="text-xl text-amber-800/80 max-w-lg mx-auto leading-relaxed">Step back to 1750. Negotiate fair trades to earn <strong>Gold</strong> or <strong>Prestige</strong>.</p>
                     <div class="flex flex-col gap-4 max-w-xs mx-auto">
-                        <button onclick="setScreen('role_select')" class="px-8 py-4 bg-amber-700 hover:bg-amber-800 text-white text-xl font-bold rounded-2xl shadow-xl transform transition hover:scale-105">
-                            Start Journey
-                        </button>
-                        <button onclick="toggleHelp()" class="px-8 py-3 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-xl transition">
-                            Value Guide
-                        </button>
+                        <button onclick="setScreen('role_select')" class="px-8 py-4 bg-amber-700 hover:bg-amber-800 text-white text-xl font-bold rounded-2xl shadow-xl transform transition hover:scale-105">Start Journey</button>
+                        <button onclick="toggleHelp()" class="px-8 py-3 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-xl transition">Value Guide</button>
                     </div>
                 </div>
             `;
@@ -227,46 +212,23 @@
                 <div class="flex flex-col items-center w-full max-w-5xl fade-in">
                     <button onclick="setScreen('start')" class="self-start mb-4 text-amber-800 font-bold hover:underline flex items-center gap-1"><i data-lucide="arrow-left" class="w-4 h-4"></i> Back</button>
                     <h2 class="text-4xl font-bold text-amber-900 mb-2">Choose Your Path</h2>
-                    <p class="text-amber-800/70 mb-10">Each role values items differently.</p>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
-                        <!-- Merchant Card -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mt-8">
                         <button onclick="selectRole('trader')" class="group relative overflow-hidden bg-white p-8 rounded-3xl shadow-lg border-4 border-transparent hover:border-red-700 transition-all text-left">
-                            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
-                                <i data-lucide="ship" class="w-32 h-32 text-red-900"></i>
-                            </div>
+                            <div class="absolute top-0 right-0 p-4 opacity-10"><i data-lucide="ship" class="w-32 h-32 text-red-900"></i></div>
                             <div class="relative z-10">
-                                <div class="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mb-6">
-                                    <i data-lucide="coins" class="w-8 h-8 text-red-700"></i>
-                                </div>
+                                <div class="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mb-6"><i data-lucide="coins" class="w-8 h-8 text-red-700"></i></div>
                                 <h3 class="text-3xl font-bold text-slate-800 mb-2">The Merchant</h3>
-                                <p class="text-red-700 font-bold mb-4 uppercase tracking-wider text-sm">Goal: Wealth (Gold)</p>
-                                <p class="text-slate-600 text-sm mb-4">
-                                    "I need Beaver, Otter and Bear skins to sell for a fortune in Europe."
-                                </p>
-                                <div class="bg-red-50 p-3 rounded-lg text-xs text-red-900 font-semibold">
-                                    High Value: Beaver (10 Gold)
-                                </div>
+                                <p class="text-red-700 font-bold mb-4 uppercase text-sm">Goal: Wealth (Gold)</p>
+                                <p class="text-slate-600 text-sm">"I need Beaver, Otter and Bear skins to sell in Europe."</p>
                             </div>
                         </button>
-
-                        <!-- Trapper Card -->
                         <button onclick="selectRole('trapper')" class="group relative overflow-hidden bg-white p-8 rounded-3xl shadow-lg border-4 border-transparent hover:border-emerald-700 transition-all text-left">
-                            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
-                                <i data-lucide="trees" class="w-32 h-32 text-emerald-900"></i>
-                            </div>
+                            <div class="absolute top-0 right-0 p-4 opacity-10"><i data-lucide="trees" class="w-32 h-32 text-emerald-900"></i></div>
                             <div class="relative z-10">
-                                <div class="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mb-6">
-                                    <i data-lucide="feather" class="w-8 h-8 text-emerald-700"></i>
-                                </div>
-                                <h3 class="text-3xl font-bold text-slate-800 mb-2">The Trapper</h3>
-                                <p class="text-emerald-700 font-bold mb-4 uppercase tracking-wider text-sm">Goal: Prestige (Points)</p>
-                                <p class="text-slate-600 text-sm mb-4">
-                                    "I need Muskets, Cauldrons and Blankets to survive and gain honor."
-                                </p>
-                                <div class="bg-emerald-50 p-3 rounded-lg text-xs text-emerald-900 font-semibold">
-                                    High Value: Musket (10 Pts)
-                                </div>
+                                <div class="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mb-6"><i data-lucide="feather" class="w-8 h-8 text-emerald-700"></i></div>
+                                <h3 class="text-3xl font-bold text-slate-800 mb-2">Cree Trapper</h3>
+                                <p class="text-emerald-700 font-bold mb-4 uppercase text-sm">Goal: Prestige (Points)</p>
+                                <p class="text-slate-600 text-sm">"I need Muskets, Cauldrons and Blankets for my village."</p>
                             </div>
                         </button>
                     </div>
@@ -276,62 +238,39 @@
 
         function renderGathering() {
             const role = ROLES[state.role];
+            let locationText = role.startLocation;
+            if (state.role === 'trader') locationText = state.company === 'hbc' ? "York Factory (HBC)" : "Montreal Post (NWC)";
             
-            const invHtml = state.inventory.map(item => `
-                <div class="bg-white p-2 rounded-lg shadow-sm border border-slate-200 flex items-center gap-2 slide-up text-sm">
-                    <i data-lucide="${ITEMS[item.id].icon}" class="${ITEMS[item.id].color} w-4 h-4"></i>
-                    <span class="font-bold text-slate-700 truncate">${item.name}</span>
+            const invHtml = getGroupedItems(state.inventory).map(g => `
+                <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-200 flex items-center gap-2 slide-up">
+                    <div class="relative">
+                        <i data-lucide="${g.icon}" class="${g.color} w-6 h-6"></i>
+                        <span class="absolute -top-2 -right-2 bg-slate-800 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">${g.count}</span>
+                    </div>
+                    <span class="font-bold text-slate-700 text-sm">${g.name}</span>
                 </div>
             `).join('');
 
-            const actionButton = state.rollsLeft > 0 
-                ? `<button onclick="rollDice()" class="w-full mt-4 bg-slate-800 text-white px-8 py-4 rounded-xl text-xl font-bold shadow-lg hover:bg-slate-700 transition flex items-center justify-center gap-3">
-                     <i data-lucide="dices"></i> ${role.gatherVerb} (${state.rollsLeft})
-                   </button>`
-                : `<button onclick="setScreen('travel')" class="w-full mt-4 ${role.theme} text-white px-8 py-4 rounded-xl text-xl font-bold shadow-lg hover:opacity-90 transition flex items-center justify-center gap-3 animate-pulse">
-                     <i data-lucide="arrow-right"></i> Travel to Trade Post
-                   </button>`;
-
             return `
-                <div class="max-w-4xl w-full flex flex-col items-center fade-in">
-                    <!-- Header -->
+                <div class="max-w-4xl w-full flex flex-col items-center">
                     <div class="flex justify-between items-end w-full mb-4 px-4">
-                        <div>
-                            <div class="text-xs font-bold uppercase tracking-widest text-slate-500">Year ${state.year} of ${state.maxYears}</div>
-                            <h2 class="text-3xl font-bold text-slate-800">The Season of Gathering</h2>
-                        </div>
+                        <div><div class="text-xs font-bold uppercase tracking-widest text-slate-500">Year ${state.year} of ${state.maxYears}</div><h2 class="text-3xl font-bold text-slate-800">The Season of Gathering</h2></div>
                         <button onclick="toggleHelp()" class="text-amber-700 font-bold text-sm underline">Value Guide</button>
                     </div>
-
                     <div class="w-full bg-white rounded-3xl shadow-xl overflow-hidden flex flex-col md:flex-row min-h-[500px]">
-                        <!-- Left Panel: Context -->
                         <div class="${role.lightTheme} p-8 md:w-1/3 flex flex-col border-r border-slate-100">
-                            <div class="mb-6">
-                                <div class="text-xs uppercase text-slate-500 font-bold mb-1">Location</div>
-                                <div class="text-xl font-bold text-slate-800 flex items-center gap-2">
-                                    <i data-lucide="map-pin" class="w-5 h-5"></i> ${role.startLocation}
-                                </div>
-                            </div>
+                            <div class="mb-6"><div class="text-xs uppercase text-slate-500 font-bold mb-1">Location</div><div class="text-xl font-bold text-slate-800 flex items-center gap-2"><i data-lucide="map-pin" class="w-5 h-5"></i> ${locationText}</div></div>
                             <p class="text-slate-600 mb-6 flex-1 text-sm leading-relaxed">${role.desc}</p>
-                            
-                            <div class="bg-white/50 p-4 rounded-xl border border-white/60">
-                                <div class="text-xs font-bold text-slate-500 uppercase mb-2">Current Score</div>
-                                <div class="text-3xl font-bold text-slate-800">${calculateScore()} <span class="text-sm font-normal text-slate-500">${role.scoring === 'Gold Pieces' ? 'Gold' : 'Pts'}</span></div>
-                            </div>
+                            <div class="bg-white/50 p-4 rounded-xl border border-white/60"><div class="text-xs font-bold text-slate-500 uppercase mb-2">Total Score</div><div class="text-3xl font-bold text-slate-800">${calculateScore()} <span class="text-sm font-normal text-slate-500">${role.scoring === 'Gold Pieces' ? 'Gold' : 'Pts'}</span></div></div>
                         </div>
-
-                        <!-- Right Panel: Action -->
                         <div class="p-8 md:w-2/3 flex flex-col">
-                            <div class="flex-1">
-                                <div class="text-sm font-bold text-slate-400 uppercase mb-4">Your Inventory</div>
-                                <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 content-start">
-                                    ${invHtml || '<div class="col-span-3 text-center text-slate-400 italic py-10 border-2 border-dashed border-slate-200 rounded-xl">Inventory empty. Roll to gather!</div>'}
-                                </div>
-                            </div>
-                            
+                            <div class="flex-1"><div class="text-sm font-bold text-slate-400 uppercase mb-4">Your Trading Stock</div><div class="grid grid-cols-2 lg:grid-cols-3 gap-3 content-start">${invHtml || '<div class="col-span-3 text-center text-slate-400 italic py-10 border-2 border-dashed border-slate-200 rounded-xl">Inventory empty. Roll to gather!</div>'}</div></div>
                             <div class="mt-6 border-t border-slate-100 pt-6">
                                 ${state.log.length > 0 ? `<div class="text-amber-600 font-bold mb-2 text-sm text-center animate-bounce">${state.log[state.log.length-1]}</div>` : ''}
-                                ${actionButton}
+                                ${state.rollsLeft > 0 
+                                    ? `<button onclick="rollDice()" class="w-full bg-slate-800 text-white px-8 py-4 rounded-xl text-xl font-bold shadow-lg hover:bg-slate-700 transition flex items-center justify-center gap-3"><i data-lucide="dices"></i> ${role.gatherVerb} (${state.rollsLeft})</button>`
+                                    : `<button onclick="setScreen('travel')" class="w-full ${role.theme} text-white px-8 py-4 rounded-xl text-xl font-bold shadow-lg hover:opacity-90 transition flex items-center justify-center gap-3 animate-pulse"><i data-lucide="arrow-right"></i> ${state.role === 'trader' ? 'Open Trading Post' : 'Travel to Post'}</button>`
+                                }
                             </div>
                         </div>
                     </div>
@@ -340,188 +279,108 @@
         }
 
         function renderTravel() {
-            setTimeout(() => {
-                if(state.opponentInventory.length === 0) initOpponentInventory();
-                setScreen('trading');
-            }, 2500);
-
+            if (state.role === 'trapper' && !state.companyChosenThisTurn) return renderCompanyChoice();
+            setTimeout(() => { if(state.opponentInventory.length === 0) initOpponentInventory(); setScreen('trading'); }, 2500);
             return `
                 <div class="text-center fade-in max-w-md mx-auto">
-                    <div class="relative w-32 h-32 mx-auto mb-8">
-                        <div class="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-20"></div>
-                        <div class="relative bg-white p-6 rounded-full shadow-xl z-10">
-                            <i data-lucide="waves" class="w-20 h-20 text-blue-500"></i>
-                        </div>
-                    </div>
+                    <div class="relative w-32 h-32 mx-auto mb-8"><div class="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-20"></div><div class="relative bg-white p-6 rounded-full shadow-xl z-10"><i data-lucide="${ROLES[state.role].travelIcon}" class="w-20 h-20 text-blue-500"></i></div></div>
                     <h2 class="text-3xl font-bold text-slate-800 mb-4">Travelling...</h2>
-                    <p class="text-xl text-slate-600">
-                        Leaving ${ROLES[state.role].startLocation}...<br>
-                        Approaching the Trading Post.
-                    </p>
+                    <p class="text-xl text-slate-600 mb-2">${ROLES[state.role].travelText}</p>
                 </div>
             `;
         }
 
-        function getDemandBadge(item) {
-            const oppRole = ROLES[state.role].opponent;
-            const valueToOpponent = oppRole === 'trader' ? item.traderValue : item.trapperValue;
-            
-            // Scaled for the new value system (Max is 10)
-            if (valueToOpponent >= 10) return `<span class="bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded ml-auto border border-green-200">High Demand</span>`;
-            if (valueToOpponent >= 4) return `<span class="bg-blue-50 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded ml-auto border border-blue-200">Med Demand</span>`;
-            return `<span class="bg-slate-100 text-slate-400 text-[10px] px-1.5 py-0.5 rounded ml-auto">Low Demand</span>`;
+        function renderCompanyChoice() {
+            return `
+                <div class="max-w-2xl w-full mx-auto fade-in">
+                    <h2 class="text-3xl font-bold text-slate-800 mb-6 text-center">Where will you trade this season?</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <button onclick="chooseCompany('hbc')" class="bg-white p-6 rounded-2xl shadow-lg border-2 border-transparent hover:border-blue-800 transition group text-left">
+                            <div class="flex items-center gap-4 mb-4"><div class="bg-blue-100 p-3 rounded-lg"><i data-lucide="anchor" class="w-8 h-8 text-blue-800"></i></div><div><div class="font-bold text-blue-900 text-lg">Hudson's Bay Co.</div><div class="text-xs text-blue-600 font-semibold uppercase">York Factory</div></div></div>
+                            <p class="text-slate-600 text-sm">Travel north. Strict traders, high quality goods.</p>
+                        </button>
+                        <button onclick="chooseCompany('nwc')" class="bg-white p-6 rounded-2xl shadow-lg border-2 border-transparent hover:border-red-800 transition group text-left">
+                            <div class="flex items-center gap-4 mb-4"><div class="bg-red-100 p-3 rounded-lg"><i data-lucide="compass" class="w-8 h-8 text-red-800"></i></div><div><div class="font-bold text-red-900 text-lg">North West Co.</div><div class="text-xs text-red-600 font-semibold uppercase">Montreal Traders</div></div></div>
+                            <p class="text-slate-600 text-sm">Meet the Voyageurs. Flexible and friendly.</p>
+                        </button>
+                    </div>
+                </div>
+            `;
         }
 
         function renderTrading() {
             const role = ROLES[state.role];
-            const oppRole = ROLES[role.opponent];
+            const companyInfo = COMPANIES[state.company];
+            const headerColor = state.company === 'hbc' ? 'bg-blue-900' : 'bg-red-900';
             
-            // --- LEFT: PLAYER INVENTORY ---
-            const playerInvHtml = state.inventory.map((item, i) => `
-                <button onclick="togglePlayerOffer(${i})" 
-                    class="p-2 rounded-lg border flex items-center gap-2 w-full mb-2 transition-colors duration-100 text-left group
-                    ${state.playerOffer.some(o => o.uniqueId === item.uniqueId) 
-                        ? 'bg-amber-100 border-amber-500 ring-1 ring-amber-500 opacity-50' 
-                        : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-amber-300'}
-                ">
-                    <i data-lucide="${ITEMS[item.id].icon}" class="${ITEMS[item.id].color} w-5 h-5"></i>
-                    <div class="flex-1">
-                        <div class="font-bold text-sm text-slate-700 flex items-center">${item.name}</div>
-                    </div>
-                    ${getDemandBadge(item)}
-                </button>
-            `).join('');
+            // Available to Trade
+            const groupedPlayerInv = getGroupedItems(state.inventory.filter(i => !state.playerOffer.some(o => o.uniqueId === i.uniqueId)));
+            // Banked (Safe)
+            const groupedBanked = getGroupedItems(state.bankedItems);
+            // Opponent
+            const groupedOpponentInv = getGroupedItems(state.opponentInventory.filter(i => !state.playerRequest.some(r => r.uniqueId === i.uniqueId)));
             
-            // --- RIGHT: OPPONENT INVENTORY (MARKET) ---
-            const opponentInvHtml = state.opponentInventory.map((item, i) => `
-                <button onclick="togglePlayerRequest(${i})"
-                    class="p-2 rounded-lg border flex items-center gap-2 w-full mb-2 transition-colors duration-100 text-left
-                    ${state.playerRequest.some(o => o.uniqueId === item.uniqueId) 
-                        ? 'bg-emerald-100 border-emerald-500 ring-1 ring-emerald-500 opacity-50' 
-                        : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-emerald-300'}
-                ">
-                    <i data-lucide="${ITEMS[item.id].icon}" class="${ITEMS[item.id].color} w-5 h-5"></i>
-                    <span class="font-bold text-sm text-slate-700 flex-1">${item.name}</span>
-                    <i data-lucide="plus-circle" class="w-4 h-4 text-slate-300"></i>
-                </button>
-            `).join('');
-
-            // Animation class
-            const containerClass = state.previousScreen !== 'trading' ? 'fade-in' : '';
-
             return `
-                <div class="w-full max-w-7xl h-[95vh] flex flex-col ${containerClass} overflow-hidden">
-                    
+                <div class="w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden">
                     <!-- HEADER -->
-                    <div class="bg-amber-900 text-amber-50 px-6 py-4 rounded-t-2xl flex justify-between items-center shadow-lg z-20 shrink-0">
-                        <div class="flex items-center gap-4">
-                            <div class="bg-white/10 p-2 rounded-lg"><i data-lucide="handshake" class="w-6 h-6"></i></div>
-                            <div>
-                                <h2 class="text-xl font-bold">Trading Post - Year ${state.year}</h2>
-                                <p class="text-sm text-amber-200/80">Select items from both sides to build a deal.</p>
-                            </div>
-                        </div>
+                    <div class="${headerColor} text-amber-50 px-6 py-4 rounded-t-2xl flex justify-between items-center shadow-lg z-20 shrink-0">
+                        <div class="flex items-center gap-4"><div class="bg-white/10 p-2 rounded-lg"><i data-lucide="handshake" class="w-6 h-6"></i></div><div><h2 class="text-xl font-bold">${companyInfo.name} - Year ${state.year}</h2></div></div>
                         <div class="flex items-center gap-6">
-                             <div class="text-right">
-                                <div class="text-xs uppercase tracking-wide opacity-70">Your Wealth</div>
-                                <div class="font-bold text-xl">${calculateScore()}</div>
-                            </div>
-                            <button onclick="toggleHelp()" class="bg-white/10 hover:bg-white/20 p-2 rounded-full transition"><i data-lucide="info"></i></button>
-                            <button onclick="nextPhase()" class="bg-red-500/20 hover:bg-red-500/40 text-red-100 px-4 py-2 rounded-lg text-sm font-bold border border-red-500/30 transition">
-                                ${state.year < state.maxYears ? 'End Year' : 'End Game'}
-                            </button>
+                            <div class="text-right"><div class="text-xs uppercase opacity-70">Total Score</div><div class="font-bold text-xl">${calculateScore()}</div></div>
+                            <button onclick="toggleHelp()" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg font-bold text-sm transition flex items-center gap-2"><i data-lucide="book-open" class="w-4 h-4"></i> Value Guide</button>
+                            <button onclick="nextPhase()" class="bg-red-500/20 hover:bg-red-500/40 text-red-100 px-4 py-2 rounded-lg text-sm font-bold border border-red-500/30 transition">${state.year < state.maxYears ? 'End Year' : 'End Game'}</button>
                         </div>
                     </div>
 
-                    <!-- MAIN AREA -->
+                    <!-- BODY -->
                     <div class="flex-1 bg-amber-50 border-x border-b border-amber-900/10 rounded-b-2xl shadow-2xl flex overflow-hidden relative">
                         
-                        <!-- LEFT: YOUR INVENTORY -->
+                        <!-- LEFT COLUMN: PLAYER -->
                         <div class="w-1/4 bg-white border-r border-slate-200 flex flex-col">
-                            <div class="p-3 bg-slate-50 border-b border-slate-100 font-bold text-xs uppercase text-slate-500 text-center sticky top-0 flex items-center justify-center gap-2">
-                                <i data-lucide="backpack" class="w-3 h-3"></i> Your Inventory
-                            </div>
-                            <div class="p-3 overflow-y-auto inventory-scroll flex-1">
-                                ${state.inventory.length === 0 ? '<div class="text-center text-slate-400 text-sm mt-10">Empty.</div>' : playerInvHtml}
-                            </div>
-                        </div>
-
-                        <!-- CENTER: THE DEAL TABLE -->
-                        <div class="w-2/4 flex flex-col bg-slate-100 relative">
                             
-                            <!-- Messages Area -->
-                             <div class="h-12 flex items-center justify-center bg-white border-b border-slate-200 px-4">
-                                ${state.log.length > 0 ? `<div class="text-sm font-bold ${state.tradeStage === 'rejected' ? 'text-red-600' : 'text-emerald-600'} animate-bounce">${state.log[state.log.length-1]}</div>` : '<div class="text-xs text-slate-400">Construct a deal below...</div>'}
+                            <!-- Top Half: Available Inventory -->
+                            <div class="h-1/2 flex flex-col border-b border-slate-200">
+                                <div class="p-3 bg-slate-50 border-b border-slate-100 font-bold text-xs uppercase text-slate-500 text-center sticky top-0 flex items-center justify-center gap-2"><i data-lucide="backpack" class="w-3 h-3"></i> Your Trading Stock</div>
+                                <div class="p-3 overflow-y-auto inventory-scroll flex-1">
+                                    ${groupedPlayerInv.map(g => `<button onclick="moveItemToTable('player', '${g.id}')" class="p-2 rounded-lg border flex items-center gap-2 w-full mb-2 bg-white border-slate-200 hover:bg-slate-50 hover:border-blue-300"><div class="relative"><i data-lucide="${g.icon}" class="${g.color} w-6 h-6"></i><span class="absolute -top-2 -right-2 bg-slate-700 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">${g.count}</span></div><div class="flex-1 text-left ml-2"><div class="font-bold text-sm text-slate-700">${g.name}</div><div class="text-xs text-slate-400">${g.desc}</div></div></button>`).join('') || '<div class="text-center text-xs text-slate-400 mt-4">Empty</div>'}
+                                </div>
                             </div>
 
-                            <div class="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
-                                
-                                <!-- REQUEST BOX (Top) -->
-                                <div class="flex-1 bg-white rounded-xl border-2 border-dashed border-emerald-200 p-4 flex flex-col overflow-hidden relative">
-                                    <div class="text-xs font-bold text-emerald-600 uppercase mb-2 flex items-center gap-2"><i data-lucide="download" class="w-3 h-3"></i> You Get</div>
-                                    <div class="overflow-y-auto flex-1 pr-2">
-                                        ${state.playerRequest.length === 0 
-                                            ? '<div class="h-full flex items-center justify-center text-slate-300 text-sm italic">Select items from Merchant (Right)</div>' 
-                                            : state.playerRequest.map(item => `
-                                                <div class="bg-emerald-50 p-2 rounded border border-emerald-200 flex items-center gap-2 mb-2 slide-up">
-                                                    <i data-lucide="${ITEMS[item.id].icon}" class="${ITEMS[item.id].color} w-4 h-4"></i>
-                                                    <span class="font-bold text-emerald-900 text-sm flex-1">${item.name}</span>
-                                                    <button onclick="togglePlayerRequest(${state.opponentInventory.findIndex(i => i.uniqueId === item.uniqueId)})" class="text-slate-400 hover:text-red-500"><i data-lucide="x" class="w-3 h-3"></i></button>
-                                                </div>
-                                            `).join('')}
-                                    </div>
+                            <!-- Bottom Half: Banked/Safe -->
+                            <div class="h-1/2 flex flex-col bg-slate-50/50">
+                                <div class="p-3 bg-slate-100 border-b border-slate-200 font-bold text-xs uppercase text-slate-500 text-center sticky top-0 flex items-center justify-center gap-2"><i data-lucide="${role.bankIcon}" class="w-3 h-3"></i> ${role.bankLabel}</div>
+                                <div class="p-3 overflow-y-auto inventory-scroll flex-1">
+                                    ${groupedBanked.map(g => `<div class="p-2 rounded-lg border flex items-center gap-2 w-full mb-2 bg-slate-100 border-slate-200 opacity-80"><div class="relative"><i data-lucide="${g.icon}" class="${g.color} w-6 h-6 grayscale-[0.3]"></i><span class="absolute -top-2 -right-2 bg-emerald-700 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">${g.count}</span></div><div class="flex-1 text-left ml-2"><div class="font-bold text-sm text-slate-600">${g.name}</div></div></div>`).join('') || '<div class="text-center text-xs text-slate-400 mt-4">No secured items yet</div>'}
                                 </div>
-
-                                <!-- ARROW -->
-                                <div class="flex justify-center -my-2 z-10">
-                                    <div class="bg-slate-200 rounded-full p-1"><i data-lucide="arrow-up-down" class="w-4 h-4 text-slate-500"></i></div>
-                                </div>
-
-                                <!-- OFFER BOX (Bottom) -->
-                                <div class="flex-1 bg-white rounded-xl border-2 border-dashed border-amber-200 p-4 flex flex-col overflow-hidden relative">
-                                    <div class="text-xs font-bold text-amber-600 uppercase mb-2 flex items-center gap-2"><i data-lucide="upload" class="w-3 h-3"></i> You Give</div>
-                                    <div class="overflow-y-auto flex-1 pr-2">
-                                        ${state.playerOffer.length === 0 
-                                            ? '<div class="h-full flex items-center justify-center text-slate-300 text-sm italic">Select items from Inventory (Left)</div>' 
-                                            : state.playerOffer.map(item => `
-                                                <div class="bg-amber-50 p-2 rounded border border-amber-200 flex items-center gap-2 mb-2 slide-up">
-                                                    <i data-lucide="${ITEMS[item.id].icon}" class="${ITEMS[item.id].color} w-4 h-4"></i>
-                                                    <span class="font-bold text-amber-900 text-sm flex-1">${item.name}</span>
-                                                    <button onclick="togglePlayerOffer(${state.inventory.findIndex(i => i.uniqueId === item.uniqueId)})" class="text-slate-400 hover:text-red-500"><i data-lucide="x" class="w-3 h-3"></i></button>
-                                                </div>
-                                            `).join('')}
-                                    </div>
-                                </div>
-
                             </div>
-
-                            <!-- ACTION BAR -->
-                            <div class="p-4 bg-white border-t border-slate-200 flex justify-center pb-8">
-                                <button onclick="proposeTrade()" 
-                                    class="bg-slate-800 text-white px-10 py-3 rounded-xl font-bold shadow-lg hover:bg-slate-700 transition disabled:opacity-50 flex items-center gap-2" 
-                                    ${state.playerOffer.length === 0 && state.playerRequest.length === 0 ? 'disabled' : ''}>
-                                    Propose Deal
-                                </button>
-                            </div>
-
                         </div>
 
-                        <!-- RIGHT: OPPONENT INVENTORY -->
-                        <div class="w-1/4 bg-white border-l border-slate-200 flex flex-col">
-                             <div class="p-3 bg-slate-50 border-b border-slate-100 font-bold text-xs uppercase text-slate-500 text-center sticky top-0 flex items-center justify-center gap-2">
-                                <i data-lucide="store" class="w-3 h-3"></i> Merchant's Wares
-                            </div>
-                            <div class="p-3 overflow-y-auto inventory-scroll flex-1">
-                                ${opponentInvHtml}
-                            </div>
-                             <div class="p-4 border-t border-slate-100 bg-slate-50 text-center">
-                                <div class="flex justify-center mb-2">
-                                    <div class="w-12 h-12 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center">
-                                         <i data-lucide="${oppRole.icon}" class="w-6 h-6 text-slate-700"></i>
-                                    </div>
+                        <!-- CENTER COLUMN: TRADE TABLE -->
+                        <div class="w-2/4 flex flex-col bg-slate-100 relative">
+                            <div class="h-12 flex items-center justify-center bg-white border-b border-slate-200 px-4">${state.log.length > 0 ? `<div class="text-sm font-bold ${state.tradeStage === 'rejected' ? 'text-red-600' : 'text-emerald-600'} animate-bounce text-center">${state.log[state.log.length-1]}</div>` : '<div class="text-xs text-slate-400">Construct a deal...</div>'}</div>
+                            <div class="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
+                                <div class="flex-1 bg-white rounded-xl border-2 border-dashed border-emerald-200 p-4 flex flex-col overflow-hidden relative">
+                                    <div class="flex justify-between items-center mb-2"><div class="text-xs font-bold text-emerald-600 uppercase flex items-center gap-2"><i data-lucide="download" class="w-3 h-3"></i> You Get</div><div class="text-xs font-bold text-slate-400">Value: ${state.playerRequest.reduce((s,i)=>s+i.value,0)}</div></div>
+                                    <div class="overflow-y-auto flex-1 pr-2">${getGroupedItems(state.playerRequest).map(g => `<button onclick="returnItemFromTable('opponent', '${g.id}')" class="bg-emerald-50 p-2 rounded border border-emerald-200 flex items-center gap-2 mb-2 w-full hover:bg-red-50 hover:border-red-200 group transition-colors"><div class="relative"><i data-lucide="${g.icon}" class="${g.color} w-5 h-5"></i><span class="absolute -top-2 -right-2 bg-emerald-600 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">${g.count}</span></div><span class="font-bold text-emerald-900 text-sm flex-1 text-left ml-1">${g.name}</span><i data-lucide="x" class="w-3 h-3 text-slate-400 group-hover:text-red-500"></i></button>`).join('') || '<div class="h-full flex items-center justify-center text-slate-300 text-sm italic">Click items from Store (Right)</div>'}</div>
                                 </div>
-                                <div class="text-xs text-slate-500 italic">"I have goods. I need yours. Make a fair offer."</div>
-                             </div>
+                                <div class="flex justify-center -my-2 z-10"><div class="bg-slate-200 rounded-full p-1"><i data-lucide="arrow-up-down" class="w-4 h-4 text-slate-500"></i></div></div>
+                                <div class="flex-1 bg-white rounded-xl border-2 border-dashed border-amber-200 p-4 flex flex-col overflow-hidden relative">
+                                    <div class="flex justify-between items-center mb-2"><div class="text-xs font-bold text-amber-600 uppercase flex items-center gap-2"><i data-lucide="upload" class="w-3 h-3"></i> You Give</div><div class="text-xs font-bold text-slate-400">Value: ${state.playerOffer.reduce((s,i)=>s+i.value,0)}</div></div>
+                                    <div class="overflow-y-auto flex-1 pr-2">${getGroupedItems(state.playerOffer).map(g => `<button onclick="returnItemFromTable('player', '${g.id}')" class="bg-amber-50 p-2 rounded border border-amber-200 flex items-center gap-2 mb-2 w-full hover:bg-red-50 hover:border-red-200 group transition-colors"><div class="relative"><i data-lucide="${g.icon}" class="${g.color} w-5 h-5"></i><span class="absolute -top-2 -right-2 bg-amber-600 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">${g.count}</span></div><span class="font-bold text-amber-900 text-sm flex-1 text-left ml-1">${g.name}</span><i data-lucide="x" class="w-3 h-3 text-slate-400 group-hover:text-red-500"></i></button>`).join('') || '<div class="h-full flex items-center justify-center text-slate-300 text-sm italic">Click items from Inventory (Left)</div>'}</div>
+                                </div>
+                            </div>
+                            <div class="p-4 bg-white border-t border-slate-200 flex justify-center pb-8 gap-4">
+                                <button onclick="tryOtherCompany()" class="bg-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold hover:bg-slate-300 transition items-center gap-2 flex">Try Other Post</button>
+                                <button onclick="proposeTrade()" class="bg-slate-800 text-white px-10 py-3 rounded-xl font-bold shadow-lg hover:bg-slate-700 transition disabled:opacity-50 flex items-center gap-2" ${state.playerOffer.length === 0 && state.playerRequest.length === 0 ? 'disabled' : ''}>Propose Deal</button>
+                            </div>
+                        </div>
+
+                        <!-- RIGHT COLUMN: STORE -->
+                        <div class="w-1/4 bg-white border-l border-slate-200 flex flex-col">
+                             <div class="p-3 bg-slate-50 border-b border-slate-100 font-bold text-xs uppercase text-slate-500 text-center sticky top-0 flex items-center justify-center gap-2"><i data-lucide="store" class="w-3 h-3"></i> ${role.opponentLabel}</div>
+                            <div class="p-3 overflow-y-auto inventory-scroll flex-1">
+                                ${groupedOpponentInv.map(g => `<button onclick="moveItemToTable('opponent', '${g.id}')" class="p-2 rounded-lg border flex items-center gap-2 w-full mb-2 bg-white border-slate-200 hover:bg-slate-50 hover:border-emerald-300 text-left group"><div class="relative"><i data-lucide="${g.icon}" class="${g.color} w-6 h-6"></i><span class="absolute -top-2 -right-2 bg-slate-700 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">${g.count}</span></div><div class="flex-1 text-left ml-2"><div class="font-bold text-sm text-slate-700">${g.name}</div><div class="text-xs text-slate-400">${g.desc}</div></div><i data-lucide="plus-circle" class="w-4 h-4 text-slate-300 group-hover:text-emerald-500"></i></button>`).join('')}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -529,283 +388,125 @@
         }
 
         function renderSummary() {
-            const role = ROLES[state.role];
-            const finalScore = calculateScore();
-            
-            // Adjusted thresholds for new scoring system (where Max per item is 10)
-            let feedback = "";
-            if(finalScore > 100) feedback = "Legendary! You have built a fortune that will last generations.";
-            else if(finalScore > 50) feedback = "A prosperous career. You retired comfortable and respected.";
-            else feedback = "A hard life. You survived, but fortune eluded you.";
-
             return `
                 <div class="max-w-md w-full bg-white p-8 rounded-3xl shadow-2xl text-center fade-in">
-                    <div class="mb-6 flex justify-center">
-                         <div class="p-4 bg-amber-100 rounded-full ring-4 ring-amber-50">
-                            <i data-lucide="trophy" class="w-16 h-16 text-amber-600"></i>
-                         </div>
-                    </div>
+                    <div class="mb-6 flex justify-center"><div class="p-4 bg-amber-100 rounded-full ring-4 ring-amber-50"><i data-lucide="trophy" class="w-16 h-16 text-amber-600"></i></div></div>
                     <h2 class="text-3xl font-bold text-slate-800 mb-2">Retirement</h2>
-                    <p class="text-slate-600 mb-8 text-sm leading-relaxed">${feedback}</p>
-                    
-                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-8 relative overflow-hidden">
-                        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-400 to-transparent"></div>
-                        <div class="text-xs uppercase tracking-wide text-slate-400 font-bold mb-1">Final Wealth</div>
-                        <div class="text-6xl font-black text-amber-900 mb-2">${finalScore}</div>
-                        <div class="text-xs text-slate-400 font-medium">Accumulated over ${state.maxYears} Years</div>
-                    </div>
-
+                    <p class="text-slate-600 mb-8 text-sm leading-relaxed">${calculateScore() > 50 ? "A prosperous career." : "A hard life."}</p>
+                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-8 relative overflow-hidden"><div class="text-xs uppercase tracking-wide text-slate-400 font-bold mb-1">Final Wealth</div><div class="text-6xl font-black text-amber-900 mb-2">${calculateScore()}</div></div>
                     <button onclick="setScreen('start')" class="w-full py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition shadow-lg">Play Again</button>
                 </div>
             `;
         }
 
-
         // --- LOGIC ---
 
-        function toggleHelp() {
-            state.showHelp = !state.showHelp;
-            render();
+        function toggleHelp() { state.showHelp = !state.showHelp; render(); }
+        // Score includes both banked items and remaining inventory
+        function calculateScore() { 
+            const invVal = state.inventory.reduce((s,i) => s + i.value, 0);
+            const bankedVal = state.bankedItems.reduce((s,i) => s + i.value, 0);
+            return invVal + bankedVal; 
         }
-
-        function calculateScore() {
-            let score = 0;
-            state.inventory.forEach(item => {
-                if(state.role === 'trader') score += item.traderValue;
-                if(state.role === 'trapper') score += item.trapperValue;
-            });
-            return score;
-        }
-
-        function setScreen(s) {
-            state.previousScreen = state.screen; 
-            state.screen = s;
-            state.log = [];
-            if(s === 'start') resetGame();
-            render();
-        }
-
+        function setScreen(s) { state.screen = s; state.log = []; if(s === 'start') resetGame(); render(); }
+        
         function resetGame() {
-            state = {
-                screen: 'start',
-                year: 1,
-                maxYears: 3,
-                role: null,
-                inventory: [],
-                opponentInventory: [],
-                rollsLeft: 3,
-                tradeStage: 'constructing',
-                playerOffer: [],
-                playerRequest: [],
-                score: 0,
-                log: [],
-                showHelp: false
-            };
+            state = { screen: 'start', year: 1, maxYears: 3, role: null, company: 'hbc', companyChosenThisTurn: false, inventory: [], bankedItems: [], opponentInventory: [], rollsLeft: 3, tradeStage: 'constructing', playerOffer: [], playerRequest: [], log: [], showHelp: false };
         }
 
-        function selectRole(r) {
-            state.role = r;
-            setScreen('gathering');
-        }
+        function selectRole(r) { state.role = r; if(r === 'trader') state.company = Math.random() > 0.5 ? 'hbc' : 'nwc'; setScreen('gathering'); }
 
         function rollDice() {
             if(state.rollsLeft <= 0) return;
-            
             const table = DICE_TABLES[state.role];
-            const rollIndex = Math.floor(Math.random() * table.length);
-            const result = table[rollIndex];
-
-            for(let i=0; i<result.count; i++) {
-                state.inventory.push({ ...ITEMS[result.id], id: result.id, uniqueId: Math.random().toString(36).substr(2, 9) });
-            }
-
+            const result = table[Math.floor(Math.random() * table.length)];
+            for(let i=0; i<result.count; i++) state.inventory.push({ ...ITEMS[result.id], id: result.id, uniqueId: Math.random().toString(36).substr(2, 9) });
             state.rollsLeft--;
             state.log.push(`Found ${result.label}!`);
             render();
         }
 
+        function chooseCompany(c) { state.company = c; state.companyChosenThisTurn = true; render(); }
+
         function initOpponentInventory() {
             const oppRoleKey = ROLES[state.role].opponent;
             const table = DICE_TABLES[oppRoleKey];
-            
             state.opponentInventory = [];
-            
-            // Give AI a good stock (5 rolls worth)
             for(let r=0; r<5; r++) {
                 const result = table[Math.floor(Math.random() * table.length)];
-                for(let i=0; i<result.count; i++) {
-                    state.opponentInventory.push({ ...ITEMS[result.id], id: result.id, uniqueId: Math.random().toString(36).substr(2, 9) });
-                }
+                for(let i=0; i<result.count; i++) state.opponentInventory.push({ ...ITEMS[result.id], id: result.id, uniqueId: Math.random().toString(36).substr(2, 9) });
             }
         }
 
-        function togglePlayerOffer(idx) {
-            const item = state.inventory[idx];
-            const offerIdx = state.playerOffer.findIndex(i => i.uniqueId === item.uniqueId);
-            
-            if(offerIdx >= 0) {
-                state.playerOffer.splice(offerIdx, 1);
-            } else {
-                state.playerOffer.push(item);
-            }
-            state.tradeStage = 'constructing';
-            state.log = [];
-            render(); 
+        function moveItemToTable(source, itemId) {
+            let sArr = source === 'player' ? state.inventory : state.opponentInventory;
+            let tArr = source === 'player' ? state.playerOffer : state.playerRequest;
+            const item = sArr.find(i => i.id === itemId && !tArr.some(t => t.uniqueId === i.uniqueId));
+            if (item) { tArr.push(item); state.tradeStage = 'constructing'; state.log = []; render(); }
         }
 
-        function togglePlayerRequest(idx) {
-            const item = state.opponentInventory[idx];
-            const reqIdx = state.playerRequest.findIndex(i => i.uniqueId === item.uniqueId);
-            
-            if(reqIdx >= 0) {
-                state.playerRequest.splice(reqIdx, 1);
-            } else {
-                state.playerRequest.push(item);
-            }
-            state.tradeStage = 'constructing';
-            state.log = [];
-            render(); 
+        function returnItemFromTable(source, itemId) {
+            let tArr = source === 'player' ? state.playerOffer : state.playerRequest;
+            const idx = tArr.findIndex(i => i.id === itemId);
+            if (idx > -1) { tArr.splice(idx, 1); state.tradeStage = 'constructing'; state.log = []; render(); }
         }
 
         function proposeTrade() {
-            // Logic: Does the AI think this is a good deal?
-            // AI evaluates: Value of Items It Gets vs Value of Items It Loses
-            
-            let valueGainedByAI = 0;
-            let valueLostByAI = 0;
+            let valGiven = state.playerOffer.reduce((s, i) => s + i.value, 0);
+            let valGot = state.playerRequest.reduce((s, i) => s + i.value, 0);
 
-            // 1. Calculate Gain (What Player is giving AI)
-            state.playerOffer.forEach(item => {
-                // AI Value Logic:
-                // If AI is Trapper (Player is Trader), AI values Goods (trapperValue)
-                // If AI is Trader (Player is Trapper), AI values Furs (traderValue)
-                if (state.role === 'trader') valueGainedByAI += item.trapperValue;
-                else valueGainedByAI += item.traderValue;
-            });
+            if (state.playerOffer.length === 0) { state.log = ["Give something to get something!"]; state.tradeStage = 'rejected'; render(); return; }
 
-            // 2. Calculate Loss (What Player is taking from AI)
-            state.playerRequest.forEach(item => {
-                // To the AI, the "Value Lost" is the OPPORTUNITY COST (The High Value to them)
-                // Wait. No.
-                // If AI is Trapper, it has a Musket (Val 10 to Trapper).
-                // If AI gives Musket, it loses 10 Points.
-                // So it needs to get >10 Points back?
-                // NO. That's the trap.
-                // Trapper has Musket. Trapper DOES NOT WANT Musket. Trapper wants Furs?
-                // Wait, let's re-read the cards/logic.
-                // Trapper starts with Furs. Trader starts with Goods.
+            let balance = valGiven - valGot; 
+            let threshold = COMPANIES[state.company].strictness === 'relaxed' ? -2 : 0;
+
+            if (balance >= threshold) {
+                // Execute Trade
                 
-                // If Player is Trader (Has Goods):
-                // Player offers Musket (Val 10 to Trapper).
-                // AI (Trapper) gains 10 Value.
-                // AI gives Beaver (Val 2 to Trapper).
-                // AI loses 2 Value.
-                // Net Gain for AI = 8. AI is HAPPY.
-                
-                // Let's implement this logic:
-                // ValueGainedByAI = Value of items Player gives (using AI's valuation)
-                // ValueLostByAI = Value of items AI gives (using AI's valuation)
-                
-                if (state.role === 'trader') {
-                    // AI is Trapper
-                    valueGainedByAI += item.trapperValue; 
-                } else {
-                    // AI is Trader
-                    valueGainedByAI += item.traderValue;
-                }
-            });
+                // 1. Remove Offered items from Inventory
+                state.playerOffer.forEach(o => {
+                    const idx = state.inventory.findIndex(i => i.uniqueId === o.uniqueId);
+                    if(idx > -1) state.inventory.splice(idx, 1);
+                });
 
-            state.playerRequest.forEach(item => {
-                if (state.role === 'trader') {
-                    // AI is Trapper. Giving up Beaver.
-                    // Beaver is Low Value to Trapper (2).
-                    valueLostByAI += item.trapperValue;
-                } else {
-                    // AI is Trader. Giving up Musket.
-                    // Musket is Low Value to Trader (2).
-                    valueLostByAI += item.traderValue;
-                }
-            });
+                // 2. Remove Requested items from Opponent Inventory
+                state.playerRequest.forEach(r => {
+                    const idx = state.opponentInventory.findIndex(i => i.uniqueId === r.uniqueId);
+                    if(idx > -1) state.opponentInventory.splice(idx, 1);
+                });
 
-            // 3. Evaluation
-            if (state.playerOffer.length === 0 && state.playerRequest.length === 0) {
-                state.log = ["We are just staring at each other..."];
-                return;
-            }
+                // 3. Add Requested items to BANKED ITEMS (not inventory)
+                state.bankedItems.push(...state.playerRequest);
 
-            if (state.playerOffer.length === 0) {
-                state.log = ["You want my goods for free? I think not."];
-                state.tradeStage = 'rejected';
-                render();
-                return;
-            }
-
-            // AI Fairness Threshold
-            // Since there is a massive asymmetry (Gain 10, Lose 2), trades should be easy.
-            // AI just wants to ensure Net Gain > 0.
-            // But to prevent Player from robbing them (e.g. 1 Musket for 10 Beavers),
-            // We should check if the ratio is decent.
-            // Actually, in this game, 1 Musket (10 Pts) for 1 Beaver (2 Pts cost) is a huge win.
-            // But is it? 
-            // If I am Trapper. I give 1 Beaver (Cost 2). I get 1 Musket (Gain 10). Net +8.
-            // If I give 5 Beavers (Cost 10). I get 1 Musket (Gain 10). Net 0.
-            // So 1 Musket is worth roughly 5 Beavers to the Trapper?
-            // AND 1 Musket is worth roughly 5 Beavers to the Trader (Cost 2 vs Gain 10).
-            // So the "Exchange Rate" naturally settles around 1 High Item = 1 High Item.
-            
-            // Let's use a simple heuristic:
-            // AI accepts if ValueGained >= ValueLost * 1.0
-            // This allows the "Profit" to drive the trade.
-            
-            if (valueGainedByAI >= valueLostByAI) {
-                // ACCEPT
-                performTrade();
-                state.log = ["Agreed. That is a fair trade."];
+                // 4. Reset Tables
+                state.playerOffer = []; state.playerRequest = [];
+                state.log = ["Deal accepted! Goods secured."];
                 state.tradeStage = 'accepted';
             } else {
-                // REJECT
-                state.log = ["I cannot give up so much for so little."];
                 state.tradeStage = 'rejected';
+                state.log = [`No deal. I need ${Math.abs(balance)} more value.`];
             }
             render();
         }
 
-        function performTrade() {
-            // Remove from Player
-            state.playerOffer.forEach(offerItem => {
-                const idx = state.inventory.findIndex(i => i.uniqueId === offerItem.uniqueId);
-                if(idx > -1) state.inventory.splice(idx, 1);
-            });
-
-            // Remove from AI
-            state.playerRequest.forEach(reqItem => {
-                const idx = state.opponentInventory.findIndex(i => i.uniqueId === reqItem.uniqueId);
-                if(idx > -1) state.opponentInventory.splice(idx, 1);
-            });
-
-            // Add to Player
-            state.inventory.push(...state.playerRequest);
-            
-            // Clear selections
+        function tryOtherCompany() {
+            state.company = state.company === 'hbc' ? 'nwc' : 'hbc';
+            state.tradeStage = 'constructing';
+            state.log = [`Paddled to ${COMPANIES[state.company].name}.`];
             state.playerOffer = [];
             state.playerRequest = [];
+            initOpponentInventory();
+            render();
         }
 
         function nextPhase() {
             if(state.year < state.maxYears) {
-                state.year++;
-                state.rollsLeft = 3; 
-                state.playerOffer = [];
-                state.playerRequest = [];
+                state.year++; state.rollsLeft = 3; state.playerOffer = []; state.playerRequest = []; state.companyChosenThisTurn = false;
                 setScreen('gathering');
-            } else {
-                setScreen('summary');
-            }
+            } else { setScreen('summary'); }
         }
 
-        // Init
         render();
-
     </script>
 </body>
 </html>
