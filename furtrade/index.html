@@ -40,18 +40,27 @@
     <script>
         // --- CONSTANTS & DATA ---
         
-        // Asymmetric Value System
+        // Asymmetric Value System (Based on uploaded Cards)
+        // traderValue = Gold Pieces (Value to Merchant)
+        // trapperValue = Prestige Points (Value to First Nations)
+        // cost = The "perceived cost" to the owner (used for AI logic to ensure they don't give away too much)
+        
         const ITEMS = {
-            // FURS (High Value to Trader, Low to Trapper)
-            beaver: { name: "Beaver Pelt", icon: "squirrel", type: "fur", traderValue: 25, trapperValue: 5, color: "text-amber-700", desc: "Prime winter fur." },
-            fox: { name: "Silver Fox", icon: "dog", type: "fur", traderValue: 30, trapperValue: 5, color: "text-slate-500", desc: "Rare and luxurious." },
-            bear: { name: "Bear Skin", icon: "paw-print", type: "fur", traderValue: 20, trapperValue: 10, color: "text-stone-800", desc: "Heavy and warm." },
+            // FURS (Merchant wants these for Gold)
+            beaver: { name: "Beaver Pelt", icon: "squirrel", type: "fur", traderValue: 10, trapperValue: 2, color: "text-amber-800", desc: "10 Gold Pieces" },
+            otter: { name: "Otter Pelt", icon: "waves", type: "fur", traderValue: 5, trapperValue: 1, color: "text-slate-600", desc: "5 Gold Pieces" },
+            bear: { name: "Bear Skin", icon: "paw-print", type: "fur", traderValue: 4, trapperValue: 2, color: "text-stone-900", desc: "4 Gold Pieces" },
+            deer: { name: "Deerskin", icon: "venetian-mask", type: "fur", traderValue: 3, trapperValue: 1, color: "text-orange-900", desc: "3 Gold Pieces" }, // Icon approx
+            mink: { name: "Mink Pelt", icon: "cat", type: "fur", traderValue: 2, trapperValue: 0.5, color: "text-slate-500", desc: "2 Gold Pieces" },
+            muskrat: { name: "Muskrat Pelt", icon: "rat", type: "fur", traderValue: 1, trapperValue: 0.2, color: "text-stone-500", desc: "1 Gold Piece" },
             
-            // GOODS (High Value to Trapper, Low to Trader)
-            musket: { name: "Musket", icon: "crosshair", type: "good", traderValue: 10, trapperValue: 40, color: "text-slate-800", desc: "Essential for hunting." },
-            kettle: { name: "Copper Kettle", icon: "cooking-pot", type: "good", traderValue: 5, trapperValue: 20, color: "text-orange-700", desc: "Durable cookware." },
-            blanket: { name: "Wool Blanket", icon: "scroll", type: "good", traderValue: 3, trapperValue: 15, color: "text-red-700", desc: "Warmth for winter." },
-            beads: { name: "Glass Beads", icon: "gem", type: "good", traderValue: 2, trapperValue: 10, color: "text-blue-600", desc: "Valuable for ceremony." }
+            // GOODS (First Nations want these for Prestige)
+            musket: { name: "Musket", icon: "crosshair", type: "good", traderValue: 2, trapperValue: 10, color: "text-slate-800", desc: "10 Prestige Points" },
+            cauldron: { name: "Cauldron", icon: "cooking-pot", type: "good", traderValue: 1.5, trapperValue: 5, color: "text-orange-700", desc: "5 Prestige Points" },
+            shirt: { name: "Shirt", icon: "shirt", type: "good", traderValue: 1, trapperValue: 4, color: "text-blue-700", desc: "4 Prestige Points" },
+            blanket: { name: "Blanket", icon: "scroll", type: "good", traderValue: 1, trapperValue: 3, color: "text-red-700", desc: "3 Prestige Points" },
+            silver: { name: "Trade Silver", icon: "gem", type: "good", traderValue: 0.5, trapperValue: 2, color: "text-gray-400", desc: "2 Prestige Points" },
+            tools: { name: "Metal Tools", icon: "hammer", type: "good", traderValue: 0.2, trapperValue: 1, color: "text-slate-600", desc: "1 Prestige Point" }
         };
 
         const ROLES = {
@@ -59,8 +68,8 @@
                 title: "Travelling Merchant",
                 objective: "Accumulate Wealth",
                 desc: "You come from Montreal with manufactured goods.",
-                goalText: "The Trappers value your metal goods highly, but they have little use for furs beyond their own needs. Buy Furs cheaply!",
-                scoring: "Wealth (£)",
+                goalText: "Buy Furs cheaply to sell for Gold in Europe.",
+                scoring: "Gold Pieces",
                 opponent: "trapper",
                 startLocation: "Montreal Warehouse",
                 gatherVerb: "Stock Up",
@@ -70,10 +79,10 @@
             },
             trapper: {
                 title: "First Nations Trapper",
-                objective: "Gain Prestige & Tools",
+                objective: "Gain Prestige",
                 desc: "You live on the land and hunt skilled game.",
-                goalText: "The Merchant values your furs highly for European markets. You have plenty of furs, but metal tools are rare and precious to you.",
-                scoring: "Prestige (Pts)",
+                goalText: "Trade abundant furs for rare tools to help your village.",
+                scoring: "Prestige Points",
                 opponent: "trader",
                 startLocation: "Winter Hunting Grounds",
                 gatherVerb: "Hunt & Gather",
@@ -86,19 +95,19 @@
         const DICE_TABLES = {
             trader: [
                 { id: 'musket', count: 1, label: "1 Musket" },
-                { id: 'kettle', count: 2, label: "2 Kettles" },
+                { id: 'cauldron', count: 2, label: "2 Cauldrons" },
                 { id: 'blanket', count: 3, label: "3 Blankets" },
-                { id: 'beads', count: 5, label: "Box of Beads" },
-                { id: 'musket', count: 2, label: "2 Muskets" },
-                { id: 'blanket', count: 5, label: "5 Blankets" }
+                { id: 'silver', count: 5, label: "5 Trade Silver" },
+                { id: 'tools', count: 6, label: "6 Metal Tools" },
+                { id: 'shirt', count: 2, label: "2 Shirts" }
             ],
             trapper: [
-                { id: 'beaver', count: 2, label: "2 Beavers" },
-                { id: 'fox', count: 1, label: "1 Silver Fox" },
-                { id: 'bear', count: 1, label: "1 Bear Skin" },
-                { id: 'beaver', count: 3, label: "3 Beavers" },
-                { id: 'fox', count: 2, label: "2 Foxes" },
-                { id: 'beaver', count: 1, label: "1 Beaver" }
+                { id: 'beaver', count: 1, label: "1 Beaver" },
+                { id: 'otter', count: 2, label: "2 Otters" },
+                { id: 'bear', count: 3, label: "3 Bear Skins" },
+                { id: 'deer', count: 3, label: "3 Deerskins" },
+                { id: 'mink', count: 5, label: "5 Minks" },
+                { id: 'muskrat', count: 6, label: "6 Muskrats" }
             ]
         };
 
@@ -153,31 +162,31 @@
                 <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onclick="toggleHelp()">
                     <div class="bg-white rounded-2xl max-w-2xl w-full p-8 shadow-2xl relative" onclick="event.stopPropagation()">
                         <button onclick="toggleHelp()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-800"><i data-lucide="x"></i></button>
-                        <h2 class="text-2xl font-bold text-amber-900 mb-4">Understanding Value</h2>
+                        <h2 class="text-2xl font-bold text-amber-900 mb-4">The Value of Exchange</h2>
                         
                         <div class="grid grid-cols-2 gap-8 mb-6">
                             <div class="bg-red-50 p-4 rounded-xl">
-                                <h3 class="font-bold text-red-900 mb-2 flex items-center gap-2"><i data-lucide="ship" class="w-4 h-4"></i> The Merchant</h3>
-                                <p class="text-sm text-slate-700 mb-2">Needs <strong>Furs</strong> for Europe.</p>
-                                <ul class="text-xs space-y-1 text-slate-600">
-                                    <li class="flex justify-between"><span>Silver Fox</span> <span class="font-bold">High Value</span></li>
-                                    <li class="flex justify-between"><span>Beaver</span> <span class="font-bold">Med Value</span></li>
-                                    <li class="flex justify-between"><span>Goods</span> <span class="text-red-500">Low Value</span></li>
-                                </ul>
+                                <h3 class="font-bold text-red-900 mb-2 flex items-center gap-2"><i data-lucide="ship" class="w-4 h-4"></i> The Merchant (Gold)</h3>
+                                <div class="space-y-1 text-sm text-slate-600">
+                                    <div class="flex justify-between border-b border-red-100 py-1"><span>Beaver Pelt</span> <span class="font-bold">10 Gold</span></div>
+                                    <div class="flex justify-between border-b border-red-100 py-1"><span>Otter Pelt</span> <span class="font-bold">5 Gold</span></div>
+                                    <div class="flex justify-between border-b border-red-100 py-1"><span>Bear Skin</span> <span class="font-bold">4 Gold</span></div>
+                                    <div class="flex justify-between border-b border-red-100 py-1"><span>Deerskin</span> <span class="font-bold">3 Gold</span></div>
+                                </div>
                             </div>
                             <div class="bg-emerald-50 p-4 rounded-xl">
-                                <h3 class="font-bold text-emerald-900 mb-2 flex items-center gap-2"><i data-lucide="tent" class="w-4 h-4"></i> The Trapper</h3>
-                                <p class="text-sm text-slate-700 mb-2">Needs <strong>Tools</strong> for survival.</p>
-                                <ul class="text-xs space-y-1 text-slate-600">
-                                    <li class="flex justify-between"><span>Musket</span> <span class="font-bold">High Value</span></li>
-                                    <li class="flex justify-between"><span>Kettle</span> <span class="font-bold">Med Value</span></li>
-                                    <li class="flex justify-between"><span>Furs</span> <span class="text-emerald-500">Low Value</span></li>
-                                </ul>
+                                <h3 class="font-bold text-emerald-900 mb-2 flex items-center gap-2"><i data-lucide="tent" class="w-4 h-4"></i> The Trapper (Prestige)</h3>
+                                <div class="space-y-1 text-sm text-slate-600">
+                                    <div class="flex justify-between border-b border-emerald-100 py-1"><span>Musket</span> <span class="font-bold">10 Pts</span></div>
+                                    <div class="flex justify-between border-b border-emerald-100 py-1"><span>Cauldron</span> <span class="font-bold">5 Pts</span></div>
+                                    <div class="flex justify-between border-b border-emerald-100 py-1"><span>Shirt</span> <span class="font-bold">4 Pts</span></div>
+                                    <div class="flex justify-between border-b border-emerald-100 py-1"><span>Blanket</span> <span class="font-bold">3 Pts</span></div>
+                                </div>
                             </div>
                         </div>
 
                         <p class="text-slate-600 italic text-sm border-t pt-4">
-                            <strong>Tip:</strong> Look for the "Demand" tags on your items. High Demand means the opponent really wants it!
+                            <strong>Fair Trade:</strong> 1 Gold roughly equals 1 Prestige Point. A Musket (10 Pts) is a fair swap for a Beaver (10 Gold).
                         </p>
                     </div>
                 </div>
@@ -192,13 +201,13 @@
                     <div class="flex justify-center mb-6">
                         <div class="bg-amber-900 p-6 rounded-full shadow-2xl relative">
                             <i data-lucide="scale" class="w-20 h-20 text-amber-100"></i>
-                            <div class="absolute -top-2 -right-2 bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full animate-bounce">v1.1</div>
+                            <div class="absolute -top-2 -right-2 bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full animate-bounce">v2.0</div>
                         </div>
                     </div>
                     <h1 class="text-6xl font-extrabold text-amber-900 tracking-tight">The Fur Trade</h1>
                     <p class="text-xl text-amber-800/80 max-w-lg mx-auto leading-relaxed">
-                        A game of negotiation and value. <br>
-                        Construct the perfect deal over <strong>3 Years</strong> to maximize your fortune.
+                        Step back to 1750. <br>
+                        Negotiate fair trades to earn <strong>Gold</strong> or <strong>Prestige</strong>.
                     </p>
                     
                     <div class="flex flex-col gap-4 max-w-xs mx-auto">
@@ -206,7 +215,7 @@
                             Start Journey
                         </button>
                         <button onclick="toggleHelp()" class="px-8 py-3 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-xl transition">
-                            How to Play
+                            Value Guide
                         </button>
                     </div>
                 </div>
@@ -231,12 +240,12 @@
                                     <i data-lucide="coins" class="w-8 h-8 text-red-700"></i>
                                 </div>
                                 <h3 class="text-3xl font-bold text-slate-800 mb-2">The Merchant</h3>
-                                <p class="text-red-700 font-bold mb-4 uppercase tracking-wider text-sm">Wealth (£)</p>
+                                <p class="text-red-700 font-bold mb-4 uppercase tracking-wider text-sm">Goal: Wealth (Gold)</p>
                                 <p class="text-slate-600 text-sm mb-4">
-                                    "I bring metal goods from Europe. I need Furs to sell in London."
+                                    "I need Beaver, Otter and Bear skins to sell for a fortune in Europe."
                                 </p>
                                 <div class="bg-red-50 p-3 rounded-lg text-xs text-red-900 font-semibold">
-                                    Goal: Trade cheap goods for expensive furs.
+                                    High Value: Beaver (10 Gold)
                                 </div>
                             </div>
                         </button>
@@ -251,12 +260,12 @@
                                     <i data-lucide="feather" class="w-8 h-8 text-emerald-700"></i>
                                 </div>
                                 <h3 class="text-3xl font-bold text-slate-800 mb-2">The Trapper</h3>
-                                <p class="text-emerald-700 font-bold mb-4 uppercase tracking-wider text-sm">Prestige (Pts)</p>
+                                <p class="text-emerald-700 font-bold mb-4 uppercase tracking-wider text-sm">Goal: Prestige (Points)</p>
                                 <p class="text-slate-600 text-sm mb-4">
-                                    "I hunt the land. I have many furs, but I need muskets and kettles."
+                                    "I need Muskets, Cauldrons and Blankets to survive and gain honor."
                                 </p>
                                 <div class="bg-emerald-50 p-3 rounded-lg text-xs text-emerald-900 font-semibold">
-                                    Goal: Trade abundant furs for rare tools.
+                                    High Value: Musket (10 Pts)
                                 </div>
                             </div>
                         </button>
@@ -277,7 +286,7 @@
 
             const actionButton = state.rollsLeft > 0 
                 ? `<button onclick="rollDice()" class="w-full mt-4 bg-slate-800 text-white px-8 py-4 rounded-xl text-xl font-bold shadow-lg hover:bg-slate-700 transition flex items-center justify-center gap-3">
-                     <i data-lucide="dices"></i> Gather Supplies (${state.rollsLeft})
+                     <i data-lucide="dices"></i> ${role.gatherVerb} (${state.rollsLeft})
                    </button>`
                 : `<button onclick="setScreen('travel')" class="w-full mt-4 ${role.theme} text-white px-8 py-4 rounded-xl text-xl font-bold shadow-lg hover:opacity-90 transition flex items-center justify-center gap-3 animate-pulse">
                      <i data-lucide="arrow-right"></i> Travel to Trade Post
@@ -306,8 +315,8 @@
                             <p class="text-slate-600 mb-6 flex-1 text-sm leading-relaxed">${role.desc}</p>
                             
                             <div class="bg-white/50 p-4 rounded-xl border border-white/60">
-                                <div class="text-xs font-bold text-slate-500 uppercase mb-2">Current Wealth</div>
-                                <div class="text-3xl font-bold text-slate-800">${calculateScore()}</div>
+                                <div class="text-xs font-bold text-slate-500 uppercase mb-2">Current Score</div>
+                                <div class="text-3xl font-bold text-slate-800">${calculateScore()} <span class="text-sm font-normal text-slate-500">${role.scoring === 'Gold Pieces' ? 'Gold' : 'Pts'}</span></div>
                             </div>
                         </div>
 
@@ -357,8 +366,9 @@
             const oppRole = ROLES[state.role].opponent;
             const valueToOpponent = oppRole === 'trader' ? item.traderValue : item.trapperValue;
             
-            if (valueToOpponent >= 20) return `<span class="bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded ml-auto border border-green-200">High Demand</span>`;
-            if (valueToOpponent >= 10) return `<span class="bg-blue-50 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded ml-auto border border-blue-200">Med Demand</span>`;
+            // Scaled for the new value system (Max is 10)
+            if (valueToOpponent >= 10) return `<span class="bg-green-100 text-green-700 text-[10px] font-bold px-1.5 py-0.5 rounded ml-auto border border-green-200">High Demand</span>`;
+            if (valueToOpponent >= 4) return `<span class="bg-blue-50 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded ml-auto border border-blue-200">Med Demand</span>`;
             return `<span class="bg-slate-100 text-slate-400 text-[10px] px-1.5 py-0.5 rounded ml-auto">Low Demand</span>`;
         }
 
@@ -522,9 +532,10 @@
             const role = ROLES[state.role];
             const finalScore = calculateScore();
             
+            // Adjusted thresholds for new scoring system (where Max per item is 10)
             let feedback = "";
-            if(finalScore > 300) feedback = "Legendary! You have built a fortune that will last generations.";
-            else if(finalScore > 150) feedback = "A prosperous career. You retired comfortable and respected.";
+            if(finalScore > 100) feedback = "Legendary! You have built a fortune that will last generations.";
+            else if(finalScore > 50) feedback = "A prosperous career. You retired comfortable and respected.";
             else feedback = "A hard life. You survived, but fortune eluded you.";
 
             return `
@@ -674,8 +685,46 @@
 
             // 2. Calculate Loss (What Player is taking from AI)
             state.playerRequest.forEach(item => {
-                if (state.role === 'trader') valueLostByAI += item.trapperValue;
-                else valueLostByAI += item.traderValue;
+                // To the AI, the "Value Lost" is the OPPORTUNITY COST (The High Value to them)
+                // Wait. No.
+                // If AI is Trapper, it has a Musket (Val 10 to Trapper).
+                // If AI gives Musket, it loses 10 Points.
+                // So it needs to get >10 Points back?
+                // NO. That's the trap.
+                // Trapper has Musket. Trapper DOES NOT WANT Musket. Trapper wants Furs?
+                // Wait, let's re-read the cards/logic.
+                // Trapper starts with Furs. Trader starts with Goods.
+                
+                // If Player is Trader (Has Goods):
+                // Player offers Musket (Val 10 to Trapper).
+                // AI (Trapper) gains 10 Value.
+                // AI gives Beaver (Val 2 to Trapper).
+                // AI loses 2 Value.
+                // Net Gain for AI = 8. AI is HAPPY.
+                
+                // Let's implement this logic:
+                // ValueGainedByAI = Value of items Player gives (using AI's valuation)
+                // ValueLostByAI = Value of items AI gives (using AI's valuation)
+                
+                if (state.role === 'trader') {
+                    // AI is Trapper
+                    valueGainedByAI += item.trapperValue; 
+                } else {
+                    // AI is Trader
+                    valueGainedByAI += item.traderValue;
+                }
+            });
+
+            state.playerRequest.forEach(item => {
+                if (state.role === 'trader') {
+                    // AI is Trapper. Giving up Beaver.
+                    // Beaver is Low Value to Trapper (2).
+                    valueLostByAI += item.trapperValue;
+                } else {
+                    // AI is Trader. Giving up Musket.
+                    // Musket is Low Value to Trader (2).
+                    valueLostByAI += item.traderValue;
+                }
             });
 
             // 3. Evaluation
@@ -691,23 +740,31 @@
                 return;
             }
 
-            // AI Fairness Threshold (Can be tweaked for difficulty)
-            // AI wants at least equal value, maybe a slight profit (margin)
-            const margin = 0.9; // AI is generous, accepts 90% value match to facilitate trade
+            // AI Fairness Threshold
+            // Since there is a massive asymmetry (Gain 10, Lose 2), trades should be easy.
+            // AI just wants to ensure Net Gain > 0.
+            // But to prevent Player from robbing them (e.g. 1 Musket for 10 Beavers),
+            // We should check if the ratio is decent.
+            // Actually, in this game, 1 Musket (10 Pts) for 1 Beaver (2 Pts cost) is a huge win.
+            // But is it? 
+            // If I am Trapper. I give 1 Beaver (Cost 2). I get 1 Musket (Gain 10). Net +8.
+            // If I give 5 Beavers (Cost 10). I get 1 Musket (Gain 10). Net 0.
+            // So 1 Musket is worth roughly 5 Beavers to the Trapper?
+            // AND 1 Musket is worth roughly 5 Beavers to the Trader (Cost 2 vs Gain 10).
+            // So the "Exchange Rate" naturally settles around 1 High Item = 1 High Item.
             
-            if (valueGainedByAI >= (valueLostByAI * margin)) {
+            // Let's use a simple heuristic:
+            // AI accepts if ValueGained >= ValueLost * 1.0
+            // This allows the "Profit" to drive the trade.
+            
+            if (valueGainedByAI >= valueLostByAI) {
                 // ACCEPT
                 performTrade();
                 state.log = ["Agreed. That is a fair trade."];
                 state.tradeStage = 'accepted';
             } else {
                 // REJECT
-                // Provide hint
-                if (valueGainedByAI < (valueLostByAI * 0.5)) {
-                    state.log = ["That is an insult! I need much more."];
-                } else {
-                    state.log = ["Close, but I need a little more value."];
-                }
+                state.log = ["I cannot give up so much for so little."];
                 state.tradeStage = 'rejected';
             }
             render();
@@ -728,9 +785,6 @@
 
             // Add to Player
             state.inventory.push(...state.playerRequest);
-
-            // Add to AI (Optional, but keeps conservation of mass if we tracked AI inventory rigorously)
-            // For now, AI items just disappear into the market
             
             // Clear selections
             state.playerOffer = [];
