@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vocabulary Arcade 1.0</title>
+    <!-- ADDED ID HERE -->
+    <script id="tailwind-script" src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }a
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #f8fafc;
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 32px 32px;
+            touch-action: none;
+            color: #1e293b;
+        }
+        
+        /* Glassmorphism & UI Utils */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        canvas {
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+            cursor: grab;
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+        .btn-secondary {
+            background: white;
+            border: 1px solid #e2e8f0;
+            color: #475569;
+            transition: all 0.2s ease;
+        }
+        .btn-secondary:hover {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+            transform: translateY(-2px);
+        }
+
+        .btn-xs {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            line-height: 1rem;
+        }
+        
+        /* Animations */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-4px) rotate(-2deg); }
+            40% { transform: translateX(4px) rotate(2deg); }
+            60% { transform: translateX(-2px); }
+            80% { transform: translateX(2px); }
+        }
+        .shake {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.9); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .card-pop {
+            animation: popIn 0.3s ease-out forwards;
+        }
+
+        /* Swipe Game Animations */
+        .swipe-right { transform: translateX(1000px) rotate(30deg) !important; opacity: 0; transition: all 0.5s ease; }
+        .swipe-left { transform: translateX(-1000px) rotate(-30deg) !important; opacity: 0; transition: all 0.5s ease; }
+        .swipe-card { transition: transform 0.1s linear; }
+
+        /* Scramble Game Styles */
+        .letter-tile { cursor: grab; touch-action: none; user-select: none; }
+        .letter-tile:active { cursor: grabbing; transform: scale(1.1); }
+        .drop-slot { transition: all 0.2s; }
+        .drop-slot.over { background-color: #e0e7ff; border-color: #6366f1; transform: scale(1.05); }
+
+        /* Flashcard Styles */
+        .perspective-1000 { perspective: 1000px; }
+        .transform-style-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+        
+        .flashcard-inner {
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        /* Corrected Selector: Target ID instead of class if element only has ID */
+        #flashcard.flipped .flashcard-inner {
+            transform: rotateY(180deg);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="flex justify-center items-center p-4 sm:p-6">
+
+    <div id="app-container" class="w-full h-full max-w-7xl mx-auto flex flex-col relative">
+        
+        <!-- App Header -->
+        <header id="app-header" class="mb-6 flex-shrink-0 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white text-xl shadow-lg shadow-indigo-200">
+                    🕹️
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Vocabulary Arcade 1.0</h1>
+                    <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Import & Play</p>
+                </div>
+            </div>
+            
+            <!-- Header Actions -->
+            <div class="flex gap-3">
+                <button id="import-json-btn" class="btn-secondary px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    Import Set
+                </button>
+                <button id="download-html-btn" class="btn-secondary px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Download Arcade
+                </button>
+            </div>
+        </header>
+
+        <!-- Hidden File Input -->
+        <input type="file" id="json-importer" class="hidden" accept=".json">
+
+        <!-- Start Screen -->
+        <section id="start-screen" class="flex-grow flex flex-col justify-center items-center relative z-10 overflow-y-auto">
+            
+            <div class="text-center mb-6 max-w-2xl flex-shrink-0">
+                <h2 id="start-title" class="text-3xl font-bold text-slate-800 mb-2">Ready to Play?</h2>
+                <p class="text-slate-500 text-lg">Import a JSON file or use the sample set.</p>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 w-full max-w-6xl pb-4">
+                <!-- Game 1: Match -->
+                <div class="group bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl border border-slate-200 transition-all duration-300 flex flex-col items-center text-center">
+                    <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-2xl mb-3">🧩</div>
+                    <h3 class="text-lg font-bold text-slate-800">Match Master</h3>
+                    <p class="text-slate-500 mb-4 text-xs leading-relaxed flex-grow">Drag definitions to their matching terms.</p>
+                    <button id="start-match-game-btn" class="btn-primary text-white w-full py-2 rounded-lg font-bold text-sm mb-3">Play Match</button>
+                    
+                    <div class="w-full flex gap-2 border-t border-slate-100 pt-3 mt-auto">
+                        <button onclick="exportGame('match', 'copy')" class="btn-secondary flex-1 py-1 text-xs rounded font-medium flex items-center justify-center gap-1 hover:bg-slate-50">
+                             Copy HTML
+                        </button>
+                        <button onclick="exportGame('match', 'download')" class="btn-secondary flex-1 py-1 text-xs rounded font-medium flex items-center justify-center gap-1 hover:bg-slate-50">
+                             Download
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Game 2: Quiz -->
+                <div class="group bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl border border-slate-200 transition-all duration-300 flex flex-col items-center text-center">
+                    <div class="w-12 h-12 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center text-2xl mb-3">⚡</div>
+                    <h3 class="text-lg font-bold text-slate-800">Speed Quiz</h3>
+                    <p class="text-slate-500 mb-4 text-xs leading-relaxed flex-grow">Spot the correct card instantly.</p>
+                    <button id="start-quiz-game-btn" class="btn-primary text-white w-full py-2 rounded-lg font-bold text-sm mb-3">Play Quiz</button>
+                    
+                     <div class="w-full flex gap-2 border-t border-slate-100 pt-3 mt-auto">
+                        <button onclick="exportGame('quiz', 'copy')" class="btn-secondary flex-1 py-1 text-xs rounded font-medium flex items-center justify-center gap-1 hover:bg-slate-50">
+                             Copy HTML
+                        </button>
+                        <button onclick="exportGame('quiz', 'download')" class="btn-secondary flex-1 py-1 text-xs rounded font-medium flex items-center justify-center gap-1 hover:bg-slate-50">
+                             Download
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Game 3: Swipe -->
+                <div class="group bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl border border-slate-200 transition-all duration-300 flex flex-col items-center text-center">
+                    <div class="w-12 h-12 bg-pink-50 text-pink-600 rounded-xl flex items-center justify-center text-2xl mb-3">🔥</div>
+                    <h3 class="text-lg font-bold text-slate-800">Swipe Review</h3>
+                    <p class="text-slate-500 mb-4 text-xs leading-relaxed flex-grow">Swipe Right if it matches, Left if it doesn't.</p>
+                    <button id="start-swipe-game-btn" class="btn-primary text-white w-full py-2 rounded-lg font-bold text-sm mb-3">Play Swipe</button>
+                    
+                     <div class="w-full flex gap-2 border-t border-slate-100 pt-3 mt-auto">
+                        <button onclick="exportGame('swipe', 'copy')" class="btn-secondary flex-1 py-1 text-xs rounded font-medium flex items-center justify-center gap-1 hover:bg-slate-50">
+                             Copy HTML
+                        </button>
+                        <button onclick="exportGame('swipe', 'download')" class="btn-secondary flex-1 py-1 text-xs rounded font-medium flex items-center justify-center gap-1 hover:bg-slate-50">
+                             Download
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Game 4: Scramble -->
+                <div class="group bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl border border-slate-200 transition-all duration-300 flex flex-col items-center text-center">
+                    <div class="w-12 h-12 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center text-2xl mb-3">🔤</div>
+                    <h3 class="text-lg font-bold text-slate-800">Word Scramble</h3>
+                    <p class="text-slate-500 mb-4 text-xs leading-relaxed flex-grow">Type or Unscramble letters to spell.</p>
+                    <button id="start-scramble-game-btn" class="btn-primary text-white w-full py-2 rounded-lg font-bold text-sm mb-3">Play Scramble</button>
+                    
+                     <div class="w-full flex gap-2 border-t border-slate-100 pt-3 mt-auto">
+                        <button onclick="exportGame('scramble', 'copy')" class="btn-secondary flex-1 py-1 text-xs rounded font-medium flex items-center justify-center gap-1 hover:bg-slate-50">
+                             Copy HTML
+                        </button>
+                        <button onclick="exportGame('scramble', 'download')" class="btn-secondary flex-1 py-1 text-xs rounded font-medium flex items-center justify-center gap-1 hover:bg-slate-50">
+                             Download
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Game 5: Flashcards -->
+                <div class="group bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl border border-slate-200 transition-all duration-300 flex flex-col items-center text-center">
+                    <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-2xl mb-3">🎓</div>
+                    <h3 class="text-lg font-bold text-slate-800">Flashcard Study</h3>
+                    <p class="text-slate-500 mb-4 text-xs leading-relaxed flex-grow">Flip through cards to study terms.</p>
+                    <button id="start-flashcard-game-btn" class="btn-primary text-white w-full py-2 rounded-lg font-bold text-sm mb-3">Start Study</button>
+                    
+                     <div class="w-full flex gap-2 border-t border-slate-100 pt-3 mt-auto">
+                        <button onclick="exportGame('flashcard', 'copy')" class="btn-secondary flex-1 py-1 text-xs rounded font-medium flex items-center justify-center gap-1 hover:bg-slate-50">
+                             Copy HTML
+                        </button>
+                        <button onclick="exportGame('flashcard', 'download')" class="btn-secondary flex-1 py-1 text-xs rounded font-medium flex items-center justify-center gap-1 hover:bg-slate-50">
+                             Download
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- GAME 1: Match Game Container -->
+        <main id="match-game-container" class="hidden w-full flex-grow flex flex-col items-center relative">
+            <div class="w-full flex items-center justify-between mb-4 px-1 flex-shrink-0">
+                <button class="main-menu-btn text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-2 text-sm">← Exit</button>
+                <div class="flex gap-4 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200 text-sm font-bold text-slate-600">
+                    <span id="round-display" class="text-indigo-600">Round 1</span>
+                    <span class="text-slate-300">|</span>
+                    <span id="timer-display">0s</span>
+                </div>
+            </div>
+            <div class="relative w-full flex-grow bg-slate-200/50 rounded-2xl border border-slate-200/60 p-1 shadow-inner overflow-hidden">
+                <canvas id="game-canvas"></canvas>
+            </div>
+        </main>
+        
+        <!-- GAME 2: Quiz Game Container -->
+        <main id="quiz-game-container" class="hidden w-full h-full flex-grow flex flex-col items-center relative">
+            <div class="w-full flex items-center justify-between mb-4 px-1 flex-shrink-0">
+                <button class="main-menu-btn text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-2 text-sm">← Exit</button>
+                <div class="text-sm font-bold text-slate-400 uppercase tracking-wider">Select the match</div>
+            </div>
+            <section id="hint-section" class="flex-shrink-0 w-full max-w-3xl bg-white border border-indigo-100 p-6 rounded-2xl shadow-lg shadow-indigo-100/50 text-center mb-6 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+                <p class="text-xs font-bold text-indigo-500 uppercase tracking-wider mb-2">Find this Term</p>
+                <p id="hint-text" class="text-xl md:text-2xl font-bold text-slate-800">Click start to play!</p>
+            </section>
+            
+            <!-- Card Grid -->
+            <div id="card-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 w-full max-w-6xl flex-grow overflow-y-auto p-2 pb-4"></div>
+
+            <!-- Word Bank -->
+            <div class="w-full bg-white border-t border-slate-200 p-4 flex-shrink-0 z-10">
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Word Bank</p>
+                <div id="quiz-word-bank" class="flex flex-wrap gap-2 justify-center">
+                    <!-- Words injected here -->
+                </div>
+            </div>
+
+            <!-- SUCCESS MODAL -->
+            <div id="quiz-feedback-modal" class="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+                <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-[90%] text-center transform scale-95 transition-transform duration-300 flex flex-col items-center" id="quiz-feedback-content">
+                    <div class="mb-4 w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-3xl font-bold shadow-inner">✓</div>
+                    <h3 class="text-3xl font-black text-slate-800 mb-2 leading-tight" id="feedback-term">Term</h3>
+                    <p class="text-slate-500 mb-6 text-sm font-medium px-4" id="feedback-def">Definition</p>
+                    <div class="h-40 w-full flex items-center justify-center bg-slate-50 rounded-xl p-4 mb-4 border border-slate-100 shadow-inner">
+                        <img id="feedback-img" src="" class="max-h-full max-w-full object-contain drop-shadow-sm">
+                    </div>
+                    <p class="text-xs font-bold text-green-500 uppercase tracking-widest animate-pulse">Correct!</p>
+                </div>
+            </div>
+
+            <!-- FAILURE MODAL -->
+            <div id="quiz-failure-modal" class="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+                <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-[90%] text-center transform scale-95 transition-transform duration-300 flex flex-col items-center" id="quiz-failure-content">
+                    <div class="mb-4 w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-600 text-3xl font-bold shadow-inner">✕</div>
+                    <h3 class="text-2xl font-bold text-slate-800 mb-1">No, that's a...</h3>
+                    <h3 class="text-3xl font-black text-red-600 mb-4 leading-tight" id="fail-term">Term</h3>
+                    <div class="h-40 w-full flex items-center justify-center bg-slate-50 rounded-xl p-4 mb-6 border border-slate-100 shadow-inner">
+                        <img id="fail-img" src="" class="max-h-full max-w-full object-contain drop-shadow-sm">
+                    </div>
+                    <button onclick="quizGame.hideFailure()" class="btn-primary text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200">Try Again</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- GAME 3: Swipe Game Container -->
+        <main id="swipe-game-container" class="hidden w-full h-full flex-grow flex flex-col items-center justify-center relative overflow-hidden">
+             <div class="absolute top-4 left-4 z-20">
+                <button class="main-menu-btn text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-2 text-sm bg-white/80 backdrop-blur px-3 py-2 rounded-lg shadow-sm">← Exit</button>
+            </div>
+            
+            <!-- Visual Cues -->
+            <div class="absolute left-4 top-1/2 transform -translate-y-1/2 hidden md:flex flex-col items-center z-0 opacity-50">
+                <div class="text-4xl font-black text-red-200 mb-2">✕</div>
+                <div class="text-xs font-bold text-red-300 uppercase tracking-widest rotate-90 origin-center whitespace-nowrap">No Match &lt;</div>
+            </div>
+            <div class="absolute right-4 top-1/2 transform -translate-y-1/2 hidden md:flex flex-col items-center z-0 opacity-50">
+                <div class="text-4xl font-black text-green-200 mb-2">✓</div>
+                <div class="text-xs font-bold text-green-300 uppercase tracking-widest -rotate-90 origin-center whitespace-nowrap">&gt; Match</div>
+            </div>
+
+            <!-- Swipe Area -->
+            <div class="relative w-full max-w-sm aspect-[3/4] flex flex-col items-center justify-center">
+                <!-- Background Stack Effect -->
+                <div class="absolute w-[90%] h-[90%] bg-white rounded-3xl border border-slate-200 shadow-sm transform scale-90 translate-y-4 opacity-50 z-0"></div>
+                <div class="absolute w-[95%] h-[95%] bg-white rounded-3xl border border-slate-200 shadow-sm transform scale-95 translate-y-2 opacity-80 z-0"></div>
+                
+                <!-- Active Card -->
+                <div id="swipe-card" class="swipe-card absolute w-full h-full bg-white rounded-3xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden cursor-grab z-10 touch-none">
+                    <!-- Image Area -->
+                    <div class="h-3/5 bg-slate-50 flex items-center justify-center p-8 relative overflow-hidden">
+                        <img id="swipe-img" src="" class="max-w-full max-h-full object-contain drop-shadow-md pointer-events-none">
+                        <!-- Overlays -->
+                        <div id="overlay-nope" class="absolute top-4 right-4 border-4 border-red-500 text-red-500 font-black text-2xl px-2 py-1 rounded opacity-0 transform rotate-12 pointer-events-none">NOPE</div>
+                        <div id="overlay-like" class="absolute top-4 left-4 border-4 border-green-500 text-green-500 font-black text-2xl px-2 py-1 rounded opacity-0 transform -rotate-12 pointer-events-none">YES</div>
+                    </div>
+                    <!-- Text Area -->
+                    <div class="h-2/5 p-6 flex flex-col items-center justify-center text-center">
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Is this...</p>
+                        <h2 id="swipe-term" class="text-3xl font-bold text-slate-800 mb-2">Term</h2>
+                        <p id="swipe-def" class="text-sm text-slate-500 line-clamp-3 hidden">Definition</p> 
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="mt-8 flex gap-6 z-20">
+                <button id="btn-swipe-left" class="w-16 h-16 rounded-full bg-white text-red-500 shadow-lg flex items-center justify-center text-2xl hover:scale-110 transition-transform border border-red-100 relative">
+                    ✕
+                    <span class="absolute -bottom-6 text-[10px] font-bold text-slate-300 uppercase">No</span>
+                </button>
+                <button id="btn-swipe-right" class="w-16 h-16 rounded-full bg-white text-green-500 shadow-lg flex items-center justify-center text-2xl hover:scale-110 transition-transform border border-green-100 relative">
+                    ♥
+                    <span class="absolute -bottom-6 text-[10px] font-bold text-slate-300 uppercase">Match</span>
+                </button>
+            </div>
+            
+            <div class="mt-4 text-slate-400 text-sm font-medium">Use Arrow Keys or Swipe</div>
+        </main>
+
+        <!-- GAME 4: Scramble Game Container -->
+        <main id="scramble-game-container" class="hidden w-full h-full flex-grow flex flex-col items-center relative overflow-y-auto">
+            <div class="w-full flex items-center justify-between mb-4 px-1 flex-shrink-0">
+                <button class="main-menu-btn text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-2 text-sm">← Exit</button>
+                <div id="scramble-score" class="text-indigo-600 font-bold text-lg">Score: 0</div>
+            </div>
+
+            <div class="flex-grow flex flex-col items-center justify-center w-full max-w-2xl pb-10">
+                <!-- Clue Section -->
+                <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-100 w-full flex flex-col items-center mb-8">
+                    <img id="scramble-img" src="" class="h-32 w-auto object-contain mb-4 drop-shadow-sm">
+                    <p id="scramble-def" class="text-slate-600 text-center font-medium">Definition goes here...</p>
+                </div>
+
+                <!-- Slots -->
+                <div id="word-slots" class="flex flex-wrap justify-center gap-2 mb-8">
+                    <!-- Slots injected via JS -->
+                </div>
+
+                <!-- Input Field -->
+                <div class="w-full max-w-xs mb-8">
+                    <input type="text" id="scramble-input" class="w-full text-center px-4 py-3 rounded-xl border-2 border-indigo-100 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-slate-700 font-bold uppercase tracking-widest placeholder-slate-300" placeholder="TYPE ANSWER HERE">
+                </div>
+
+                <!-- Letter Tiles -->
+                <div id="letter-bank" class="flex flex-wrap justify-center gap-3 p-4 bg-slate-200/50 rounded-2xl min-h-[80px] w-full">
+                    <!-- Tiles injected via JS -->
+                </div>
+                
+                <div id="scramble-message" class="h-8 mt-4 text-lg font-bold text-emerald-500"></div>
+                <button id="scramble-next-btn" class="mt-4 btn-primary text-white px-6 py-2 rounded-lg hidden">Next Word →</button>
+            </div>
+        </main>
+
+        <!-- GAME 5: Flashcard Study Container -->
+        <main id="flashcard-game-container" class="hidden w-full h-full flex-grow flex flex-col items-center relative overflow-y-auto">
+            <div class="w-full flex items-center justify-between mb-4 px-1 flex-shrink-0">
+                <button class="main-menu-btn text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-2 text-sm">← Exit</button>
+                <div class="text-sm font-bold text-slate-400 uppercase tracking-wider" id="flashcard-counter">Card 1 of 10</div>
+            </div>
+
+            <div class="flex-grow flex flex-col items-center justify-center w-full h-full pb-10 px-4">
+                <!-- Flashcard with Class -->
+                <div id="flashcard" class="flashcard group perspective-1000 w-full max-w-md h-96 cursor-pointer mb-8 relative">
+                    <div class="flashcard-inner relative w-full h-full transition-all duration-500 transform-style-3d shadow-xl rounded-2xl">
+                        <!-- Front -->
+                        <div class="absolute w-full h-full backface-hidden bg-white rounded-2xl p-8 flex flex-col items-center justify-center border border-slate-200">
+                            <div class="flex-grow flex items-center justify-center mb-4 w-full h-3/5">
+                                <img id="fc-front-img" src="" class="max-w-full max-h-full object-contain drop-shadow-sm">
+                            </div>
+                            <h2 id="fc-front-term" class="text-3xl font-bold text-slate-800 text-center">Term</h2>
+                            <p class="absolute bottom-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Click to Flip</p>
+                        </div>
+                        <!-- Back -->
+                        <div class="absolute w-full h-full backface-hidden rotate-y-180 bg-indigo-600 rounded-2xl p-8 flex flex-col items-center justify-center text-white border border-indigo-500">
+                            <p class="text-xs font-bold text-indigo-200 uppercase tracking-widest mb-4">Definition</p>
+                            <p id="fc-back-def" class="text-xl font-medium text-center leading-relaxed">Definition goes here.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="flex gap-6 items-center">
+                    <button id="fc-prev-btn" class="btn-secondary w-12 h-12 rounded-full flex items-center justify-center text-xl shadow-md">←</button>
+                    <button id="fc-flip-btn" class="btn-primary text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        Flip
+                    </button>
+                    <button id="fc-next-btn" class="btn-secondary w-12 h-12 rounded-full flex items-center justify-center text-xl shadow-md">→</button>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <!-- ADDED ID HERE -->
+    <script id="game-logic-script">
+        // --- General UI Elements ---
+        const appContainer = document.getElementById('app-container');
+        const startScreen = document.getElementById('start-screen');
+        const startTitle = document.getElementById('start-title');
+        const importJsonButton = document.getElementById('import-json-btn');
+        const downloadHtmlButton = document.getElementById('download-html-btn');
+        const jsonImporter = document.getElementById('json-importer');
+        
+        // --- DATA & STATE ---
+        // /* DATA_START */
+        const DEFAULT_MATCH_VOCAB = [
+            { term: "Apple", definition: "A red or green fruit", imageSrc: "https://img.icons8.com/color/96/apple.png" },
+            { term: "Car", definition: "A vehicle with 4 wheels", imageSrc: "https://img.icons8.com/color/96/car.png" },
+            { term: "Sun", definition: "Star at center of solar system", imageSrc: "https://img.icons8.com/color/96/sun.png" },
+            { term: "Book", definition: "Pages with stories or info", imageSrc: "https://img.icons8.com/color/96/book.png" },
+            { term: "Tree", definition: "Tall plant with trunk", imageSrc: "https://img.icons8.com/color/96/tree.png" },
+            { term: "Dog", definition: "Loyal pet, barks", imageSrc: "https://img.icons8.com/color/96/dog.png" },
+            { term: "Computer", definition: "Electronic device for data", imageSrc: "https://img.icons8.com/color/96/computer.png" },
+            { term: "Music", definition: "Sounds combined in harmony", imageSrc: "https://img.icons8.com/color/96/musical-notes.png" }
+        ];
+        // /* DATA_END */
+
+        let MASTER_VOCABULARY = JSON.parse(JSON.stringify(DEFAULT_MATCH_VOCAB));
+        let IS_CUSTOM_SET_LOADED = false;
+
+        // --- NAVIGATION ---
+        const containers = {
+            start: document.getElementById('start-screen'),
+            match: document.getElementById('match-game-container'),
+            quiz: document.getElementById('quiz-game-container'),
+            swipe: document.getElementById('swipe-game-container'),
+            scramble: document.getElementById('scramble-game-container'),
+            flashcard: document.getElementById('flashcard-game-container')
+        };
+
+        function showStartScreen() {
+            // Null check: If we exported a single game, start screen might not exist
+            Object.values(containers).forEach(c => c && c.classList.add('hidden'));
+            if (containers.start) containers.start.classList.remove('hidden');
+            const header = document.getElementById('app-header');
+            if (header) header.classList.remove('hidden');
+        }
+
+        function startGame(type) {
+            // Hide Header for immersion
+            const header = document.getElementById('app-header');
+            if (header) header.classList.add('hidden');
+            
+            // Hide all containers
+            Object.values(containers).forEach(c => c && c.classList.add('hidden'));
+            
+            // Show selected container
+            if (containers[type]) containers[type].classList.remove('hidden');
+            
+            // Initialize specific game
+            if (type === 'match') matchGame.init();
+            if (type === 'quiz') quizGame.init();
+            if (type === 'swipe') swipeGame.init();
+            if (type === 'scramble') scrambleGame.init();
+            if (type === 'flashcard') flashcardGame.init();
+        }
+
+        // --- EVENT LISTENERS ---
+        const bindBtn = (id, fn) => {
+            const el = document.getElementById(id);
+            if (el) el.onclick = fn;
+        };
+
+        bindBtn('start-match-game-btn', () => startGame('match'));
+        bindBtn('start-quiz-game-btn', () => startGame('quiz'));
+        bindBtn('start-swipe-game-btn', () => startGame('swipe'));
+        bindBtn('start-scramble-game-btn', () => startGame('scramble'));
+        bindBtn('start-flashcard-game-btn', () => startGame('flashcard'));
+
+        document.querySelectorAll('.main-menu-btn').forEach(btn => {
+            btn.onclick = showStartScreen;
+        });
+
+        // --- Import / Export ---
+        if (importJsonButton) importJsonButton.addEventListener('click', () => jsonImporter.click());
+        
+        jsonImporter.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    const standardizedData = importedData.map(item => ({...item, imageSrc: item.imageSrc || item.image }));
+                    if (!Array.isArray(standardizedData) || standardizedData.some(item => !item.term || !item.definition)) throw new Error("Invalid JSON");
+                    MASTER_VOCABULARY = standardizedData;
+                    IS_CUSTOM_SET_LOADED = true;
+                    if (startTitle) startTitle.innerHTML = `<span class="text-green-600">Success!</span> Loaded ${MASTER_VOCABULARY.length} Cards.`;
+                } catch (error) {
+                    if (startTitle) startTitle.innerHTML = `<span class="text-red-500">Error:</span> ${error.message}`;
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        const getSelfContainedHtml = (targetGame = null) => {
+            const vocabToSave = IS_CUSTOM_SET_LOADED ? MASTER_VOCABULARY : DEFAULT_MATCH_VOCAB;
+            
+            const cleanVocab = vocabToSave.map(item => ({
+                term: item.term,
+                definition: item.definition,
+                imageSrc: item.imageSrc || item.image 
+            }));
+            
+            // 1. Prepare Data with PRETTY PRINT
+            const newScriptData = `
+        /* DATA_START */
+        const DEFAULT_MATCH_VOCAB = ${JSON.stringify(cleanVocab, null, 2)};
+        /* DATA_END */
+            `;
+            
+            // 2. Get HTML & AGGRESSIVELY CLEAN IT
+            let rawHtml = document.documentElement.outerHTML;
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(rawHtml, 'text/html');
+
+            // Remove System Scripts
+            const scripts = doc.querySelectorAll('script');
+            scripts.forEach(script => {
+                const id = script.id || "";
+                const content = script.textContent || "";
+                // Allow our specific auto-start script if it exists
+                const isAutoStart = content.includes("window.addEventListener") && content.includes("startGame");
+
+                if (id !== "tailwind-script" && id !== "game-logic-script" && !isAutoStart) {
+                    script.remove();
+                }
+            });
+            
+            // Remove comments/iframes
+            const removeComments = (node) => {
+                const children = Array.from(node.childNodes);
+                children.forEach(child => {
+                    if (child.nodeType === 8) child.remove();
+                    else if (child.nodeType === 1) removeComments(child);
+                });
+            };
+            removeComments(doc.documentElement);
+            doc.querySelectorAll('iframe').forEach(f => f.remove());
+
+            let html = doc.documentElement.outerHTML;
+
+            // 3. Inject Data (Robust Replace)
+            const startMarker = "/* DATA_START */";
+            const endMarker = "/* DATA_END */";
+            const startIndex = html.indexOf(startMarker);
+            const endIndex = html.indexOf(endMarker);
+
+            if (startIndex !== -1 && endIndex !== -1) {
+                const before = html.substring(0, startIndex);
+                const after = html.substring(endIndex + endMarker.length);
+                html = [before, newScriptData, after].join('');
+            } else {
+                 const script = `const DEFAULT_MATCH_VOCAB = ${JSON.stringify(cleanVocab, null, 2)};\n        MASTER_VOCABULARY = DEFAULT_MATCH_VOCAB; IS_CUSTOM_SET_LOADED = true;`;
+                 html = html.replace(/const DEFAULT_MATCH_VOCAB = \[[\s\S]*?\];/, script);
+            }
+
+            // 4. STRIP UNUSED GAMES (HTML & JS)
+            if (targetGame) {
+                const cleanDoc = new DOMParser().parseFromString(html, 'text/html');
+
+                // A. HTML Cleanup
+                const header = cleanDoc.getElementById('app-header');
+                const start = cleanDoc.getElementById('start-screen');
+                if (header) header.remove();
+                if (start) start.remove();
+
+                const gameContainers = [
+                    'match-game-container', 'quiz-game-container', 'swipe-game-container', 
+                    'scramble-game-container', 'flashcard-game-container'
+                ];
+                
+                const targetId = `${targetGame}-game-container`;
+                gameContainers.forEach(id => {
+                    const el = cleanDoc.getElementById(id);
+                    if (el) {
+                        if (id === targetId) {
+                            el.classList.remove('hidden');
+                            el.querySelectorAll('.main-menu-btn').forEach(btn => btn.remove());
+                        } else {
+                            el.remove();
+                        }
+                    }
+                });
+
+                // Auto-Start Script Injection
+                const script = cleanDoc.createElement('script');
+                script.textContent = `
+                    window.addEventListener('DOMContentLoaded', () => {
+                        setTimeout(() => startGame('${targetGame}'), 100);
+                    });
+                `;
+                cleanDoc.body.appendChild(script);
+
+                html = cleanDoc.documentElement.outerHTML;
+
+                // B. JAVASCRIPT Cleanup (Remove unused game objects)
+                // This removes code blocks like /* GAME_CODE_START: quiz */ ... /* GAME_CODE_END: quiz */
+                const allGameTypes = ['match', 'quiz', 'swipe', 'scramble', 'flashcard'];
+                
+                allGameTypes.forEach(type => {
+                    if (type !== targetGame) {
+                        // Regex to find the block for this specific game type
+                        // Looks for /* GAME_CODE_START: type */ ... content ... /* GAME_CODE_END: type */
+                        const regex = new RegExp(`\/\\* GAME_CODE_START: ${type} \\*\/[\\s\\S]*?\/\\* GAME_CODE_END: ${type} \\*\/`, 'g');
+                        html = html.replace(regex, '');
+                    }
+                });
+            }
+            
+            return `<!DOCTYPE html>\n${html}`;
+        };
+
+        // ... (UI Helper remains same) ...
+        const showManualCopyModal = (text) => {
+            const modal = document.createElement('div');
+            modal.style.position = 'fixed';
+            modal.style.inset = '0';
+            modal.style.zIndex = '10000';
+            modal.style.backgroundColor = 'rgba(15, 23, 42, 0.95)';
+            modal.style.display = 'flex';
+            modal.style.flexDirection = 'column';
+            modal.style.alignItems = 'center';
+            modal.style.justifyContent = 'center';
+            modal.style.padding = '20px';
+
+            const container = document.createElement('div');
+            container.className = 'bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl flex flex-col gap-4';
+            container.style.maxHeight = '80vh';
+
+            const header = document.createElement('h3');
+            header.className = 'text-xl font-bold text-slate-800 flex items-center gap-2';
+            header.innerHTML = '<span class="text-2xl">📋</span> Copy Code';
+            
+            const hint = document.createElement('div');
+            hint.className = 'text-slate-500 text-sm space-y-2';
+            hint.innerHTML = `
+                <p>The file is ready. <strong class="text-indigo-600">Press Ctrl+C</strong> to copy.</p>
+                <div class="bg-orange-50 border-l-4 border-orange-400 p-3 text-orange-700 text-xs">
+                    <strong>⚠️ GITHUB WARNING:</strong><br>
+                    This file is large (${(text.length / 1024 / 1024).toFixed(1)} MB). 
+                    Do <u>NOT</u> paste it into the GitHub text editor, or it may crash.<br>
+                    <strong>Recommended:</strong> Use the <b>Download</b> button instead and upload the file to GitHub.
+                </div>
+            `;
+
+            const textArea = document.createElement('textarea');
+            textArea.className = 'w-full h-48 p-4 border border-slate-300 rounded-lg font-mono text-xs bg-slate-50 text-slate-400 focus:text-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none resize-none';
+            textArea.value = text;
+            textArea.readOnly = true;
+
+            const footer = document.createElement('div');
+            footer.className = "flex justify-end";
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'btn-primary px-6 py-2 rounded-lg font-bold text-white shadow-lg shadow-indigo-200';
+            closeBtn.innerText = 'Done';
+            closeBtn.onclick = () => document.body.removeChild(modal);
+
+            footer.appendChild(closeBtn);
+            container.appendChild(header);
+            container.appendChild(hint);
+            container.appendChild(textArea);
+            container.appendChild(footer);
+            modal.appendChild(container);
+            document.body.appendChild(modal);
+
+            textArea.focus();
+            textArea.select();
+        };
+
+        // Helper to export specific games
+        window.exportGame = function(gameType, action) {
+             // 1. Generate HTML (with auto-start and DOM stripping)
+            const fullHtml = getSelfContainedHtml(gameType);
+
+            if (action === 'download') {
+                const blob = new Blob([fullHtml], { type: 'text/html' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `${gameType}-game.html`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else if (action === 'copy') {
+                showManualCopyModal(fullHtml);
+            }
+        };
+
+        if (downloadHtmlButton) {
+            downloadHtmlButton.addEventListener('click', () => {
+                // Default "Download Arcade" (whole thing, menu start)
+                const fullHtml = getSelfContainedHtml(null);
+                const blob = new Blob([fullHtml], { type: 'text/html' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'vocabulary-arcade.html';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+        }
+
+
+        /*********************************************************
+         * GAME 1: MATCH MASTER (High DPI Fixed)
+         *********************************************************/
+        /* GAME_CODE_START: match */
+        const matchGame = {
+            canvas: document.getElementById('game-canvas'),
+            ctx: document.getElementById('game-canvas').getContext('2d'),
+            gameObjects: [], images: {}, draggedObject: null, 
+            timerInterval: null, secondsElapsed: 0, currentRound: 0,
+            CARD_WIDTH: 200, CARD_HEIGHT: 150, PADDING: 20,
+            logicalWidth: 0, logicalHeight: 0,
+            
+            init: function() {
+                this.workingVocabulary = JSON.parse(JSON.stringify(MASTER_VOCABULARY));
+                this.currentRound = 0;
+
+                // High DPI Scaling
+                const rect = this.canvas.parentElement.getBoundingClientRect();
+                this.logicalWidth = rect.width;
+                this.logicalHeight = rect.height;
+                const dpr = window.devicePixelRatio || 1;
+                this.canvas.width = this.logicalWidth * dpr;
+                this.canvas.height = this.logicalHeight * dpr;
+                this.canvas.style.width = `${this.logicalWidth}px`;
+                this.canvas.style.height = `${this.logicalHeight}px`;
+                this.ctx.scale(dpr, dpr);
+                
+                this.startRound();
+                
+                // Bind Events - Robust Touch Support
+                const canvas = this.canvas;
+                
+                // Clean up any old listeners
+                canvas.onmousedown = null;
+                canvas.onmousemove = null;
+                canvas.onmouseup = null;
+                canvas.ontouchstart = null;
+                canvas.ontouchmove = null;
+                canvas.ontouchend = null;
+
+                // Mouse Listeners
+                canvas.addEventListener('mousedown', (e) => this.onDown(e));
+                canvas.addEventListener('mousemove', (e) => this.onMove(e));
+                window.addEventListener('mouseup', (e) => this.onUp(e)); // Catch release outside canvas
+
+                // Touch Listeners (Passive: false prevents scrolling)
+                canvas.addEventListener('touchstart', (e) => this.onDown(e), { passive: false });
+                canvas.addEventListener('touchmove', (e) => this.onMove(e), { passive: false });
+                window.addEventListener('touchend', (e) => this.onUp(e));
+            },
+            
+            startRound: function() {
+                this.currentRound++;
+                const roundSize = Math.min(6, this.workingVocabulary.length);
+                if (roundSize === 0) return showStartScreen(); 
+                
+                const vocab = this.workingVocabulary.splice(0, roundSize);
+                document.getElementById('round-display').textContent = `Round ${this.currentRound}`;
+                this.secondsElapsed = 0;
+                
+                let loaded = 0;
+                if (vocab.length === 0) return;
+                vocab.forEach(item => {
+                    const img = new Image();
+                    img.src = item.imageSrc;
+                    img.onload = img.onerror = () => {
+                        this.images[item.term] = img;
+                        if (++loaded === vocab.length) this.setupObjects(vocab);
+                    };
+                });
+            },
+            
+            setupObjects: function(vocab) {
+                this.gameObjects = [];
+                let placed = [];
+                const create = (item, type) => {
+                    let obj, overlap, attempts = 0;
+                    do {
+                        // Use logicalWidth/Height for placement calculations
+                        obj = {
+                            term: item.term, type: type, content: type === 'term' ? item.term : item.definition,
+                            x: this.PADDING + Math.random() * (this.logicalWidth - this.CARD_WIDTH - 40),
+                            y: this.PADDING + Math.random() * (this.logicalHeight - this.CARD_HEIGHT - 40),
+                            width: this.CARD_WIDTH, height: this.CARD_HEIGHT, isMatched: false
+                        };
+                        overlap = placed.some(p => this.isOverlapping(obj, p));
+                    } while(overlap && attempts++ < 50);
+                    placed.push(obj);
+                    return obj;
+                };
+                vocab.forEach(item => {
+                    this.gameObjects.push(create(item, 'term'), create(item, 'definition'));
+                });
+                
+                if (this.timerInterval) clearInterval(this.timerInterval);
+                this.timerInterval = setInterval(() => {
+                    document.getElementById('timer-display').textContent = `${++this.secondsElapsed}s`;
+                }, 1000);
+                this.draw();
+            },
+            
+            draw: function() {
+                this.ctx.clearRect(0, 0, this.logicalWidth + 100, this.logicalHeight + 100);
+                this.gameObjects.forEach(o => !o.isMatched && this.drawCard(o, true));
+                this.gameObjects.forEach(o => !o.isMatched && o !== this.draggedObject && this.drawCard(o));
+                if (this.draggedObject) this.drawCard(this.draggedObject);
+            },
+            
+            drawCard: function(obj, shadow = false) {
+                const ctx = this.ctx;
+                if (shadow) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.1)';
+                    ctx.beginPath(); ctx.roundRect(obj.x, obj.y + 4, obj.width, obj.height, 16); ctx.fill();
+                    return;
+                }
+                ctx.fillStyle = obj.type === 'term' ? '#f8fafc' : '#fff7ed';
+                ctx.strokeStyle = obj.type === 'term' ? '#e2e8f0' : '#fed7aa';
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.roundRect(obj.x, obj.y, obj.width, obj.height, 16); ctx.fill(); ctx.stroke();
+                
+                ctx.fillStyle = '#1e293b';
+                ctx.textAlign = 'center';
+                if (obj.type === 'term') {
+                    const img = this.images[obj.term];
+                    // SAFETY CHECK: Only draw if image exists, is fully loaded, and has width
+                    if (img && img.complete && img.naturalWidth > 0) {
+                        const scale = Math.min((obj.width-30)/img.width, (obj.height-60)/img.height);
+                        const w = img.width*scale, h = img.height*scale;
+                        ctx.drawImage(img, Math.floor(obj.x + (obj.width-w)/2), Math.floor(obj.y+20), Math.floor(w), Math.floor(h));
+                    }
+                    ctx.fillStyle = '#6366f1';
+                    ctx.font = 'bold 16px Outfit';
+                    this.wrapText(ctx, obj.content, obj.x+obj.width/2, obj.y+obj.height-20, obj.width-20, 20);
+                } else {
+                    ctx.fillStyle = '#ea580c';
+                    ctx.font = '500 14px Outfit';
+                    this.wrapText(ctx, obj.content, obj.x+obj.width/2, obj.y+obj.height/2, obj.width-20, 20);
+                }
+            },
+            
+            onDown: function(e) {
+                if (e.cancelable) e.preventDefault(); // Prevent scrolling on touch
+                const rect = this.canvas.getBoundingClientRect();
+                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+                const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+                
+                for (let i = this.gameObjects.length - 1; i >= 0; i--) {
+                    const o = this.gameObjects[i];
+                    if (!o.isMatched && x > o.x && x < o.x + o.width && y > o.y && y < o.y + o.height) {
+                        this.draggedObject = o;
+                        this.dragOffset = { x: x - o.x, y: y - o.y };
+                        // Move to top of stack
+                        this.gameObjects.push(this.gameObjects.splice(i, 1)[0]);
+                        this.draw(); // Instant feedback
+                        return;
+                    }
+                }
+            },
+            
+            onMove: function(e) {
+                if (!this.draggedObject) return;
+                if (e.cancelable) e.preventDefault();
+                
+                const rect = this.canvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                
+                const x = clientX - rect.left;
+                const y = clientY - rect.top;
+                
+                this.draggedObject.x = x - this.dragOffset.x;
+                this.draggedObject.y = y - this.dragOffset.y;
+                this.draw();
+            },
+            
+            onUp: function(e) {
+                if (!this.draggedObject) return;
+                
+                // Check collisions
+                const target = this.gameObjects.find(o => 
+                    o !== this.draggedObject && 
+                    !o.isMatched && 
+                    o.term === this.draggedObject.term && 
+                    this.isOverlapping(this.draggedObject, o)
+                );
+
+                if (target) {
+                    this.draggedObject.isMatched = true;
+                    target.isMatched = true;
+                    
+                    // Snap to target for neatness
+                    this.draggedObject.x = target.x + 10;
+                    this.draggedObject.y = target.y + 10;
+                }
+                
+                this.draggedObject = null;
+                this.draw();
+                
+                if (this.gameObjects.every(o => o.isMatched)) {
+                    clearInterval(this.timerInterval);
+                    setTimeout(() => this.startRound(), 1000);
+                }
+            },
+            
+            isOverlapping: function(r1, r2) {
+                return r1.x < r2.x + r2.width - 20 && r1.x + r1.width > r2.x + 20 && r1.y < r2.y + r2.height - 20 && r1.y + r1.height > r2.y + 20;
+            },
+            
+            wrapText: function(ctx, text, x, y, maxW, lineH) {
+                const words = text.split(' ');
+                let line = '', lines = [];
+                for(let n = 0; n < words.length; n++) {
+                    let test = line + words[n] + ' ';
+                    if(ctx.measureText(test).width > maxW && n > 0) { lines.push(line); line = words[n] + ' '; }
+                    else { line = test; }
+                }
+                lines.push(line);
+                let startY = y - (lines.length * lineH)/2 + lineH/2;
+                lines.forEach((l, i) => ctx.fillText(l, x, startY + i*lineH));
+            }
+        };
+        /* GAME_CODE_END: match */
+
+
+        /*********************************************************
+         * GAME 2: SPEED QUIZ (With Success/Failure Modals)
+         *********************************************************/
+        /* GAME_CODE_START: quiz */
+        const quizGame = {
+            container: document.getElementById('card-container'),
+            hintText: document.getElementById('hint-text'),
+            wordBank: document.getElementById('quiz-word-bank'),
+            modal: document.getElementById('quiz-feedback-modal'),
+            modalContent: document.getElementById('quiz-feedback-content'),
+            failModal: document.getElementById('quiz-failure-modal'),
+            failContent: document.getElementById('quiz-failure-content'),
+            feedbackTerm: document.getElementById('feedback-term'),
+            feedbackDef: document.getElementById('feedback-def'),
+            feedbackImg: document.getElementById('feedback-img'),
+            failTerm: document.getElementById('fail-term'),
+            failImg: document.getElementById('fail-img'),
+            colors: ['bg-rose-50', 'bg-orange-50', 'bg-amber-50', 'bg-emerald-50', 'bg-teal-50', 'bg-cyan-50', 'bg-indigo-50'],
+            
+            init: function() {
+                this.cards = [...MASTER_VOCABULARY].sort(() => Math.random() - 0.5);
+                this.index = 0;
+                this.renderCards();
+                this.renderWordBank();
+                this.nextHint();
+            },
+            
+            nextHint: function() {
+                if (this.index >= this.cards.length) {
+                    this.hintText.textContent = "🎉 Completed! 🎉";
+                    setTimeout(showStartScreen, 2000);
+                    return;
+                }
+                this.hintText.textContent = this.cards[this.index].definition;
+            },
+            
+            renderCards: function() {
+                this.container.innerHTML = '';
+                const displayCards = [...this.cards].sort(() => Math.random() - 0.5);
+                displayCards.forEach((card, i) => {
+                    const el = document.createElement('div');
+                    el.className = `card-pop h-48 ${this.colors[i % 7]} rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md cursor-pointer relative overflow-hidden flex flex-col`;
+                    el.innerHTML = `
+                        <div class="flex-1 p-4 flex items-center justify-center"><img src="${card.imageSrc}" class="max-h-full max-w-full object-contain drop-shadow-sm"></div>
+                        <div class="h-12 bg-white/80 flex items-center justify-center px-2 border-t border-slate-100"><h2 class="text-sm font-bold text-slate-800 text-center leading-snug">${card.term}</h2></div>
+                        <div class="absolute inset-0 bg-emerald-500/90 flex items-center justify-center opacity-0 transition-opacity is-correct"><span class="text-white text-4xl font-bold">✓</span></div>
+                    `;
+                    el.onclick = () => this.check(el, card);
+                    this.container.appendChild(el);
+                });
+            },
+
+            renderWordBank: function() {
+                this.wordBank.innerHTML = '';
+                const sortedTerms = [...this.cards].sort((a,b) => a.term.localeCompare(b.term));
+                sortedTerms.forEach(card => {
+                    const chip = document.createElement('div');
+                    chip.id = `bank-term-${card.term.replace(/\s/g, '-')}`;
+                    chip.className = "px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold border border-slate-200 transition-all";
+                    chip.textContent = card.term;
+                    this.wordBank.appendChild(chip);
+                });
+            },
+            
+            check: function(el, card) {
+                if (el.classList.contains('pointer-events-none')) return;
+                
+                if (card.term === this.cards[this.index].term) {
+                    // Correct
+                    el.querySelector('.is-correct').classList.remove('opacity-0');
+                    el.classList.add('pointer-events-none');
+                    
+                    const bankChip = document.getElementById(`bank-term-${card.term.replace(/\s/g, '-')}`);
+                    if (bankChip) {
+                        bankChip.classList.remove('bg-slate-100', 'text-slate-600', 'border-slate-200');
+                        bankChip.classList.add('bg-green-100', 'text-green-700', 'border-green-300', 'ring-2', 'ring-green-200');
+                        bankChip.innerHTML = `✓ ${card.term}`;
+                    }
+
+                    this.showFeedback(card);
+                    this.index++;
+                } else {
+                    // Incorrect
+                    el.classList.add('shake', 'border-red-400');
+                    setTimeout(() => el.classList.remove('shake', 'border-red-400'), 500);
+                    this.showFailure(card);
+                }
+            },
+
+            showFeedback: function(card) {
+                this.feedbackTerm.textContent = card.term;
+                this.feedbackDef.textContent = card.definition;
+                this.feedbackImg.src = card.imageSrc;
+                this.modal.classList.remove('hidden');
+                setTimeout(() => { this.modal.classList.remove('opacity-0'); this.modalContent.classList.add('scale-100'); }, 10);
+                setTimeout(() => { this.modal.classList.add('opacity-0'); this.modalContent.classList.remove('scale-100'); setTimeout(() => { this.modal.classList.add('hidden'); this.nextHint(); }, 300); }, 2000);
+            },
+
+            showFailure: function(card) {
+                this.failTerm.textContent = card.term;
+                this.failImg.src = card.imageSrc;
+                this.failModal.classList.remove('hidden');
+                setTimeout(() => { this.failModal.classList.remove('opacity-0'); this.failContent.classList.add('scale-100'); }, 10);
+            },
+
+            hideFailure: function() {
+                this.failModal.classList.add('opacity-0');
+                this.failContent.classList.remove('scale-100');
+                setTimeout(() => { this.failModal.classList.add('hidden'); }, 300);
+            }
+        };
+        /* GAME_CODE_END: quiz */
+
+
+        /*********************************************************
+         * GAME 3: SWIPE REVIEW (New!)
+         *********************************************************/
+        /* GAME_CODE_START: swipe */
+        const swipeGame = {
+            cardEl: document.getElementById('swipe-card'),
+            imgEl: document.getElementById('swipe-img'),
+            termEl: document.getElementById('swipe-term'),
+            defEl: document.getElementById('swipe-def'),
+            likeOverlay: document.getElementById('overlay-like'),
+            nopeOverlay: document.getElementById('overlay-nope'),
+            
+            queue: [],
+            currentPair: null,
+            isDragging: false,
+            startX: 0,
+
+            init: function() {
+                this.queue = [];
+                const deck = [...MASTER_VOCABULARY];
+                
+                // Phase 1: GUARANTEED Correct Matches (Review Every Term)
+                deck.forEach(item => {
+                    this.queue.push({
+                        imageSrc: item.imageSrc,
+                        term: item.term,
+                        isMatch: true,
+                        correctTerm: item.term
+                    });
+                });
+
+                // Phase 2: Add Distractors (Incorrect Matches)
+                // We add distractors equal to 60% of the deck size to keep it unpredictable
+                const distractorCount = Math.ceil(deck.length * 0.6);
+                for(let i = 0; i < distractorCount; i++) {
+                    const correct = deck[i % deck.length];
+                    let wrong;
+                    // Find a wrong term (ensure we don't accidentally pick the same one)
+                    let attempts = 0;
+                    do { 
+                        wrong = deck[Math.floor(Math.random() * deck.length)]; 
+                        attempts++;
+                    } while (wrong.term === correct.term && attempts < 10);
+                    
+                    this.queue.push({
+                        imageSrc: correct.imageSrc, // Show correct image
+                        term: wrong.term,           // But wrong label
+                        isMatch: false,
+                        correctTerm: correct.term
+                    });
+                }
+
+                // Shuffle the entire queue so matches and mismatches are mixed
+                this.queue.sort(() => Math.random() - 0.5);
+
+                this.loadCard();
+                this.bindEvents();
+            },
+
+            loadCard: function() {
+                if (this.queue.length === 0) {
+                    this.termEl.textContent = "Run Complete!";
+                    this.imgEl.src = "";
+                    setTimeout(showStartScreen, 2000);
+                    return;
+                }
+                // Queue behaves as a stack here (pop from end)
+                this.currentPair = this.queue.pop();
+                this.imgEl.src = this.currentPair.imageSrc;
+                this.termEl.textContent = this.currentPair.term;
+                this.defEl.textContent = ""; 
+                
+                this.cardEl.style.transform = '';
+                this.cardEl.style.transition = 'none';
+                this.likeOverlay.style.opacity = 0;
+                this.nopeOverlay.style.opacity = 0;
+            },
+
+            handleSwipe: function(direction) { 
+                this.cardEl.classList.add(direction === 'right' ? 'swipe-right' : 'swipe-left');
+                
+                const userSaidYes = direction === 'right';
+                const isCorrect = (userSaidYes && this.currentPair.isMatch) || (!userSaidYes && !this.currentPair.isMatch);
+                
+                document.body.style.backgroundColor = isCorrect ? '#dcfce7' : '#fee2e2'; 
+                setTimeout(() => document.body.style.backgroundColor = '#f8fafc', 300);
+
+                setTimeout(() => {
+                    this.cardEl.classList.remove('swipe-right', 'swipe-left');
+                    this.loadCard();
+                }, 300);
+            },
+
+            bindEvents: function() {
+                const card = this.cardEl;
+                const start = (x) => { this.isDragging = true; this.startX = x; card.style.transition = 'none'; };
+                const move = (x) => {
+                    if (!this.isDragging) return;
+                    const delta = x - this.startX;
+                    const rotate = delta * 0.1;
+                    card.style.transform = `translateX(${delta}px) rotate(${rotate}deg)`;
+                    
+                    this.likeOverlay.style.opacity = delta > 0 ? Math.min(delta/100, 1) : 0;
+                    this.nopeOverlay.style.opacity = delta < 0 ? Math.min(Math.abs(delta)/100, 1) : 0;
+                };
+                const end = (x) => {
+                    if (!this.isDragging) return;
+                    this.isDragging = false;
+                    const delta = x - this.startX;
+                    if (delta > 100) this.handleSwipe('right');
+                    else if (delta < -100) this.handleSwipe('left');
+                    else {
+                        card.style.transition = 'transform 0.3s ease';
+                        card.style.transform = '';
+                        this.likeOverlay.style.opacity = 0;
+                        this.nopeOverlay.style.opacity = 0;
+                    }
+                };
+
+                card.onmousedown = e => start(e.clientX);
+                document.onmousemove = e => move(e.clientX);
+                document.onmouseup = e => end(e.clientX);
+
+                card.ontouchstart = e => start(e.touches[0].clientX);
+                document.ontouchmove = e => move(e.touches[0].clientX);
+                document.ontouchend = e => end(e.changedTouches[0].clientX);
+
+                document.getElementById('btn-swipe-left').onclick = () => this.handleSwipe('left');
+                document.getElementById('btn-swipe-right').onclick = () => this.handleSwipe('right');
+
+                document.onkeydown = (e) => {
+                    if (containers.swipe.classList.contains('hidden')) return;
+                    if (e.key === 'ArrowLeft') this.handleSwipe('left');
+                    if (e.key === 'ArrowRight') this.handleSwipe('right');
+                };
+            }
+        };
+        /* GAME_CODE_END: swipe */
+
+
+        /*********************************************************
+         * GAME 4: WORD SCRAMBLE (Typing Added + Auto-Advance)
+         *********************************************************/
+        /* GAME_CODE_START: scramble */
+        const scrambleGame = {
+            imgEl: document.getElementById('scramble-img'),
+            defEl: document.getElementById('scramble-def'),
+            slotsContainer: document.getElementById('word-slots'),
+            bankContainer: document.getElementById('letter-bank'),
+            msgEl: document.getElementById('scramble-message'),
+            nextBtn: document.getElementById('scramble-next-btn'),
+            scoreEl: document.getElementById('scramble-score'),
+            inputEl: document.getElementById('scramble-input'),
+            
+            words: [], index: 0, score: 0, draggedLetter: null,
+
+            init: function() {
+                this.words = [...MASTER_VOCABULARY].sort(() => Math.random() - 0.5);
+                this.index = 0;
+                this.score = 0;
+                this.scoreEl.textContent = "Score: 0";
+                this.nextBtn.onclick = () => this.loadWord();
+                this.inputEl.addEventListener('input', (e) => this.handleTyping(e));
+                this.loadWord();
+            },
+
+            loadWord: function() {
+                if (this.index >= this.words.length) {
+                    this.msgEl.textContent = "All words solved!";
+                    setTimeout(showStartScreen, 2000);
+                    return;
+                }
+                
+                const current = this.words[this.index];
+                const cleanWord = current.term.replace(/[^a-zA-Z]/g, '').toUpperCase();
+                
+                this.imgEl.src = current.imageSrc;
+                this.defEl.textContent = current.definition;
+                this.msgEl.textContent = "";
+                this.nextBtn.classList.add('hidden');
+                this.slotsContainer.innerHTML = '';
+                this.bankContainer.innerHTML = '';
+                this.inputEl.disabled = false; // Re-enable input
+                this.inputEl.value = '';
+                this.inputEl.focus();
+                
+                for (let i = 0; i < cleanWord.length; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = "w-10 h-12 border-b-4 border-slate-300 flex items-center justify-center text-2xl font-bold text-slate-700 bg-white rounded-t-md drop-slot";
+                    slot.dataset.index = i;
+                    
+                    slot.ondragover = e => { e.preventDefault(); slot.classList.add('over'); };
+                    slot.ondragleave = () => slot.classList.remove('over');
+                    slot.ondrop = e => this.handleDrop(e, slot);
+                    slot.onclick = () => this.handleSlotClick(slot);
+                    
+                    this.slotsContainer.appendChild(slot);
+                }
+
+                const letters = cleanWord.split('').map((l, i) => ({ char: l, id: i }));
+                letters.sort(() => Math.random() - 0.5);
+                
+                letters.forEach(l => {
+                    const tile = document.createElement('div');
+                    tile.className = "w-10 h-10 bg-indigo-600 text-white rounded-lg shadow-md flex items-center justify-center font-bold text-xl letter-tile hover:scale-110 transition-transform";
+                    tile.draggable = true;
+                    tile.textContent = l.char;
+                    tile.id = `tile-${l.id}`;
+                    
+                    tile.ondragstart = e => { 
+                        this.draggedLetter = tile; 
+                        e.dataTransfer.setData('text/plain', tile.id);
+                    };
+                    tile.onclick = () => this.autoPlace(tile);
+                    
+                    this.bankContainer.appendChild(tile);
+                });
+            },
+
+            handleTyping: function(e) {
+                const val = e.target.value.toUpperCase();
+                const slots = Array.from(this.slotsContainer.children);
+                
+                // Basic 2-way bind: update slots visually
+                slots.forEach((slot, i) => {
+                    if (val[i]) {
+                        // Find a matching tile in bank if possible, else create phantom
+                        // Simplest logic: Just set text
+                        slot.textContent = val[i];
+                        slot.classList.add('border-indigo-400');
+                    } else {
+                        slot.textContent = '';
+                        slot.classList.remove('border-indigo-400');
+                    }
+                });
+
+                const currentWord = this.words[this.index].term.replace(/[^a-zA-Z]/g, '').toUpperCase();
+                if (val === currentWord) {
+                    this.win();
+                }
+            },
+
+            handleDrop: function(e, slot) {
+                e.preventDefault();
+                slot.classList.remove('over');
+                const tileId = e.dataTransfer.getData('text/plain');
+                const tile = document.getElementById(tileId);
+                this.placeTile(tile, slot);
+            },
+
+            autoPlace: function(tile) {
+                const emptySlot = Array.from(this.slotsContainer.children).find(s => !s.hasChildNodes());
+                if (emptySlot) this.placeTile(tile, emptySlot);
+            },
+            
+            handleSlotClick: function(slot) {
+                if (slot.hasChildNodes() && slot.firstChild.nodeType === 1) { // Is Element
+                    const tile = slot.firstChild;
+                    this.bankContainer.appendChild(tile); 
+                    this.syncInput();
+                }
+            },
+
+            placeTile: function(tile, slot) {
+                if (slot.hasChildNodes()) return; 
+                slot.appendChild(tile);
+                this.syncInput();
+                this.checkWin();
+            },
+
+            syncInput: function() {
+               // Update input box based on tiles
+               const slots = Array.from(this.slotsContainer.children);
+               const text = slots.map(s => s.textContent).join('');
+               this.inputEl.value = text;
+            },
+
+            checkWin: function() {
+                const currentWord = this.words[this.index].term.replace(/[^a-zA-Z]/g, '').toUpperCase();
+                const slots = Array.from(this.slotsContainer.children);
+                if (slots.some(s => !s.textContent)) return; // Incomplete
+
+                const spelled = slots.map(s => s.textContent).join('');
+                if (spelled === currentWord) {
+                    this.win();
+                } else {
+                    this.msgEl.textContent = "Try again...";
+                    this.slotsContainer.classList.add('shake');
+                    setTimeout(() => this.slotsContainer.classList.remove('shake'), 500);
+                }
+            },
+
+            win: function() {
+                this.msgEl.textContent = "Correct! 🎉";
+                this.score += 10;
+                this.scoreEl.textContent = `Score: ${this.score}`;
+                this.slotsContainer.childNodes.forEach(s => s.classList.add('bg-green-100', 'border-green-500'));
+                this.inputEl.value = ''; 
+                this.inputEl.disabled = true; // Disable input during transition
+                this.index++;
+                
+                // Auto-advance after 1.5 seconds
+                setTimeout(() => {
+                    this.loadWord();
+                }, 1500);
+            }
+        };
+        /* GAME_CODE_END: scramble */
+
+
+        /*********************************************************
+         * GAME 5: FLASHCARD STUDY MODE
+         *********************************************************/
+        /* GAME_CODE_START: flashcard */
+        const flashcardGame = {
+            container: document.getElementById('flashcard-game-container'),
+            cardEl: null, // Will set in init
+            frontImg: null,
+            frontTerm: null,
+            backDef: null,
+            counter: null,
+            
+            cards: [],
+            index: 0,
+            isFlipped: false,
+
+            init: function() {
+                // Re-fetch elements FRESH to ensure no stale references if DOM updated
+                this.cardEl = document.getElementById('flashcard');
+                this.frontImg = document.getElementById('fc-front-img');
+                this.frontTerm = document.getElementById('fc-front-term');
+                this.backDef = document.getElementById('fc-back-def');
+                this.counter = document.getElementById('flashcard-counter');
+
+                this.cards = [...MASTER_VOCABULARY];
+                this.index = 0;
+                this.isFlipped = false;
+                this.renderCard();
+                this.bindEvents();
+            },
+
+            renderCard: function() {
+                const card = this.cards[this.index];
+                this.frontImg.src = card.imageSrc;
+                this.frontTerm.textContent = card.term;
+                this.backDef.textContent = card.definition;
+                this.counter.textContent = `Card ${this.index + 1} of ${this.cards.length}`;
+                
+                // Reset flip state
+                this.isFlipped = false;
+                this.cardEl.classList.remove('flipped');
+            },
+
+            flipCard: function() {
+                this.isFlipped = !this.isFlipped;
+                this.cardEl.classList.toggle('flipped');
+            },
+
+            nextCard: function() {
+                if (this.index < this.cards.length - 1) {
+                    this.index++;
+                    this.renderCard();
+                }
+            },
+
+            prevCard: function() {
+                if (this.index > 0) {
+                    this.index--;
+                    this.renderCard();
+                }
+            },
+
+            bindEvents: function() {
+                // Assign directly. If called multiple times, it just overwrites.
+                this.cardEl.onclick = (e) => {
+                    // Prevent bubbling if clicking inner interactive elements (though none here)
+                    this.flipCard();
+                };
+                document.getElementById('fc-flip-btn').onclick = () => this.flipCard();
+                document.getElementById('fc-next-btn').onclick = () => this.nextCard();
+                document.getElementById('fc-prev-btn').onclick = () => this.prevCard();
+
+                // Keyboard Nav
+                document.onkeydown = (e) => {
+                    if (containers.flashcard.classList.contains('hidden')) return;
+                    if (e.key === 'ArrowRight') this.nextCard();
+                    if (e.key === 'ArrowLeft') this.prevCard();
+                    if (e.key === ' ' || e.key === 'Enter') this.flipCard();
+                };
+            }
+        };
+        /* GAME_CODE_END: flashcard */
+
+    </script>
+</body>
+</html>
