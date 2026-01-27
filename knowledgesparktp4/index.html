@@ -78,7 +78,8 @@
                 camera: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
                 trash: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
                 bookOpen: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>,
-                chevronDown: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>
+                chevronDown: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>,
+                download: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
             };
             return icons[name] || null;
         };
@@ -250,7 +251,23 @@
                 if(confirm("Clear the current web?")) {
                     setIdeas([]);
                 }
-            }
+            };
+
+            const saveAsText = () => {
+                if (ideas.length === 0 && !centralNodeText) {
+                    alert("Add some ideas first!");
+                    return;
+                }
+                const textContent = `Topic: ${centralNodeText}\n\nFacts & Ideas:\n${ideas.map(idea => `- ${idea.text}`).join('\n')}\n\nGenerated with Knowledge Spark`;
+                
+                const element = document.createElement("a");
+                const file = new Blob([textContent], {type: 'text/plain'});
+                element.href = URL.createObjectURL(file);
+                element.download = `${centralNodeText.replace(/\s+/g, '_')}_notes.txt`;
+                document.body.appendChild(element);
+                element.click();
+                document.body.removeChild(element);
+            };
 
             const handleMouseDown = (e, id) => {
                 e.stopPropagation();
@@ -368,7 +385,7 @@
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="flex justify-between items-center mt-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-center mt-4 gap-3">
                          <button 
                             onClick={resetWeb}
                             className="text-slate-400 hover:text-rose-500 text-sm font-semibold flex items-center gap-1 transition-colors px-2 py-1"
@@ -376,12 +393,20 @@
                             <Icon name="trash" size={16} /> Reset Web
                         </button>
                         
-                        <button 
-                            onClick={() => saveAsImage("mind-web-capture", centralNodeText)}
-                            className="bg-slate-800 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg hover:bg-slate-700 transition-all flex items-center gap-2 transform hover:-translate-y-1"
-                        >
-                            <Icon name="camera" size={20} /> Save Image
-                        </button>
+                        <div className="flex items-center gap-3 w-full sm:w-auto">
+                            <button 
+                                onClick={saveAsText}
+                                className="flex-1 sm:flex-none bg-white border border-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl shadow-sm hover:bg-slate-50 hover:text-indigo-600 transition-all flex items-center justify-center gap-2"
+                            >
+                                <Icon name="download" size={20} /> <span className="whitespace-nowrap">Save Text</span>
+                            </button>
+                            <button 
+                                onClick={() => saveAsImage("mind-web-capture", centralNodeText)}
+                                className="flex-1 sm:flex-none bg-slate-800 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg hover:bg-slate-700 transition-all flex items-center justify-center gap-2 transform hover:-translate-y-1"
+                            >
+                                <Icon name="camera" size={20} /> <span className="whitespace-nowrap">Save Image</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             );
