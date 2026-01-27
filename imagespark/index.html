@@ -19,6 +19,8 @@
                 radial-gradient(at 0% 0%, hsla(253,16%,7%,0) 0, hsla(253,16%,7%,0) 50%), 
                 radial-gradient(at 50% 0%, hsla(225,39%,30%,0.1) 0, hsla(225,39%,30%,0) 50%), 
                 radial-gradient(at 100% 0%, hsla(339,49%,30%,0.1) 0, hsla(339,49%,30%,0) 50%);
+            height: 100vh;
+            overflow: hidden; /* Prevent body scroll to keep layout fixed */
         }
         
         h1, h2, h3, h4, h5, h6, .font-heading {
@@ -114,9 +116,6 @@
             const [draggingId, setDraggingId] = useState(null);
             const dragOffset = useRef({ x: 0, y: 0 });
             const [centralNodeText, setCentralNodeText] = useState("What do I notice?");
-
-            // Reset central text if title changes significantly (optional logic)
-            // For now, we keep it as "What do I notice?" to prompt inquiry
             
             const addIdea = () => {
                 if (newIdea.trim()) {
@@ -205,24 +204,24 @@
             };
 
             return (
-                <div className="flex flex-col h-full">
+                <div className="flex flex-col h-full overflow-hidden">
                     {/* Input Bar */}
-                    <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                    <div className="flex flex-col sm:flex-row gap-2 mb-4 shrink-0">
                         <input 
                             type="text" 
-                            className="flex-1 px-5 py-3 border-2 border-slate-200 rounded-full focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all shadow-sm text-base text-slate-700 font-medium"
+                            className="flex-1 px-4 py-2 border-2 border-slate-200 rounded-full focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all shadow-sm text-sm text-slate-700 font-medium"
                             placeholder="I notice..."
                             value={newIdea}
                             onChange={(e) => setNewIdea(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && addIdea()}
                         />
-                        <button onClick={addIdea} className="bg-indigo-600 text-white p-3 px-6 rounded-full hover:bg-indigo-700 transition shadow-md flex items-center justify-center gap-2 font-bold whitespace-nowrap transform hover:scale-105 active:scale-95">
-                            <Icon name="plus" size={20} /> <span className="hidden sm:inline">Add Observation</span>
+                        <button onClick={addIdea} className="bg-indigo-600 text-white p-2 px-5 rounded-full hover:bg-indigo-700 transition shadow-md flex items-center justify-center gap-2 font-bold whitespace-nowrap transform hover:scale-105 active:scale-95 text-sm">
+                            <Icon name="plus" size={18} /> <span className="hidden xl:inline">Add</span>
                         </button>
                     </div>
 
                     {/* Canvas Area */}
-                    <div id="mind-web-capture" className="relative flex-1 bg-white rounded-3xl border border-slate-200 shadow-inner overflow-hidden min-h-[500px] touch-none select-none">
+                    <div id="mind-web-capture" className="relative flex-1 bg-white rounded-2xl border border-slate-200 shadow-inner overflow-hidden min-h-0 touch-none select-none">
                         <div 
                             ref={containerRef}
                             className="w-full h-full relative"
@@ -237,14 +236,14 @@
                             }}></div>
 
                             {/* Center Node */}
-                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none w-64 text-center">
-                                <div className="bg-white border-4 border-indigo-100 p-6 rounded-full shadow-2xl flex items-center justify-center aspect-square animate-float mx-auto">
+                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none w-48 text-center">
+                                <div className="bg-white border-4 border-indigo-100 p-4 rounded-full shadow-2xl flex items-center justify-center aspect-square animate-float mx-auto">
                                     <div className="text-center">
-                                        <div className="text-3xl mb-2">👁️</div>
+                                        <div className="text-2xl mb-1">👁️</div>
                                         <textarea 
                                             value={centralNodeText}
                                             onChange={(e) => setCentralNodeText(e.target.value)}
-                                            className="font-heading font-bold text-indigo-900 text-lg md:text-xl bg-transparent text-center border-none focus:ring-0 pointer-events-auto w-full break-words whitespace-normal resize-none overflow-hidden"
+                                            className="font-heading font-bold text-indigo-900 text-base md:text-lg bg-transparent text-center border-none focus:ring-0 pointer-events-auto w-full break-words whitespace-normal resize-none overflow-hidden"
                                             rows={2}
                                         />
                                     </div>
@@ -256,25 +255,25 @@
                                 <div 
                                     key={idea.id}
                                     onMouseDown={(e) => handleMouseDown(e, idea.id)}
-                                    className={`absolute ${idea.color} p-3 md:p-4 rounded-xl shadow-md border border-black/5 max-w-[200px] cursor-move transition-transform ${draggingId === idea.id ? 'z-50 scale-105 shadow-xl' : 'hover:scale-105 hover:z-20'}`}
+                                    className={`absolute ${idea.color} p-2 md:p-3 rounded-xl shadow-md border border-black/5 max-w-[180px] cursor-move transition-transform ${draggingId === idea.id ? 'z-50 scale-105 shadow-xl' : 'hover:scale-105 hover:z-20'}`}
                                     style={{ 
                                         top: `${idea.y}%`, 
                                         left: `${idea.x}%`,
                                         transform: `rotate(${idea.rotate}deg)`
                                     }}
                                 >
-                                    <div className="handwritten text-lg text-slate-800 leading-tight pointer-events-none">{idea.text}</div>
+                                    <div className="handwritten text-base text-slate-800 leading-tight pointer-events-none">{idea.text}</div>
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); removeIdea(idea.id); }}
                                         className="absolute -top-2 -right-2 bg-white text-rose-500 rounded-full p-1 shadow-sm hover:bg-rose-50 border border-rose-100 cursor-pointer"
                                     >
-                                        <Icon name="plus" size={12} className="rotate-45" />
+                                        <Icon name="plus" size={10} className="rotate-45" />
                                     </button>
                                 </div>
                             ))}
                             
                             {ideas.length === 0 && (
-                                <div className="absolute bottom-6 left-0 right-0 text-center text-slate-400 text-sm pointer-events-none px-4">
+                                <div className="absolute bottom-4 left-0 right-0 text-center text-slate-400 text-xs pointer-events-none px-4">
                                     What details do you notice? Add them to the web!
                                 </div>
                             )}
@@ -282,26 +281,26 @@
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="flex flex-col sm:flex-row justify-between items-center mt-4 gap-3">
+                    <div className="flex justify-between items-center mt-3 gap-2 shrink-0">
                          <button 
                             onClick={resetWeb}
-                            className="text-slate-400 hover:text-rose-500 text-sm font-semibold flex items-center gap-1 transition-colors px-2 py-1"
+                            className="text-slate-400 hover:text-rose-500 text-xs font-semibold flex items-center gap-1 transition-colors px-2 py-1"
                         >
-                            <Icon name="trash" size={16} /> Reset Web
+                            <Icon name="trash" size={14} /> Reset
                         </button>
                         
-                        <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <div className="flex items-center gap-2">
                             <button 
                                 onClick={saveAsText}
-                                className="flex-1 sm:flex-none bg-white border border-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl shadow-sm hover:bg-slate-50 hover:text-indigo-600 transition-all flex items-center justify-center gap-2"
+                                className="bg-white border border-slate-200 text-slate-700 font-bold py-1.5 px-3 rounded-lg shadow-sm hover:bg-slate-50 hover:text-indigo-600 transition-all flex items-center justify-center gap-1 text-xs"
                             >
-                                <Icon name="download" size={20} /> <span className="whitespace-nowrap">Save Text</span>
+                                <Icon name="download" size={16} /> <span className="hidden sm:inline">Text</span>
                             </button>
                             <button 
                                 onClick={() => saveAsImage("mind-web-capture", title)}
-                                className="flex-1 sm:flex-none bg-slate-800 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg hover:bg-slate-700 transition-all flex items-center justify-center gap-2 transform hover:-translate-y-1"
+                                className="bg-slate-800 text-white font-bold py-1.5 px-4 rounded-lg shadow-lg hover:bg-slate-700 transition-all flex items-center justify-center gap-1 transform hover:-translate-y-0.5 text-xs"
                             >
-                                <Icon name="camera" size={20} /> <span className="whitespace-nowrap">Save Image</span>
+                                <Icon name="camera" size={16} /> <span className="hidden sm:inline">Image</span>
                             </button>
                         </div>
                     </div>
@@ -326,107 +325,113 @@
             };
 
             return (
-                <div className="min-h-screen pb-10">
+                <div className="h-screen flex flex-col overflow-hidden">
                     {/* Header */}
-                    <header className="glass-panel sticky top-0 z-50 px-6 py-4 border-b border-white/40 shadow-sm mb-6">
-                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                    <header className="glass-panel shrink-0 z-50 px-6 py-3 border-b border-white/40 shadow-sm">
+                        <div className="max-w-[95rem] mx-auto flex flex-col md:flex-row justify-between items-center gap-2">
                             <div className="flex items-center gap-3">
-                                <div className="bg-gradient-to-br from-indigo-600 to-violet-600 p-2.5 rounded-xl text-white shadow-lg">
-                                    <Icon name="eye" size={20} />
+                                <div className="bg-gradient-to-br from-indigo-600 to-violet-600 p-2 rounded-xl text-white shadow-lg">
+                                    <Icon name="eye" size={18} />
                                 </div>
                                 <div>
-                                    <h1 className="text-2xl font-heading font-extrabold text-slate-800 tracking-tight leading-none">Image Spark</h1>
-                                    <span className="text-xs text-indigo-600 font-bold uppercase tracking-wider">Visual Analysis</span>
+                                    <h1 className="text-xl font-heading font-extrabold text-slate-800 tracking-tight leading-none">Image Spark</h1>
+                                    <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wider">Visual Analysis</span>
                                 </div>
                             </div>
-                            <div className="text-xs md:text-sm font-bold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full border border-indigo-100">
+                            <div className="text-[10px] md:text-xs font-bold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full border border-indigo-100">
                                 Historical Thinking
                             </div>
                         </div>
                     </header>
 
-                    <main className="max-w-7xl mx-auto px-4 md:px-8">
+                    <main className="flex-1 w-full max-w-[95rem] mx-auto px-4 md:px-6 py-4 min-h-0">
                         
-                        {/* Image Container */}
-                        <div className="bg-slate-900 text-white rounded-3xl shadow-xl mb-6 relative overflow-hidden group border border-slate-700">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 h-full">
                              
-                             {/* Controls */}
-                             <div className="absolute top-4 right-4 z-20 flex gap-2">
-                                <button 
-                                    onClick={() => setShowImageInput(!showImageInput)}
-                                    className="bg-slate-800/80 hover:bg-indigo-600 text-white p-2 rounded-lg backdrop-blur-sm border border-white/10 transition-colors shadow-lg"
-                                    title="Change Image"
-                                >
-                                    <Icon name={showImageInput ? "refresh" : "image"} size={20} />
-                                </button>
-                             </div>
+                             {/* Left: Image Container */}
+                            <div className="bg-slate-900 text-white rounded-3xl shadow-xl relative overflow-hidden group border border-slate-700 flex flex-col h-full min-h-[300px]">
+                                 
+                                 {/* Controls */}
+                                 <div className="absolute top-4 right-4 z-20 flex gap-2">
+                                    <button 
+                                        onClick={() => setShowImageInput(!showImageInput)}
+                                        className="bg-slate-800/80 hover:bg-indigo-600 text-white p-2 rounded-lg backdrop-blur-sm border border-white/10 transition-colors shadow-lg"
+                                        title="Change Image"
+                                    >
+                                        <Icon name={showImageInput ? "refresh" : "image"} size={20} />
+                                    </button>
+                                 </div>
 
-                             {/* Image Display */}
-                             <div className="relative w-full h-[400px] md:h-[500px] bg-black flex items-center justify-center overflow-hidden">
-                                <img 
-                                    src={imageUrl} 
-                                    alt={imageTitle}
-                                    className="w-full h-full object-contain"
-                                    onError={(e) => { e.target.src = "https://placehold.co/800x400?text=Image+Load+Error"; }}
-                                />
-                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-6 pt-20">
-                                    <h2 className="text-2xl md:text-3xl font-heading font-bold text-white text-center shadow-black drop-shadow-md">{imageTitle}</h2>
-                                </div>
-                             </div>
+                                 {/* Image Display */}
+                                 <div className="relative w-full flex-1 bg-black flex items-center justify-center overflow-hidden">
+                                    <img 
+                                        src={imageUrl} 
+                                        alt={imageTitle}
+                                        className="w-full h-full object-contain"
+                                        onError={(e) => { e.target.src = "https://placehold.co/800x400?text=Image+Load+Error"; }}
+                                    />
+                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-6 pt-12 pointer-events-none">
+                                        <h2 className="text-lg md:text-2xl font-heading font-bold text-white text-center shadow-black drop-shadow-md">{imageTitle}</h2>
+                                    </div>
+                                 </div>
 
-                             {/* Settings Drawer */}
-                             {showImageInput && (
-                                <div className="bg-slate-800 border-t border-slate-700 p-6 animate-fadeIn">
-                                    <div className="max-w-3xl mx-auto space-y-4">
-                                        <h3 className="text-indigo-400 font-bold uppercase text-xs">Update Image Source</h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-slate-400 text-xs mb-1">Image URL</label>
-                                                <input 
-                                                    className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-indigo-500 outline-none"
-                                                    placeholder="Paste image address..."
-                                                    value={tempUrl}
-                                                    onChange={(e) => setTempUrl(e.target.value)}
-                                                />
+                                 {/* Settings Drawer */}
+                                 {showImageInput && (
+                                    <div className="absolute inset-x-0 top-0 bg-slate-800/95 backdrop-blur-md border-b border-slate-700 p-6 animate-fadeIn z-30 shadow-2xl">
+                                        <div className="max-w-xl mx-auto space-y-4">
+                                            <h3 className="text-indigo-400 font-bold uppercase text-xs">Update Image Source</h3>
+                                            <div className="grid grid-cols-1 gap-3">
+                                                <div>
+                                                    <label className="block text-slate-400 text-[10px] mb-1">Image URL</label>
+                                                    <input 
+                                                        className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-indigo-500 outline-none text-sm"
+                                                        placeholder="Paste image address..."
+                                                        value={tempUrl}
+                                                        onChange={(e) => setTempUrl(e.target.value)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-slate-400 text-[10px] mb-1">Title / Caption</label>
+                                                    <input 
+                                                        className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-indigo-500 outline-none text-sm"
+                                                        placeholder="e.g. The Death of Wolfe"
+                                                        value={tempTitle}
+                                                        onChange={(e) => setTempTitle(e.target.value)}
+                                                    />
+                                                </div>
                                             </div>
-                                            <div>
-                                                <label className="block text-slate-400 text-xs mb-1">Title / Caption</label>
-                                                <input 
-                                                    className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-indigo-500 outline-none"
-                                                    placeholder="e.g. The Death of Wolfe"
-                                                    value={tempTitle}
-                                                    onChange={(e) => setTempTitle(e.target.value)}
-                                                />
+                                            <div className="flex justify-end gap-2">
+                                                <button 
+                                                    onClick={() => setShowImageInput(false)}
+                                                    className="px-4 py-2 text-slate-400 hover:text-white transition-colors text-sm"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button 
+                                                    onClick={handleUpdateImage}
+                                                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition-transform hover:scale-105 text-sm"
+                                                >
+                                                    Update View
+                                                </button>
                                             </div>
-                                        </div>
-                                        <div className="flex justify-end gap-2">
-                                            <button 
-                                                onClick={() => setShowImageInput(false)}
-                                                className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button 
-                                                onClick={handleUpdateImage}
-                                                className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition-transform hover:scale-105"
-                                            >
-                                                Update View
-                                            </button>
                                         </div>
                                     </div>
-                                </div>
-                             )}
-                        </div>
-
-                        {/* Mind Web Container (White Card Style) */}
-                        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-4 md:p-8 min-h-[50vh] border border-slate-100 h-[75vh]">
-                             <div className="flex items-center gap-2 mb-4 pb-4 border-b border-slate-100">
-                                <div className="bg-pink-100 text-pink-600 p-2 rounded-lg">
-                                    <Icon name="eye" size={20} />
-                                </div>
-                                <h3 className="text-xl font-heading font-bold text-slate-800">Visual Brainstorming</h3>
+                                 )}
                             </div>
-                            <MindWeb title={imageTitle} />
+
+                            {/* Right: Mind Web Container */}
+                            <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-4 border border-slate-100 flex flex-col h-full min-h-[400px]">
+                                 <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100 shrink-0">
+                                    <div className="bg-pink-100 text-pink-600 p-1.5 rounded-lg">
+                                        <Icon name="eye" size={16} />
+                                    </div>
+                                    <h3 className="text-lg font-heading font-bold text-slate-800">Visual Brainstorming</h3>
+                                </div>
+                                <div className="flex-1 min-h-0 relative">
+                                     <MindWeb title={imageTitle} />
+                                </div>
+                            </div>
+
                         </div>
 
                     </main>
