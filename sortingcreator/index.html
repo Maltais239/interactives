@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Sorting Game Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Tool UI Styles */
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+        }
+        .loader {
+            border: 3px solid #e2e8f0; 
+            border-top: 3px solid #6366f1;
+            border-radius: 50%; 
+            width: 24px; 
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- PREVIEW / GAME CSS (Scoped for the preview area) --- */
+        .game-preview-area {
+            font-family: 'Poppins', sans-serif;
+            background: #4b6584; /* Deep slate blue */
+            border-radius: 12px;
+            padding: 20px;
+            color: white;
+            position: relative;
+        }
+
+        .game-zone-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .game-drop-zone {
+            background: #fff;
+            border: 3px dashed #4b6584;
+            border-radius: 12px;
+            min-height: 200px;
+            padding: 15px;
+            color: #2d3436;
+            transition: background 0.3s, border-color 0.3s;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-content: flex-start;
+        }
+        .game-drop-zone.over {
+            background: #d1d8e0;
+            border-style: solid;
+            border-color: #20bf6b;
+        }
+
+        .game-item {
+            width: 90px;
+            min-height: 100px;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            cursor: grab;
+            user-select: none;
+            touch-action: none; /* Critical for touch */
+            position: relative;
+            z-index: 10;
+        }
+        .game-item:active { cursor: grabbing; }
+        .game-item img {
+            width: 50px;
+            height: 50px;
+            object-fit: contain;
+            pointer-events: none;
+            margin-bottom: 5px;
+        }
+        .game-item span {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #4b5563;
+            text-align: center;
+            line-height: 1.1;
+            pointer-events: none;
+        }
+        .game-item.dragging {
+            opacity: 0.8;
+            position: fixed; /* Fixed for simpler coordinate math in preview */
+            z-index: 9999;
+            pointer-events: none; /* Let events pass through to zones */
+            transform: scale(1.1);
+        }
+
+        .game-controls button {
+            background: #20bf6b;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 0px #1a9c58;
+            transition: transform 0.1s;
+        }
+        .game-controls button:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+        .game-controls button.reset {
+            background: #eb3b5a;
+            box-shadow: 0 4px 0px #c0392b;
+        }
+        .game-controls button.reset:active {
+            box-shadow: none;
+        }
+
+        /* Asset Editor Styles */
+        .asset-card {
+            transition: all 0.2s;
+        }
+        .asset-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .ai-magic-box {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 100%);
+            border: 1px solid #c7d2fe;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center pb-20">
+
+    <!-- Header -->
+    <div class="w-full bg-white border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white text-xl font-bold shadow-indigo-200 shadow-lg">🧩</div>
+                <h1 class="text-xl font-bold text-slate-800">AI Sorting Game Builder</h1>
+            </div>
+            <div class="text-sm text-slate-500">
+                Design &rarr; Generate &rarr; Export to GitHub
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="w-full max-w-6xl px-6 mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- LEFT COLUMN: Input & Builder -->
+        <div class="lg:col-span-4 space-y-6">
+            
+            <!-- Step 1: Configuration -->
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs flex items-center justify-center border border-slate-200">1</span>
+                    Game Content
+                </h2>
+                
+                <div class="space-y-4">
+                    <!-- Magic Input Section -->
+                    <div class="ai-magic-box p-4 rounded-xl space-y-3">
+                        <label class="block text-xs font-bold text-indigo-800 uppercase tracking-wide">
+                            ✨ Quick Start (Topic or Curriculum)
+                        </label>
+                        <textarea id="topic-input" rows="2" class="w-full p-2 bg-white/80 border border-indigo-100 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. Healthy vs Unhealthy Foods, or 2nd Grade Geometry Shapes"></textarea>
+                        <button id="auto-create-btn" class="w-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2">
+                           <span id="auto-btn-text">✨ Auto-Create List</span>
+                           <div id="auto-btn-loader" class="loader !w-4 !h-4 !border-indigo-300 !border-t-indigo-700 hidden"></div>
+                        </button>
+                    </div>
+
+                    <div class="relative py-2">
+                        <div class="absolute inset-0 flex items-center" aria-hidden="true">
+                            <div class="w-full border-t border-slate-200"></div>
+                        </div>
+                        <div class="relative flex justify-center">
+                            <span class="bg-white px-2 text-xs text-slate-400 font-medium">OR EDIT MANUALLY</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Game Title</label>
+                        <input type="text" id="game-title" value="Sorting Challenge" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                            Item List
+                        </label>
+                        <p class="text-xs text-slate-400 mb-2">Format: <code>Item: Category (Visual clue)</code></p>
+                        <textarea id="game-input" class="w-full h-48 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none resize-none" placeholder="Eagle: Living Things (soaring bird)&#10;Rock: Non-Living (grey boulder)"></textarea>
+                    </div>
+
+                    <button id="generate-assets-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2">
+                        <span>🚀 Generate Assets & Preview</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 3: Export (Disabled initially) -->
+            <div id="export-panel" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm opacity-50 pointer-events-none transition-opacity">
+                <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs flex items-center justify-center border border-slate-200">3</span>
+                    Export Game
+                </h2>
+                <p class="text-sm text-slate-600 mb-4">Happy with the preview? Copy the code to use on GitHub.</p>
+                <button id="copy-html-btn" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2">
+                    <span>📋 Copy Game HTML</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Asset Editor & Preview -->
+        <div class="lg:col-span-8 space-y-6">
+            
+            <!-- Asset Editor -->
+            <div id="asset-editor" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs flex items-center justify-center border border-slate-200">2</span>
+                        Review Assets
+                    </h2>
+                    <span class="text-xs text-slate-400 bg-slate-50 px-2 py-1 rounded">Click image to upload custom</span>
+                </div>
+                
+                <div id="assets-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    <!-- Assets injected here -->
+                </div>
+                
+                <div class="mt-6 flex justify-end">
+                    <button id="update-preview-btn" class="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-4 py-2 rounded-lg text-sm font-bold transition-colors">
+                        Refresh Preview &rarr;
+                    </button>
+                </div>
+            </div>
+
+            <!-- Game Preview -->
+            <div id="game-preview-container" class="hidden">
+                <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Live Preview</h3>
+                <div class="game-preview-area">
+                    <h1 id="preview-title" class="text-3xl font-bold text-center mb-2">Sorting Challenge</h1>
+                    <p class="text-center text-white/80 mb-6 text-sm">Drag items to their correct category!</p>
+
+                    <div class="bg-white/10 p-4 rounded-xl border border-white/20 mb-6 min-h-[140px]">
+                         <div id="preview-items-container" class="flex flex-wrap gap-3 justify-center">
+                            <!-- Draggable items go here -->
+                         </div>
+                    </div>
+
+                    <div id="preview-zones-container" class="game-zone-container">
+                        <!-- Drop zones go here -->
+                    </div>
+
+                    <div class="game-controls text-center mt-8 space-x-4">
+                        <button id="preview-check-btn">Check Answers</button>
+                        <button id="preview-reset-btn" class="reset">Reset</button>
+                    </div>
+                    <div id="preview-message" class="text-center mt-4 h-6 font-bold text-lg"></div>
+                </div>
+            </div>
+
+            <!-- Empty State Placeholder -->
+            <div id="empty-state" class="h-96 flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl">
+                <div class="text-4xl mb-2">🎨</div>
+                <p>Enter items (or a topic) to start.</p>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- GLOBAL STATE ---
+        const apiKey = ""; // System provided
+        let gameData = {
+            title: "Sorting Game",
+            categories: [],
+            items: [] // { id, name, category, prompt, imageSrc (base64) }
+        };
+
+        // --- 1. MAGIC LIST GENERATION ---
+        document.getElementById('auto-create-btn').addEventListener('click', async () => {
+            const topic = document.getElementById('topic-input').value;
+            if(!topic.trim()) return alert("Please enter a topic first!");
+
+            // UI Loading State
+            const btnText = document.getElementById('auto-btn-text');
+            const loader = document.getElementById('auto-btn-loader');
+            btnText.textContent = "Thinking...";
+            loader.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{
+                                text: `Create a list of 10 to 12 distinct items for a sorting game based on this topic: "${topic}". 
+                                There must be at least 2 distinct categories. 
+                                Format the output exactly as follows for each line:
+                                Item Name: Category Name (Visual description for an icon)
+                                Do not use markdown, bullets, or numbering. Just the raw lines.`
+                            }]
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+                const text = data.candidates[0].content.parts[0].text;
+                
+                // Populate Textarea
+                const cleanText = text.replace(/^\* /gm, '').replace(/^\d+\. /gm, ''); // Remove potential bullets if AI adds them
+                document.getElementById('game-input').value = cleanText;
+                
+                // Auto-set title if generic
+                if(document.getElementById('game-title').value === "Sorting Challenge") {
+                    document.getElementById('game-title').value = topic.charAt(0).toUpperCase() + topic.slice(1) + " Sort";
+                }
+
+            } catch (e) {
+                console.error("Error generating list:", e);
+                alert("Sorry, couldn't generate the list. Please try again.");
+            } finally {
+                btnText.textContent = "✨ Auto-Create List";
+                loader.classList.add('hidden');
+            }
+        });
+
+        // --- 2. PARSING & IMAGE GENERATION ---
+        document.getElementById('generate-assets-btn').addEventListener('click', async () => {
+            const input = document.getElementById('game-input').value;
+            const title = document.getElementById('game-title').value;
+            if(!input.trim()) return alert("Please enter some items!");
+
+            // Reset UI
+            document.getElementById('empty-state').classList.add('hidden');
+            document.getElementById('asset-editor').classList.remove('hidden');
+            document.getElementById('game-preview-container').classList.remove('hidden');
+            const assetGrid = document.getElementById('assets-grid');
+            assetGrid.innerHTML = '';
+            
+            // Parse Input
+            const lines = input.split('\n');
+            const items = [];
+            const categories = new Set();
+
+            lines.forEach((line, idx) => {
+                if(!line.includes(':')) return;
+                
+                // Regex to handle "Item: Category (Prompt)"
+                const match = line.match(/^([^:]+):\s*([^(]+)(?:\(([^)]+)\))?/);
+                if(match) {
+                    const name = match[1].trim();
+                    const category = match[2].trim();
+                    const prompt = match[3] ? match[3].trim() : '';
+                    
+                    categories.add(category);
+                    items.push({
+                        id: `item-${idx}`,
+                        name,
+                        category,
+                        prompt,
+                        imageSrc: null // Will be filled by AI
+                    });
+                }
+            });
+
+            if(items.length === 0) return alert("No valid items found. Use format 'Item: Category'");
+
+            gameData.title = title;
+            gameData.items = items;
+            gameData.categories = Array.from(categories);
+
+            // Render Asset Placeholders
+            renderAssetEditor();
+
+            // Trigger AI Generation
+            await generateAllImages();
+            
+            // Build Initial Preview
+            buildGamePreview();
+            
+            // Enable Export
+            const exportPanel = document.getElementById('export-panel');
+            exportPanel.classList.remove('opacity-50', 'pointer-events-none');
+        });
+
+        document.getElementById('update-preview-btn').addEventListener('click', buildGamePreview);
+
+
+        // --- 3. ASSET MANAGEMENT & AI HELPERS ---
+        function renderAssetEditor() {
+            const grid = document.getElementById('assets-grid');
+            grid.innerHTML = '';
+
+            gameData.items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'asset-card bg-white p-3 rounded-xl border border-slate-200 flex flex-col items-center gap-2 group relative';
+                div.innerHTML = `
+                    <div class="w-full aspect-square bg-slate-50 rounded-lg flex items-center justify-center overflow-hidden border border-slate-100 cursor-pointer relative" onclick="document.getElementById('file-${item.id}').click()">
+                        ${item.imageSrc ? `<img src="${item.imageSrc}" class="w-full h-full object-contain">` : '<div class="loader"></div>'}
+                        <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold">Upload Custom</div>
+                    </div>
+                    <div class="text-center w-full">
+                        <div class="font-bold text-sm text-slate-700 truncate">${item.name}</div>
+                        <div class="text-[10px] uppercase font-bold text-slate-400 truncate">${item.category}</div>
+                    </div>
+                    <input type="file" id="file-${item.id}" class="hidden" accept="image/*" onchange="handleFileUpload(event, '${item.id}')">
+                    <button onclick="regenerateItem('${item.id}')" class="absolute top-2 right-2 p-1.5 bg-white rounded-md shadow-sm border border-slate-200 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Regenerate">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+                    </button>
+                `;
+                grid.appendChild(div);
+            });
+        }
+
+        async function generateAllImages() {
+            const promises = gameData.items.map(item => generateSingleImage(item));
+            await Promise.all(promises);
+            buildGamePreview(); // Update preview once all done
+        }
+
+        async function regenerateItem(itemId) {
+            const item = gameData.items.find(i => i.id === itemId);
+            if (!item) return;
+
+            // Visual loading state
+            item.imageSrc = null; 
+            renderAssetEditor();
+            
+            await generateSingleImage(item);
+            renderAssetEditor();
+            buildGamePreview();
+        }
+
+        function handleFileUpload(event, itemId) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const item = gameData.items.find(i => i.id === itemId);
+                item.imageSrc = e.target.result;
+                renderAssetEditor();
+                buildGamePreview();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function generateSingleImage(item) {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+            const promptContext = item.prompt || "simple icon";
+            const prompt = `A clean, vector-style clipart icon of ${item.name} (${promptContext}). Isolated on white background. Simple, bold colors. No text, no labels.`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        instances: [{ prompt: prompt }],
+                        parameters: { sampleCount: 1 }
+                    })
+                });
+                const data = await response.json();
+                if (data.predictions && data.predictions[0].bytesBase64Encoded) {
+                    item.imageSrc = `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
+                } else {
+                    console.error("No image generated");
+                }
+            } catch (e) {
+                console.error("API Error", e);
+            }
+            // Update UI for this single item
+            renderAssetEditor();
+        }
+
+
+        // --- 4. PREVIEW & GAME LOGIC ---
+        function buildGamePreview() {
+            const itemsContainer = document.getElementById('preview-items-container');
+            const zonesContainer = document.getElementById('preview-zones-container');
+            
+            document.getElementById('preview-title').textContent = gameData.title;
+            itemsContainer.innerHTML = '';
+            zonesContainer.innerHTML = '';
+
+            // Create Zones
+            gameData.categories.forEach(cat => {
+                const zone = document.createElement('div');
+                zone.className = 'game-drop-zone';
+                zone.dataset.category = cat;
+                zone.innerHTML = `<div class="w-full text-center font-bold text-slate-500 mb-2 pointer-events-none uppercase tracking-wide text-sm">${cat}</div>`;
+                
+                // Add Drop Events
+                zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('over'); });
+                zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+                zone.addEventListener('drop', handleDrop);
+                zonesContainer.appendChild(zone);
+            });
+
+            // Create Items (Shuffled)
+            const shuffled = [...gameData.items].sort(() => 0.5 - Math.random());
+            shuffled.forEach(item => {
+                const el = document.createElement('div');
+                el.className = 'game-item';
+                el.draggable = true;
+                el.dataset.id = item.id;
+                el.dataset.category = item.category; // For checking
+                el.innerHTML = `
+                    <img src="${item.imageSrc || 'https://placehold.co/50x50?text=?'}" draggable="false">
+                    <span>${item.name}</span>
+                `;
+                
+                // Drag Events
+                el.addEventListener('dragstart', handleDragStart);
+                itemsContainer.appendChild(el);
+            });
+            
+            document.getElementById('preview-message').textContent = '';
+        }
+
+        // Simple Preview Drag Logic (Desktop only for preview simplicity, full Touch in export)
+        let draggedEl = null;
+        function handleDragStart(e) {
+            draggedEl = e.currentTarget;
+            e.dataTransfer.setData('text/plain', e.currentTarget.dataset.id);
+            setTimeout(() => e.target.style.opacity = '0.5', 0);
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const zone = e.currentTarget; // The drop zone
+            zone.classList.remove('over');
+            
+            if (draggedEl) {
+                draggedEl.style.opacity = '1';
+                zone.appendChild(draggedEl);
+                draggedEl = null;
+            }
+        }
+
+        // Preview Controls
+        document.getElementById('preview-check-btn').addEventListener('click', () => {
+            let correct = 0;
+            let total = gameData.items.length;
+            const items = document.querySelectorAll('.game-item');
+            
+            items.forEach(item => {
+                const parentZone = item.parentElement;
+                if(parentZone.classList.contains('game-drop-zone')) {
+                    if(parentZone.dataset.category === item.dataset.category) {
+                        correct++;
+                        item.style.border = '2px solid #20bf6b';
+                    } else {
+                        item.style.border = '2px solid #eb3b5a';
+                    }
+                }
+            });
+            
+            const msg = document.getElementById('preview-message');
+            if(correct === total) {
+                msg.textContent = "🎉 Perfect! You sorted everything correctly!";
+                msg.style.color = "#55efc4";
+            } else {
+                msg.textContent = `${correct} / ${total} Correct. Keep trying!`;
+                msg.style.color = "#ff7675";
+            }
+        });
+
+        document.getElementById('preview-reset-btn').addEventListener('click', buildGamePreview);
+
+
+        // --- 5. EXPORT LOGIC (The "Copy HTML" Button) ---
+        document.getElementById('copy-html-btn').addEventListener('click', () => {
+            const exportedHTML = generateStandaloneHTML();
+            copyToClipboard(exportedHTML);
+        });
+
+        function copyToClipboard(text) {
+            // Create a temporary textarea element to hold the text
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            
+            // Move it off-screen but keep it part of the DOM so it can be selected
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            textarea.style.top = '0';
+            document.body.appendChild(textarea);
+            
+            // Select and copy
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                // Success UI feedback
+                const btn = document.getElementById('copy-html-btn');
+                const originalText = "<span>📋 Copy Game HTML</span>"; // Hardcoded restart state or save previous
+                // We'll just assume the current innerHTML is the "before" state if we hadn't already changed it, 
+                // but simpler to just set the success message and revert.
+                
+                btn.innerHTML = '<span>✅ Copied to Clipboard!</span>';
+                setTimeout(() => {
+                    btn.innerHTML = originalText; 
+                }, 2000);
+            } catch (err) {
+                console.error('Copy failed', err);
+                prompt("Automatic copy failed. Please press Ctrl+C to copy:", text);
+            }
+            
+            // Clean up
+            document.body.removeChild(textarea);
+        }
+
+        function generateStandaloneHTML() {
+            // Serialize data for the standalone file
+            const exportItems = gameData.items.map(i => ({
+                id: i.id,
+                name: i.name,
+                category: i.category,
+                src: i.imageSrc
+            }));
+            
+            const exportCategories = gameData.categories;
+            const title = gameData.title;
+
+            return `<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="UTF-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+ <title>${title}</title>
+ <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet" />
+ <style>
+   :root {
+     --bg: #4b6584; --panel: #f1f2f6; --btn: #20bf6b; --btn-hover: #26de81;
+     --zone-border: #4b6584; --zone-bg-hover: #d1d8e0; --text-light: #ffffff;
+     --text-dark: #2d3436;
+   }
+   *{box-sizing:border-box;}
+   body{
+     margin:0; font-family:'Poppins',sans-serif; background:var(--bg);
+     display:flex; flex-direction:column; align-items:center; padding:20px;
+     min-height: 100vh;
+     touch-action: none;
+   }
+   h1{font-size:2rem;color:var(--text-light);margin:10px 0; text-align: center;}
+   p{color:var(--text-light);margin:0 0 20px; text-align: center; font-size: 0.9rem; opacity: 0.9;}
+
+   .game-container{
+     background:var(--panel); width:100%; max-width:900px; padding:20px; border-radius:12px;
+     position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+   }
+
+   #items-container{
+       display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:20px;
+       padding: 15px; background-color: rgba(255,255,255,0.8); border-radius: 8px;
+       min-height: 130px; border: 2px solid #ced6e0;
+   }
+   .item{
+     width:90px; min-height:100px;
+     background:#fff;display:flex;flex-direction:column;
+     align-items:center;justify-content:center;
+     border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);
+     cursor:grab; touch-action: none; user-select: none;
+     position: relative; padding: 8px; z-index: 10;
+   }
+   .item:active { cursor: grabbing; transform: scale(1.05); }
+   .item img { width: 55px; height: 55px; margin-bottom: 6px; pointer-events: none; object-fit: contain; }
+   .item span { font-size: 0.75rem; font-weight: 600; color: #4b5563; text-align: center; line-height: 1.1; pointer-events: none; }
+
+   .item.dragging {
+     opacity: 0.8; position: fixed; z-index: 1000; pointer-events: none;
+     left: 0; top: 0; margin: 0;
+   }
+
+   .zones-container{
+       display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+       gap:20px; margin-bottom:20px;
+   }
+   .zone-wrapper { display: flex; flex-direction: column; }
+   .zone-label{font-weight:700;margin-bottom:10px;color:var(--text-dark); text-align: center; font-size: 1.1rem; text-transform: uppercase;}
+   .drop-zone{
+     flex: 1; min-height:200px;
+     background:#fff;border:3px dashed var(--zone-border);border-radius:12px;
+     padding:15px;display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start; justify-content: center;
+     transition:background .3s;
+   }
+   .drop-zone.over{background:var(--zone-bg-hover); border-style: solid; border-color: var(--btn);}
+
+   .controls{text-align:center; margin-top: 10px;}
+   .controls button{
+     background:var(--btn);color:var(--text-light);border:none;padding:12px 30px;border-radius:8px;cursor:pointer;
+     margin:10px 5px;font-size:1rem;font-weight:600;transition: all 0.2s;
+     box-shadow: 0 4px 0px #1a9c58;
+   }
+   .controls button:hover{background:var(--btn-hover); transform: translateY(-1px);}
+   .controls button:active{transform: translateY(3px); box-shadow: 0 1px 0px #1a9c58;}
+   .controls button#reset-btn { background: #eb3b5a; box-shadow: 0 4px 0px #c0392b; }
+
+   #message-area {
+       text-align: center; margin-top: 15px; font-size: 1.1rem; font-weight: 600; min-height: 1.5em;
+   }
+ </style>
+</head>
+<body>
+ <h1>${title}</h1>
+ <p>Drag the items to the correct category!</p>
+
+ <div class="game-container">
+   <div id="items-container"></div>
+   <div class="zones-container" id="zones-container"></div>
+   <div class="controls">
+     <button id="check-btn">Check Answers</button>
+     <button id="reset-btn">Start Over</button>
+   </div>
+   <div id="message-area"></div>
+ </div>
+
+ <script>
+   const DATA = ${JSON.stringify({ items: exportItems, categories: exportCategories })};
+
+   const itemsContainer = document.getElementById('items-container');
+   const zonesContainer = document.getElementById('zones-container');
+   const messageArea = document.getElementById('message-area');
+   
+   // --- Initialization ---
+   function init() {
+       // 1. Build Zones
+       zonesContainer.innerHTML = '';
+       DATA.categories.forEach(cat => {
+           const wrapper = document.createElement('div');
+           wrapper.className = 'zone-wrapper';
+           wrapper.innerHTML = \`
+               <div class="zone-label">\${cat}</div>
+               <div class="drop-zone" data-category="\${cat}"></div>
+           \`;
+           zonesContainer.appendChild(wrapper);
+       });
+
+       // 2. Build Items
+       itemsContainer.innerHTML = '';
+       const shuffled = [...DATA.items].sort(() => Math.random() - 0.5);
+       shuffled.forEach(item => {
+           const el = document.createElement('div');
+           el.className = 'item';
+           el.draggable = true;
+           el.dataset.category = item.category;
+           el.innerHTML = \`<img src="\${item.src}"><span>\${item.name}</span>\`;
+           
+           // Mouse Events
+           el.addEventListener('dragstart', handleDragStart);
+           el.addEventListener('dragend', handleDragEnd);
+           
+           // Touch Events
+           el.addEventListener('touchstart', handleTouchStart, {passive: false});
+           itemsContainer.appendChild(el);
+       });
+       
+       // Zone Events
+       document.querySelectorAll('.drop-zone').forEach(zone => {
+           zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('over'); });
+           zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+           zone.addEventListener('drop', handleDrop);
+       });
+       
+       messageArea.textContent = '';
+   }
+
+   // --- Drag Logic (Mouse) ---
+   let draggedItem = null;
+   function handleDragStart(e) {
+       draggedItem = e.currentTarget;
+       setTimeout(() => e.target.style.opacity = '0.5', 0);
+   }
+   function handleDragEnd(e) {
+       e.target.style.opacity = '1';
+       document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('over'));
+       draggedItem = null;
+   }
+   function handleDrop(e) {
+       e.preventDefault();
+       const zone = e.currentTarget;
+       zone.classList.remove('over');
+       if(draggedItem) zone.appendChild(draggedItem);
+   }
+
+   // --- Drag Logic (Touch) ---
+   let touchItem = null;
+   let touchOffsetX = 0;
+   let touchOffsetY = 0;
+   let clone = null;
+
+   function handleTouchStart(e) {
+       e.preventDefault(); // Prevent scroll
+       touchItem = e.currentTarget;
+       const rect = touchItem.getBoundingClientRect();
+       const touch = e.touches[0];
+       
+       touchOffsetX = touch.clientX - rect.left;
+       touchOffsetY = touch.clientY - rect.top;
+
+       // Create clone for dragging visual
+       clone = touchItem.cloneNode(true);
+       clone.classList.add('dragging');
+       clone.style.width = rect.width + 'px';
+       clone.style.height = rect.height + 'px';
+       // Position clone exactly where original is
+       clone.style.left = rect.left + 'px';
+       clone.style.top = rect.top + 'px';
+       
+       document.body.appendChild(clone);
+       touchItem.style.opacity = '0.3';
+
+       document.addEventListener('touchmove', handleTouchMove, {passive: false});
+       document.addEventListener('touchend', handleTouchEnd);
+   }
+
+   function handleTouchMove(e) {
+       e.preventDefault();
+       if(!clone) return;
+       const touch = e.touches[0];
+       
+       // Move clone
+       clone.style.left = (touch.clientX - touchOffsetX) + 'px';
+       clone.style.top = (touch.clientY - touchOffsetY) + 'px';
+       
+       // Highlight zones
+       const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+       const zone = elemBelow ? elemBelow.closest('.drop-zone') : null;
+       
+       document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('over'));
+       if(zone) zone.classList.add('over');
+   }
+
+   function handleTouchEnd(e) {
+       document.removeEventListener('touchmove', handleTouchMove);
+       document.removeEventListener('touchend', handleTouchEnd);
+       
+       const touch = e.changedTouches[0];
+       const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+       const zone = elemBelow ? elemBelow.closest('.drop-zone') : null;
+
+       if(zone) {
+           zone.appendChild(touchItem);
+       }
+       
+       // Cleanup
+       if(clone) clone.remove();
+       touchItem.style.opacity = '1';
+       document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('over'));
+       touchItem = null;
+       clone = null;
+   }
+
+   // --- Game Logic ---
+   document.getElementById('check-btn').addEventListener('click', () => {
+       let correct = 0;
+       const items = document.querySelectorAll('.item');
+       items.forEach(item => {
+           const zone = item.closest('.drop-zone');
+           if(zone) {
+               if(zone.dataset.category === item.dataset.category) {
+                   correct++;
+                   item.style.border = '3px solid #20bf6b';
+               } else {
+                   item.style.border = '3px solid #eb3b5a';
+               }
+           } else {
+                item.style.border = 'none'; // Reset if in top container
+           }
+       });
+
+       if(correct === items.length && document.getElementById('items-container').children.length === 0) {
+           messageArea.textContent = "Great Job! All correct! 🎉";
+           messageArea.style.color = "#20bf6b";
+       } else {
+           messageArea.textContent = "Keep trying!";
+           messageArea.style.color = "#eb3b5a";
+       }
+   });
+
+   document.getElementById('reset-btn').addEventListener('click', init);
+
+   init();
+ <\/script>
+</body>
+</html>`;
+        }
+    </script>
+</body>
+</html>
