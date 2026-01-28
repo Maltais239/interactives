@@ -1,0 +1,575 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruler of the Ancients: Strategy RPG</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Lato', sans-serif;
+            background-color: #2c241b;
+            color: #3c4043;
+            user-select: none;
+            background-image: url('https://www.transparenttextures.com/patterns/aged-paper.png');
+        }
+
+        h1, h2, .rpg-font {
+            font-family: 'Cinzel', serif;
+        }
+
+        /* Custom Theme Colors */
+        .bg-parchment { background-color: #f3e9d2; }
+        .text-imperial { color: #8B0000; }
+        .bg-imperial { background-color: #8B0000; }
+        .text-gold-dark { color: #B8860B; }
+        .border-gold { border-color: #B8860B; }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        @keyframes statChange {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: translateY(-20px) scale(1.2); opacity: 0; }
+        }
+        .stat-popup {
+            position: absolute;
+            font-weight: bold;
+            animation: statChange 1.5s ease-out forwards;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        /* Card Styles */
+        .game-card {
+            background-image: url('https://www.transparenttextures.com/patterns/rough-cloth.png');
+            background-color: #f3e9d2;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            border: 4px solid #B8860B;
+        }
+
+        .btn-option {
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-option:hover {
+            transform: translateX(5px);
+            background-color: #fff;
+            border-color: #8B0000;
+        }
+        .btn-option:active {
+            transform: scale(0.98);
+        }
+
+        .correct-answer {
+            background-color: #dcfce7 !important;
+            border-color: #16a34a !important;
+            color: #14532d !important;
+        }
+        
+        .wrong-answer {
+            background-color: #fee2e2 !important;
+            border-color: #dc2626 !important;
+            color: #7f1d1d !important;
+        }
+
+        /* Stat Bars */
+        .stat-container {
+            background: rgba(0,0,0,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            height: 10px;
+            width: 100%;
+        }
+        .stat-fill {
+            height: 100%;
+            transition: width 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body class="h-screen w-full flex items-center justify-center p-4">
+
+    <!-- Game Container -->
+    <div id="game-container" class="game-card w-full max-w-5xl h-[720px] rounded-sm overflow-hidden relative flex flex-col">
+        
+        <!-- Header: Stats Bar -->
+        <div id="stats-header" class="bg-[#3e3428] text-white p-4 flex justify-between items-center border-b-4 border-gold hidden z-20 shadow-lg">
+            <div class="flex gap-8 w-full justify-center">
+                <!-- Power Stat -->
+                <div class="w-1/4 relative">
+                    <div class="flex justify-between text-xs mb-1 uppercase tracking-widest text-gold-dark">
+                        <span><i class="fa-solid fa-fist-raised"></i> Power</span>
+                        <span id="val-power">50</span>
+                    </div>
+                    <div class="stat-container">
+                        <div id="bar-power" class="stat-fill bg-red-600" style="width: 50%"></div>
+                    </div>
+                </div>
+                <!-- Happiness Stat -->
+                <div class="w-1/4 relative">
+                    <div class="flex justify-between text-xs mb-1 uppercase tracking-widest text-green-400">
+                        <span><i class="fa-solid fa-face-smile"></i> Happiness</span>
+                        <span id="val-happiness">50</span>
+                    </div>
+                    <div class="stat-container">
+                        <div id="bar-happiness" class="stat-fill bg-green-500" style="width: 50%"></div>
+                    </div>
+                </div>
+                <!-- Wealth Stat -->
+                <div class="w-1/4 relative">
+                    <div class="flex justify-between text-xs mb-1 uppercase tracking-widest text-yellow-400">
+                        <span><i class="fa-solid fa-coins"></i> Wealth</span>
+                        <span id="val-wealth">50</span>
+                    </div>
+                    <div class="stat-container">
+                        <div id="bar-wealth" class="stat-fill bg-yellow-500" style="width: 50%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dynamic Content Area -->
+        <div id="scene-container" class="flex-grow flex flex-col items-center justify-center p-8 relative z-0 overflow-y-auto">
+            <!-- Content injected by JS -->
+        </div>
+
+    </div>
+
+    <script>
+        // --- Game Data: Role Play Scenarios ---
+        const scenarios = [
+            {
+                id: 1,
+                title: "The Crisis of Chaos",
+                narrative: "Your kingdom is plagued by bandits and disorder. The people cry out for safety. Your advisors suggest establishing an **Authoritarian** government to restore order quickly.",
+                rolePlayQ: "As the new Ruler, what is your first decree to establish absolute authority?",
+                options: [
+                    { 
+                        text: "I declare myself the sole leader. Strict obedience is required!", 
+                        outcome: "Order is restored, but the people fear your iron fist.",
+                        stats: { power: 20, happiness: -10, wealth: 0 },
+                        correct: true // Aligns with 'Authoritarian' concept
+                    },
+                    { 
+                        text: "I will let every village vote on what to do.", 
+                        outcome: "The voting takes too long. Chaos continues. This is not Authoritarianism.",
+                        stats: { power: -10, happiness: 5, wealth: -5 },
+                        correct: false
+                    },
+                    { 
+                        text: "I will step down and let the bandits rule.", 
+                        outcome: "Your kingdom collapses immediately.",
+                        stats: { power: -50, happiness: -50, wealth: -50 },
+                        correct: false
+                    }
+                ],
+                kusp: "Concept: Authoritarian Rule"
+            },
+            {
+                id: 2,
+                title: "The Question of Legitimacy",
+                narrative: "The nobles whisper in the court. They ask, 'Why should YOU be King?' You need to solidify your position using the ancient belief of **Divine Right**.",
+                rolePlayQ: "How do you answer the questioning nobles?",
+                options: [
+                    { 
+                        text: "Because I have the biggest army!", 
+                        outcome: "Effective, but that is rule by Force, not Divine Right.",
+                        stats: { power: 10, happiness: -5, wealth: -10 },
+                        correct: false
+                    },
+                    { 
+                        text: "The Gods have chosen me to rule. To defy me is to defy the Heavens!", 
+                        outcome: "The nobles fall silent in awe. They fear the wrath of the Gods.",
+                        stats: { power: 15, happiness: 0, wealth: 0 },
+                        correct: true 
+                    },
+                    { 
+                        text: "Because my father was King.", 
+                        outcome: "That is Heredity, which is true, but they asked for Divine proof.",
+                        stats: { power: 5, happiness: 0, wealth: 0 },
+                        correct: false
+                    }
+                ],
+                kusp: "Concept: Divine Right / Mandate of Heaven"
+            },
+            {
+                id: 3,
+                title: "The Great Famine",
+                narrative: "A drought has struck. Food is scarce. As an ancient ruler bound by the **Social Hierarchy**, you must decide how to distribute the remaining grain storage.",
+                rolePlayQ: "Who receives the highest priority for rations?",
+                options: [
+                    { 
+                        text: "Feed the Farmers first; they grow the food.", 
+                        outcome: "A kind choice, but the Nobles are furious. This breaks the social pyramid.",
+                        stats: { power: -15, happiness: 10, wealth: 0 },
+                        correct: false
+                    },
+                    { 
+                        text: "Distribute it equally to everyone.", 
+                        outcome: "Egalitarian, but ancient empires rarely functioned this way. The elite revolt.",
+                        stats: { power: -10, happiness: 5, wealth: 0 },
+                        correct: false
+                    },
+                    { 
+                        text: "The Ruler, Nobles, and Priests eat first.", 
+                        outcome: "The hierarchy is maintained. The powerful are satisfied, though the poor suffer.",
+                        stats: { power: 10, happiness: -15, wealth: 0 },
+                        correct: true 
+                    }
+                ],
+                kusp: "Concept: Social Hierarchy (Pyramid)"
+            },
+            {
+                id: 4,
+                title: "Diplomatic Meeting",
+                narrative: "You travel to the lands of the Haudenosaunee. You wish to speak to their leader. You see a Council of Men (Hoyaneh) and a group of Elder Women (Clan Mothers).",
+                rolePlayQ: "Based on their **Matrilineal** system, who do you acknowledge as having the power to select and remove the chiefs?",
+                options: [
+                    { 
+                        text: "I bow to the Clan Mothers.", 
+                        outcome: "They respect your wisdom. Diplomatic relations improve.",
+                        stats: { power: 5, happiness: 10, wealth: 5 },
+                        correct: true 
+                    },
+                    { 
+                        text: "I ignore the women and speak only to the men.", 
+                        outcome: "You have offended them. The Clan Mothers hold the true authority.",
+                        stats: { power: -5, happiness: -5, wealth: 0 },
+                        correct: false
+                    }
+                ],
+                kusp: "Concept: Indigenous Matriarchy"
+            },
+            {
+                id: 5,
+                title: "The Empty Treasury",
+                narrative: "Your wars have drained the treasury. Your advisors warn of collapse. You must transform your civilization into an **Empire** to gain more resources.",
+                rolePlayQ: "How will you expand your influence to fill the treasury?",
+                options: [
+                    { 
+                        text: "I will demand higher taxes from the poor.", 
+                        outcome: "The poor have nothing left. A revolt begins.",
+                        stats: { power: -10, happiness: -20, wealth: 5 },
+                        correct: false
+                    },
+                    { 
+                        text: "We will seize control of the Gold and Salt trade routes.", 
+                        outcome: "Trade flows into your cities! Your wealth skyrockets.",
+                        stats: { power: 10, happiness: 5, wealth: 20 },
+                        correct: true 
+                    },
+                    { 
+                        text: "I will sell the palace furniture.", 
+                        outcome: "A temporary fix, but not how Empires are built.",
+                        stats: { power: -5, happiness: -5, wealth: 5 },
+                        correct: false
+                    }
+                ],
+                kusp: "Concept: Empire Growth (Trade)"
+            },
+            {
+                id: 6,
+                title: "The Economic Dispute",
+                narrative: "A neighboring kingdom has blocked your trade caravans! They want the gold for themselves. If you do nothing, your empire will fall like Ghana or Mali.",
+                rolePlayQ: "What is your command?",
+                options: [
+                    { 
+                        text: "Ignore it. We have enough for now.", 
+                        outcome: "Your resources dwindle. Your empire fades into history.",
+                        stats: { power: -20, happiness: -10, wealth: -20 },
+                        correct: false
+                    },
+                    { 
+                        text: "Send the military to secure the route!", 
+                        outcome: "War is costly, but the trade route is restored. Your power endures.",
+                        stats: { power: 15, happiness: -5, wealth: -10 },
+                        correct: true 
+                    }
+                ],
+                kusp: "Concept: Rise and Fall (Economics)"
+            }
+        ];
+
+        // --- Game State ---
+        let currentState = {
+            step: 'start',
+            scenarioIndex: 0,
+            stats: {
+                power: 50,
+                happiness: 50,
+                wealth: 50
+            }
+        };
+
+        // --- DOM Elements ---
+        const container = document.getElementById('scene-container');
+        const statsHeader = document.getElementById('stats-header');
+        
+        // --- Core Functions ---
+
+        function initGame() {
+            renderStartScreen();
+        }
+
+        function startGame() {
+            currentState.scenarioIndex = 0;
+            currentState.stats = { power: 50, happiness: 50, wealth: 50 };
+            statsHeader.classList.remove('hidden');
+            updateStatsUI();
+            renderScenario();
+        }
+
+        function updateStatsUI() {
+            // Clamp stats between 0 and 100
+            for (const key in currentState.stats) {
+                if (currentState.stats[key] > 100) currentState.stats[key] = 100;
+                if (currentState.stats[key] < 0) currentState.stats[key] = 0;
+            }
+
+            document.getElementById('val-power').innerText = currentState.stats.power;
+            document.getElementById('bar-power').style.width = `${currentState.stats.power}%`;
+            
+            document.getElementById('val-happiness').innerText = currentState.stats.happiness;
+            document.getElementById('bar-happiness').style.width = `${currentState.stats.happiness}%`;
+            
+            document.getElementById('val-wealth').innerText = currentState.stats.wealth;
+            document.getElementById('bar-wealth').style.width = `${currentState.stats.wealth}%`;
+        }
+
+        function showStatChange(element, changes) {
+            // changes = { power: 10, happiness: -5 }
+            const rect = element.getBoundingClientRect();
+            let delay = 0;
+
+            for (const [key, value] of Object.entries(changes)) {
+                if (value === 0) continue;
+                
+                const popup = document.createElement('div');
+                popup.className = 'stat-popup text-xl';
+                const icon = key === 'power' ? '<i class="fa-solid fa-fist-raised"></i>' : 
+                             key === 'happiness' ? '<i class="fa-solid fa-face-smile"></i>' : 
+                             '<i class="fa-solid fa-coins"></i>';
+                
+                const sign = value > 0 ? '+' : '';
+                const color = value > 0 ? 'text-green-600' : 'text-red-600';
+                
+                popup.innerHTML = `<span class="${color}">${icon} ${sign}${value}</span>`;
+                
+                // Randomize position slightly
+                const randomX = (Math.random() - 0.5) * 50;
+                
+                popup.style.left = (rect.width / 2 + randomX) + 'px';
+                popup.style.top = '0px';
+                popup.style.animationDelay = `${delay}s`;
+
+                element.appendChild(popup);
+                delay += 0.2;
+            }
+        }
+
+        // --- Rendering Scenes ---
+
+        function renderStartScreen() {
+            container.innerHTML = `
+                <div class="text-center animate-fade-in max-w-2xl bg-parchment p-12 rounded-lg border-2 border-gold shadow-2xl">
+                    <div class="mb-4 text-imperial text-6xl">
+                        <i class="fa-brands fa-fort-awesome"></i>
+                    </div>
+                    <h1 class="text-5xl font-bold text-imperial mb-2 tracking-widest uppercase">Ruler of the Ancients</h1>
+                    <p class="text-xl text-gray-600 mb-8 font-serif italic">Will you be a Tyrant, a Diplomat, or a Conqueror?</p>
+                    
+                    <div class="text-left bg-white/50 p-6 rounded border border-gray-300 mb-8 text-lg">
+                        <p class="mb-2"><strong><i class="fa-solid fa-crown text-gold-dark"></i> Your Duty:</strong> Guide your civilization through history.</p>
+                        <p class="mb-2"><strong><i class="fa-solid fa-scale-balanced text-imperial"></i> The Challenge:</strong> Balance your 
+                            <span class="text-red-700 font-bold">Power</span>, 
+                            <span class="text-green-700 font-bold">Happiness</span>, and 
+                            <span class="text-yellow-600 font-bold">Wealth</span>.
+                        </p>
+                        <p>If any stat drops to zero, your reign may end in disaster!</p>
+                    </div>
+
+                    <button onclick="startGame()" class="bg-imperial hover:bg-red-900 text-white font-serif font-bold py-4 px-12 rounded shadow-lg text-xl border-2 border-gold transition transform hover:-translate-y-1">
+                        Ascend the Throne
+                    </button>
+                </div>
+            `;
+            statsHeader.classList.add('hidden');
+        }
+
+        function renderScenario() {
+            const scene = scenarios[currentState.scenarioIndex];
+            
+            // Options Generation
+            const optionsHtml = scene.options.map((opt, idx) => `
+                <button onclick="handleChoice(${idx}, this)" class="btn-option w-full text-left bg-parchment border-2 border-[#d4c5a9] p-5 rounded mb-4 flex items-center group relative">
+                    <div class="absolute left-0 top-0 bottom-0 w-2 bg-gray-300 group-hover:bg-imperial transition-colors"></div>
+                    <span class="w-8 h-8 rounded-full bg-white border border-gray-400 text-gray-600 font-bold flex flex-shrink-0 items-center justify-center mr-4 group-hover:border-imperial group-hover:text-imperial">${String.fromCharCode(65 + idx)}</span>
+                    <span class="text-lg font-serif text-gray-800">${opt.text}</span>
+                </button>
+            `).join('');
+
+            container.innerHTML = `
+                <div class="w-full max-w-3xl animate-fade-in flex flex-col">
+                    <div class="text-gold-dark font-serif font-bold text-sm tracking-[0.2em] mb-2 uppercase text-center">Year ${100 + (currentState.scenarioIndex * 50)} BC</div>
+                    
+                    <div class="bg-white/80 p-8 rounded-lg border-2 border-gray-300 shadow-sm mb-6 relative">
+                        <!-- Decorative Corners -->
+                        <div class="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-imperial"></div>
+                        <div class="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-imperial"></div>
+                        <div class="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-imperial"></div>
+                        <div class="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-imperial"></div>
+
+                        <h2 class="text-3xl font-bold text-center text-imperial mb-4 font-serif">${scene.title}</h2>
+                        <p class="text-xl text-gray-800 leading-relaxed mb-4 italic font-serif">"${scene.narrative}"</p>
+                        <p class="text-lg text-black font-bold border-t border-gray-300 pt-4">${scene.rolePlayQ}</p>
+                    </div>
+
+                    <div class="w-full">
+                        ${optionsHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        function handleChoice(optionIndex, btnElement) {
+            const scene = scenarios[currentState.scenarioIndex];
+            const choice = scene.options[optionIndex];
+
+            // 1. Disable all buttons
+            const buttons = container.querySelectorAll('.btn-option');
+            buttons.forEach(btn => {
+                btn.disabled = true;
+                btn.classList.add('opacity-60');
+            });
+            btnElement.classList.remove('opacity-60');
+
+            // 2. Visual Feedback on Button
+            if (choice.correct) {
+                btnElement.classList.add('correct-answer');
+            } else {
+                btnElement.classList.add('wrong-answer');
+            }
+
+            // 3. Update Stats
+            currentState.stats.power += choice.stats.power;
+            currentState.stats.happiness += choice.stats.happiness;
+            currentState.stats.wealth += choice.stats.wealth;
+            
+            // 4. Show Floating Numbers
+            showStatChange(btnElement, choice.stats);
+            updateStatsUI();
+
+            // 5. Show Outcome Modal
+            setTimeout(() => {
+                showOutcome(choice, scene.kusp);
+            }, 1000);
+        }
+
+        function showOutcome(choice, kuspText) {
+            const isGood = choice.correct;
+            const title = isGood ? "Wise Decree" : "Questionable Decision";
+            const colorClass = isGood ? "text-green-800" : "text-red-800";
+            
+            container.innerHTML = `
+                <div class="animate-fade-in text-center max-w-xl p-10 bg-parchment rounded-lg shadow-2xl border-4 border-double ${isGood ? 'border-green-600' : 'border-red-600'} relative">
+                    <div class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-2">${kuspText}</div>
+                    <h2 class="text-4xl font-serif font-bold ${colorClass} mb-4">${title}</h2>
+                    <hr class="border-gray-400 mb-6 w-1/2 mx-auto">
+                    <p class="text-2xl text-gray-800 mb-8 font-serif italic">"${choice.outcome}"</p>
+                    
+                    <button onclick="nextScenario()" class="bg-imperial hover:bg-red-900 text-white font-bold py-3 px-10 rounded shadow-md transition transform hover:-translate-y-1 font-serif text-lg">
+                        Proceed <i class="fa-solid fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+            `;
+        }
+
+        function nextScenario() {
+            // Check for Game Over conditions (if we wanted strict difficulty)
+            // For Grade 5, we stick to narrative flow, but could add "Revolt" screen here if happiness < 10.
+
+            currentState.scenarioIndex++;
+            if (currentState.scenarioIndex < scenarios.length) {
+                renderScenario();
+            } else {
+                renderEndScreen();
+            }
+        }
+
+        function renderEndScreen() {
+            const { power, happiness, wealth } = currentState.stats;
+            const total = power + happiness + wealth;
+            
+            let title = "The Forgotten Ruler";
+            let desc = "Your reign was short and unmemorable.";
+
+            if (power > 80 && happiness < 30) {
+                title = "The Iron Tyrant";
+                desc = "You built a powerful empire, but your people lived in fear. History remembers your strength, but not your kindness.";
+            } else if (wealth > 80 && power < 40) {
+                title = "The Merchant King";
+                desc = "Your coffers overflowed with gold, but your armies were weak. You were eventually conquered by a stronger neighbor.";
+            } else if (happiness > 70 && power > 50) {
+                title = "The Benevolent Architect";
+                desc = "A Golden Age! You balanced power with the needs of the people. Statues are built in your honor.";
+            } else if (total > 150) {
+                title = "The Great Emperor";
+                desc = "You navigated the complexities of history with skill. Your civilization stands the test of time.";
+            }
+
+            container.innerHTML = `
+                <div class="text-center animate-fade-in max-w-2xl">
+                    <div class="mb-4">
+                        <i class="fa-solid fa-crown text-6xl text-gold-dark animate-bounce"></i>
+                    </div>
+                    
+                    <h1 class="text-5xl font-bold text-imperial mb-2 font-serif">${title}</h1>
+                    <div class="w-32 h-1 bg-gold mx-auto mb-6"></div>
+                    
+                    <p class="text-2xl text-gray-800 font-serif italic mb-8">"${desc}"</p>
+                    
+                    <div class="grid grid-cols-3 gap-4 mb-8 bg-white/50 p-4 rounded border border-gray-400">
+                        <div>
+                            <div class="text-xs uppercase text-gray-500">Power</div>
+                            <div class="text-xl font-bold text-red-700">${power}</div>
+                        </div>
+                        <div>
+                            <div class="text-xs uppercase text-gray-500">Happiness</div>
+                            <div class="text-xl font-bold text-green-700">${happiness}</div>
+                        </div>
+                        <div>
+                            <div class="text-xs uppercase text-gray-500">Wealth</div>
+                            <div class="text-xl font-bold text-yellow-600">${wealth}</div>
+                        </div>
+                    </div>
+
+                    <button onclick="startGame()" class="bg-white border-2 border-imperial text-imperial hover:bg-imperial hover:text-white font-bold py-3 px-8 rounded text-lg transition shadow-md font-serif">
+                        <i class="fa-solid fa-rotate-right mr-2"></i> Rule Again
+                    </button>
+                </div>
+            `;
+            statsHeader.classList.add('hidden');
+        }
+
+        // Start
+        initGame();
+
+    </script>
+</body>
+</html>
+
