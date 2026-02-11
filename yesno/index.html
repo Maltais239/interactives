@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yes / No Board</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Disable text selection to keep it clean */
+        body {
+            user-select: none;
+            overflow: hidden; /* Prevent scrolling */
+        }
+        
+        /* Smooth brightness transition */
+        .option-panel {
+            transition: filter 0.1s ease, transform 0.1s ease;
+        }
+
+        /* Visual feedback on active state */
+        .option-panel.active {
+            filter: brightness(1.2);
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 h-screen w-screen flex flex-col font-sans">
+
+    <!-- MAIN APP CONTAINER -->
+    <main class="flex-1 flex w-full h-full relative">
+        
+        <!-- YES SECTION (LEFT) -->
+        <div id="yes-zone" 
+             class="option-panel w-1/2 h-full bg-green-500 flex items-center justify-center cursor-pointer border-r-4 border-black/20"
+             onmouseenter="triggerResponse('yes')"
+             onclick="triggerResponse('yes')"
+             >
+            <div class="text-center pointer-events-none">
+                <!-- Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32 mx-auto text-white mb-4 opacity-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7" />
+                </svg>
+                <!-- Text -->
+                <h1 class="text-[15vw] font-black text-white leading-none drop-shadow-lg tracking-wider">YES</h1>
+            </div>
+        </div>
+
+        <!-- NO SECTION (RIGHT) -->
+        <div id="no-zone" 
+             class="option-panel w-1/2 h-full bg-red-500 flex items-center justify-center cursor-pointer border-l-4 border-black/20"
+             onmouseenter="triggerResponse('no')"
+             onclick="triggerResponse('no')"
+             >
+            <div class="text-center pointer-events-none">
+                <!-- Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-32 w-32 mx-auto text-white mb-4 opacity-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <!-- Text -->
+                <h1 class="text-[15vw] font-black text-white leading-none drop-shadow-lg tracking-wider">NO</h1>
+            </div>
+        </div>
+        
+        <!-- Helpful hint if audio is blocked by browser policy -->
+        <div id="audio-hint" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 text-white/30 text-sm pointer-events-none">
+            (If no sound, click anywhere once to enable)
+        </div>
+
+    </main>
+
+    <script>
+        let voices = [];
+        let lastTriggerTime = 0;
+
+        // Load voices robustly for different browsers
+        function loadVoices() {
+            voices = window.speechSynthesis.getVoices();
+        }
+
+        // Initialize voices
+        loadVoices();
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = loadVoices;
+        }
+
+        // Silent interaction listener to wake up audio context if browser blocked it
+        document.addEventListener('click', () => {
+            window.speechSynthesis.resume();
+            document.getElementById('audio-hint').style.display = 'none';
+        }, { once: true });
+
+        function triggerResponse(type) {
+            const now = Date.now();
+            // Tiny debounce (100ms) just to stop glitching if mouse is exactly on the pixel line
+            if (now - lastTriggerTime < 100) return; 
+            lastTriggerTime = now;
+
+            // Visual Feedback
+            const element = document.getElementById(type + '-zone');
+            
+            // Reset previous active states immediately
+            document.querySelectorAll('.option-panel').forEach(el => {
+                el.classList.remove('active');
+                el.style.transform = 'scale(1)';
+            });
+
+            // Activate current
+            element.classList.add('active');
+            element.style.transform = 'scale(1.02)';
+            
+            // Quick reset visual after animation
+            setTimeout(() => {
+                element.classList.remove('active');
+                element.style.transform = 'scale(1)';
+            }, 200);
+
+            // Audio Feedback (Speech only)
+            speakText(type === 'yes' ? 'Yes' : 'No');
+        }
+
+        function speakText(text) {
+            // Cancel any currently speaking audio immediately so the new word plays instantly
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0; 
+            utterance.pitch = 1;
+            utterance.volume = 1;
+            
+            // Try to select a clear English voice
+            const preferredVoice = voices.find(voice => voice.lang.startsWith('en')) || voices[0];
+            if (preferredVoice) utterance.voice = preferredVoice;
+
+            window.speechSynthesis.speak(utterance);
+        }
+    </script>
+</body>
+</html>
