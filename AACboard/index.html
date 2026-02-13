@@ -1,313 +1,519 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, X, Volume2, Trash2, Settings, Search, LayoutGrid, RefreshCw, MessageSquare } from 'lucide-react';
-
-// Refined color palette with better contrast and "tactile" border colors
-const COLORS = [
-  { label: 'People (Yellow)', value: 'bg-amber-50 border-amber-400 text-amber-950 shadow-amber-200' },
-  { label: 'Verbs (Green)', value: 'bg-emerald-50 border-emerald-400 text-emerald-950 shadow-emerald-200' },
-  { label: 'Nouns (Orange)', value: 'bg-orange-50 border-orange-400 text-orange-950 shadow-orange-200' },
-  { label: 'Adjectives (Blue)', value: 'bg-sky-50 border-sky-400 text-sky-950 shadow-sky-200' },
-  { label: 'Social (Pink)', value: 'bg-pink-50 border-pink-400 text-pink-950 shadow-pink-200' },
-  { label: 'Negation (Red)', value: 'bg-red-50 border-red-400 text-red-950 shadow-red-200' },
-  { label: 'Misc (White)', value: 'bg-white border-slate-300 text-slate-900 shadow-slate-200' },
-];
-
-const DEFAULT_WORDS = [
-  { id: 1, text: "I", color: "bg-amber-50 border-amber-400 text-amber-950 shadow-amber-200" },
-  { id: 2, text: "want", color: "bg-emerald-50 border-emerald-400 text-emerald-950 shadow-emerald-200" },
-  { id: 3, text: "stop", color: "bg-red-50 border-red-400 text-red-950 shadow-red-200" },
-  { id: 4, text: "go", color: "bg-emerald-50 border-emerald-400 text-emerald-950 shadow-emerald-200" },
-  { id: 5, text: "more", color: "bg-sky-50 border-sky-400 text-sky-950 shadow-sky-200" },
-  { id: 6, text: "help", color: "bg-pink-50 border-pink-400 text-pink-950 shadow-pink-200" },
-  { id: 7, text: "yes", color: "bg-emerald-50 border-emerald-400 text-emerald-950 shadow-emerald-200" },
-  { id: 8, text: "no", color: "bg-red-50 border-red-400 text-red-950 shadow-red-200" },
-];
-
-export default function App() {
-  const [cards, setCards] = useState([]);
-  const [sentence, setSentence] = useState([]);
-  const [isEditMode, setIsEditMode] = useState(false);
-  
-  // New Card State
-  const [newWord, setNewWord] = useState("");
-  const [selectedColor, setSelectedColor] = useState(COLORS[6].value);
-  const [isSearching, setIsSearching] = useState(false);
-
-  useEffect(() => {
-    // Load initial default cards
-    const loadDefaults = async () => {
-      const loaded = [];
-      for (const item of DEFAULT_WORDS) {
-        const img = await fetchArasaacImage(item.text);
-        loaded.push({ ...item, image: img });
-      }
-      setCards(loaded);
-    };
-    loadDefaults();
-  }, []);
-
-  // --- API HELPER ---
-  const fetchArasaacImage = async (query) => {
-    try {
-      const searchRes = await fetch(`https://api.arasaac.org/api/pictograms/en/bestsearch/${query.toLowerCase()}`);
-      if (!searchRes.ok) return null;
-      const data = await searchRes.json();
-      
-      if (data && data.length > 0) {
-        return `https://static.arasaac.org/pictograms/${data[0]._id}/${data[0]._id}_300.png`;
-      }
-      return null;
-    } catch (e) {
-      console.error("Failed to fetch image", e);
-      return null;
-    }
-  };
-
-  // --- ACTIONS ---
-  const handleAddCard = async (e) => {
-    e.preventDefault();
-    if (!newWord.trim()) return;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AAC Communication Board</title>
     
-    setIsSearching(true);
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 
-    const imageUrl = await fetchArasaacImage(newWord);
+    <style>
+        /* Hide scrollbar for clean horizontal scrolling */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        /* Smooth transitions */
+        .card-enter {
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
 
-    const newCard = {
-      id: Date.now(),
-      text: newWord,
-      image: imageUrl,
-      color: selectedColor
-    };
+        .no-select { user-select: none; -webkit-user-select: none; }
+    </style>
+</head>
+<body class="bg-slate-200 min-h-screen flex flex-col font-sans selection:bg-blue-200 transition-colors duration-300" id="body-bg">
 
-    setCards([...cards, newCard]);
-    setNewWord("");
-    setIsSearching(false);
-  };
-
-  const handleCardClick = (card) => {
-    if (isEditMode) return;
-    speak(card.text);
-    setSentence([...sentence, card]);
-  };
-
-  const speak = (text) => {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    // Use a slightly clearer/slower rate for AAC
-    utterance.rate = 0.9;
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const speakSentence = () => {
-    const fullText = sentence.map(s => s.text).join(" ");
-    speak(fullText);
-  };
-
-  const removeCard = (id) => {
-    setCards(cards.filter(c => c.id !== id));
-  };
-
-  const clearSentence = () => {
-    setSentence([]);
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-sans selection:bg-blue-200">
-      
-      {/* --- SENTENCE STRIP --- */}
-      <div className="bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-20 shadow-sm">
-        <div className="max-w-6xl mx-auto flex items-stretch gap-3 h-24">
-          
-          {/* The "Tray" */}
-          <div className="flex-1 bg-slate-50 rounded-2xl border-2 border-slate-200 shadow-inner p-2 flex items-center gap-2 overflow-x-auto no-scrollbar relative">
-            {sentence.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center text-slate-300 pointer-events-none select-none">
-                <MessageSquare className="w-6 h-6 mr-2 opacity-50" />
-                <span className="font-medium text-lg">Tap cards to speak...</span>
-              </div>
-            )}
-            {sentence.map((item, idx) => (
-              <div key={idx} className="flex-shrink-0 flex flex-col items-center bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm h-full w-20 justify-center animate-in zoom-in-50 duration-200">
-                {item.image && <img src={item.image} alt="" className="w-10 h-10 object-contain mb-1" />}
-                <span className="font-bold text-xs text-slate-700 capitalize leading-tight text-center line-clamp-2">{item.text}</span>
-              </div>
-            ))}
-          </div>
-          
-          {/* Action Buttons */}
-          <div className="flex flex-col gap-2">
-            <button 
-              onClick={speakSentence}
-              disabled={sentence.length === 0}
-              className="flex-1 px-5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl shadow-[0_4px_0_rgb(29,78,216)] active:shadow-none active:translate-y-[4px] transition-all disabled:opacity-50 disabled:shadow-none disabled:translate-y-[4px] disabled:cursor-not-allowed flex items-center justify-center"
-              title="Speak Sentence"
-            >
-              <Volume2 size={28} />
-            </button>
-            <button 
-              onClick={clearSentence}
-              disabled={sentence.length === 0}
-              className="flex-1 px-5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-xl shadow-[0_4px_0_rgb(148,163,184)] active:shadow-none active:translate-y-[4px] transition-all disabled:opacity-50 disabled:shadow-none disabled:translate-y-[4px] flex items-center justify-center"
-              title="Clear"
-            >
-              <Trash2 size={24} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* --- MAIN GRID --- */}
-      <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-6">
+    <!-- SENTENCE STRIP -->
+    <div class="bg-white border-b border-slate-300 px-4 py-3 sticky top-0 z-20 shadow-md">
+        <div class="max-w-6xl mx-auto flex items-stretch gap-3 h-24">
             
-            {cards.map((card) => (
-              <div 
-                key={card.id} 
-                onClick={() => handleCardClick(card)}
-                className={`
-                  relative aspect-[4/5] sm:aspect-square flex flex-col items-center justify-between p-3 rounded-2xl border-[3px] border-b-[6px] transition-all duration-150 group
-                  ${card.color}
-                  ${isEditMode ? 'cursor-default opacity-60 scale-95 border-dashed' : 'cursor-pointer hover:-translate-y-1 active:translate-y-[2px] active:border-b-[3px]'}
-                `}
-              >
-                {/* Delete Button (Edit Mode Only) */}
-                {isEditMode && (
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); removeCard(card.id); }}
-                    className="absolute -top-3 -right-3 bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 z-10 hover:scale-110 transition-transform"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-                
-                {/* Card Content */}
-                <div className="flex-1 flex items-center justify-center w-full p-1">
-                  {card.image ? (
-                    <img src={card.image} alt={card.text} className="max-w-full max-h-full object-contain drop-shadow-sm group-hover:scale-110 transition-transform duration-300" />
-                  ) : (
-                    <span className="text-4xl select-none">💭</span>
-                  )}
+            <!-- The "Tray" -->
+            <div id="sentence-tray" class="flex-1 bg-slate-50 rounded-lg border-2 border-slate-200 shadow-inner p-2 flex items-center gap-2 overflow-x-auto no-scrollbar relative">
+                <div id="empty-msg" class="absolute inset-0 flex items-center justify-center text-slate-300 pointer-events-none select-none">
+                    <i data-lucide="message-square" class="w-6 h-6 mr-2 opacity-50"></i>
+                    <span class="font-medium text-lg">Tap cards to speak...</span>
                 </div>
-                
-                {/* Label */}
-                <div className="w-full text-center mt-1">
-                    <span className="font-extrabold text-lg sm:text-xl tracking-wide capitalize leading-none block truncate px-1 select-none">
-                        {card.text}
-                    </span>
-                </div>
-              </div>
-            ))}
-
-            {/* Empty State */}
-            {cards.length === 0 && !isEditMode && (
-              <div className="col-span-full flex flex-col items-center justify-center py-24 text-slate-300">
-                <LayoutGrid size={80} strokeWidth={1.5} />
-                <p className="mt-4 text-xl font-medium">Board is empty</p>
-                <p className="text-sm opacity-70">Open Teacher Tools to add cards</p>
-              </div>
-            )}
-          </div>
+                <div id="sentence-content" class="flex items-center gap-2 h-full"></div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex flex-col gap-2 w-20 sm:w-24">
+                <button onclick="speakSentence()" id="btn-speak" disabled class="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">
+                    <i data-lucide="volume-2" class="w-6 h-6"></i>
+                </button>
+                <button onclick="clearSentence()" id="btn-clear" disabled class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-lg shadow-sm active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center">
+                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                </button>
+            </div>
         </div>
-      </main>
+    </div>
 
-      {/* --- TEACHER TOOLS DRAWER --- */}
-      <div className={`
-        fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] transition-transform duration-300 z-30
-        ${isEditMode ? 'translate-y-0' : 'translate-y-[calc(100%-4.5rem)]'}
-      `}>
-        {/* Toggle Handle */}
-        <div 
-            onClick={() => setIsEditMode(!isEditMode)}
-            className="h-[4.5rem] flex items-center justify-between px-4 sm:px-8 cursor-pointer hover:bg-slate-50 border-b border-slate-100 group"
-        >
-            <div className="flex items-center gap-4">
-                <div className={`
-                    p-2.5 rounded-xl transition-colors
-                    ${isEditMode ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'}
-                `}>
-                    <Settings size={24} />
+    <!-- MAIN GRID -->
+    <main class="flex-1 p-4 sm:p-6 overflow-y-auto pb-64">
+        <div class="max-w-6xl mx-auto">
+            <div id="card-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4 transition-all">
+                <!-- Cards injected by JS -->
+            </div>
+            
+            <div id="empty-state" class="hidden flex flex-col items-center justify-center py-24 text-slate-400">
+                <i data-lucide="layout-grid" class="w-20 h-20 opacity-50" stroke-width="1.5"></i>
+                <p class="mt-4 text-xl font-medium">Board is empty</p>
+                <p class="text-sm opacity-70">Open Teacher Tools to add cards</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- TEACHER TOOLS DRAWER -->
+    <div id="drawer" class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] transition-transform duration-300 z-30 translate-y-[calc(100%-4.5rem)]">
+        
+        <!-- Toggle Handle -->
+        <div onclick="toggleEditMode()" class="h-[4.5rem] flex items-center justify-between px-4 sm:px-8 cursor-pointer hover:bg-slate-50 border-b border-slate-100 group">
+            <div class="flex items-center gap-4">
+                <div id="drawer-icon-bg" class="p-2.5 rounded-xl transition-colors bg-slate-100 text-slate-500 group-hover:bg-slate-200">
+                    <i data-lucide="settings" class="w-6 h-6"></i>
                 </div>
                 <div>
-                    <h3 className="font-bold text-slate-800 text-lg">Teacher Tools</h3>
-                    <p className="text-xs text-slate-500 font-medium">{isEditMode ? 'Tap to close editor' : 'Tap to customize board'}</p>
+                    <h3 class="font-bold text-slate-800 text-lg">Teacher Tools</h3>
+                    <p id="drawer-text" class="text-xs text-slate-500 font-medium">Tap to customize board</p>
                 </div>
             </div>
-            <div className={`
-                text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider
-                ${isEditMode ? 'bg-slate-100 text-slate-500' : 'bg-blue-600 text-white animate-pulse'}
-            `}>
-                {isEditMode ? 'Close' : 'Edit'}
+            <div id="edit-badge" class="text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider bg-blue-600 text-white animate-pulse">
+                Edit
             </div>
         </div>
 
-        {/* Editor Content */}
-        <div className="p-6 bg-slate-50/50 max-h-[60vh] overflow-y-auto">
-            <div className="max-w-4xl mx-auto space-y-6">
+        <!-- Editor Content -->
+        <div class="p-6 bg-slate-50/50 max-h-[60vh] overflow-y-auto">
+            <div class="max-w-4xl mx-auto space-y-8">
                 
-                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                    <h4 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
-                        <Plus size={20} className="text-blue-500" /> 
+                <!-- STYLE SWITCHER -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                     <h4 class="font-bold text-slate-700 mb-4 flex items-center gap-2 text-sm uppercase tracking-wider">
+                        <i data-lucide="palette" class="text-slate-400 w-4 h-4"></i>
+                        Board Style
+                    </h4>
+                    <div class="grid grid-cols-3 gap-3">
+                        <!-- Modern -->
+                        <button onclick="setTheme('modern')" id="theme-btn-modern" class="theme-btn flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-slate-100 hover:border-blue-200 hover:bg-blue-50 transition-all">
+                            <div class="w-full h-10 bg-white border border-slate-200 rounded relative overflow-hidden flex flex-col shadow-sm">
+                                <div class="h-2 w-full bg-blue-500"></div>
+                                <div class="flex-1 flex items-center justify-center text-[10px] text-gray-400">abc</div>
+                            </div>
+                            <span class="text-xs font-bold text-slate-600">Standard</span>
+                        </button>
+                        
+                        <!-- Classic (WFL) -->
+                        <button onclick="setTheme('classic')" id="theme-btn-classic" class="theme-btn flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-slate-100 hover:border-blue-200 hover:bg-blue-50 transition-all">
+                            <div class="w-full h-10 bg-yellow-300 border border-slate-400 rounded relative flex items-center justify-center shadow-sm">
+                                <div class="text-[10px] font-bold text-black">ABC</div>
+                            </div>
+                            <span class="text-xs font-bold text-slate-600">Words for Life</span>
+                        </button>
+                        
+                        <!-- Emoji -->
+                        <button onclick="setTheme('emoji')" id="theme-btn-emoji" class="theme-btn flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-slate-100 hover:border-blue-200 hover:bg-blue-50 transition-all">
+                            <div class="w-full h-10 bg-white rounded-lg shadow-md flex items-center justify-center text-lg">
+                                😀
+                            </div>
+                            <span class="text-xs font-bold text-slate-600">Emoji</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ADD CARD -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <h4 class="font-bold text-slate-700 mb-4 flex items-center gap-2">
+                        <i data-lucide="plus" class="text-blue-500 w-5 h-5"></i>
                         Create New Card
                     </h4>
                     
-                    <form onSubmit={handleAddCard} className="flex flex-col md:flex-row gap-4">
-                        {/* Text Input */}
-                        <div className="flex-1 relative group">
+                    <form onsubmit="handleAddCard(event)" class="flex flex-col md:flex-row gap-4">
+                        <div class="flex-1 relative group">
                             <input
+                                id="new-word-input"
                                 type="text"
-                                value={newWord}
-                                onChange={(e) => setNewWord(e.target.value)}
                                 placeholder="Type a word..."
-                                className="w-full h-14 pl-12 pr-4 rounded-xl border-2 border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all font-bold text-lg text-slate-700 placeholder:text-slate-400"
+                                class="w-full h-14 pl-12 pr-4 rounded-xl border-2 border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all font-bold text-lg text-slate-700 placeholder:text-slate-400"
                             />
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={24} />
+                            <div class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                                <i data-lucide="search" class="w-6 h-6"></i>
+                            </div>
                         </div>
 
-                        {/* Color Selection */}
-                        <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 px-1 items-center no-scrollbar">
-                            {COLORS.map((col, idx) => (
-                                <button
-                                    key={idx}
-                                    type="button"
-                                    onClick={() => setSelectedColor(col.value)}
-                                    className={`
-                                        w-10 h-10 md:w-12 md:h-12 rounded-full border-4 flex-shrink-0 transition-all duration-200 relative
-                                        ${col.value.split(' ')[0]} 
-                                        ${col.value.split(' ')[1]}
-                                        ${selectedColor === col.value ? 'scale-110 -translate-y-1 shadow-md ring-2 ring-blue-500 ring-offset-2' : 'hover:scale-105 opacity-80 hover:opacity-100'}
-                                    `}
-                                    title={col.label}
-                                >
-                                    {selectedColor === col.value && (
-                                        <div className="absolute inset-0 flex items-center justify-center">
-                                            <div className="w-2 h-2 bg-slate-900 rounded-full opacity-20" />
-                                        </div>
-                                    )}
-                                </button>
-                            ))}
+                        <div id="color-picker" class="flex gap-2 overflow-x-auto pb-2 md:pb-0 px-1 items-center no-scrollbar">
+                            <!-- Injected by JS -->
                         </div>
 
-                        {/* Add Button */}
                         <button 
+                            id="btn-add"
                             type="submit" 
-                            disabled={!newWord || isSearching}
-                            className="h-14 px-8 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 active:scale-95 disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[140px] shadow-lg shadow-blue-600/20 transition-all"
+                            disabled
+                            class="h-14 px-8 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 active:scale-95 disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[140px] shadow-lg shadow-blue-600/20 transition-all"
                         >
-                            {isSearching ? <RefreshCw className="animate-spin" /> : 'Add'}
+                            Add
                         </button>
                     </form>
                 </div>
-
-                <div className="text-center">
-                   <p className="text-xs font-medium text-slate-400 uppercase tracking-widest">
-                        Powered by ARASAAC Symbols
-                    </p>
-                </div>
             </div>
         </div>
-      </div>
-
     </div>
-  );
-}
+
+    <script>
+        // --- DATA ---
+        // COLORS: 'full' is used for the Words for Life theme
+        const COLORS = [
+            { label: 'People (Yellow)', bar: 'bg-amber-400', full: 'bg-yellow-300 border-yellow-500', ring: 'ring-amber-400' },
+            { label: 'Verbs (Green)', bar: 'bg-green-500', full: 'bg-green-300 border-green-500', ring: 'ring-green-500' },
+            { label: 'Nouns (Orange)', bar: 'bg-orange-400', full: 'bg-orange-300 border-orange-500', ring: 'ring-orange-400' },
+            { label: 'Adjectives (Blue)', bar: 'bg-blue-400', full: 'bg-blue-200 border-blue-400', ring: 'ring-blue-400' },
+            { label: 'Social (Pink)', bar: 'bg-pink-400', full: 'bg-pink-200 border-pink-400', ring: 'ring-pink-400' },
+            { label: 'Negation (Red)', bar: 'bg-red-500', full: 'bg-red-200 border-red-400', ring: 'ring-red-500' },
+            { label: 'Misc (White)', bar: 'bg-slate-200', full: 'bg-white border-slate-300', ring: 'ring-slate-300' },
+        ];
+
+        const DEFAULT_WORDS = [
+            { text: "I", color: COLORS[0], emoji: "🙋" },
+            { text: "want", color: COLORS[1], emoji: "🤲" },
+            { text: "stop", color: COLORS[5], emoji: "🛑" },
+            { text: "go", color: COLORS[1], emoji: "🟢" },
+            { text: "more", color: COLORS[3], emoji: "➕" },
+            { text: "help", color: COLORS[4], emoji: "🆘" },
+            { text: "yes", color: COLORS[1], emoji: "👍" },
+            { text: "no", color: COLORS[5], emoji: "👎" },
+        ];
+
+        // --- STATE ---
+        let cards = [];
+        let sentence = [];
+        let isEditMode = false;
+        let selectedColor = COLORS[6];
+        let currentTheme = 'modern'; // modern | classic | emoji
+
+        // --- INIT ---
+        async function init() {
+            renderColorPicker();
+            updateThemeUI();
+            
+            document.getElementById('new-word-input').addEventListener('input', (e) => {
+                const btn = document.getElementById('btn-add');
+                if (e.target.value.trim().length > 0) btn.removeAttribute('disabled');
+                else btn.setAttribute('disabled', 'true');
+            });
+
+            // Load defaults
+            for (const item of DEFAULT_WORDS) {
+                const arasaacId = await fetchArasaacId(item.text);
+                cards.push({ 
+                    id: Date.now() + Math.random(), 
+                    text: item.text, 
+                    arasaacId: arasaacId, 
+                    color: item.color,
+                    emoji: item.emoji 
+                });
+                await new Promise(r => setTimeout(r, 20)); 
+            }
+            renderCards();
+        }
+
+        // --- API & HELPERS ---
+        async function fetchArasaacId(query) {
+            try {
+                const searchRes = await fetch(`https://api.arasaac.org/api/pictograms/en/bestsearch/${query.toLowerCase()}`);
+                if (!searchRes.ok) return null;
+                const data = await searchRes.json();
+                if (data && data.length > 0) return data[0]._id;
+                return null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // Extremely basic emoji mapper for new words if search API isn't available
+        function getBasicEmoji(word) {
+            return "💭";
+        }
+
+        function getImageUrl(id) {
+            if (!id) return null;
+            return `https://static.arasaac.org/pictograms/${id}/${id}_300.png`;
+        }
+
+        // --- THEME LOGIC ---
+        function setTheme(themeName) {
+            currentTheme = themeName;
+            updateThemeUI();
+            renderCards();
+            renderSentence();
+        }
+
+        function updateThemeUI() {
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-50', 'border-blue-200');
+                btn.classList.add('border-slate-100');
+            });
+            const activeBtn = document.getElementById(`theme-btn-${currentTheme}`);
+            if(activeBtn) {
+                activeBtn.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50', 'border-blue-200');
+                activeBtn.classList.remove('border-slate-100');
+            }
+
+            const body = document.getElementById('body-bg');
+            if (currentTheme === 'classic') {
+                body.className = "bg-stone-200 min-h-screen flex flex-col font-sans";
+            } else if (currentTheme === 'emoji') {
+                body.className = "bg-indigo-50 min-h-screen flex flex-col font-sans";
+            } else {
+                body.className = "bg-slate-200 min-h-screen flex flex-col font-sans";
+            }
+        }
+
+        // --- ACTIONS ---
+        function speak(text) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 0.9;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function speakSentence() {
+            const fullText = sentence.map(s => s.text).join(" ");
+            speak(fullText);
+        }
+
+        function clearSentence() {
+            sentence = [];
+            renderSentence();
+        }
+
+        function handleCardClick(id) {
+            const card = cards.find(c => c.id == id);
+            if (!card) return;
+            if (isEditMode) return;
+
+            speak(card.text);
+            sentence.push(card);
+            renderSentence();
+            
+            const el = document.getElementById(`card-${id}`);
+            if(el) {
+                el.classList.add('scale-95');
+                setTimeout(() => el.classList.remove('scale-95'), 100);
+            }
+        }
+
+        function removeCard(e, id) {
+            e.stopPropagation();
+            cards = cards.filter(c => c.id != id);
+            renderCards();
+        }
+
+        async function handleAddCard(e) {
+            e.preventDefault();
+            const input = document.getElementById('new-word-input');
+            const btn = document.getElementById('btn-add');
+            const word = input.value.trim();
+            if (!word) return;
+
+            btn.innerHTML = `<i data-lucide="refresh-cw" class="animate-spin w-5 h-5"></i>`;
+            btn.disabled = true;
+            updateIcons();
+
+            const arasaacId = await fetchArasaacId(word);
+            const emojiChar = getBasicEmoji(word); 
+            
+            cards.push({
+                id: Date.now(),
+                text: word,
+                arasaacId: arasaacId,
+                color: selectedColor,
+                emoji: emojiChar
+            });
+
+            input.value = "";
+            btn.innerText = "Add";
+            btn.disabled = true;
+            renderCards();
+        }
+
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            const drawer = document.getElementById('drawer');
+            const badge = document.getElementById('edit-badge');
+            const iconBg = document.getElementById('drawer-icon-bg');
+            const text = document.getElementById('drawer-text');
+
+            if (isEditMode) {
+                drawer.classList.remove('translate-y-[calc(100%-4.5rem)]');
+                drawer.classList.add('translate-y-0');
+                badge.innerText = "Close";
+                badge.classList.remove('bg-blue-600', 'text-white', 'animate-pulse');
+                badge.classList.add('bg-slate-100', 'text-slate-500');
+                iconBg.classList.replace('bg-slate-100', 'bg-blue-100');
+                iconBg.classList.replace('text-slate-500', 'text-blue-600');
+                text.innerText = "Tap to close editor";
+            } else {
+                drawer.classList.add('translate-y-[calc(100%-4.5rem)]');
+                drawer.classList.remove('translate-y-0');
+                badge.innerText = "Edit";
+                badge.classList.add('bg-blue-600', 'text-white', 'animate-pulse');
+                badge.classList.remove('bg-slate-100', 'text-slate-500');
+                iconBg.classList.replace('bg-blue-100', 'bg-slate-100');
+                iconBg.classList.replace('text-blue-600', 'text-slate-500');
+                text.innerText = "Tap to customize board";
+            }
+            renderCards();
+        }
+
+        function selectColor(index) {
+            selectedColor = COLORS[index];
+            renderColorPicker();
+        }
+
+        // --- RENDER ---
+        function updateIcons() {
+            lucide.createIcons();
+        }
+
+        function renderColorPicker() {
+            const container = document.getElementById('color-picker');
+            container.innerHTML = COLORS.map((col, idx) => {
+                // We use 'full' color for preview if theme is classic, otherwise 'bar' color
+                // 'full' usually contains a bg-color and a border-color. We extract the bg part for the circle.
+                const bgClass = col.full.split(' ')[0];
+                const colorClass = currentTheme === 'classic' ? bgClass : col.bar;
+                const isSelected = selectedColor.label === col.label;
+                
+                return `
+                    <button type="button" onclick="selectColor(${idx})"
+                        class="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-white shadow-sm flex-shrink-0 transition-all duration-200 relative ${colorClass} ${isSelected ? 'scale-110 ring-2 ring-offset-2 ring-slate-400' : 'hover:scale-105 opacity-80 hover:opacity-100'}"
+                        title="${col.label}">
+                        ${isSelected ? '<div class="absolute inset-0 flex items-center justify-center"><div class="w-2 h-2 bg-white rounded-full opacity-50"></div></div>' : ''}
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function renderSentence() {
+            const container = document.getElementById('sentence-content');
+            const emptyMsg = document.getElementById('empty-msg');
+            const btnSpeak = document.getElementById('btn-speak');
+            const btnClear = document.getElementById('btn-clear');
+
+            if (sentence.length === 0) {
+                emptyMsg.style.display = 'flex';
+                container.innerHTML = '';
+                btnSpeak.disabled = true;
+                btnClear.disabled = true;
+            } else {
+                emptyMsg.style.display = 'none';
+                btnSpeak.disabled = false;
+                btnClear.disabled = false;
+                
+                container.innerHTML = sentence.map((item, idx) => {
+                    const imgUrl = getImageUrl(item.arasaacId);
+                    
+                    const visual = currentTheme === 'emoji' 
+                        ? `<span class="text-2xl">${item.emoji || '💭'}</span>`
+                        : (imgUrl ? `<img src="${imgUrl}" class="w-8 h-8 object-contain mb-1" />` : '');
+
+                    return `
+                    <div class="card-enter flex-shrink-0 flex flex-col items-center bg-white rounded-lg border border-slate-300 shadow-sm h-full w-20 overflow-hidden">
+                        <div class="h-2 w-full ${item.color.bar}"></div>
+                        <div class="flex-1 flex flex-col items-center justify-center p-1 w-full">
+                            ${visual}
+                            <span class="font-bold text-[10px] text-slate-800 capitalize leading-none text-center line-clamp-1">${item.text}</span>
+                        </div>
+                    </div>
+                `}).join('');
+            }
+        }
+
+        function renderCards() {
+            const grid = document.getElementById('card-grid');
+            const emptyState = document.getElementById('empty-state');
+
+            if (cards.length === 0 && !isEditMode) {
+                emptyState.classList.remove('hidden');
+                grid.innerHTML = '';
+                updateIcons();
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            
+            grid.innerHTML = cards.map(card => {
+                const imgUrl = getImageUrl(card.arasaacId);
+                const deleteBtn = isEditMode ? `
+                    <button onclick="removeCard(event, ${card.id})"
+                        class="absolute top-1 right-1 bg-red-500 text-white p-1.5 rounded-full shadow-md hover:bg-red-600 z-20 hover:scale-110 transition-transform flex items-center justify-center">
+                        <i data-lucide="x" class="w-3 h-3"></i>
+                    </button>` : '';
+
+                let containerClass = "relative aspect-[4/5] sm:aspect-square flex flex-col items-center transition-all duration-200 card-bg ";
+                let innerContent = "";
+
+                // --- THEME 1: MODERN (Proloquo) ---
+                if (currentTheme === 'modern') {
+                    containerClass += "bg-white rounded-xl shadow-sm border border-slate-300 overflow-hidden hover:shadow-md hover:-translate-y-1";
+                    innerContent = `
+                        <div class="h-4 sm:h-5 w-full ${card.color.bar} shrink-0"></div>
+                        <div class="w-full text-center pt-2 px-1"><span class="font-bold text-sm sm:text-lg text-slate-900 capitalize leading-none block truncate">${card.text}</span></div>
+                        <div class="flex-1 flex items-center justify-center w-full p-2 overflow-hidden">
+                            ${imgUrl ? `<img src="${imgUrl}" class="w-full h-full object-contain" draggable="false" />` : '<span class="text-3xl sm:text-4xl select-none opacity-20">💭</span>'}
+                        </div>
+                    `;
+                } 
+                // --- THEME 2: WORDS FOR LIFE (Full Color) ---
+                else if (currentTheme === 'classic') {
+                    // Full background color, simple border, square look
+                    containerClass += `${card.color.full} rounded-md border-2 hover:brightness-95 shadow-sm`;
+                    innerContent = `
+                        <div class="w-full text-center pt-1 px-1"><span class="font-bold text-sm sm:text-lg text-black capitalize leading-none block truncate">${card.text}</span></div>
+                        <div class="flex-1 flex items-center justify-center w-full p-2 overflow-hidden">
+                            <!-- Note: Using colored ARASAAC to mimic WFL look -->
+                            ${imgUrl ? `<img src="${imgUrl}" class="w-full h-full object-contain" draggable="false" />` : '<span class="text-3xl sm:text-4xl select-none opacity-20">💭</span>'}
+                        </div>
+                    `;
+                } 
+                // --- THEME 3: EMOJI (OpenMoji Style) ---
+                else if (currentTheme === 'emoji') {
+                    containerClass += "bg-white rounded-[1.5rem] shadow-[0_8px_20px_-8px_rgba(0,0,0,0.1)] hover:shadow-[0_12px_24px_-8px_rgba(0,0,0,0.15)] hover:scale-105";
+                    innerContent = `
+                        <div class="flex-1 flex items-center justify-center w-full p-2 overflow-hidden">
+                             <span class="text-5xl sm:text-6xl select-none filter drop-shadow-sm">${card.emoji || '💭'}</span>
+                        </div>
+                        <div class="w-full text-center pb-3 px-1"><span class="font-bold text-slate-500 uppercase tracking-wide text-[10px] sm:text-xs block truncate">${card.text}</span></div>
+                    `;
+                }
+
+                if (isEditMode) containerClass += " opacity-80 cursor-default animate-pulse";
+                else containerClass += " cursor-pointer active:scale-95";
+
+                return `
+                    <div id="card-${card.id}" onclick="handleCardClick(${card.id})" class="${containerClass}">
+                        ${deleteBtn}
+                        ${innerContent}
+                    </div>
+                `;
+            }).join('');
+
+            updateIcons();
+        }
+
+        init();
+    </script>
+</body>
+</html>
