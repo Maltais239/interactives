@@ -1,0 +1,313 @@
+import React, { useState, useEffect } from 'react';
+import { Plus, X, Volume2, Trash2, Settings, Search, LayoutGrid, RefreshCw, MessageSquare } from 'lucide-react';
+
+// Refined color palette with better contrast and "tactile" border colors
+const COLORS = [
+  { label: 'People (Yellow)', value: 'bg-amber-50 border-amber-400 text-amber-950 shadow-amber-200' },
+  { label: 'Verbs (Green)', value: 'bg-emerald-50 border-emerald-400 text-emerald-950 shadow-emerald-200' },
+  { label: 'Nouns (Orange)', value: 'bg-orange-50 border-orange-400 text-orange-950 shadow-orange-200' },
+  { label: 'Adjectives (Blue)', value: 'bg-sky-50 border-sky-400 text-sky-950 shadow-sky-200' },
+  { label: 'Social (Pink)', value: 'bg-pink-50 border-pink-400 text-pink-950 shadow-pink-200' },
+  { label: 'Negation (Red)', value: 'bg-red-50 border-red-400 text-red-950 shadow-red-200' },
+  { label: 'Misc (White)', value: 'bg-white border-slate-300 text-slate-900 shadow-slate-200' },
+];
+
+const DEFAULT_WORDS = [
+  { id: 1, text: "I", color: "bg-amber-50 border-amber-400 text-amber-950 shadow-amber-200" },
+  { id: 2, text: "want", color: "bg-emerald-50 border-emerald-400 text-emerald-950 shadow-emerald-200" },
+  { id: 3, text: "stop", color: "bg-red-50 border-red-400 text-red-950 shadow-red-200" },
+  { id: 4, text: "go", color: "bg-emerald-50 border-emerald-400 text-emerald-950 shadow-emerald-200" },
+  { id: 5, text: "more", color: "bg-sky-50 border-sky-400 text-sky-950 shadow-sky-200" },
+  { id: 6, text: "help", color: "bg-pink-50 border-pink-400 text-pink-950 shadow-pink-200" },
+  { id: 7, text: "yes", color: "bg-emerald-50 border-emerald-400 text-emerald-950 shadow-emerald-200" },
+  { id: 8, text: "no", color: "bg-red-50 border-red-400 text-red-950 shadow-red-200" },
+];
+
+export default function App() {
+  const [cards, setCards] = useState([]);
+  const [sentence, setSentence] = useState([]);
+  const [isEditMode, setIsEditMode] = useState(false);
+  
+  // New Card State
+  const [newWord, setNewWord] = useState("");
+  const [selectedColor, setSelectedColor] = useState(COLORS[6].value);
+  const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+    // Load initial default cards
+    const loadDefaults = async () => {
+      const loaded = [];
+      for (const item of DEFAULT_WORDS) {
+        const img = await fetchArasaacImage(item.text);
+        loaded.push({ ...item, image: img });
+      }
+      setCards(loaded);
+    };
+    loadDefaults();
+  }, []);
+
+  // --- API HELPER ---
+  const fetchArasaacImage = async (query) => {
+    try {
+      const searchRes = await fetch(`https://api.arasaac.org/api/pictograms/en/bestsearch/${query.toLowerCase()}`);
+      if (!searchRes.ok) return null;
+      const data = await searchRes.json();
+      
+      if (data && data.length > 0) {
+        return `https://static.arasaac.org/pictograms/${data[0]._id}/${data[0]._id}_300.png`;
+      }
+      return null;
+    } catch (e) {
+      console.error("Failed to fetch image", e);
+      return null;
+    }
+  };
+
+  // --- ACTIONS ---
+  const handleAddCard = async (e) => {
+    e.preventDefault();
+    if (!newWord.trim()) return;
+    
+    setIsSearching(true);
+
+    const imageUrl = await fetchArasaacImage(newWord);
+
+    const newCard = {
+      id: Date.now(),
+      text: newWord,
+      image: imageUrl,
+      color: selectedColor
+    };
+
+    setCards([...cards, newCard]);
+    setNewWord("");
+    setIsSearching(false);
+  };
+
+  const handleCardClick = (card) => {
+    if (isEditMode) return;
+    speak(card.text);
+    setSentence([...sentence, card]);
+  };
+
+  const speak = (text) => {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    // Use a slightly clearer/slower rate for AAC
+    utterance.rate = 0.9;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const speakSentence = () => {
+    const fullText = sentence.map(s => s.text).join(" ");
+    speak(fullText);
+  };
+
+  const removeCard = (id) => {
+    setCards(cards.filter(c => c.id !== id));
+  };
+
+  const clearSentence = () => {
+    setSentence([]);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-100 flex flex-col font-sans selection:bg-blue-200">
+      
+      {/* --- SENTENCE STRIP --- */}
+      <div className="bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-20 shadow-sm">
+        <div className="max-w-6xl mx-auto flex items-stretch gap-3 h-24">
+          
+          {/* The "Tray" */}
+          <div className="flex-1 bg-slate-50 rounded-2xl border-2 border-slate-200 shadow-inner p-2 flex items-center gap-2 overflow-x-auto no-scrollbar relative">
+            {sentence.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center text-slate-300 pointer-events-none select-none">
+                <MessageSquare className="w-6 h-6 mr-2 opacity-50" />
+                <span className="font-medium text-lg">Tap cards to speak...</span>
+              </div>
+            )}
+            {sentence.map((item, idx) => (
+              <div key={idx} className="flex-shrink-0 flex flex-col items-center bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm h-full w-20 justify-center animate-in zoom-in-50 duration-200">
+                {item.image && <img src={item.image} alt="" className="w-10 h-10 object-contain mb-1" />}
+                <span className="font-bold text-xs text-slate-700 capitalize leading-tight text-center line-clamp-2">{item.text}</span>
+              </div>
+            ))}
+          </div>
+          
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-2">
+            <button 
+              onClick={speakSentence}
+              disabled={sentence.length === 0}
+              className="flex-1 px-5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl shadow-[0_4px_0_rgb(29,78,216)] active:shadow-none active:translate-y-[4px] transition-all disabled:opacity-50 disabled:shadow-none disabled:translate-y-[4px] disabled:cursor-not-allowed flex items-center justify-center"
+              title="Speak Sentence"
+            >
+              <Volume2 size={28} />
+            </button>
+            <button 
+              onClick={clearSentence}
+              disabled={sentence.length === 0}
+              className="flex-1 px-5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-xl shadow-[0_4px_0_rgb(148,163,184)] active:shadow-none active:translate-y-[4px] transition-all disabled:opacity-50 disabled:shadow-none disabled:translate-y-[4px] flex items-center justify-center"
+              title="Clear"
+            >
+              <Trash2 size={24} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* --- MAIN GRID --- */}
+      <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-6">
+            
+            {cards.map((card) => (
+              <div 
+                key={card.id} 
+                onClick={() => handleCardClick(card)}
+                className={`
+                  relative aspect-[4/5] sm:aspect-square flex flex-col items-center justify-between p-3 rounded-2xl border-[3px] border-b-[6px] transition-all duration-150 group
+                  ${card.color}
+                  ${isEditMode ? 'cursor-default opacity-60 scale-95 border-dashed' : 'cursor-pointer hover:-translate-y-1 active:translate-y-[2px] active:border-b-[3px]'}
+                `}
+              >
+                {/* Delete Button (Edit Mode Only) */}
+                {isEditMode && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); removeCard(card.id); }}
+                    className="absolute -top-3 -right-3 bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 z-10 hover:scale-110 transition-transform"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+                
+                {/* Card Content */}
+                <div className="flex-1 flex items-center justify-center w-full p-1">
+                  {card.image ? (
+                    <img src={card.image} alt={card.text} className="max-w-full max-h-full object-contain drop-shadow-sm group-hover:scale-110 transition-transform duration-300" />
+                  ) : (
+                    <span className="text-4xl select-none">💭</span>
+                  )}
+                </div>
+                
+                {/* Label */}
+                <div className="w-full text-center mt-1">
+                    <span className="font-extrabold text-lg sm:text-xl tracking-wide capitalize leading-none block truncate px-1 select-none">
+                        {card.text}
+                    </span>
+                </div>
+              </div>
+            ))}
+
+            {/* Empty State */}
+            {cards.length === 0 && !isEditMode && (
+              <div className="col-span-full flex flex-col items-center justify-center py-24 text-slate-300">
+                <LayoutGrid size={80} strokeWidth={1.5} />
+                <p className="mt-4 text-xl font-medium">Board is empty</p>
+                <p className="text-sm opacity-70">Open Teacher Tools to add cards</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {/* --- TEACHER TOOLS DRAWER --- */}
+      <div className={`
+        fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] transition-transform duration-300 z-30
+        ${isEditMode ? 'translate-y-0' : 'translate-y-[calc(100%-4.5rem)]'}
+      `}>
+        {/* Toggle Handle */}
+        <div 
+            onClick={() => setIsEditMode(!isEditMode)}
+            className="h-[4.5rem] flex items-center justify-between px-4 sm:px-8 cursor-pointer hover:bg-slate-50 border-b border-slate-100 group"
+        >
+            <div className="flex items-center gap-4">
+                <div className={`
+                    p-2.5 rounded-xl transition-colors
+                    ${isEditMode ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'}
+                `}>
+                    <Settings size={24} />
+                </div>
+                <div>
+                    <h3 className="font-bold text-slate-800 text-lg">Teacher Tools</h3>
+                    <p className="text-xs text-slate-500 font-medium">{isEditMode ? 'Tap to close editor' : 'Tap to customize board'}</p>
+                </div>
+            </div>
+            <div className={`
+                text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider
+                ${isEditMode ? 'bg-slate-100 text-slate-500' : 'bg-blue-600 text-white animate-pulse'}
+            `}>
+                {isEditMode ? 'Close' : 'Edit'}
+            </div>
+        </div>
+
+        {/* Editor Content */}
+        <div className="p-6 bg-slate-50/50 max-h-[60vh] overflow-y-auto">
+            <div className="max-w-4xl mx-auto space-y-6">
+                
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <h4 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
+                        <Plus size={20} className="text-blue-500" /> 
+                        Create New Card
+                    </h4>
+                    
+                    <form onSubmit={handleAddCard} className="flex flex-col md:flex-row gap-4">
+                        {/* Text Input */}
+                        <div className="flex-1 relative group">
+                            <input
+                                type="text"
+                                value={newWord}
+                                onChange={(e) => setNewWord(e.target.value)}
+                                placeholder="Type a word..."
+                                className="w-full h-14 pl-12 pr-4 rounded-xl border-2 border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all font-bold text-lg text-slate-700 placeholder:text-slate-400"
+                            />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={24} />
+                        </div>
+
+                        {/* Color Selection */}
+                        <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 px-1 items-center no-scrollbar">
+                            {COLORS.map((col, idx) => (
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => setSelectedColor(col.value)}
+                                    className={`
+                                        w-10 h-10 md:w-12 md:h-12 rounded-full border-4 flex-shrink-0 transition-all duration-200 relative
+                                        ${col.value.split(' ')[0]} 
+                                        ${col.value.split(' ')[1]}
+                                        ${selectedColor === col.value ? 'scale-110 -translate-y-1 shadow-md ring-2 ring-blue-500 ring-offset-2' : 'hover:scale-105 opacity-80 hover:opacity-100'}
+                                    `}
+                                    title={col.label}
+                                >
+                                    {selectedColor === col.value && (
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="w-2 h-2 bg-slate-900 rounded-full opacity-20" />
+                                        </div>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Add Button */}
+                        <button 
+                            type="submit" 
+                            disabled={!newWord || isSearching}
+                            className="h-14 px-8 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 active:scale-95 disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[140px] shadow-lg shadow-blue-600/20 transition-all"
+                        >
+                            {isSearching ? <RefreshCw className="animate-spin" /> : 'Add'}
+                        </button>
+                    </form>
+                </div>
+
+                <div className="text-center">
+                   <p className="text-xs font-medium text-slate-400 uppercase tracking-widest">
+                        Powered by ARASAAC Symbols
+                    </p>
+                </div>
+            </div>
+        </div>
+      </div>
+
+    </div>
+  );
+}
