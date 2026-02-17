@@ -14,12 +14,23 @@
     <style>
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         .animate-fade-in { animation: fade-in 0.3s ease-out; }
-        #map { height: 100%; width: 100%; z-index: 1; }
+        
+        /* Ensure the map container has an absolute layout to prevent collapsing */
+        #map { 
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 1; 
+        }
+        
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .side-panel { transition: transform 0.3s ease-in-out; }
-        .leaflet-container { font-family: inherit; background: #f8fafc; }
+        .leaflet-container { font-family: inherit; background: #f8fafc; height: 100% !important; width: 100% !important; }
+        
         /* Style for trade route labels */
         .route-label {
             background: rgba(255, 255, 255, 0.9);
@@ -287,6 +298,12 @@
 
                     map.on('click', () => setSelectedCiv(null));
 
+                    // CRITICAL FIX: Invalidate size after map is ready and DOM has settled
+                    // This prevents the "thin line" issue caused by zero-height initialization
+                    setTimeout(() => {
+                        map.invalidateSize();
+                    }, 250);
+
                     return () => {
                         if (mapInstance.current) {
                             mapInstance.current.remove();
@@ -333,7 +350,8 @@
                     <main className="flex-grow flex relative overflow-hidden">
                         {activeTab === 'explore' && (
                             <div className="flex w-full h-full relative">
-                                <div className="flex-grow h-full w-full bg-slate-200">
+                                <div className="flex-grow h-full w-full bg-slate-200 relative">
+                                    {/* The absolute positioning here paired with the CSS helps prevent collapse */}
                                     <div ref={mapRef} id="map" className="w-full h-full"></div>
                                     {!selectedCiv && (
                                         <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur px-6 py-3 rounded-full shadow-lg z-[1000] border border-slate-200 animate-fade-in pointer-events-none">
