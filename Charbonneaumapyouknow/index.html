@@ -19,8 +19,18 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .side-panel { transition: transform 0.3s ease-in-out; }
-        /* Prevent Leaflet from interfering with React layout */
         .leaflet-container { font-family: inherit; background: #f8fafc; }
+        /* Style for trade route labels */
+        .route-label {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #94a3b8;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: 800;
+            color: #1e293b;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 m-0 p-0">
@@ -145,6 +155,48 @@
             }
         };
 
+        const tradeRoutes = [
+            {
+                name: "The Silk Road",
+                color: "#eab308",
+                path: [
+                    [34.34, 108.93], // Chang'an (Xi'an)
+                    [40.14, 94.66],  // Dunhuang
+                    [39.46, 75.99],  // Kashgar
+                    [39.65, 66.97],  // Samarkand
+                    [37.66, 62.19],  // Merv
+                    [35.58, 51.44],  // Rayy (Tehran)
+                    [36.20, 36.16],  // Antioch
+                    [41.90, 12.49]   // Rome
+                ],
+                description: "The premier network connecting China to the Mediterranean world."
+            },
+            {
+                name: "The Royal Road",
+                color: "#be185d",
+                path: [
+                    [32.18, 48.33], // Susa
+                    [34.80, 48.51], // Ecbatana
+                    [36.32, 43.15], // Nineveh
+                    [38.48, 28.13]  // Sardis
+                ],
+                description: "A vital highway built by the Persian Empire for rapid communication."
+            },
+            {
+                name: "Trans-Saharan Routes",
+                color: "#f97316",
+                path: [
+                    [16.76, -3.00],  // Timbuktu
+                    [24.30, -4.90],  // Taghaza (Salt mines)
+                    [31.20, -4.20],  // Sijilmasa
+                    [31.62, -7.98],  // Marrakesh
+                    [30.10, 9.40],   // Ghadames
+                    [26.80, 30.80]   // Egypt (Western Desert)
+                ],
+                description: "Connecting the gold-rich West African empires to the Mediterranean."
+            }
+        ];
+
         const quizQuestions = [
             { question: "Which geographic feature supported agriculture in river valleys like the Nile?", options: ["Deserts", "Abundant water & fertile soil", "High mountain peaks", "Glacial ice"], answer: "Abundant water & fertile soil", explanation: "Rivers provided the water and nutrient-rich silt needed for civilizations to settle and grow food." },
             { question: "The 'Royal Road' was a 1,600-mile innovation used by which empire?", options: ["Rome", "China", "Persia", "Egypt"], answer: "Persia", explanation: "The Persian Royal Road allowed for rapid communication and trade across their vast empire." },
@@ -201,6 +253,22 @@
                     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
                     L.control.zoom({ position: 'topleft' }).addTo(map);
 
+                    // Add Trade Routes to the map
+                    tradeRoutes.forEach(route => {
+                        const line = L.polyline(route.path, {
+                            color: route.color,
+                            weight: 3,
+                            opacity: 0.7,
+                            dashArray: '8, 8'
+                        }).addTo(map);
+
+                        line.bindTooltip(route.name, {
+                            sticky: true,
+                            className: 'route-label'
+                        });
+                    });
+
+                    // Add Civilization markers
                     Object.values(civilizations).forEach(civ => {
                         const marker = L.circleMarker(civ.latLng, {
                             radius: 10,
@@ -243,7 +311,7 @@
             };
 
             return (
-                <div className="flex flex-col h-screen overflow-hidden bg-slate-100">
+                <div className="flex flex-col h-screen overflow-hidden bg-slate-100 font-sans">
                     <header className="bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm z-50">
                         <div className="flex items-center gap-3">
                             <Icon name="history" size={28} className="text-blue-600" />
@@ -274,6 +342,19 @@
                                             </p>
                                         </div>
                                     )}
+                                    
+                                    {/* Map Legend for Trade Routes */}
+                                    <div className="absolute bottom-10 left-6 bg-white/90 backdrop-blur p-4 rounded-xl shadow-lg z-[1000] border border-slate-200 animate-fade-in">
+                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Major Trade Routes</h4>
+                                        <div className="space-y-2">
+                                            {tradeRoutes.map(route => (
+                                                <div key={route.name} className="flex items-center gap-3">
+                                                    <div className="w-8 h-1 rounded-full" style={{ background: route.color, border: '1px dashed rgba(0,0,0,0.1)' }}></div>
+                                                    <span className="text-xs font-bold text-slate-700">{route.name}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className={`absolute top-0 right-0 h-full w-80 md:w-96 bg-white border-l shadow-2xl z-[1001] transform transition-transform duration-300 ease-in-out flex flex-col ${selectedCiv ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -310,12 +391,12 @@
                                                     </h4>
                                                     <p className="text-sm leading-relaxed text-slate-700 mb-3">{selectedCiv.economics}</p>
                                                     <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
-                                                        <p className="text-[10px] font-bold text-blue-600 uppercase mb-1">Key Trade Route</p>
+                                                        <p className="text-[10px] font-bold text-blue-600 uppercase mb-1">Key Trade Route Context</p>
                                                         <p className="text-xs text-blue-800 font-medium">{selectedCiv.trade}</p>
                                                     </div>
                                                 </section>
 
-                                                <section className="bg-slate-900 text-white p-5 rounded-2xl shadow-inner relative overflow-hidden mb-6">
+                                                <section className="bg-slate-900 text-white p-5 rounded-2xl shadow-inner relative overflow-hidden mb-8">
                                                     <Icon name="zap" size={60} className="absolute -right-4 -bottom-4 opacity-10" />
                                                     <h4 className="text-[10px] font-bold uppercase text-blue-400 mb-2">Legacy Innovation</h4>
                                                     <p className="text-xs leading-relaxed text-slate-300">{selectedCiv.legacies}</p>
