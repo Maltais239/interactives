@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ancient Civilizations Explorer</title>
+    <title>World Explorer 1.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -292,14 +292,19 @@
                         marker.on('click', (e) => {
                             L.DomEvent.stopPropagation(e);
                             setSelectedCiv(civ);
-                            map.flyTo(civ.latLng, 4);
+                            // Zoom in to the selected city
+                            map.flyTo(civ.latLng, 6);
                         });
                     });
 
-                    map.on('click', () => setSelectedCiv(null));
+                    // Reset when clicking elsewhere
+                    map.on('click', () => {
+                        setSelectedCiv(null);
+                        // Zoom back out to global view
+                        map.flyTo([20, 25], 2);
+                    });
 
                     // CRITICAL FIX: Invalidate size after map is ready and DOM has settled
-                    // This prevents the "thin line" issue caused by zero-height initialization
                     setTimeout(() => {
                         map.invalidateSize();
                     }, 250);
@@ -332,7 +337,7 @@
                     <header className="bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm z-50">
                         <div className="flex items-center gap-3">
                             <Icon name="history" size={28} className="text-blue-600" />
-                            <h1 className="font-black text-xl tracking-tight text-slate-800">Ancient World Explorer</h1>
+                            <h1 className="font-black text-xl tracking-tight text-slate-800">World Explorer 1.0</h1>
                         </div>
                         <nav className="flex bg-slate-100 p-1 rounded-xl">
                             {['explore', 'quiz'].map(tab => (
@@ -351,12 +356,11 @@
                         {activeTab === 'explore' && (
                             <div className="flex w-full h-full relative">
                                 <div className="flex-grow h-full w-full bg-slate-200 relative">
-                                    {/* The absolute positioning here paired with the CSS helps prevent collapse */}
                                     <div ref={mapRef} id="map" className="w-full h-full"></div>
                                     {!selectedCiv && (
-                                        <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur px-6 py-3 rounded-full shadow-lg z-[1000] border border-slate-200 animate-fade-in pointer-events-none">
+                                        <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur px-6 py-3 rounded-full shadow-lg z-[1000] border border-slate-200 animate-fade-in pointer-events-none text-center">
                                             <p className="text-sm font-bold text-slate-600 flex items-center gap-2">
-                                                <Icon name="mouse-pointer-2" size={16} /> Select a marker to explore civilizations
+                                                <Icon name="mouse-pointer-2" size={16} /> Select a marker to zoom in, click the map to zoom out
                                             </p>
                                         </div>
                                     )}
@@ -383,7 +387,7 @@
                                                     <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Knowledge Panel</span>
                                                     <h2 className="text-3xl font-black mt-1" style={{color: selectedCiv.color}}>{selectedCiv.name}</h2>
                                                 </div>
-                                                <button onClick={() => setSelectedCiv(null)} className="p-2 hover:bg-slate-200 rounded-full text-slate-400">
+                                                <button onClick={() => { setSelectedCiv(null); mapInstance.current.flyTo([20, 25], 2); }} className="p-2 hover:bg-slate-200 rounded-full text-slate-400">
                                                     <Icon name="x" size={20} />
                                                 </button>
                                             </div>
