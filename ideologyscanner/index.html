@@ -91,33 +91,75 @@
             const [foundTerms, setFoundTerms] = useState({ ind: [], col: [] });
             const [history, setHistory] = useState([]);
             const [showCurriculum, setShowCurriculum] = useState(false);
+            const [isTyping, setIsTyping] = useState(false);
 
-            // Analysis Logic
+            // Analysis Logic with Debounce
             useEffect(() => {
+                // Reset state immediately if empty
                 if (!inputText.trim()) {
                     setScore(50);
                     setFoundTerms({ ind: [], col: [] });
+                    setIsTyping(false);
                     return;
                 }
 
-                const lowerText = inputText.toLowerCase();
-                const foundInd = keywords.individualism.filter(term => lowerText.includes(term));
-                const foundCol = keywords.collectivism.filter(term => lowerText.includes(term));
+                setIsTyping(true);
 
-                setFoundTerms({ ind: foundInd, col: foundCol });
+                // Set a timeout to delay analysis (Debounce)
+                const delayDebounceFn = setTimeout(() => {
+                    analyzeText();
+                    setIsTyping(false);
+                }, 600); // Wait 600ms after user stops typing
 
-                // Simple scoring: start at 50, +/- 10 for each term, capped at 0/100
-                // Collectivism pulls left (-), Individualism pulls right (+)
+                return () => clearTimeout(delayDebounceFn);
+            }, [inputText]);
+
+            const analyzeText = () => {
+                let textToScan = inputText.toLowerCase();
+                const matchedInd = [];
+                const matchedCol = [];
+
+                // 1. Merge all keywords into one list with metadata
+                const allKeywords = [
+                    ...keywords.individualism.map(k => ({ term: k, type: 'ind' })),
+                    ...keywords.collectivism.map(k => ({ term: k, type: 'col' }))
+                ];
+
+                // 2. Sort by length (descending) to match "Individual Rights" before "Individual"
+                allKeywords.sort((a, b) => b.term.length - a.term.length);
+
+                // 3. Scan and consume text
+                allKeywords.forEach(({ term, type }) => {
+                    // Regex for whole word matching
+                    // Escape special characters in term just in case
+                    const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(`\\b${escapedTerm}\\b`, 'gi');
+
+                    if (regex.test(textToScan)) {
+                        if (type === 'ind') matchedInd.push(term);
+                        if (type === 'col') matchedCol.push(term);
+                        
+                        // "Consume" the matched term from the temp text so it isn't matched again by shorter words
+                        // We replace it with spaces to preserve indices/boundaries if we were doing more complex stuff, 
+                        // but here we just need to ensure "individual" doesn't match the "individual" in "individual rights"
+                        textToScan = textToScan.replace(regex, ' '.repeat(term.length));
+                    }
+                });
+
+                setFoundTerms({ ind: matchedInd, col: matchedCol });
+
+                // Scoring Logic
                 let newScore = 50;
-                newScore -= (foundCol.length * 15);
-                newScore += (foundInd.length * 15);
+                const pointsPerTerm = 10; // Reduced from 15 to be less jumpy
 
-                // Clamp score between 5 and 95 (keep it visible)
+                newScore -= (matchedCol.length * pointsPerTerm);
+                newScore += (matchedInd.length * pointsPerTerm);
+
+                // Clamp score between 5 and 95
                 newScore = Math.max(5, Math.min(95, newScore));
                 
                 setScore(newScore);
-
-            }, [inputText]);
+            };
 
             const saveEntry = () => {
                 if (!inputText.trim()) return;
@@ -202,10 +244,10 @@
                                     style={{ left: `${score}%` }}
                                 >
                                     <div className="absolute -top-3 -translate-x-1/2 left-1/2">
-                                        <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[12px] border-t-slate-800"></div>
+                                        <div className={`w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[12px] transition-colors ${isTyping ? 'border-t-slate-300' : 'border-t-slate-800'}`}></div>
                                     </div>
-                                    <div className="absolute -bottom-10 -translate-x-1/2 left-1/2 bg-slate-800 text-white text-xs font-bold py-1 px-3 rounded-full whitespace-nowrap shadow-lg">
-                                        {getAnalysisLabel(score)}
+                                    <div className={`absolute -bottom-10 -translate-x-1/2 left-1/2 bg-slate-800 text-white text-xs font-bold py-1 px-3 rounded-full whitespace-nowrap shadow-lg transition-opacity ${isTyping ? 'opacity-50' : 'opacity-100'}`}>
+                                        {isTyping ? "Analyzing..." : getAnalysisLabel(score)}
                                     </div>
                                 </div>
                             </div>
@@ -240,9 +282,14 @@
                                             {term}
                                         </span>
                                     ))}
-                                    {(foundTerms.col.length === 0 && foundTerms.ind.length === 0 && inputText.length > 5) && (
+                                    {(foundTerms.col.length === 0 && foundTerms.ind.length === 0 && inputText.length > 5 && !isTyping) && (
                                         <span className="text-xs text-slate-400 italic">
                                             No keywords detected yet... try words like "competition" or "equality"
+                                        </span>
+                                    )}
+                                     {isTyping && (
+                                        <span className="text-xs text-slate-400 italic animate-pulse">
+                                            Scanning...
                                         </span>
                                     )}
                                 </div>
