@@ -69,19 +69,39 @@
         );
 
         // --- Keyword Dictionary ---
-        // Based on curriculum concepts
+        // Expanded to include phrases and stronger context clues
         const keywords = {
             individualism: [
-                "private property", "self-reliance", "personal responsibility", "freedom of choice", 
-                "economic freedom", "competition", "individual rights", "rule of law", "profit", 
-                "consumer", "market", "capitalism", "deregulation", "privatization", "owner", 
-                "independence", "liberty", "individual", "business", "buy", "sell", "trade"
+                // Phrases (High Weight)
+                "private property", "economic freedom", "individual rights", "rule of law", 
+                "freedom of choice", "self reliance", "personal responsibility", "free market", 
+                "private enterprise", "profit motive", "limited government", "low taxes", 
+                "lower taxes", "flat tax", "private healthcare", "private schools", 
+                "user pay", "supply and demand", "consumer sovereignty", "deregulation", 
+                "privatization", "voluntary exchange", "laissez faire", "competition",
+                "market economy", "class structure", "meritocracy", "healthcare is private",
+                "user fees", "small government",
+                
+                // Words (Standard Weight)
+                "capitalism", "profit", "consumer", "market", "owner", 
+                "business", "buy", "sell", "trade", "liberty", 
+                "independence", "individual", "efficient", "incentive"
             ],
             collectivism: [
+                // Phrases (High Weight)
                 "public property", "common good", "collective interest", "economic equality", 
-                "cooperation", "collective responsibility", "collective norms", "planned economy", 
-                "command economy", "government control", "social programs", "welfare", "public ownership", 
-                "union", "share", "community", "state", "regulation", "intervention", "tax", "group"
+                "collective responsibility", "collective norms", "planned economy", 
+                "command economy", "government control", "social programs", "public ownership", 
+                "universal healthcare", "free healthcare", "healthcare is public", "public education", 
+                "free education", "higher taxes", "progressive tax", "wealth redistribution", 
+                "social safety net", "labor union", "trade union", "crown corporation", 
+                "government funded", "state owned", "cooperation", "public services",
+                "central planning", "nationalization", "big government",
+                
+                // Words (Standard Weight)
+                "welfare", "union", "share", "community", "state", 
+                "regulation", "intervention", "tax", "group", "public", 
+                "equality", "solidarity", "socialism", "communism"
             ]
         };
 
@@ -130,7 +150,7 @@
 
                 // 3. Scan and consume text
                 allKeywords.forEach(({ term, type }) => {
-                    // Regex for whole word matching
+                    // Regex for whole word/phrase matching
                     // Escape special characters in term just in case
                     const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                     const regex = new RegExp(`\\b${escapedTerm}\\b`, 'gi');
@@ -150,10 +170,12 @@
 
                 // Scoring Logic
                 let newScore = 50;
-                const pointsPerTerm = 10; // Reduced from 15 to be less jumpy
+                
+                // Weighting: Multi-word phrases are worth more (20) than single words (10)
+                const getPoints = (term) => term.includes(' ') ? 20 : 10;
 
-                newScore -= (matchedCol.length * pointsPerTerm);
-                newScore += (matchedInd.length * pointsPerTerm);
+                matchedCol.forEach(term => newScore -= getPoints(term));
+                matchedInd.forEach(term => newScore += getPoints(term));
 
                 // Clamp score between 5 and 95
                 newScore = Math.max(5, Math.min(95, newScore));
@@ -219,11 +241,11 @@
                                 <div className="grid md:grid-cols-2 gap-4">
                                     <div>
                                         <strong className="block text-blue-700 mb-1">Individualism Keywords</strong>
-                                        <p className="text-xs italic">Try typing: private property, competition, profit, freedom, self-reliance...</p>
+                                        <p className="text-xs italic">Try: private healthcare, lower taxes, free market, competition, profit motive...</p>
                                     </div>
                                     <div>
                                         <strong className="block text-red-700 mb-1">Collectivism Keywords</strong>
-                                        <p className="text-xs italic">Try typing: public property, cooperation, equality, government control, shared...</p>
+                                        <p className="text-xs italic">Try: public healthcare, wealth redistribution, social programs, higher taxes...</p>
                                     </div>
                                 </div>
                             </div>
@@ -265,7 +287,7 @@
                             <div className="p-4">
                                 <textarea
                                     className="w-full h-32 p-4 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none transition-all text-slate-700 bg-slate-50 focus:bg-white"
-                                    placeholder="Example: The government owns all the factories and ensures everyone earns the same wage..."
+                                    placeholder="Example: The government provides free healthcare for everyone and pays for it through higher taxes..."
                                     value={inputText}
                                     onChange={(e) => setInputText(e.target.value)}
                                 ></textarea>
