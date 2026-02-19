@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Writer Spark Practice App v1.1</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Indie+Flower&family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700;800;900&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(253,16%,7%,0) 0, hsla(253,16%,7%,0.02) 50%), 
+                radial-gradient(at 50% 0%, hsla(225,39%,30%,0.1) 0, hsla(225,39%,30%,0) 50%), 
+                radial-gradient(at 100% 0%, hsla(339,49%,30%,0.1) 0, hsla(339,49%,30%,0) 50%);
+            margin: 0;
+            overflow: hidden;
+        }
+        
+        h1, h2, h3, h4, h5, h6, .font-heading {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .handwritten {
+            font-family: 'Indie Flower', cursive;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+        }
+
+        /* Animations */
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            70% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .animate-pop {
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes sprout {
+            0% { transform: scale(0); opacity: 0; }
+            80% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .animate-sprout {
+            animation: sprout 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            transform-origin: center center;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-6px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .animate-float-slow {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+        }
+
+        .animate-pulse-ring {
+            animation: pulse-ring 2s infinite;
+        }
+
+        @keyframes drawLine {
+            from { stroke-dasharray: 0, 1000; }
+            to { stroke-dasharray: 1000, 1000; }
+        }
+
+        .path-animate {
+            animation: drawLine 0.6s ease-out forwards;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        const Icon = ({ name, color = "currentColor", size = 24 }) => {
+            const icons = {
+                sparkles: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M9 3v4"/><path d="M3 9h4"/></svg>,
+                help: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>,
+                close: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+                refresh: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>,
+                zap: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+                check: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>,
+                undo: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>,
+                redo: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 3.7"/></svg>,
+                edit: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>,
+                eye: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>,
+                book: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>,
+                trash: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
+                notebook: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>,
+                plus: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            };
+            return icons[name] || null;
+        };
+
+        const cleanWord = (word) => word.toLowerCase().replace(/[^a-z0-9-]/g, '');
+
+        const getColorClasses = (color) => {
+            const mapping = {
+                blue: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", line: "#60a5fa", hover: "hover:bg-blue-100", shadow: "shadow-blue-200" },
+                orange: { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", line: "#fb923c", hover: "hover:bg-orange-100", shadow: "shadow-orange-200" },
+                purple: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200", line: "#a855f7", hover: "hover:bg-purple-100", shadow: "shadow-purple-200" },
+                teal: { bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200", line: "#2dd4bf", hover: "hover:bg-teal-100", shadow: "shadow-teal-200" },
+                emerald: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", line: "#34d399", hover: "hover:bg-emerald-100", shadow: "shadow-emerald-200" },
+                amber: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", line: "#fbbf24", hover: "hover:bg-amber-100", shadow: "shadow-amber-200" },
+                rose: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200", line: "#fb7185", hover: "hover:bg-rose-100", shadow: "shadow-rose-200" },
+                slate: { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200", line: "#94a3b8", hover: "hover:bg-slate-100", shadow: "shadow-slate-200" },
+                pink: { bg: "bg-pink-50", text: "text-pink-700", border: "border-pink-200", line: "#f472b6", hover: "hover:bg-pink-100", shadow: "shadow-pink-200" },
+            };
+            return mapping[color] || mapping.blue;
+        };
+
+        const PRONOUNS = ['he', 'she', 'they', 'i', 'we', 'you', 'it', 'this', 'that', 'someone', 'everyone', 'nobody', 'something', 'anyone'];
+
+        // =========================================================================
+        // DICTIONARY 1: VOCAB BUILDER 
+        // =========================================================================
+        const vocabDictionary = {
+            "boy": { base: "boy", type: "noun", categories: [
+                { name: "Age?", color: "emerald", yields: "adjective", words: ["tiny", "teenage", "little", "growing"] },
+                { name: "Attitude?", color: "rose", yields: "adjective", words: ["rambunctious", "shy", "mischievous", "polite"] },
+                { name: "Synonyms?", color: "blue", yields: "noun", words: ["lad", "youth", "youngster", "kid"] }
+            ]},
+            "girl": { base: "girl", type: "noun", categories: [
+                { name: "Age?", color: "emerald", yields: "adjective", words: ["tiny", "teenage", "little", "growing"] },
+                { name: "Vibe?", color: "purple", yields: "adjective", words: ["fierce", "shy", "clever", "polite"] },
+                { name: "Synonyms?", color: "blue", yields: "noun", words: ["lass", "youth", "youngster", "kid"] }
+            ]},
+            "man": { base: "man", type: "noun", categories: [
+                { name: "Age?", color: "emerald", yields: "adjective", words: ["elderly", "ancient", "middle-aged", "young"] },
+                { name: "Looks?", color: "slate", yields: "adjective", words: ["scruffy", "handsome", "rugged", "weary"] },
+                { name: "Synonyms?", color: "blue", yields: "noun", words: ["gentleman", "fellow", "guy", "chap"] }
+            ]},
+            "woman": { base: "woman", type: "noun", categories: [
+                { name: "Age?", color: "emerald", yields: "adjective", words: ["elderly", "ancient", "middle-aged", "young"] },
+                { name: "Looks?", color: "rose", yields: "adjective", words: ["elegant", "beautiful", "weary", "radiant"] },
+                { name: "Synonyms?", color: "purple", yields: "noun", words: ["lady", "madam", "gal", "matron"] }
+            ]},
+            "person": { base: "person", type: "noun", categories: [ 
+                { name: "Jobs?", color: "blue", yields: "noun", words: ["doctor", "teacher", "detective", "scientist", "mechanic"] },
+                { name: "Fantasy?", color: "purple", yields: "noun", words: ["wizard", "knight", "elf", "giant", "goblin"] },
+                { name: "Everyday?", color: "teal", yields: "noun", words: ["stranger", "neighbor", "tourist", "pedestrian", "bystander"] }
+            ]},
+            "place": { base: "place", type: "noun", categories: [ 
+                { name: "City?", color: "blue", yields: "noun", words: ["metropolis", "district", "alleyway", "avenue", "boulevard"] }, 
+                { name: "Vibe?", color: "teal", yields: "adjective", words: ["cozy", "bustling", "peaceful", "eerie", "chaotic"] }, 
+                { name: "Condition?", color: "slate", yields: "adjective", words: ["cramped", "deserted", "dusty", "abandoned", "ruined"] }, 
+                { name: "Fantasy?", color: "purple", yields: "noun", words: ["graveyard", "dungeon", "catacomb", "laboratory", "castle"] } 
+            ]},
+            "building": { base: "building", type: "noun", categories: [ 
+                { name: "Homes?", color: "amber", yields: "noun", words: ["mansion", "cottage", "cabin", "shack", "estate"] }, 
+                { name: "Public?", color: "blue", yields: "noun", words: ["hospital", "museum", "library", "school", "station"] }, 
+                { name: "Big?", color: "purple", yields: "noun", words: ["skyscraper", "tower", "castle", "fortress"] }
+            ]},
+            "animal": { base: "animal", type: "noun", categories: [ 
+                { name: "Wild?", color: "orange", yields: "noun", words: ["beast", "creature", "predator", "monster", "scavenger"] }, 
+                { name: "Pet?", color: "teal", yields: "noun", words: ["companion", "feline", "canine", "hound", "mutt"] },
+                { name: "Looks?", color: "rose", yields: "adjective", words: ["ferocious", "fluffy", "scaly", "massive", "rabid"] } 
+            ]},
+            "thing": { base: "thing", type: "noun", categories: [ 
+                { name: "Object?", color: "blue", yields: "noun", words: ["trinket", "box", "tool", "contraption", "device"] }, 
+                { name: "Valuable?", color: "amber", yields: "noun", words: ["relic", "treasure", "artifact", "gem", "heirloom"] },
+                { name: "Gross?", color: "slate", yields: "noun", words: ["garbage", "clutter", "debris", "sludge", "junk"] }
+            ]},
+            "food": { base: "food", type: "noun", categories: [ 
+                { name: "Fancy?", color: "amber", yields: "noun", words: ["feast", "delicacy", "banquet", "cuisine"] }, 
+                { name: "Gross?", color: "rose", yields: "noun", words: ["slop", "mush", "gruel", "leftovers"] },
+                { name: "Small?", color: "teal", yields: "noun", words: ["snack", "morsel", "bite", "crumb"] }
+            ]},
+
+            "went": { base: "went", type: "verb", categories: [ 
+                { name: "Journey?", color: "blue", yields: "verb", words: ["traveled", "journeyed", "ventured", "migrated"] }, 
+                { name: "Left?", color: "orange", yields: "verb", words: ["departed", "exited", "vanished", "fled", "escaped"] }, 
+                { name: "Sneaky?", color: "purple", yields: "verb", words: ["sneaked", "slipped", "crept"] } 
+            ]},
+            "walked": { base: "walked", type: "verb", categories: [ 
+                { name: "Relaxed?", color: "blue", yields: "verb", words: ["sauntered", "strolled", "ambled", "wandered", "meandered"] }, 
+                { name: "Tired/Heavy?", color: "purple", yields: "verb", words: ["trudged", "plodded", "shuffled", "staggered", "limped"] }, 
+                { name: "Sneaky?", color: "teal", yields: "verb", words: ["tiptoed", "crept", "sneaked", "prowled"] } 
+            ]},
+            "ran": { base: "ran", type: "verb", categories: [ 
+                { name: "Speedy?", color: "orange", yields: "verb", words: ["sprinted", "dashed", "darted", "raced", "zoomed"] }, 
+                { name: "Escape?", color: "rose", yields: "verb", words: ["fled", "bolted", "retreated", "scrambled"] }, 
+                { name: "Heavy?", color: "slate", yields: "verb", words: ["pounded", "charged", "barreled", "stampeded"] } 
+            ]},
+            "jumped": { base: "jumped", type: "verb", categories: [ 
+                { name: "High?", color: "teal", yields: "verb", words: ["leaped", "bounded", "vaulted", "soared"] }, 
+                { name: "Sudden?", color: "orange", yields: "verb", words: ["pounced", "sprang", "lunged", "surged"] } 
+            ]},
+            "said": { base: "said", type: "verb", categories: [ 
+                { name: "Quietly?", color: "blue", yields: "verb", words: ["whispered", "muttered", "mumbled", "murmured"] }, 
+                { name: "Loudly?", color: "rose", yields: "verb", words: ["shouted", "yelled", "bellowed", "roared", "screamed"] }, 
+                { name: "Angry?", color: "orange", yields: "verb", words: ["snapped", "barked", "hissed", "growled"] }, 
+                { name: "Sad/Scared?", color: "teal", yields: "verb", words: ["sighed", "whimpered", "stammered", "croaked", "stuttered"] } 
+            ]},
+            "looked": { base: "looked", type: "verb", categories: [ 
+                { name: "Quick glance?", color: "blue", yields: "verb", words: ["glanced", "peeked", "glimpsed", "spotted"] }, 
+                { name: "Long stare?", color: "purple", yields: "verb", words: ["stared", "gazed", "peered", "studied", "examined", "observed"] }, 
+                { name: "Angry?", color: "rose", yields: "verb", words: ["glared", "scowled", "goggled"] } 
+            ]},
+            "got": { base: "got", type: "verb", categories: [ 
+                { name: "Earned?", color: "emerald", yields: "verb", words: ["achieved", "acquired", "earned", "obtained", "secured"] }, 
+                { name: "Caught?", color: "orange", yields: "verb", words: ["captured", "snagged", "grabbed", "seized"] }, 
+                { name: "Stole?", color: "rose", yields: "verb", words: ["snatched", "swiped", "stole", "pocketed"] } 
+            ]},
+            "like": { base: "like", type: "verb", categories: [ 
+                { name: "Love?", color: "rose", yields: "verb", words: ["adore", "cherish", "treasure", "worship", "idolize"] }, 
+                { name: "Enjoy?", color: "amber", yields: "verb", words: ["appreciate", "relish", "savor", "admire"] },
+                { name: "Prefer?", color: "blue", yields: "verb", words: ["favor", "choose", "select"] }
+            ]},
+            "hated": { base: "hated", type: "verb", categories: [ 
+                { name: "Intense?", color: "rose", yields: "verb", words: ["despised", "loathed", "detested", "abhorred"] }, 
+                { name: "Disgusted?", color: "orange", yields: "verb", words: ["scorned", "resented", "rejected", "repelled"] }
+            ]},
+            "ate": { base: "ate", type: "verb", categories: [ 
+                { name: "Messy/Fast?", color: "orange", yields: "verb", words: ["devoured", "scarfed", "inhaled", "gobbled", "wolfed down"] }, 
+                { name: "Small bites?", color: "teal", yields: "verb", words: ["nibbled", "pecked", "snacked", "tasted"] },
+                { name: "Noisy?", color: "rose", yields: "verb", words: ["chomped", "crunched", "slurped", "munched"] }
+            ]},
+
+            "good": { base: "good", type: "adjective", categories: [ 
+                { name: "Friendly?", color: "amber", yields: "adjective", words: ["outgoing", "sociable", "personable", "affable"] }, 
+                { name: "Smart?", color: "blue", yields: "adjective", words: ["brilliant", "clever", "ingenious", "wise"] }, 
+                { name: "Excellent?", color: "emerald", yields: "adjective", words: ["superb", "outstanding", "fantastic", "magnificent", "phenomenal"] } 
+            ]},
+            "bad": { base: "bad", type: "adjective", categories: [ 
+                { name: "Angry?", color: "rose", yields: "adjective", words: ["furious", "irate", "hostile", "bitter"] }, 
+                { name: "Cruel?", color: "purple", yields: "adjective", words: ["vicious", "ruthless", "wicked", "malicious"] }, 
+                { name: "Terrible?", color: "slate", yields: "adjective", words: ["awful", "dreadful", "horrendous", "abysmal", "atrocious"] } 
+            ]},
+            "big": { base: "big", type: "adjective", categories: [ 
+                { name: "Massive?", color: "orange", yields: "adjective", words: ["gigantic", "colossal", "enormous", "monstrous", "towering", "mammoth"] }, 
+                { name: "Wide?", color: "blue", yields: "adjective", words: ["vast", "immense", "expansive", "boundless", "infinite"] } 
+            ]},
+            "small": { base: "small", type: "adjective", categories: [ 
+                { name: "Size?", color: "pink", yields: "adjective", words: ["tiny", "miniature", "petite", "microscopic", "puny", "pocket-sized"] },
+                { name: "Amount?", color: "slate", yields: "adjective", words: ["meager", "scant", "paltry", "insignificant", "sparse"] } 
+            ]},
+            "loud": { base: "loud", type: "adjective", categories: [ 
+                { name: "Deafening?", color: "rose", yields: "adjective", words: ["ear-splitting", "thunderous", "booming", "roaring", "explosive"] }, 
+                { name: "Annoying?", color: "orange", yields: "adjective", words: ["piercing", "shrill", "blaring", "screeching", "grating"] } 
+            ]},
+            "quiet": { base: "quiet", type: "adjective", categories: [ 
+                { name: "Peaceful?", color: "teal", yields: "adjective", words: ["silent", "hushed", "tranquil", "serene", "calm"] }, 
+                { name: "Hard to hear?", color: "purple", yields: "adjective", words: ["muffled", "faint", "inaudible", "whispered", "muted"] } 
+            ]},
+            "funny": { base: "funny", type: "adjective", categories: [ 
+                { name: "Hilarious?", color: "orange", yields: "adjective", words: ["comical", "hysterical", "uproarious", "amusing", "entertaining"] }, 
+                { name: "Silly?", color: "pink", yields: "adjective", words: ["goofy", "wacky", "absurd", "ludicrous", "ridiculous"] }
+            ]},
+            "happy": { base: "happy", type: "adjective", categories: [ 
+                { name: "Intense Joy?", color: "pink", yields: "adjective", words: ["ecstatic", "thrilled", "jubilant", "elated", "overjoyed"] }, 
+                { name: "Peaceful?", color: "emerald", yields: "adjective", words: ["content", "satisfied", "serene", "relaxed", "tranquil"] }, 
+                { name: "Playful?", color: "amber", yields: "adjective", words: ["cheerful", "giddy", "merry", "jovial", "lively"] }
+            ]},
+            "sad": { base: "sad", type: "adjective", categories: [ 
+                { name: "Crying?", color: "teal", yields: "adjective", words: ["weeping", "sobbing", "bawling", "tearful"] }, 
+                { name: "Hopeless?", color: "blue", yields: "adjective", words: ["miserable", "devastated", "crushed", "defeated", "despairing"] },
+                { name: "Gloomy?", color: "slate", yields: "adjective", words: ["depressed", "melancholy", "somber", "downcast", "dreary"] } 
+            ]},
+            "scared": { base: "scared", type: "adjective", categories: [ 
+                { name: "Frozen?", color: "purple", yields: "adjective", words: ["terrified", "petrified", "paralyzed", "horrified"] }, 
+                { name: "Shaking?", color: "blue", yields: "adjective", words: ["anxious", "jittery", "trembling", "panicked"] }, 
+                { name: "Surprised?", color: "orange", yields: "adjective", words: ["startled", "spooked", "alarmed", "shocked"] } 
+            ]}
+        };
+
+        // =========================================================================
+        // DICTIONARY 2: SCENE BUILDER (Every word is an independent playground!)
+        // =========================================================================
+        const sceneDictionary = {
+            // VERBS (Action Fillers)
+            "taking": { base: "taking", type: "verb", categories: [
+                { name: "❤️ Internal", color: "rose", words: ["A heavy knot of pure anxiety formed deep in their stomach.", "They took a deep, shaky breath to steady their racing nerves."] },
+                { name: "👀 Actions", color: "blue", words: ["Their hands trembled slightly as they reached out to grasp it.", "They hesitated for a brief, terrifying second before committing."] }
+            ]},
+            "walking": { base: "walking", type: "verb", categories: [
+                { name: "👂 Sounds", color: "slate", words: ["Their heavy footsteps beat a steady, rhythmic cadence on the ground.", "Rubber soles scuffed softly against the uneven, cracked surface."] },
+                { name: "✋ Touch", color: "emerald", words: ["A gentle, cool breeze brushed against their face as they moved.", "The hard ground sent a slight jolt up through their tired legs."] }
+            ]},
+            "watching": { base: "watching", type: "verb", categories: [
+                { name: "👀 Visuals", color: "amber", words: ["Their eyes darted frantically, trying to catch every single detail.", "They stared unblinking, absolutely mesmerized by the sight."] },
+                { name: "❤️ Internal", color: "purple", words: ["They held their breath in sheer, undeniable anticipation.", "A feeling of pure awe swept over them as they observed."] }
+            ]},
+            "eating": { base: "eating", type: "verb", categories: [
+                { name: "👅 Taste", color: "orange", words: ["A burst of incredibly rich, savory flavor filled their mouth.", "The delicious, sugary sweetness coated their tongue perfectly."] },
+                { name: "👂 Sounds", color: "teal", words: ["They chewed loudly, savoring every single delicious bite.", "The satisfying, loud crunch echoed directly in their ears."] }
+            ]},
+            "sailing": { base: "sailing", type: "verb", categories: [
+                { name: "👀 Visuals", color: "blue", words: ["The wooden bow cut smoothly through the massive, rolling waves.", "White canvas sails billowed tightly against the strong wind."] },
+                { name: "✋ Touch", color: "teal", words: ["The polished wooden helm felt sturdy and solid under their grip.", "Freezing, bitter sea spray misted heavily across their face."] }
+            ]},
+            "driving": { base: "driving", type: "verb", categories: [
+                { name: "👀 Visuals", color: "slate", words: ["The dotted yellow line blurred endlessly into a solid, fast streak.", "Bright headlights cut a sharp cone through the thick darkness."] },
+                { name: "✋ Touch", color: "orange", words: ["The leather steering wheel vibrated slightly under their tight grip.", "They rolled down the window to feel the rushing wind against their skin."] }
+            ]},
+            "climbing": { base: "climbing", type: "verb", categories: [
+                { name: "👀 Visuals", color: "slate", words: ["Searching desperately for the next tiny crack in the rock face.", "A dizzying, terrifying drop stretching out endlessly below."] },
+                { name: "✋ Touch", color: "amber", words: ["Rough, unforgiving stone scraping against raw fingertips.", "White chalk coating their sweaty, trembling palms."] },
+                { name: "🏃 Body", color: "rose", words: ["Their arms trembled violently from sheer exhaustion.", "Muscles burned with lactic acid on every single agonizing pull."] }
+            ]},
+            "feeling": { base: "feeling", type: "emotion", categories: [
+                { name: "❤️ Internal", color: "rose", words: ["A sudden wave of intense emotion washed over them entirely.", "Their chest tightened with an overwhelming, undeniable sensation."] },
+                { name: "🏃 Body", color: "blue", words: ["Their entire body reacted before their brain even caught up.", "A visible, violent shiver ran straight down their spine."] }
+            ]},
+
+            // SENSORY ADJECTIVES (Independent Highlights)
+            "scary": { base: "scary", type: "setting", categories: [
+                { name: "👀 Visuals", color: "slate", words: ["Twisted shadows seemed to reach out with long, dark fingers.", "A thick, unnatural darkness swallowed the corners of the area.", "Strange, unexplained shapes flickered just out of the corner of their eye."] },
+                { name: "❤️ Feelings", color: "rose", words: ["A sudden, bone-chilling dread settled deep into their stomach.", "Every primal instinct screamed at them to run away immediately.", "The heavy air felt incredibly suffocating and dangerous."] }
+            ]},
+            "old": { base: "old", type: "setting", categories: [
+                { name: "👀 Visuals", color: "amber", words: ["A thick, grey layer of undisturbed dust coated everything.", "Edges were visibly crumbling and worn away by merciless time.", "Faded colors peeled back from the surfaces like dead skin."] },
+                { name: "👃 Smells", color: "slate", words: ["The unmistakable, musty scent of ancient decay filled the air.", "It smelled like a forgotten attic that hadn't been opened in decades.", "A dry, powdery smell tickled the back of their throat."] }
+            ]},
+            "abandoned": { base: "abandoned", type: "setting", categories: [
+                { name: "👀 Visuals", color: "slate", words: ["Aggressive, thorny weeds choked the life out of the empty space.", "Not a single soul had stepped foot here in decades.", "Shattered glass littered the floor like dangerous snow."] },
+                { name: "❤️ Feelings", color: "blue", words: ["A haunting, overwhelming sense of total isolation pressed in.", "The heavy emptiness felt almost like a physical weight on their chest.", "It felt entirely forgotten by the rest of the busy world."] }
+            ]},
+            "heavy": { base: "heavy", type: "setting", categories: [
+                { name: "🌧️ Weather", color: "blue", words: ["The torrential downpour felt like a solid wall of water hitting the ground.", "Thick, suffocating humidity weighed down every single breath.", "The oppressive atmosphere felt incredibly dense and hard to move through."] },
+                { name: "✋ Touch", color: "purple", words: ["The sheer weight of it made their trembling muscles scream in protest.", "It felt exactly like trying to lift a solid block of dense lead.", "Gravity seemed to pull ten times harder on this specific object."] }
+            ]},
+            "loud": { base: "loud", type: "setting", categories: [
+                { name: "🗣️ Crowd", color: "orange", words: ["The deafening roar of hundreds of overlapping voices filled the air.", "A chaotic symphony of shouts and laughter bounced off the walls.", "The sheer volume of the people was entirely overwhelming."] },
+                { name: "⚙️ Mechanical", color: "slate", words: ["Their ears rang with a sharp, high-pitched, painful whine.", "It felt exactly like standing right next to a jet engine taking off.", "The booming noise rattled the teeth right inside their skull."] }
+            ]},
+            "quiet": { base: "quiet", type: "setting", categories: [
+                { name: "👂 Sounds", color: "blue", words: ["A heavy, suffocating silence blanketed the entire area completely.", "The absolute lack of noise was somehow deafening in its own way.", "You could easily hear a single pin drop onto the soft carpet."] },
+                { name: "❤️ Feelings", color: "teal", words: ["The perfect stillness made them acutely aware of their own rapid heartbeat.", "It felt like the whole world was holding its breath in anticipation.", "A peaceful, deep tranquility washed over their tired mind."] }
+            ]},
+            "crowded": { base: "crowded", type: "setting", categories: [
+                { name: "🚪 Indoor", color: "purple", words: ["The stifling room was packed so tightly they could barely breathe.", "A suffocating sea of shoulder-to-shoulder bodies blocked every single exit.", "The air grew incredibly hot, sticky, and gross from all the trapped body heat."] },
+                { name: "🏙️ Outdoor", color: "orange", words: ["A chaotic swarm of hurrying pedestrians bumped into them from all sides.", "The bustling sidewalk was a massive, tangled web of fast-moving people.", "Strangers' sharp elbows constantly jabbed painfully into their ribs."] }
+            ]},
+            "dark": { base: "dark", type: "setting", categories: [ 
+                { name: "👀 Visuals", color: "slate", words: ["The terrifying shadows swallowed up the corners of the room entirely.", "Inky, absolute blackness pressed heavily against their straining eyes.", "Not a single, tiny ray of light pierced the heavy, suffocating gloom."] }, 
+                { name: "✋ Touch", color: "blue", words: ["They stretched their trembling hands out blindly into the cold, empty void.", "The icy air felt thicker and heavier without any light to cut through it.", "They bumped their bruised shins against hard, unseen furniture."] },
+                { name: "❤️ Feelings", color: "purple", words: ["A sudden, violent wave of irrational panic rose in their tight throat.", "They felt entirely swallowed and erased by the vast, quiet emptiness.", "Every primal instinct screamed at them to find a light source immediately."] }
+            ]},
+            "steep": { base: "steep", type: "setting", categories: [
+                { name: "👀 Visuals", color: "amber", words: ["Looking down made their stomach completely drop.", "The ground seemed to fall away into a terrifying nothingness.", "The incline was almost completely vertical, like a solid wall."] },
+                { name: "✋ Touch", color: "rose", words: ["Their calves burned in agony from fighting the sharp incline.", "Gravity felt like it was constantly trying to drag them backward."] }
+            ]},
+            "warm": { base: "warm", type: "setting", categories: [
+                { name: "✋ Touch", color: "orange", words: ["A gentle, toasty heat washed comfortably over their cold skin.", "The temperature was absolutely perfect, like stepping into a hug."] },
+                { name: "❤️ Feelings", color: "teal", words: ["It felt exactly like being wrapped in a thick, cozy blanket.", "A deep sense of comfort and safety settled into their bones."] }
+            ]},
+            "hot": { base: "hot", type: "setting", categories: [
+                { name: "✋ Touch", color: "rose", words: ["Hot sweat beaded instantly on their forehead and ran down their neck.", "Their clothes stuck uncomfortably to their damp, overheating skin.", "Stepping outside felt exactly like walking into a preheated oven."] },
+                { name: "👀 Visuals", color: "orange", words: ["Intense heat waves shimmered visibly off the boiling ground.", "The sun beat down relentlessly from a cloudless, blindingly blue sky."] }
+            ]},
+            "cold": { base: "cold", type: "setting", categories: [
+                { name: "✋ Touch", color: "blue", words: ["The biting, freezing wind immediately numbed their exposed cheeks.", "Their fingers felt stiff and completely frozen inside their thin gloves."] },
+                { name: "👀 Visuals", color: "slate", words: ["Their breath plumed into the freezing air like thick, gray smoke.", "Frost glittered like tiny diamonds across the frozen surfaces."] }
+            ]},
+            "bright": { base: "bright", type: "setting", categories: [
+                { name: "👀 Visuals", color: "amber", words: ["The piercing, harsh glare forced them to violently squint their eyes.", "It was like staring directly into the blinding center of the sun.", "The intense light washed out every single shadow in the room."] },
+                { name: "❤️ Internal", color: "yellow", words: ["The sheer brightness sent a sharp ache straight to the back of their head.", "They had to shield their face with their forearm just to look up."] }
+            ]},
+            "massive": { base: "massive", type: "setting", categories: [
+                { name: "👀 Visuals", color: "orange", words: ["It towered impossibly high above them, blocking out the sky.", "The sheer, overwhelming scale of it was hard to comprehend."] },
+                { name: "❤️ Feelings", color: "purple", words: ["They felt incredibly tiny and insignificant standing next to it.", "A deep sense of awe and pure intimidation washed over them."] }
+            ]},
+            "wooden": { base: "wooden", type: "setting", categories: [
+                { name: "✋ Touch", color: "amber", words: ["The rough, splintered grain scraped against their skin.", "It felt incredibly sturdy, warm, and solidly built."] },
+                { name: "👃 Smells", color: "orange", words: ["A rich, earthy scent of pine and aged oak lingered.", "It smelled faintly of old tree sap and fresh forest rain."] }
+            ]},
+            "hard": { base: "hard", type: "setting", categories: [
+                { name: "❤️ Feelings", color: "rose", words: ["Their brain felt like it was tied in an impossible knot.", "A feeling of deep frustration completely bubbled over.", "Every single option seemed entirely wrong."] },
+                { name: "👀 Actions", color: "blue", words: ["They erased their work so hard the paper almost tore.", "They buried their face in their hands in absolute defeat."] }
+            ]},
+
+            // SENSORY SETTINGS (Nouns)
+            "cave": { base: "cave", type: "setting", categories: [ 
+                { name: "👀 Visuals", color: "slate", words: ["Pitch-black shadows swallowed the remaining light.", "Jagged stalactites pointed from the ceiling like sharp teeth.", "A faint, eerie glow pulsed deep in the winding tunnels."] }, 
+                { name: "👂 Sounds", color: "blue", words: ["A low, haunting whistle of wind echoed around them.", "The steady drip-drop of water broke the heavy silence.", "Every footstep boomed like a massive drum."] }, 
+                { name: "✋ Touch", color: "teal", words: ["The damp walls were slick with cold green slime.", "Freezing air bit sharply at their exposed skin.", "Rough, unyielding rock scraped painfully against their palms."] } 
+            ]},
+            "test": { base: "test", type: "setting", categories: [ 
+                { name: "👀 Visuals", color: "amber", words: ["Rows of students sat with their heads silently bowed.", "The red second hand ticked slowly on the wall clock.", "A completely blank sheet of paper stared back at them."] }, 
+                { name: "👂 Sounds", color: "blue", words: ["Frantic pencil scratching echoed across the otherwise quiet room.", "A sudden, heavy sigh came from the back row.", "The fluorescent lights hummed annoyingly overhead."] }, 
+                { name: "❤️ Not Ready", color: "rose", words: ["My mind went completely blank in an absolute panic.", "I frantically tried to remember anything from the textbook.", "A cold, nervous sweat broke out across my forehead."] } 
+            ]},
+            "classroom": { base: "classroom", type: "setting", categories: [ 
+                { name: "👀 Visuals", color: "amber", words: ["Brightly colored educational posters covered every inch of the walls.", "Chalk dust danced lazily in the sunlight streaming through the window.", "Heavy wooden desks were arranged in perfectly straight, intimidating rows."] }, 
+                { name: "👂 Sounds", color: "blue", words: ["The school bell rang out with a shrill, piercing shriek.", "A sudden chorus of backpacks zipping shut filled the air.", "The squeak of a dry-erase marker cut sharply through the silence."] }, 
+                { name: "👃 Smells", color: "rose", words: ["The room smelled strongly of industrial floor wax and stale lunch.", "A sharp, stinging scent of hand sanitizer lingered in the air.", "The metallic smell of freshly sharpened pencils hung nearby."] } 
+            ]},
+            "forest": { base: "forest", type: "setting", categories: [ 
+                { name: "👀 Visuals", color: "emerald", words: ["Twisted, knobby roots threatened to trip them at every single step.", "Sunlight sliced through the thick, green canopy in golden laser beams.", "A thick blanket of gray fog rolled slowly over the uneven ground."] }, 
+                { name: "👂 Sounds", color: "amber", words: ["Dry, orange leaves crunched loudly under their heavy boots.", "The sudden, sharp snap of a hidden twig made them freeze entirely.", "A lonely owl hooted softly in the far distance."] }, 
+                { name: "👃 Smells", color: "orange", words: ["The rich, earthy scent of damp soil and pine needles filled the air.", "The crisp, cool smell of incoming rain stung their nose.", "The faint, smoky aroma of a distant campfire drifted by on the breeze."] } 
+            ]},
+            "cafeteria": { base: "cafeteria", type: "setting", categories: [ 
+                { name: "👀 Visuals", color: "blue", words: ["A chaotic sea of students crowded around the long, sticky tables.", "A stray piece of mystery food flew across the crowded room.", "The plastic trash cans near the exit were overflowing onto the floor."] }, 
+                { name: "👂 Sounds", color: "rose", words: ["A deafening roar of overlapping, shouting voices bounced off the brick walls.", "Hard plastic trays clattered loudly against the tables.", "Sudden, explosive bursts of unexpected laughter erupted from the corner."] }, 
+                { name: "👃 Smells", color: "purple", words: ["The heavy, greasy smell of mystery meat hung thickly in the air.", "A stale scent of spilled chocolate milk and floor wax surrounded them.", "The overwhelming aroma of deep-fried french fries drifted from the kitchen."] } 
+            ]},
+            "house": { base: "house", type: "setting", categories: [ 
+                { name: "👂 Sounds", color: "slate", words: ["The old, rotting floorboards whined under every single heavy step.", "A rhythmic, unsettling thumping came from deep inside the walls.", "The heavy front door groaned loudly on rusted, decaying hinges."] }, 
+                { name: "👀 Visuals", color: "purple", words: ["Faded, yellow wallpaper peeled back from the walls like dead skin.", "Thick, gray blankets of dust covered the sheeted, forgotten furniture.", "Sticky cobwebs stretched like intricate nets across the dark ceiling corners."] },
+                { name: "👃 Smells", color: "amber", words: ["A suffocating smell of strong mothballs and damp rot filled the tight air.", "The stale, choking stench of undisturbed dust hung heavy.", "A sharp, metallic tang of rusted pipes caught their nose unexpectedly."] } 
+            ]},
+            "city": { base: "city", type: "setting", categories: [ 
+                { name: "👀 Visuals", color: "blue", words: ["Bright neon signs flashed violently against the dark, starless night sky.", "Towering glass skyscrapers blocked out the sun completely.", "Thousands of hurried people rushed past in a continuous, blurry stream."] }, 
+                { name: "👂 Sounds", color: "rose", words: ["Angry horns blared in a never-ending, deafening chorus of traffic.", "A distant police siren wailed through the deep concrete canyons.", "The heavy rumble of a subway train shook the metal sidewalk grates."] },
+                { name: "👃 Smells", color: "slate", words: ["The heavy, choking stench of exhaust fumes stung their watering eyes.", "The sweet, sugary smell of roasted nuts drifted from a nearby street cart.", "A foul, sickening waft of damp garbage rose from the dark alleyway."] } 
+            ]},
+            "beach": { base: "beach", type: "setting", categories: [ 
+                { name: "👀 Visuals", color: "amber", words: ["Bright sunlight sparkled like tiny diamonds off the crashing, blue waves.", "An endless line of colorful umbrellas dotted the pristine white shoreline.", "Tiny, transparent crabs scurried quickly back into the wet sand."] }, 
+                { name: "👂 Sounds", color: "teal", words: ["Hungry seagulls shrieked overhead as the ocean tide roared loudly.", "The gentle, rhythmic lap of water against the shore created a calming song.", "Children squealed in pure delight as they splashed in the cold surf."] },
+                { name: "🔥 Hot", color: "rose", words: ["The baking sun hammered down relentlessly on my unprotected shoulders.", "Heat radiated off the bright white sand in intense, shimmering waves.", "I desperately craved an ice-cold drink to soothe my parched throat."] } 
+            ]},
+            "hospital": { base: "hospital", type: "setting", categories: [ 
+                { name: "👀 Visuals", color: "slate", words: ["Harsh, buzzing fluorescent lights glared off the spotless white floors.", "Exhausted nurses in blue scrubs hurried down the endless, identical corridors.", "A tangled web of clear plastic tubes hung beside the narrow, stiff bed."] }, 
+                { name: "👂 Sounds", color: "blue", words: ["The steady, rhythmic, terrifying beep of a heart monitor echoed out.", "A quiet, urgent, disguised voice called over the crackling intercom system.", "Soft, rubber-soled shoes squeaked annoyingly against the shiny linoleum."] },
+                { name: "👃 Smells", color: "teal", words: ["A sharp, incredibly sterile smell of bleach and antiseptic filled the air.", "The faint, overwhelmingly sweet scent of artificial flowers lingered nearby.", "A heavy, stinging aroma of rubbing alcohol attacked the nostrils."] } 
+            ]},
+            "graveyard": { base: "graveyard", type: "setting", categories: [ 
+                { name: "👀 Visuals", color: "slate", words: ["Crooked, moss-covered tombstones cast incredibly long, dark shadows.", "A thick, suffocating layer of low-hanging fog clung to the dead grass.", "Wilted, brown, forgotten flowers slumped against the cold gray marble."] }, 
+                { name: "👂 Sounds", color: "purple", words: ["Dead, brittle leaves crunched like snapping bones underfoot.", "A massive black crow cawed sharply from a dead, twisted oak tree.", "The chilling wind whispered ghostly secrets through the rows of stones."] },
+                { name: "❤️ Scary", color: "rose", words: ["The heavy silence felt like it was physically pressing against my eardrums.", "I constantly checked over my shoulder, terrified of what might be watching.", "A bone-chilling dread settled deep into the pit of my stomach."] } 
+            ]},
+            "room": { base: "room", type: "setting", categories: [ 
+                { name: "❤️ Feel", color: "teal", words: ["The air was so thick and stale it was genuinely hard to breathe.", "A claustrophobic, terrifying chill seeped deep into their bones.", "The walls felt like they were slowly, steadily inching closer together."] }, 
+                { name: "👀 Details", color: "blue", words: ["A single, naked lightbulb buzzed angrily and flickered overhead.", "The solitary, cracked window was completely caked in years of black grime.", "A thick layer of undisturbed, gray dust covered the bare, rotting floorboards."] },
+                { name: "👂 Sounds", color: "slate", words: ["A steady, maddening drip echoed loudly from a leaky, rusted pipe.", "The floor creaked aggressively even when nobody moved an inch.", "The silence pressed against their ears like a heavy, suffocating blanket."] }
+            ]},
+            "storm": { base: "storm", type: "setting", categories: [ 
+                { name: "👀 Visuals", color: "slate", words: ["Dark, violently bruised clouds rolled aggressively across the angry sky.", "Sudden, blinding flashes of jagged lightning lit up the entire room.", "Massive, ancient trees bent completely sideways in the powerful, rushing gale."] }, 
+                { name: "👂 Sounds", color: "amber", words: ["A deep, terrifying rumble of thunder shook the wooden floorboards.", "Heavy rain hammered violently and relentlessly against the window glass.", "The ferocious wind howled outside like a massive, trapped animal."] }, 
+                { name: "✋ Touch", color: "teal", words: ["Fat, freezing raindrops hit their exposed skin like tiny, sharp stones.", "A sudden, drastic drop in temperature sent violent shivers down their spine.", "The incredibly strong wind pushed hard against their chest, nearly knocking them over."] } 
+            ]},
+            "party": { base: "party", type: "setting", categories: [
+                { name: "👀 Visuals", color: "pink", words: ["Brightly colored balloons bobbed cheerfully against the ceiling.", "A massive pile of shiny, perfectly wrapped presents sat on the table.", "Confetti littered the floor like a colorful snowstorm."] },
+                { name: "👂 Sounds", color: "orange", words: ["Upbeat, pulsing music blasted from the massive speakers in the corner.", "The room buzzed with the happy chatter of dozens of excited guests.", "Someone popped a balloon, sending a sharp 'BANG' echoing through the room."] },
+                { name: "👃 Smells", color: "amber", words: ["The incredibly sweet scent of vanilla frosting and warm cake filled the air.", "A waft of greasy, delicious delivery pizza made everyone's mouth water.", "The sharp scent of burning candles drifted from the birthday cake."] }
+            ]},
+            "winter": { base: "winter", type: "setting", categories: [
+                { name: "👀 Visuals", color: "slate", words: ["A thick, untouched blanket of pure white snow covered the entire world.", "Long, sharp icicles hung dangerously from the edges of the roof.", "Their breath plumed into the freezing air like thick, gray smoke."] },
+                { name: "✋ Touch", color: "blue", words: ["The biting, freezing wind immediately numbed their exposed cheeks.", "Snow crunched satisfyingly and packed tightly beneath their heavy boots.", "Their fingers felt stiff and completely frozen inside their thin gloves."] },
+                { name: "👂 Sounds", color: "teal", words: ["The world was muffled in a peaceful, heavy, snowy silence.", "A harsh wind whistled sharply through the bare, skeletal tree branches.", "A snowplow scraped loudly against the pavement in the far distance."] }
+            ]},
+            "summer": { base: "summer", type: "setting", categories: [
+                { name: "👀 Visuals", color: "amber", words: ["Intense heat waves shimmered visibly off the boiling black pavement.", "The sun beat down relentlessly from a cloudless, blindingly blue sky.", "Plants drooped sadly under the oppressive, baking heat."] },
+                { name: "✋ Touch", color: "rose", words: ["Hot sweat beaded instantly on their forehead and ran down their neck.", "Their clothes stuck uncomfortably to their damp, overheating skin.", "Stepping outside felt exactly like walking into a preheated oven."] },
+                { name: "👂 Sounds", color: "orange", words: ["A loud chorus of cicadas buzzed from the nearby trees.", "The distant, cheerful jingle of an ice cream truck echoed down the block.", "The splash and laugh of kids playing in a nearby pool could be heard."] }
+            ]},
+            "morning": { base: "morning", type: "setting", categories: [
+                { name: "❄️ Winter/Cold", color: "blue", words: ["Frost glittered like tiny diamonds across the frozen ground.", "Their breath plumed into the freezing morning air like thick smoke.", "The early morning chill bit sharply right through their jacket."] },
+                { name: "☀️ Spring/Warm", color: "amber", words: ["Fresh, glittering dew drops sparkled beautifully on the green grass.", "Soft, golden sunlight slowly peeked over the edge of the horizon.", "A soft pink and orange glow painted the early morning sky."] },
+                { name: "👂 Sounds", color: "emerald", words: ["A chorus of energetic birds began their cheerful, chirping song.", "The distant, quiet hum of early morning traffic began to build.", "A rooster crowed loudly in the far distance, breaking the silence."] }
+            ]},
+            "night": { base: "night", type: "setting", categories: [
+                { name: "👀 Visuals", color: "slate", words: ["A brilliant, glowing full moon cast long, eerie shadows on the ground.", "Millions of tiny, glittering stars freckled the dark velvet sky.", "The only light came from the orange glow of a flickering streetlamp."] },
+                { name: "👂 Sounds", color: "purple", words: ["A chorus of crickets chirped steadily in the tall, hidden grass.", "The incredibly loud hoot of a hidden owl echoed through the darkness.", "A distant dog barked endlessly into the quiet void."] },
+                { name: "❤️ Feel", color: "blue", words: ["A sudden, cool breeze brought relief from the day's heavy heat.", "The darkness felt like a massive, heavy blanket wrapping around them.", "An unsettling stillness hung heavily in the cool night air."] }
+            ]},
+            "mall": { base: "mall", type: "setting", categories: [
+                { name: "👀 Visuals", color: "pink", words: ["Groups of teenagers clustered tightly around the crowded food court.", "Blinding lights reflected perfectly off the polished tile floors.", "Bright, neon sale signs were plastered across every glass window."] },
+                { name: "👂 Sounds", color: "teal", words: ["A chaotic blend of upbeat pop music echoed from different stores.", "The echoing hum of thousands of overlapping conversations filled the space.", "The sharp rattle of a metal security gate rolling up startled them."] },
+                { name: "👃 Smells", color: "amber", words: ["The overwhelming, sweet scent of warm cinnamon pretzels drifted by.", "A cloud of thick, clashing perfumes escaped from the department store.", "The greasy, unmistakable smell of the food court made them hungry."] }
+            ]},
+            "themepark": { base: "themepark", type: "setting", categories: [
+                { name: "👀 Visuals", color: "orange", words: ["A massive, looping rollercoaster towered impossibly high against the sky.", "Giant, brightly colored stuffed animals hung from the wooden game booths.", "Exhausted crowds shuffled slowly in seemingly endless, winding lines."] },
+                { name: "👂 Sounds", color: "rose", words: ["The terrifying mechanical clack-clack-clack of a coaster climbing the track.", "Piercing, thrilled screams plunged down from the sky above.", "Upbeat, cheerful carnival music blared from hidden, crackling speakers."] },
+                { name: "✋ Touch", color: "blue", words: ["The sticky, sweet residue of melted cotton candy coated their fingers.", "The dizzying, terrifying, stomach-dropping pull of gravity took over.", "The hot metal safety bar locked tightly across their lap."] }
+            ]},
+            "restaurant": { base: "restaurant", type: "setting", categories: [
+                { name: "👀 Visuals", color: "purple", words: ["Soft, dim candlelight flickered gently on the crisp white tablecloths.", "Waiters wove gracefully and quickly through the tightly packed tables.", "A towering, decadent dessert covered in sparklers arrived at a booth."] },
+                { name: "👂 Sounds", color: "emerald", words: ["The polite, rhythmic clinking of silver forks against expensive china.", "A low, sophisticated, murmuring hum of private conversations.", "Ice rattled sharply against glass as cold drinks were poured."] },
+                { name: "👃 Smells", color: "amber", words: ["The rich, mouth-watering aroma of roasted garlic and melted butter.", "The incredibly savory scent of sizzling steaks arriving from the kitchen.", "The sweet smell of caramelized sugar and baking bread."] }
+            ]},
+            "sports": { base: "sports", type: "setting", categories: [
+                { name: "👀 Visuals", color: "blue", words: ["A massive sea of screaming fans wore identical, brightly colored jerseys.", "The blinding, glaring stadium lights illuminated the vibrant green field.", "Heavy players crashed violently into each other on the painted turf."] },
+                { name: "👂 Sounds", color: "orange", words: ["The deafening, synchronized roar of the excited crowd shook the bleachers.", "A referee's sharp, piercing whistle cut immediately through the chaos.", "The incredibly loud, sickening crunch of heavy plastic pads colliding."] },
+                { name: "❤️ Feelings", color: "rose", words: ["A tense, completely electric energy radiated through the packed stands.", "Their heart pounded wildly with every single second left on the clock.", "The bitter taste of total defeat settled heavily in their stomach."] }
+            ]},
+            "ship": { base: "ship", type: "setting", categories: [ 
+                { name: "👀 Visuals", color: "slate", words: ["The towering wooden masts swayed violently with the deep ocean swells.", "Tattered sails snapped like angry whips in the gale.", "Barnacles clung desperately to the rotting, waterlogged hull."] }, 
+                { name: "👂 Sounds", color: "amber", words: ["The ancient wooden hull groaned and creaked in absolute agony.", "The relentless crashing of waves threatened to swallow the deck.", "A massive brass bell clanged repeatedly against the mast."] }, 
+                { name: "✋ Touch", color: "teal", words: ["Freezing, bitter salt spray lashed sharply against their unprotected face.", "The deck was so slick with seawater they could barely stand.", "The rough, splintered wood of the railing bit into their hands."] } 
+            ]},
+            "road": { base: "road", type: "setting", categories: [
+                { name: "👀 Visuals", color: "slate", words: ["The cracked, faded asphalt stretched endlessly into the distance.", "A thick cloud of brown dust billowed behind the rattling tires.", "The worn yellow line down the middle completely disappeared."] },
+                { name: "👂 Sounds", color: "amber", words: ["Loose gravel crunched loudly under the heavy, rolling wheels.", "The rhythmic thumping of the tires lulled them into a trance.", "Insects buzzed in a steady, unbroken hum from the deep ditches."] },
+                { name: "✋ Touch", color: "rose", words: ["Every deep pothole sent a jarring rattle right through their bones.", "The uneven, bumpy surface made the whole vehicle shake violently.", "A warm breeze blew lazily through the open windows."] }
+            ]},
+            "mountain": { base: "mountain", type: "setting", categories: [
+                { name: "👀 Visuals", color: "slate", words: ["Jagged, terrifying peaks pierced directly into the gray clouds above.", "A blinding expanse of untouched snow covered the dangerous drop.", "Thin, scraggly pine trees clung desperately to the steep cliffs."] },
+                { name: "❤️ Feelings", color: "blue", words: ["The incredibly thin air made their lungs burn with every single breath.", "A horrifying sense of vertigo washed over them as they looked down.", "Their leg muscles screamed in agony with every upward step."] },
+                { name: "✋ Touch", color: "teal", words: ["Sharp, freezing ice bit right through their thick protective gloves.", "The biting wind felt like thousands of tiny, stinging needles.", "The jagged rocks ripped right through their winter clothing."] }
+            ]},
+            "cabin": { base: "cabin", type: "setting", categories: [
+                { name: "👀 Visuals", color: "amber", words: ["A warm, orange fire crackled happily in the massive stone hearth.", "Thick, colorful patchwork quilts were piled high on the worn armchair.", "Sturdy log walls enclosed the room in a safe, protective hug."] },
+                { name: "👃 Smells", color: "orange", words: ["The incredibly comforting smell of burning pine and cedar filled the room.", "A lingering scent of old books and dried herbs surrounded them.", "The sweet smell of hot cocoa drifted from the small kitchen."] },
+                { name: "👂 Sounds", color: "blue", words: ["The wind howled harmlessly outside the thick, frost-covered windows.", "The wooden floorboards settled with a quiet, comfortable groan.", "The fire popped and hissed happily in the corner."] }
+            ]},
+            "person": { base: "person", type: "setting", categories: [
+                { name: "👀 Visuals", color: "blue", words: ["They shifted their weight awkwardly from side to side.", "Their facial expression gave absolutely nothing away."] },
+                { name: "👂 Sounds", color: "amber", words: ["Their clothing rustled softly with every single movement.", "They let out a slow, deliberate, and heavy breath."] }
+            ]},
+
+            // EMOTIONS & STATES
+            "nervous": { base: "nervous", type: "emotion", categories: [ 
+                { name: "🏃 Body", color: "blue", words: ["Their hands shook violently like leaves in the wind.", "Their knees felt like weak, trembling rubber.", "They paced back and forth across the room endlessly."] }, 
+                { name: "❤️ Internal", color: "purple", words: ["Their heart beat wildly against their ribs.", "Their stomach tied into uncomfortable, sick knots.", "Their throat went completely, painfully dry."] },
+                { name: "👀 Actions", color: "teal", words: ["They constantly bit their bottom lip until it nearly bled.", "They picked anxiously at their fingernails without realizing it.", "They couldn't stop bouncing their leg under the table."] } 
+            ]},
+            "angry": { base: "angry", type: "emotion", categories: [ 
+                { name: "🏃 Body", color: "rose", words: ["They clenched their fists until their knuckles turned white.", "Their face turned bright, burning red.", "They gritted their teeth together so tightly their jaw ached."] }, 
+                { name: "🗣️ Reactions", color: "orange", words: ["They stomped their feet aggressively against the floor.", "They slammed the door shut with a deafening bang.", "They pointed a shaking, furious finger."] },
+                { name: "❤️ Internal", color: "amber", words: ["Their blood boiled hotly in their veins.", "A hot flash of pure rage blinded their vision momentarily.", "They felt like a volcano ready to erupt."] } 
+            ]},
+            "sad": { base: "sad", type: "emotion", categories: [ 
+                { name: "👀 Eyes", color: "teal", words: ["Hot tears welled up and spilled over their eyelashes.", "They stared blankly at the floor, unblinking.", "Their eyes lost all of their usual bright shine."] }, 
+                { name: "🏃 Posture", color: "slate", words: ["Their shoulders slumped forward in total defeat.", "They let out a long, heavy, trembling sigh.", "They dragged their feet as if they weighed a ton."] },
+                { name: "❤️ Internal", color: "blue", words: ["A heavy, crushing weight settled deep into their chest.", "Their heart physically ached with an unbearable emptiness.", "A thick lump formed painfully in their throat."] } 
+            ]},
+            "embarrassed": { base: "embarrassed", type: "emotion", categories: [ 
+                { name: "🏃 Reactions", color: "rose", words: ["They stared fiercely at their own shoes, unable to look up.", "They stumbled over their words, unable to form a sentence.", "They wished the floor would open up and swallow them whole."] }, 
+                { name: "❤️ Internal", color: "orange", words: ["A hot, prickly flush crept up their neck and cheeks.", "Their ears burned with intense heat.", "Their heart raced in absolute mortification."] },
+                { name: "👀 Actions", color: "purple", words: ["They quickly hid their face behind their hands.", "They awkwardly laughed to try and cover up the mistake.", "They physically shrank back, trying to become invisible."] } 
+            ]},
+            "exhausted": { base: "exhausted", type: "emotion", categories: [ 
+                { name: "🏃 Body", color: "slate", words: ["Their eyelids drooped heavily, refusing to stay open.", "They dragged their feet like they were moving through thick mud.", "They let out a massive, jaw-cracking yawn."] }, 
+                { name: "❤️ Internal", color: "blue", words: ["Their brain felt wrapped in a thick, confusing fog.", "Every single muscle in their body ached with deep weariness.", "They could barely keep their heavy head up."] },
+                { name: "👀 Actions", color: "teal", words: ["They slumped heavily against the nearest wall for support.", "They rested their heavy head onto the cool desk immediately.", "They rubbed their bleary, burning eyes constantly."] } 
+            ]},
+            "lonely": { base: "lonely", type: "emotion", categories: [ 
+                { name: "👀 Visuals", color: "slate", words: ["The empty chair beside them sat completely untouched.", "A vast expanse of barren space stretched out before them.", "Dust gathered peacefully with absolutely no one to disturb it."] }, 
+                { name: "👂 Sounds", color: "blue", words: ["Their own breathing was the only sound in the dead silence.", "Every tiny movement they made echoed painfully loud.", "The complete lack of voices was deafening."] },
+                { name: "❤️ Internal", color: "teal", words: ["An aching hollow feeling settled deep in their chest.", "The isolation wrapped around them like a heavy winter coat.", "They longed fiercely for just a single voice to break the silence."] }
+            ]},
+            "scared": { base: "scared", type: "emotion", categories: [ 
+                { name: "🏃 Body", color: "purple", words: ["They completely froze, unable to move a single muscle.", "They quickly covered their mouth with their hands to hide a scream.", "They jumped back violently in pure horror."] }, 
+                { name: "❤️ Internal", color: "rose", words: ["The hair on the back of their neck stood straight up.", "Their breath caught sharply in their tight chest.", "Their blood instantly turned to ice in their veins."] },
+                { name: "👀 Actions", color: "slate", words: ["They squeezed their eyes shut, hoping it was a nightmare.", "They backed slowly into the corner, seeking safety.", "They scrambled frantically away from the terrifying shadow."] }
+            ]},
+            "excited": { base: "excited", type: "emotion", categories: [ 
+                { name: "🏃 Body", color: "orange", words: ["They bounced rapidly on the balls of their feet.", "They talked a million miles a minute, unable to slow down.", "They practically vibrated with pure, uncontained energy."] }, 
+                { name: "❤️ Internal", color: "pink", words: ["Their heart fluttered wildly like a trapped bird.", "A massive swarm of butterflies erupted in their stomach.", "They felt incredibly light, like they could touch the sky."] },
+                { name: "👀 Actions", color: "amber", words: ["A massive, uncontrollable grin spread across their face.", "They threw their hands in the air in pure victory.", "They let out a sudden, high-pitched squeal of delight."] } 
+            ]},
+            "sick": { base: "sick", type: "emotion", categories: [ 
+                { name: "🏃 Body", color: "emerald", words: ["Their face drained of all color, turning a sickly pale green.", "They broke out in a sudden, cold, clammy sweat.", "They clutched their stomach and groaned in severe pain."] }, 
+                { name: "❤️ Internal", color: "teal", words: ["The entire room seemed to spin dizzily around them.", "A wave of intense nausea washed over them completely.", "Their throat felt incredibly tight and scratchy."] },
+                { name: "👂 Sounds", color: "blue", words: ["They let out a deep, wet, painful cough.", "Their breathing became shallow and incredibly raspy.", "They sniffled loudly, their nose completely stuffed up."] } 
+            ]},
+            "bored": { base: "bored", type: "emotion", categories: [ 
+                { name: "👀 Actions", color: "slate", words: ["They stared blankly at the wall, completely checked out.", "They tapped their pencil rhythmically and endlessly against the desk.", "They slouched down incredibly low in their hard chair."] }, 
+                { name: "❤️ Internal", color: "purple", words: ["They mentally counted every single passing second on the clock.", "Their mind wandered thousands of miles away from the room.", "They desperately searched the room for any possible distraction."] },
+                { name: "👂 Sounds", color: "teal", words: ["They let out a loud, exaggerated, dramatic sigh.", "The rhythmic drumming of their fingers filled the silence."] } 
+            ]},
+            "lost": { base: "lost", type: "emotion", categories: [ 
+                { name: "👀 Visuals", color: "slate", words: ["Every single direction looked exactly the same, twisting into an impossible maze.", "The path behind them seemed to vanish completely into thin air.", "Unfamiliar shadows stretched out, distorting their surroundings."] }, 
+                { name: "❤️ Panic", color: "purple", words: ["A sickening, heavy drop in their stomach told them they were completely turned around.", "Absolute panic fluttered wildly in their chest like a trapped bird.", "Their breathing grew fast and shallow as realization finally set in."] },
+                { name: "🏃 Actions", color: "blue", words: ["They spun around frantically, desperately searching for a familiar landmark.", "They ran blindly forward, hoping against hope to find a way out.", "They shouted until their voice was entirely hoarse, but no one answered."] } 
+            ]}
+        };
+
+        // Massive Alias List - Single Word Fallbacks
+        const aliases = {
+            // Pronouns -> Person 
+            "he": "person", "she": "person", "they": "person", "we": "person", "i": "person", "you": "person", "someone": "person", "anyone": "person", "everyone": "person", "nobody": "person", "whoever": "person",
+            
+            // Vocab
+            "run": "ran", "sprinted": "ran", "dashed": "ran", "say": "said", "shouted": "said", "look": "looked", "stared": "looked", "get": "got", "take": "got", "love": "like", "hate": "hated", "despise": "hated", "eat": "ate", "make": "made", "build": "made", "think": "thought", "cry": "cried", "laugh": "laughed", "write": "write", "play": "play", "read": "read",
+            "great": "good", "kind": "good", "nice": "good", "evil": "bad", "terrible": "bad", "cruel": "bad", "large": "big", "huge": "big", "little": "small", "tiny": "small", "glad": "happy", "upset": "sad", "mad": "angry", "furious": "angry", "afraid": "scared", "clever": "smart", "hilarious": "funny", "warm": "hot", "freezing": "cold", "gorgeous": "beautiful", "dirty": "messy", "tired": "exhausted", "dull": "boring", "hideous": "ugly", "kid": "boy", "teenager": "boy", "youth": "boy",
+            
+            // Scene Builders 
+            "cavern": "cave", "exam": "test", "quiz": "test", "woods": "forest", "jungle": "forest", "lunchroom": "cafeteria", "hurricane": "storm", "tornado": "storm", "rain": "storm", "bedroom": "room", "kitchen": "room", "mansion": "house", "cabin": "cabin", "ocean": "beach", "sand": "beach", "clinic": "hospital", "cemetery": "graveyard", "classroom": "classroom", "snow": "winter", "sun": "summer", "celebration": "party", "mall": "mall", "shopping": "mall", "carnival": "themepark", "amusement": "themepark", "restaurant": "restaurant", "diner": "restaurant", "stadium": "sports", "theme": "themepark", "park": "themepark", "birthday": "party", "game": "sports", "street": "road"
+        };
+
+        const starterSentences = {
+            vocab: [
+                "The boy looked at the animal.",
+                "The man went to the place.",
+                "The bad guy said a bad thing.",
+                "She ran to the house.",
+                "My friend made a good thing.",
+                "The big dog ate the food.",
+                "A small person walked by.",
+                "The nice lady got a thing.",
+                "The loud noise made me scared.",
+                "She felt very sad today.",
+                "The good idea made him happy.",
+                "I looked at the big place.",
+                "He walked into the dark room.",
+                "They went into the big forest.",
+                "The funny girl had a pretty car.",
+                "He hated the boring game.",
+                "I want some new clothes.",
+                "We jumped over the big thing.",
+                "I wrote a bad story.",
+                "They played the game.",
+                "She read the big book."
+            ],
+            scene: [
+                "A dark cave.", 
+                "Taking a hard test.", 
+                "The loud school cafeteria.", 
+                "Lost in the dark forest.", 
+                "An old abandoned house.", 
+                "A heavy rain storm.", 
+                "A crowded city street.", 
+                "A hot summer beach.", 
+                "A quiet hospital hallway.", 
+                "A scary old graveyard.", 
+                "The dark empty classroom.", 
+                "A dark lonely room.", 
+                "A loud birthday party.", 
+                "A cold winter morning.", 
+                "A bright summer day.", 
+                "Someone who is lost.", 
+                "Someone feeling angry.", 
+                "Someone feeling exhausted.", 
+                "Watching a loud sports game.", 
+                "Walking through the crowded mall.", 
+                "Going to a bright theme park.", 
+                "Eating at a crowded restaurant.", 
+                "Sailing a massive pirate ship.", 
+                "Driving a quiet country road.", 
+                "Climbing a steep mountain.", 
+                "A warm old wooden cabin." 
+            ]
+        };
+
+        const App = () => {
+            const [activeTab, setActiveTab] = useState("vocab"); 
+
+            const [sentence, setSentence] = useState(starterSentences.vocab[0]);
+            
+            // Rolling indexes for sequential cycling
+            const [rollIndexVocab, setRollIndexVocab] = useState(0);
+            const [rollIndexScene, setRollIndexScene] = useState(0);
+
+            const [history, setHistory] = useState([starterSentences.vocab[0]]);
+            const [historyIndex, setHistoryIndex] = useState(0);
+
+            // Independent memories for the two notebooks
+            const [savedVocabSentences, setSavedVocabSentences] = useState([]); 
+            const [savedSceneSentences, setSavedSceneSentences] = useState([]);
+
+            const currentSavedSentences = activeTab === 'vocab' ? savedVocabSentences : savedSceneSentences;
+            const setCurrentSavedSentences = activeTab === 'vocab' ? setSavedVocabSentences : setSavedSceneSentences;
+
+            const [activeWordIndex, setActiveWordIndex] = useState(null); 
+            const [activeData, setActiveData] = useState(null); 
+            const [expandedCategoryIndex, setExpandedCategoryIndex] = useState(null);
+            
+            const [followUpReq, setFollowUpReq] = useState(null);
+            const [manualEditState, setManualEditState] = useState(null);
+            const [rewritePrompt, setRewritePrompt] = useState(null);
+            const [rewriteText, setRewriteText] = useState("");
+
+            const [copied, setCopied] = useState(false);
+
+            const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
+            const containerRef = useRef(null);
+
+            useEffect(() => {
+                if (!containerRef.current) return;
+                const observer = new ResizeObserver((entries) => {
+                    const rect = entries[0].contentRect;
+                    setCanvasDimensions({ width: rect.width, height: rect.height });
+                });
+                observer.observe(containerRef.current);
+                return () => observer.disconnect();
+            }, []);
+
+            const handleTabSwitch = (tab) => {
+                setActiveTab(tab);
+                clearActive();
+                const newSent = tab === 'vocab' ? starterSentences.vocab[rollIndexVocab] : starterSentences.scene[rollIndexScene];
+                setSentence(newSent);
+                setHistory([newSent]);
+                setHistoryIndex(0);
+            };
+
+            const updateSentence = (newSentence) => {
+                if (newSentence === history[historyIndex]) return; 
+                const newHistory = history.slice(0, historyIndex + 1);
+                newHistory.push(newSentence);
+                setHistory(newHistory);
+                setHistoryIndex(newHistory.length - 1);
+                setSentence(newSentence);
+            };
+
+            const handleUndo = () => {
+                if (historyIndex > 0) {
+                    setHistoryIndex(historyIndex - 1);
+                    setSentence(history[historyIndex - 1]);
+                    clearActive();
+                }
+            };
+
+            const handleRedo = () => {
+                if (historyIndex < history.length - 1) {
+                    setHistoryIndex(historyIndex + 1);
+                    setSentence(history[historyIndex + 1]);
+                    clearActive();
+                }
+            };
+
+            // Exact match tokenizer for single words
+            const phrases = useMemo(() => {
+                const dict = activeTab === 'vocab' ? vocabDictionary : sceneDictionary;
+                const keys = new Set([...Object.keys(dict), ...Object.keys(aliases)]);
+                const validPhrases = [];
+                keys.forEach(k => {
+                    const base = aliases[k] || k;
+                    if (dict[base]) validPhrases.push(k);
+                });
+                return validPhrases.sort((a, b) => b.length - a.length);
+            }, [activeTab]);
+
+            const parsedTokens = useMemo(() => {
+                if (!sentence) return [];
+                const tokens = [];
+                // Split perfectly by any non-word character but keep the spaces intact in the array
+                const rawTokens = sentence.split(/(\s+|[^a-zA-Z0-9-']+)/).filter(Boolean);
+                
+                rawTokens.forEach(rawToken => {
+                    // Check if the purely alphabetical part matches
+                    const clean = rawToken.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                    
+                    const dict = activeTab === 'vocab' ? vocabDictionary : sceneDictionary;
+                    let isMatch = false;
+                    
+                    if (clean && (dict[clean] || (aliases[clean] && dict[aliases[clean]]))) {
+                        isMatch = true;
+                    }
+
+                    tokens.push({ text: rawToken, isExplorable: isMatch });
+                });
+                
+                return tokens;
+            }, [sentence, activeTab]);
+
+            const resolveDictionary = (word) => {
+                const clean = cleanWord(word);
+                if (!clean) return null;
+                const dict = activeTab === 'vocab' ? vocabDictionary : sceneDictionary;
+                
+                if (dict[clean]) return { base: clean, ...dict[clean] };
+                if (aliases[clean] && dict[aliases[clean]]) return { base: aliases[clean], ...dict[aliases[clean]] };
+                return null;
+            };
+
+            const handleWordClick = (wordText, index) => {
+                const entry = resolveDictionary(wordText);
+                if (entry) {
+                    setActiveWordIndex(index);
+                    setActiveData({ original: wordText, ...entry });
+                    setExpandedCategoryIndex(null); 
+                    setFollowUpReq(null);
+                    setManualEditState(null);
+                    setRewritePrompt(null);
+                }
+            };
+
+            const openManualEdit = (wordText, index) => {
+                setManualEditState({ index, word: wordText });
+            };
+
+            const saveManualEdit = () => {
+                if (!manualEditState) return;
+                const val = document.getElementById('manual-edit-input').value.trim();
+                const newTokens = [...parsedTokens];
+                
+                if (val) {
+                    newTokens[manualEditState.index].text = val;
+                } else {
+                    newTokens.splice(manualEditState.index, 1);
+                }
+                
+                updateSentence(newTokens.map(t => t.text).join(''));
+                setManualEditState(null);
+            };
+
+            const toggleCategory = (index) => {
+                setExpandedCategoryIndex(prev => prev === index ? null : index);
+            };
+
+            const handleReplaceWord = (newWord, yieldsType) => {
+                if (activeWordIndex === null) return;
+
+                if (activeTab === 'vocab') {
+                    if (activeData.type === "noun" && yieldsType === "adjective") {
+                        const originalClean = cleanWord(activeData.original);
+                        
+                        if (PRONOUNS.includes(originalClean)) {
+                            setFollowUpReq({ adjective: newWord, originalNoun: "" }); 
+                        } else {
+                            const cleanOriginal = activeData.original.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '');
+                            executeReplacement(`${newWord} ${cleanOriginal}`);
+                        }
+                        return;
+                    }
+                    executeReplacement(newWord);
+                } else {
+                    setRewritePrompt({ originalWord: activeData.original, detail: newWord });
+                    setRewriteText(sentence);
+                }
+            };
+
+            const finalizeFollowUp = (nounStr) => {
+                executeReplacement(`${followUpReq.adjective} ${nounStr}`.trim());
+            };
+
+            const executeReplacement = (finalWordString) => {
+                const newTokens = [...parsedTokens];
+                const oldToken = newTokens[activeWordIndex].text;
+                
+                const prefixMatch = oldToken.match(/^([^a-zA-Z0-9]+)/);
+                const suffixMatch = oldToken.match(/([^a-zA-Z0-9]+)$/);
+                
+                const prefix = prefixMatch ? prefixMatch[0] : '';
+                const suffix = suffixMatch ? suffixMatch[0] : '';
+                
+                const core = oldToken.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '');
+                const isCapitalized = core && core.charAt(0) === core.charAt(0).toUpperCase();
+                
+                let finalNewCore = finalWordString;
+                
+                if (isCapitalized) {
+                    finalNewCore = finalNewCore.charAt(0).toUpperCase() + finalNewCore.slice(1).toLowerCase();
+                } else {
+                    finalNewCore = finalNewCore.toLowerCase();
+                }
+
+                newTokens[activeWordIndex].text = prefix + finalNewCore + suffix;
+                updateSentence(newTokens.map(t => t.text).join(''));
+                clearActive();
+            };
+
+            const clearActive = () => {
+                setActiveData(null);
+                setActiveWordIndex(null);
+                setExpandedCategoryIndex(null);
+                setFollowUpReq(null);
+                setManualEditState(null);
+                setRewritePrompt(null);
+            };
+
+            const rollSentence = () => {
+                if (activeTab === 'vocab') {
+                    const nextIdx = (rollIndexVocab + 1) % starterSentences.vocab.length;
+                    setRollIndexVocab(nextIdx);
+                    updateSentence(starterSentences.vocab[nextIdx]);
+                } else {
+                    const nextIdx = (rollIndexScene + 1) % starterSentences.scene.length;
+                    setRollIndexScene(nextIdx);
+                    updateSentence(starterSentences.scene[nextIdx]);
+                }
+                clearActive();
+            };
+
+            const clearSentence = () => {
+                updateSentence("");
+                clearActive();
+            };
+
+            const handleSaveToNotebook = () => {
+                if (!sentence.trim()) return;
+                
+                const tempInput = document.createElement("textarea");
+                tempInput.value = sentence.trim();
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                try { document.execCommand("copy"); } catch (err) {}
+                document.body.removeChild(tempInput);
+                
+                setCurrentSavedSentences(prev => [sentence.trim(), ...prev]);
+                
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+                clearActive(); 
+            };
+
+            const handleTextareaBlur = () => {
+                if (sentence !== history[historyIndex]) {
+                    updateSentence(sentence);
+                }
+            };
+
+            const layout = useMemo(() => {
+                if (!activeData || canvasDimensions.width === 0) return null;
+
+                // Adjust Center Y so web is perfectly centered ABOVE the notebook!
+                const activeHeight = currentSavedSentences.length > 0 ? canvasDimensions.height - 110 : canvasDimensions.height;
+                const center = { x: canvasDimensions.width / 2, y: activeHeight / 2 };
+                
+                const marginX = activeTab === 'show' ? 240 : 130; 
+                const marginY = activeTab === 'show' ? 120 : 80;  
+                
+                const availableRx = (canvasDimensions.width / 2) - marginX;
+                const availableRy = (activeHeight / 2) - marginY;
+
+                const catRx = Math.max(120, availableRx * 0.5);
+                const catRy = Math.max(110, availableRy * 0.5);
+                const wordRx = Math.max(200, availableRx);
+                const wordRy = Math.max(170, availableRy);
+
+                const nodes = { categories: [], words: [], lines: [] };
+                
+                const catsToRender = [...activeData.categories];
+                catsToRender.push({ name: "✏️ Type Your Own!", color: "slate", isCustom: true, words: [] });
+
+                const totalCats = catsToRender.length;
+                const finalCenter = center;
+
+                catsToRender.forEach((cat, i) => {
+                    const angle = (i * (Math.PI * 2)) / totalCats - (Math.PI / 2);
+                    const catX = finalCenter.x + catRx * Math.cos(angle);
+                    const catY = finalCenter.y + catRy * Math.sin(angle);
+                    const isExpanded = expandedCategoryIndex === i;
+
+                    nodes.categories.push({ id: `cat-${i}`, index: i, isCustom: cat.isCustom, name: cat.name, color: cat.color, x: catX, y: catY, isExpanded });
+                    nodes.lines.push({ id: `line-center-cat-${i}`, x1: finalCenter.x, y1: finalCenter.y, x2: catX, y2: catY, color: getColorClasses(cat.color).line, dash: false });
+
+                    if (isExpanded && !cat.isCustom) {
+                        const totalWords = cat.words.length;
+                        const spread = Math.PI * 0.7; 
+                        const startAngle = angle - (spread / 2);
+                        const step = totalWords > 1 ? spread / (totalWords - 1) : 0; 
+
+                        cat.words.forEach((wordText, j) => {
+                            const wordAngle = totalWords === 1 ? angle : startAngle + (j * step);
+                            const stagger = (j % 2 === 0 ? 15 : -15);
+                            const wordX = finalCenter.x + (wordRx + stagger) * Math.cos(wordAngle);
+                            const wordY = finalCenter.y + (wordRy + stagger) * Math.sin(wordAngle);
+
+                            nodes.words.push({ id: `word-${i}-${j}`, text: wordText, x: wordX, y: wordY, color: cat.color, catX, catY, index: j, yields: cat.yields });
+                            nodes.lines.push({ id: `line-cat-word-${i}-${j}`, x1: catX, y1: catY, x2: wordX, y2: wordY, color: getColorClasses(cat.color).line, dash: true });
+                        });
+                    }
+                });
+
+                return { center: finalCenter, ...nodes };
+            }, [activeData, canvasDimensions, expandedCategoryIndex, activeTab, currentSavedSentences.length]);
+
+            return (
+                <div className="h-screen w-screen flex flex-col relative overflow-hidden text-slate-800 selection:bg-indigo-100 selection:text-indigo-900">
+                    
+                    {/* Header */}
+                    <header className="absolute top-0 w-full glass-panel z-50 border-b border-white/40 shadow-sm flex flex-col md:flex-row md:justify-between md:items-center">
+                        <div className="flex items-center gap-3 px-6 py-3">
+                            <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-2 rounded-xl text-white shadow-lg">
+                                <Icon name={activeTab === 'vocab' ? "book" : "eye"} size={18} />
+                            </div>
+                            <h1 className="text-xl font-heading font-extrabold tracking-tight flex items-baseline gap-2">
+                                <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-purple-700">Writer Spark Practice App</span>
+                                <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">v1.1</span>
+                            </h1>
+                        </div>
+                        
+                        <div className="flex px-4 pb-2 md:pb-0 md:px-6">
+                            <button onClick={() => handleTabSwitch('vocab')} className={`px-4 py-3 text-sm font-bold border-b-4 transition-colors ${activeTab === 'vocab' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                                Vocab Builder
+                            </button>
+                            <button onClick={() => handleTabSwitch('show')} className={`px-4 py-3 text-sm font-bold border-b-4 transition-colors flex items-center gap-2 ${activeTab === 'show' ? 'border-purple-600 text-purple-700' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                                <Icon name="sparkles" size={16} color={activeTab === 'show' ? '#9333ea' : 'currentColor'} /> Scene Builder
+                            </button>
+                        </div>
+                    </header>
+
+                    <div className="flex-1 flex flex-col relative pt-[104px] md:pt-[60px] h-full w-full">
+                        <div className="absolute inset-0 pointer-events-none opacity-20" style={{ backgroundImage: 'radial-gradient(#4f46e5 2px, transparent 2px)', backgroundSize: '30px 30px' }}></div>
+
+                        {/* Top Workspace Bar */}
+                        <div className="glass-panel relative z-20 m-4 rounded-3xl p-6 shadow-xl border-b-4 border-indigo-200">
+                            <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 gap-3">
+                                <div>
+                                    <h2 className={`text-sm font-bold uppercase tracking-widest flex items-center gap-2 ${activeTab === 'vocab' ? 'text-indigo-500' : 'text-purple-500'}`}>
+                                        <Icon name="zap" size={16} /> 
+                                        {activeTab === 'vocab' ? 'Sentence Upgrader Workspace' : 'Sensory Scene Workspace'}
+                                    </h2>
+                                    <div className="text-xs text-slate-500 font-medium mt-1">
+                                        {activeTab === 'vocab' 
+                                            ? 'Click yellow words to explore deep synonym webs!' 
+                                            : 'Click any yellow word to explore sensory details!'}
+                                    </div>
+                                </div>
+                                
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <div className="flex bg-slate-100 rounded-xl p-1 border border-slate-200 shadow-inner mr-1">
+                                        <button onClick={handleUndo} disabled={historyIndex === 0} className="p-1.5 rounded-lg text-slate-500 hover:bg-white hover:text-indigo-600 hover:shadow-sm disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:shadow-none transition-all" title="Undo"><Icon name="undo" size={18} /></button>
+                                        <button onClick={handleRedo} disabled={historyIndex === history.length - 1} className="p-1.5 rounded-lg text-slate-500 hover:bg-white hover:text-indigo-600 hover:shadow-sm disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:shadow-none transition-all" title="Redo"><Icon name="redo" size={18} /></button>
+                                    </div>
+
+                                    <button onClick={clearSentence} className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold px-3 py-2 rounded-xl shadow-sm transition-all" title="Start from scratch">
+                                        <Icon name="trash" size={14} /> Clear
+                                    </button>
+
+                                    <button onClick={handleSaveToNotebook} className={`flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl shadow-sm transition-all border ${copied ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'}`}>
+                                        {copied ? <Icon name="check" size={14} /> : <Icon name="check" size={14} />}
+                                        {copied ? "Saved!" : "I Like It!"}
+                                    </button>
+
+                                    <button onClick={rollSentence} className="flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold px-3 py-2 rounded-xl shadow-sm transition-all">
+                                        <Icon name="refresh" size={14} /> Roll Example
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div className="relative group">
+                                <textarea
+                                    id="sentence-input"
+                                    className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-text resize-none"
+                                    value={sentence}
+                                    onChange={(e) => setSentence(e.target.value)}
+                                    onBlur={handleTextareaBlur}
+                                    spellCheck="false"
+                                />
+                                <div id="sentence-display-area" className="w-full min-h-[60px] p-4 bg-white/70 border-2 border-slate-200 group-focus-within:border-indigo-400 group-focus-within:bg-white rounded-2xl text-2xl md:text-3xl font-heading font-medium text-slate-700 leading-relaxed transition-all break-words" style={{ whiteSpace: 'pre-wrap' }}>
+                                    {sentence.length === 0 && <span className="text-slate-300 italic flex items-center gap-2"><Icon name="edit" size={24} /> Type your {activeTab === 'show' ? 'scene' : 'sentence'} here...</span>}
+                                    {parsedTokens.map((token, i) => {
+                                        if (/^[\s\W]+$/.test(token.text)) {
+                                            return <span key={i}>{token.text}</span>;
+                                        }
+
+                                        const isActive = activeWordIndex === i;
+                                        const activeBg = activeTab === 'vocab' ? 'bg-indigo-600 shadow-indigo-500/30' : 'bg-purple-600 shadow-purple-500/30';
+                                        
+                                        if (token.isExplorable) {
+                                            return (
+                                                <span 
+                                                    key={i} 
+                                                    onClick={() => handleWordClick(token.text, i)}
+                                                    className={`relative inline-block cursor-pointer px-1 mx-0.5 rounded-lg transition-all duration-300 z-20
+                                                        ${isActive ? `${activeBg} text-white shadow-lg scale-110 -translate-y-1` : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 hover:scale-105 border border-yellow-300 animate-pulse-ring'}`}
+                                                    title={activeTab === 'vocab' ? "Click to upgrade!" : "Click to Explore Senses!"}
+                                                >
+                                                    {token.text}
+                                                </span>
+                                            );
+                                        }
+                                        return (
+                                            <span key={i} onClick={() => openManualEdit(token.text, i)} className="inline-block px-1 rounded hover:bg-slate-200 cursor-pointer transition-colors z-20 relative" title="Click to edit">
+                                                {token.text}
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Interactive Radial Area */}
+                        <div className={`flex-1 relative w-full h-full overflow-hidden ${currentSavedSentences.length > 0 ? 'pb-32' : ''}`} ref={containerRef}>
+                            {!activeData || !layout ? (
+                                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8 text-center animate-pop h-full">
+                                    <div className="w-24 h-24 bg-white rounded-full shadow-lg flex items-center justify-center mb-6 animate-float-slow border-4 border-slate-50">
+                                        <Icon name={activeTab === 'vocab' ? "book" : "eye"} size={40} color={activeTab === 'vocab' ? "#818cf8" : "#a855f7"} />
+                                    </div>
+                                    <h3 className="font-heading font-bold text-2xl text-slate-600 mb-2">
+                                        {activeTab === 'vocab' ? 'Vocabulary Web' : 'Sensory Explorer'}
+                                    </h3>
+                                    <p className="max-w-md text-slate-500">
+                                        {activeTab === 'vocab' 
+                                            ? <span>Turn boring words into great ones! Click a <span className="bg-yellow-100 text-yellow-800 px-2 rounded border border-yellow-300">yellow</span> word to build your web.</span>
+                                            : <span>Don't just say they were in a forest—paint a picture! Click a <span className="bg-yellow-100 text-yellow-800 px-2 rounded border border-yellow-300">yellow</span> setting to find sensory details.</span>
+                                        }
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="absolute inset-0 overflow-hidden">
+                                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
+                                        {layout.lines.map(line => (
+                                            <path key={line.id} d={`M ${line.x1} ${line.y1} L ${line.x2} ${line.y2}`} fill="none" stroke={line.color} strokeWidth={line.dash ? "2" : "4"} strokeDasharray={line.dash ? "6 6" : "none"} strokeLinecap="round" className="path-animate opacity-50" />
+                                        ))}
+                                    </svg>
+
+                                    <div className="absolute inset-0 z-10 pointer-events-none">
+                                        <div className="absolute pointer-events-auto z-50" style={{ left: layout.center.x, top: layout.center.y }}>
+                                            <div className="transform -translate-x-1/2 -translate-y-1/2">
+                                                <div className="animate-pop relative group">
+                                                    <div className={`text-white border-4 shadow-2xl rounded-full w-28 h-28 flex flex-col items-center justify-center animate-float-slow cursor-pointer hover:scale-105 transition-transform ${activeTab === 'vocab' ? 'bg-indigo-600 border-indigo-200 shadow-indigo-500/30' : 'bg-purple-600 border-purple-200 shadow-purple-500/30'}`} onClick={clearActive}>
+                                                        <span className="text-2xl font-heading font-extrabold capitalize leading-none mb-1 text-center px-2 break-all">{activeData.base}</span>
+                                                        <span className="text-[10px] font-medium uppercase tracking-wider opacity-80 mt-1">Cancel</span>
+                                                        <div className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"><Icon name="close" size={14} /></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {layout.categories.map((cat) => {
+                                            const style = getColorClasses(cat.color);
+                                            return (
+                                                <div key={cat.id} className={`absolute pointer-events-auto transition-all duration-300 ${cat.isExpanded ? 'z-30' : 'z-20'}`} style={{ left: cat.x, top: cat.y }}>
+                                                    <div className="transform -translate-x-1/2 -translate-y-1/2">
+                                                        <div style={{ animation: `popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) ${cat.index * 0.1}s forwards`, opacity: 0 }}>
+                                                            <div 
+                                                                onClick={() => {
+                                                                    if (cat.isCustom) {
+                                                                        openManualEdit(activeData.original, activeWordIndex);
+                                                                        setExpandedCategoryIndex(null);
+                                                                    } else {
+                                                                        toggleCategory(cat.index);
+                                                                    }
+                                                                }} 
+                                                                className={`px-5 py-3 rounded-2xl cursor-pointer font-bold text-center border-2 shadow-lg flex items-center gap-2 ${cat.isExpanded ? `${style.bg} ${style.border} ${style.text} shadow-xl ring-4 ring-white` : `bg-white ${style.border} ${style.text} ${style.hover}`}`}
+                                                            >
+                                                                <span className="whitespace-nowrap">{cat.name}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+
+                                        {layout.words.map((word) => {
+                                            const style = getColorClasses(word.color);
+                                            const isLongText = word.text.length > 15;
+                                            return (
+                                                <div key={word.id} className="absolute pointer-events-auto group z-40" style={{ left: word.x, top: word.y }}>
+                                                    <div style={{ transform: `translate(-50%, -50%) rotate(${Math.random() * 6 - 3}deg)` }}>
+                                                        <div style={{ animation: `sprout 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) ${word.index * 0.05}s forwards`, opacity: 0, transformOrigin: 'center center' }}>
+                                                            <div onClick={() => handleReplaceWord(word.text, word.yields)} className={`${style.bg} ${style.text} border-2 ${style.border} px-5 py-2.5 rounded-3xl shadow-md cursor-pointer transform transition-all duration-200 hover:scale-110 hover:shadow-xl ${style.shadow} flex items-center justify-center bg-white ${activeTab === 'show' ? 'max-w-[200px] md:max-w-[250px]' : ''}`}>
+                                                                <span className={`handwritten font-bold pt-1 text-center leading-tight ${isLongText ? 'text-lg' : 'text-2xl'}`}>{word.text}</span>
+                                                                <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-xl flex items-center gap-1 z-50">
+                                                                    <Icon name={activeTab === 'show' ? "plus" : "sparkles"} size={12} color="#fbbf24" /> {activeTab === 'show' ? "Add to scene!" : "Use this!"}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* SMALL BOTTOM NOTEBOOK */}
+                            {currentSavedSentences.length > 0 && (
+                                <div className="absolute bottom-4 left-4 right-4 z-[90] animate-pop">
+                                    <div className="max-w-5xl mx-auto bg-white/95 backdrop-blur-lg shadow-2xl rounded-2xl border-2 border-slate-200 overflow-hidden flex flex-col">
+                                        <div className="px-4 py-2 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
+                                            <h2 className={`text-xs font-bold uppercase tracking-widest flex items-center gap-2 ${activeTab === 'vocab' ? 'text-indigo-500' : 'text-purple-500'}`}>
+                                                <Icon name="notebook" size={14}/> {activeTab === 'vocab' ? 'Vocab Story Threads' : 'Scene Drafts'}
+                                            </h2>
+                                            <button onClick={() => setCurrentSavedSentences([])} className="text-xs text-rose-500 font-bold hover:underline">Clear</button>
+                                        </div>
+                                        <div className="flex gap-3 p-3 overflow-x-auto whitespace-nowrap scroll-smooth items-center min-h-[64px]">
+                                            {currentSavedSentences.map((s, idx) => (
+                                                <div 
+                                                    key={idx} 
+                                                    onClick={() => { setSentence(s); updateSentence(s); clearActive(); }} 
+                                                    className={`px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm text-sm font-medium text-slate-700 cursor-pointer hover:shadow-md transition-all shrink-0 max-w-[300px] max-h-[100px] overflow-hidden group relative ${activeTab === 'vocab' ? 'hover:border-indigo-400' : 'hover:border-purple-400'}`}
+                                                    style={{ whiteSpace: 'pre-wrap' }}
+                                                >
+                                                    <span className={`opacity-0 group-hover:opacity-100 absolute -top-1 -right-1 text-white text-[10px] px-2 py-0.5 rounded-full transition-opacity shadow ${activeTab === 'vocab' ? 'bg-indigo-500' : 'bg-purple-500'}`}>Load</span>
+                                                    {s}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* MANUAL EDIT MODAL */}
+                            {manualEditState && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-auto z-[100] animate-pop bg-slate-900/20 backdrop-blur-sm" onClick={() => setManualEditState(null)}>
+                                    <div className="bg-white p-8 rounded-3xl shadow-2xl border-4 border-slate-200 max-w-md w-full text-center relative" onClick={(e) => e.stopPropagation()}>
+                                        <button onClick={() => setManualEditState(null)} className="absolute top-4 right-4 text-slate-400 hover:text-rose-500 transition-colors"><Icon name="close" size={24} /></button>
+                                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-500 ring-4 ring-slate-50"><Icon name="edit" size={28} /></div>
+                                        <h3 className="text-xl font-heading font-bold text-slate-700 mb-2">Edit or Delete Word</h3>
+                                        <div className="mb-6">
+                                            <input type="text" id="manual-edit-input" defaultValue={manualEditState.word} className="w-full p-4 text-2xl font-bold text-slate-700 border-2 border-slate-200 rounded-xl focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 focus:outline-none transition-all shadow-inner text-center" autoFocus onFocus={(e) => { const val = e.target.value; e.target.value = ''; e.target.value = val; }} onKeyDown={(e) => { if (e.key === 'Enter') saveManualEdit(); }} />
+                                            <p className="text-xs text-slate-400 mt-2">Clear the box to delete the word entirely.</p>
+                                        </div>
+                                        <button onClick={saveManualEdit} className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-4 rounded-xl shadow-lg transition-transform hover:-translate-y-1 text-lg flex items-center justify-center gap-2"><Icon name="check" size={20} /> Save Changes</button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* VOCAB TAB: GRAMMAR FOLLOW UP MODAL (For Pronouns and Adjectives!) */}
+                            {followUpReq && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-auto z-[100] animate-pop bg-slate-900/20 backdrop-blur-sm" onClick={() => setFollowUpReq(null)}>
+                                    <div className="bg-white p-8 rounded-3xl shadow-2xl border-4 border-indigo-200 max-w-md w-full text-center relative" onClick={(e) => e.stopPropagation()}>
+                                        <button onClick={() => setFollowUpReq(null)} className="absolute top-4 right-4 text-slate-400 hover:text-rose-500 transition-colors"><Icon name="close" size={24} /></button>
+                                        <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4 text-indigo-500 ring-4 ring-indigo-100"><Icon name="zap" size={28} /></div>
+                                        <h3 className="text-2xl font-heading font-bold text-slate-700 mb-2"><span className="text-indigo-600 handwritten text-3xl font-bold">{followUpReq.adjective}</span>... what?</h3>
+                                        <p className="text-sm text-slate-500 mb-6">
+                                            {followUpReq.originalNoun === "" ? "You picked a describing word. Type a noun to replace the pronoun!" : "You picked a describing word. Now you need a noun to go with it!"}
+                                        </p>
+                                        <div className="flex items-center gap-2 mb-6 bg-slate-50 p-3 rounded-2xl border-2 border-slate-100">
+                                            <div className="bg-white text-indigo-700 font-bold px-4 py-3 rounded-xl shadow-sm border border-slate-200 whitespace-nowrap text-lg">{followUpReq.adjective}</div>
+                                            <span className="text-slate-400 font-black text-xl">+</span>
+                                            <input type="text" id="followup-input" defaultValue={followUpReq.originalNoun ? followUpReq.originalNoun.replace(/[^a-zA-Z0-9]/g, '') : ''} placeholder={followUpReq.originalNoun === "" ? "Type a noun..." : ""} className="w-full p-3 text-lg font-bold text-slate-700 border-2 border-indigo-100 rounded-xl focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 focus:outline-none transition-all shadow-inner" autoFocus onFocus={(e) => e.target.select()} onKeyDown={(e) => { if (e.key === 'Enter' && e.target.value.trim()) finalizeFollowUp(e.target.value.trim()); }} />
+                                        </div>
+                                        <button onClick={() => { const val = document.getElementById('followup-input').value.trim(); if (val) finalizeFollowUp(val); }} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl shadow-lg transition-transform hover:-translate-y-1 text-lg flex items-center justify-center gap-2">
+                                            <Icon name="sparkles" size={20} /> Add to Sentence
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* SHOW TAB: SCENE EXPANSION MODAL */}
+                            {rewritePrompt && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-auto z-[100] animate-pop bg-purple-900/30 backdrop-blur-sm p-4" onClick={() => setRewritePrompt(null)}>
+                                    <div className="bg-white p-6 md:p-8 rounded-3xl shadow-2xl border-4 border-purple-300 max-w-3xl w-full relative" onClick={(e) => e.stopPropagation()}>
+                                        <button onClick={() => setRewritePrompt(null)} className="absolute top-4 right-4 text-slate-400 hover:text-rose-500 transition-colors"><Icon name="close" size={24} /></button>
+                                        
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 ring-4 ring-purple-50"><Icon name="eye" size={24} /></div>
+                                            <div>
+                                                <h3 className="text-xl font-heading font-bold text-slate-800">🎨 Paint the Scene!</h3>
+                                                <p className="text-sm text-slate-500">Instead of just telling the reader, weave this sensory detail into your paragraph.</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                            <div>
+                                                <div className="text-xs font-bold text-purple-400 uppercase tracking-widest mb-1">New Sensory Sentence:</div>
+                                                <div className="handwritten text-xl md:text-2xl text-purple-700 font-bold">"{rewritePrompt.detail}"</div>
+                                            </div>
+                                            <button 
+                                                onClick={() => setRewriteText(prev => prev + (prev.endsWith(' ') || prev.endsWith('\n') ? '' : ' ') + rewritePrompt.detail)} 
+                                                className="shrink-0 bg-white border border-purple-200 text-purple-600 hover:bg-purple-100 font-bold px-4 py-2 rounded-xl text-sm shadow-sm transition-colors flex items-center gap-2"
+                                            >
+                                                <Icon name="plus" size={16} /> Add to End
+                                            </button>
+                                        </div>
+
+                                        <p className="text-sm font-semibold text-slate-600 mb-2">Your Scene Draft:</p>
+                                        <textarea 
+                                            id="rewrite-input"
+                                            value={rewriteText}
+                                            onChange={(e) => setRewriteText(e.target.value)}
+                                            className="w-full p-4 text-xl font-medium text-slate-700 border-2 border-slate-200 rounded-xl focus:border-purple-400 focus:ring-4 focus:ring-purple-100 focus:outline-none transition-all shadow-inner resize-none mb-4"
+                                            rows="5"
+                                            autoFocus
+                                        ></textarea>
+
+                                        <button 
+                                            onClick={() => {
+                                                if (rewriteText.trim()) {
+                                                    updateSentence(rewriteText.trim());
+                                                    clearActive();
+                                                }
+                                            }} 
+                                            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl shadow-lg transition-transform hover:-translate-y-1 text-lg flex items-center justify-center gap-2"
+                                        >
+                                            <Icon name="check" size={20} /> Save New Scene
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
