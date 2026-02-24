@@ -173,23 +173,21 @@
 
         // Scaffolding based on Edutopia & standard academic paragraph models
         const expositoryBlocks = [
-            { id: 1, title: "1. The Hook", hint: "Grab the reader's attention with a question, surprising fact, or engaging quote." },
-            { id: 2, title: "2. Introduction & Main Idea", hint: "Introduce the topic broadly, then state your specific focus in one clear sentence." },
-            { id: 3, title: "3. Core Concept 1", hint: "Introduce your first main point. Support it with facts, examples, or quotes." },
-            { id: 4, title: "4. Core Concept 2", hint: "Introduce your second main point. How does it connect to the first?" },
-            { id: 5, title: "5. Deep Dive", hint: "Explore your most interesting or complex piece of evidence in detail." },
-            { id: 6, title: "6. Summary", hint: "Bring your main points together in a new way. Do not just copy the introduction." },
-            { id: 7, title: "7. Final Thought", hint: "Leave the reader with something to think about (a future prediction or a lasting thought)." }
+            { id: 1, title: "1. Introduction (Hook & Main Idea)", hint: "Grab the reader's attention and introduce the topic broadly, then state your specific focus in one clear sentence." },
+            { id: 2, title: "2. Core Concept 1", hint: "Introduce your first main point. Support it with facts, examples, or quotes." },
+            { id: 3, title: "3. Core Concept 2", hint: "Introduce your second main point. How does it connect to the first?" },
+            { id: 4, title: "4. Deep Dive", hint: "Explore your most interesting or complex piece of evidence in detail." },
+            { id: 5, title: "5. Summary", hint: "Bring your main points together in a new way. Do not just copy the introduction." },
+            { id: 6, title: "6. Final Thought", hint: "Leave the reader with something to think about (a future prediction or a lasting thought)." }
         ];
 
         const persuasiveBlocks = [
-            { id: 1, title: "1. The Hook", hint: "Grab the reader's attention with a strong statement, question, or statistic." },
-            { id: 2, title: "2. Introduction & Claim", hint: "Introduce the issue and clearly state your position (your claim) in one clear sentence." },
-            { id: 3, title: "3. Supporting Reason 1", hint: "State your first main reason. Support it with strong evidence." },
-            { id: 4, title: "4. Supporting Reason 2", hint: "State your second main reason. Build upon your argument." },
-            { id: 5, title: "5. Counterclaim & Rebuttal", hint: "Acknowledge the opposing side (Counterclaim), then explain why your argument is still stronger (Rebuttal)." },
-            { id: 6, title: "6. Summary", hint: "Restate your claim in a new way and summarize your main reasons." },
-            { id: 7, title: "7. Call to Action", hint: "Tell the reader what they should do or think next based on your argument." }
+            { id: 1, title: "1. Introduction (Hook & Claim)", hint: "Grab the reader's attention, introduce the issue, and clearly state your position (your claim)." },
+            { id: 2, title: "2. Supporting Reason 1", hint: "State your first main reason. Support it with strong evidence." },
+            { id: 3, title: "3. Supporting Reason 2", hint: "State your second main reason. Build upon your argument." },
+            { id: 4, title: "4. Counterclaim & Rebuttal", hint: "Acknowledge the opposing side (Counterclaim), then explain why your argument is still stronger (Rebuttal)." },
+            { id: 5, title: "5. Summary", hint: "Restate your claim in a new way and summarize your main reasons." },
+            { id: 6, title: "6. Call to Action", hint: "Tell the reader what they should do or think next based on your argument." }
         ];
 
         const linkingWords = {
@@ -216,25 +214,40 @@
 
         // --- GLOBAL CATEGORY STYLES ---
         const CATEGORY_STYLES = {
+            "Evidence": { bg: "bg-blue-100", text: "text-blue-900", border: "border-blue-200", icon: "text-blue-600", lightBg: "bg-blue-50" },
             "Fact": { bg: "bg-blue-100", text: "text-blue-900", border: "border-blue-200", icon: "text-blue-600", lightBg: "bg-blue-50" },
             "Statistic / Data": { bg: "bg-emerald-100", text: "text-emerald-900", border: "border-emerald-200", icon: "text-emerald-600", lightBg: "bg-emerald-50" },
             "Direct Quote": { bg: "bg-amber-100", text: "text-amber-900", border: "border-amber-200", icon: "text-amber-600", lightBg: "bg-amber-50" },
             "Example / Anecdote": { bg: "bg-purple-100", text: "text-purple-900", border: "border-purple-200", icon: "text-purple-600", lightBg: "bg-purple-50" },
             "Opposing View": { bg: "bg-rose-100", text: "text-rose-900", border: "border-rose-200", icon: "text-rose-600", lightBg: "bg-rose-50" },
+            "My View": { bg: "bg-indigo-100", text: "text-indigo-900", border: "border-indigo-200", icon: "text-indigo-600", lightBg: "bg-indigo-50" },
             "Key Term": { bg: "bg-teal-100", text: "text-teal-900", border: "border-teal-200", icon: "text-teal-600", lightBg: "bg-teal-50" }, // For Vocab
             "Default": { bg: "bg-slate-100", text: "text-slate-900", border: "border-slate-200", icon: "text-slate-600", lightBg: "bg-slate-50" }
         };
 
         const getCategoryStyle = (category) => CATEGORY_STYLES[category] || CATEGORY_STYLES["Default"];
 
+        const getCategoriesForMode = (mode) => {
+            if (mode === 'expository') {
+                return ["Fact", "Statistic / Data", "Direct Quote", "Example / Anecdote"];
+            } else {
+                return ["Fact", "Statistic / Data", "Direct Quote", "Example / Anecdote", "My View", "Opposing View"];
+            }
+        };
+
         // --- Components ---
 
-        const MindWeb = ({ ideas, setIdeas, onOrganize }) => {
+        const MindWeb = ({ ideas, setIdeas, onOrganize, mode }) => {
+            const categories = getCategoriesForMode(mode);
             const [newIdea, setNewIdea] = useState("");
-            const [newType, setNewType] = useState("Fact");
+            const [newType, setNewType] = useState(categories[0]);
             const containerRef = useRef(null);
             const [draggingId, setDraggingId] = useState(null);
             const dragOffset = useRef({ x: 0, y: 0 });
+
+            useEffect(() => {
+                setNewType(categories[0]);
+            }, [mode]);
 
             const addIdea = () => {
                 if (newIdea.trim()) {
@@ -323,11 +336,7 @@
                             value={newType}
                             onChange={e => setNewType(e.target.value)}
                         >
-                            <option>Fact</option>
-                            <option>Statistic / Data</option>
-                            <option>Direct Quote</option>
-                            <option>Example / Anecdote</option>
-                            <option>Opposing View</option>
+                            {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                         </select>
                         <button onClick={addIdea} className="bg-cyan-600 text-white p-3 px-6 rounded-xl hover:bg-cyan-700 transition shadow-md flex items-center justify-center gap-2 font-bold whitespace-nowrap">
                             <Icon name="plus" size={20} /> <span className="sm:hidden md:inline">Add</span>
@@ -509,22 +518,45 @@
         };
 
         // --- Evidence Board (Replacing Characters) ---
-        const EvidenceBoard = ({ evidence, setEvidence }) => {
+        const EvidenceBoard = ({ evidence, setEvidence, ideas = [] }) => {
+            const [newEvidenceText, setNewEvidenceText] = useState("");
             const [newSource, setNewSource] = useState("");
-            const [newType, setNewType] = useState("Fact");
 
             const addEvidence = () => {
-                if (!newSource.trim()) return;
-                const newEv = {
-                    id: Date.now(),
-                    type: 'evidence',
-                    name: newSource,
-                    category: newType,
-                    details: []
-                };
-                setEvidence([...evidence, newEv]);
+                if (!newEvidenceText.trim() && !newSource.trim()) return;
+                
+                const sourceName = newSource.trim() || "Unknown Source";
+                
+                // Group evidence if the source already exists
+                const existingIndex = evidence.findIndex(e => e.name.toLowerCase() === sourceName.toLowerCase() && sourceName !== "Unknown Source");
+                
+                if (existingIndex >= 0) {
+                    if (newEvidenceText.trim()) {
+                        const updated = [...evidence];
+                        updated[existingIndex].details.push({
+                            id: Date.now(),
+                            text: newEvidenceText.trim(),
+                            color: 'bg-blue-50'
+                        });
+                        setEvidence(updated);
+                    }
+                } else {
+                    const newEv = {
+                        id: Date.now(),
+                        type: 'evidence',
+                        name: sourceName,
+                        category: 'Evidence',
+                        details: newEvidenceText.trim() ? [{
+                            id: Date.now() + 1,
+                            text: newEvidenceText.trim(),
+                            color: 'bg-blue-50'
+                        }] : []
+                    };
+                    setEvidence([...evidence, newEv]);
+                }
+                
                 setNewSource("");
-                setNewType("Fact");
+                setNewEvidenceText("");
             };
 
             const removeEvidence = (id) => {
@@ -544,7 +576,7 @@
                      <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6">
                         <div className="text-left">
                             <h3 className="text-2xl font-heading font-bold text-slate-800">Evidence Board</h3>
-                            <p className="text-slate-500 text-sm">Collect facts, quotes, and statistics to support your thesis.</p>
+                            <p className="text-slate-500 text-sm">Find facts, quotes, and statistics to support the subtopics from your Mind Web.</p>
                         </div>
                          <button 
                             onClick={handleSnapshot}
@@ -555,37 +587,49 @@
                         </button>
                     </div>
 
+                    {/* Ideas Reference Guide */}
+                    {ideas.length > 0 && (
+                        <div className="bg-gradient-to-r from-cyan-50 to-blue-50 p-5 rounded-2xl border border-cyan-100 shadow-sm">
+                            <h4 className="text-xs font-bold text-cyan-800 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <Icon name="lightbulb" size={16} /> Look for evidence to support these ideas:
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                                {ideas.map(idea => (
+                                    <span key={idea.id} className="bg-white px-3 py-1.5 rounded-lg text-sm text-slate-700 border border-cyan-200 shadow-sm font-medium">
+                                        {idea.text}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Add Form */}
                     <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 shadow-sm flex flex-col md:flex-row gap-3 items-end">
                         <div className="flex-1 w-full">
-                            <label className="block text-xs font-bold uppercase text-blue-600 mb-1">Source Name or Topic Area</label>
+                            <label className="block text-xs font-bold uppercase text-blue-600 mb-1">Evidence (Quote, Fact, Stat)</label>
                             <input 
                                 className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none" 
-                                placeholder="e.g., National Geographic, or 'Dietary Habits'"
+                                placeholder="e.g., 'The ocean covers 71% of the Earth...'"
+                                value={newEvidenceText}
+                                onChange={e => setNewEvidenceText(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && addEvidence()}
+                            />
+                        </div>
+                        <div className="w-full md:w-64">
+                            <label className="block text-xs font-bold uppercase text-blue-600 mb-1">Where you got it (Source)</label>
+                            <input 
+                                className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none bg-white"
+                                placeholder="e.g., National Geographic"
                                 value={newSource}
                                 onChange={e => setNewSource(e.target.value)}
                                 onKeyPress={(e) => e.key === 'Enter' && addEvidence()}
                             />
                         </div>
-                        <div className="w-full md:w-48">
-                            <label className="block text-xs font-bold uppercase text-blue-600 mb-1">Evidence Type</label>
-                            <select 
-                                className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none bg-white font-medium text-slate-700"
-                                value={newType}
-                                onChange={e => setNewType(e.target.value)}
-                            >
-                                <option>Fact</option>
-                                <option>Statistic / Data</option>
-                                <option>Direct Quote</option>
-                                <option>Example / Anecdote</option>
-                                <option>Opposing View</option>
-                            </select>
-                        </div>
                         <button 
                             onClick={addEvidence}
-                            className="bg-blue-600 text-white font-bold py-2.5 px-6 rounded-xl hover:bg-blue-700 transition w-full md:w-auto shadow-md shadow-blue-600/20"
+                            className="bg-blue-600 text-white font-bold py-2.5 px-6 rounded-xl hover:bg-blue-700 transition w-full md:w-auto shadow-md shadow-blue-600/20 whitespace-nowrap"
                         >
-                            Create
+                            Add
                         </button>
                     </div>
 
@@ -1539,8 +1583,8 @@
                                     {/* Main Workspace */}
                                     <div className="w-full">
                                         <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-4 md:p-8 min-h-[50vh] border border-slate-100">
-                                            {activeTab === 'web' && <MindWeb ideas={ideas} setIdeas={setIdeas} onOrganize={goToOrganizer} />}
-                                            {activeTab === 'evidence' && <EvidenceBoard evidence={evidence} setEvidence={setEvidence} />}
+                                            {activeTab === 'web' && <MindWeb ideas={ideas} setIdeas={setIdeas} onOrganize={goToOrganizer} mode={mode} />}
+                                            {activeTab === 'evidence' && <EvidenceBoard evidence={evidence} setEvidence={setEvidence} ideas={ideas} />}
                                             {activeTab === 'vocab' && <VocabVault vocab={vocab} setVocab={setVocab} />}
                                             {activeTab === 'blocks' && <EssayBuilder blocks={blocks} setBlocks={setBlocks} ideas={ideas} evidence={evidence} vocab={vocab} />}
                                             {activeTab === 'freewrite' && <FreewriteBuilder blocks={blocks} freewriteText={freewriteText} setFreewriteText={setFreewriteText} />}
