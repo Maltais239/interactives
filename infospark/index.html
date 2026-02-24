@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MacGregor Maltais InfoSpark: The Writing Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Indie+Flower&family=Inter:wght@400;500;600&family=Outfit:wght@500;700;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0fdfa; /* Shifted to a scholarly teal/slate background */
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(199, 89%, 48%, 0.1) 0, transparent 50%), 
+                radial-gradient(at 50% 0%, hsla(160, 84%, 39%, 0.1) 0, transparent 50%), 
+                radial-gradient(at 100% 0%, hsla(43, 100%, 50%, 0.1) 0, transparent 50%);
+        }
+        
+        h1, h2, h3, h4, h5, h6, .font-heading {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .handwritten {
+            font-family: 'Indie Flower', cursive;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(20, 184, 166, 0.2);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+        
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .drag-target-active {
+            border-color: #0ea5e9 !important;
+            background-color: #f0f9ff !important;
+            transform: scale(1.01);
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback, memo } = React;
+
+        // Icons
+        const Icon = ({ name, color = "currentColor", size = 24, className="" }) => {
+            const icons = {
+                home: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+                lightbulb: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.9 1.2 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>,
+                book: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>,
+                arrowRight: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>,
+                brain: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>,
+                pencil: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>,
+                plus: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+                chevronRight: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>,
+                chevronDown: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>,
+                refresh: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>,
+                check: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"/></svg>,
+                grip: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>,
+                copy: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>,
+                download: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+                camera: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
+                save: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+                upload: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+                fileSearch: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><circle cx="10" cy="14" r="2"/><path d="m11.5 15.5 2.5 2.5"/></svg>,
+                tag: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg>,
+                trash: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+                quote: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>
+            };
+            return icons[name] || null;
+        };
+
+        // --- Helper: Save as Image ---
+        const saveAsImage = async (elementId, title) => {
+            const element = document.getElementById(elementId);
+            if(!element) return;
+            try {
+                const canvas = await window.html2canvas(element, { 
+                    scale: 2, // Better resolution
+                    backgroundColor: '#ffffff',
+                    logging: false,
+                    useCORS: true
+                });
+                
+                const link = document.createElement('a');
+                link.download = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.png`;
+                link.href = canvas.toDataURL();
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (err) {
+                console.error("Image capture failed:", err);
+                alert("Couldn't save image. Please try again.");
+            }
+        };
+
+        // --- DATA & PROMPTS ---
+        const expositoryPrompts = [
+            "Explain a natural life cycle (e.g., a butterfly, a frog, a star).",
+            "Describe the causes and effects of a major historical event (e.g., the sinking of the Titanic, the Industrial Revolution).",
+            "Compare and contrast two pieces of media (e.g., two books, a book and its movie adaptation, two video games).",
+            "Write a how-to guide on a skill you are an expert at (e.g., baking cookies, coding a simple game, playing an instrument).",
+            "Explain the importance and impact of a conservation effort (e.g., recycling, protecting endangered species, renewable energy).",
+            "Describe the structure and function of a system of government (e.g., local city council, the federal branches, a student council).",
+            "Explain a core Earth science cycle and its necessity for life (e.g., the water cycle, the carbon cycle).",
+            "Compare and contrast two distinct lifestyles or environments (e.g., big city vs. rural town, historical vs. modern living).",
+            "Describe the sequence of events that led to a groundbreaking invention (e.g., the airplane, the internet, the printing press).",
+            "Explain how a complex biological system works (e.g., the human digestive system, plant photosynthesis, the immune system).",
+            "Identify a problem in a specific community and explain potential solutions (e.g., school overcrowding, local park maintenance).",
+            "Describe the key characteristics of a specific ecological biome (e.g., the Amazon rainforest, the Sahara desert, the tundra).",
+            "Explain the differences between two closely related scientific concepts (e.g., weather vs. climate, mass vs. weight).",
+            "Write an informative piece about the history and rules of a specific activity (e.g., soccer, chess, esports).",
+            "Describe the achievements and legacy of an influential historical figure (e.g., Martin Luther King Jr., Marie Curie, Abraham Lincoln)."
+        ];
+
+        const persuasivePrompts = [
+            "Should students have homework over the weekend? Argue your position.",
+            "Convince your principal to add a new class or club to the school.",
+            "Should school uniforms be mandatory? State your claim and support it.",
+            "Argue for or against the use of cell phones in the classroom.",
+            "Should the voting age be lowered to 16? Persuade your reader.",
+            "Is it better to read a book or watch its movie adaptation? Defend your choice.",
+            "Should junk food be banned from school cafeterias? State your argument.",
+            "Persuade your parents to let you get a new pet.",
+            "Should students be paid for getting good grades? Argue your position.",
+            "Is social media more harmful or beneficial for teenagers?",
+            "Should physical education be required every day in school?",
+            "Argue for or against extending the school year to year-round.",
+            "Should video games be considered a sport? Defend your opinion.",
+            "Convince your community to invest in a new public park or facility.",
+            "Should humans focus more on space exploration or ocean exploration?"
+        ];
+
+        // Scaffolding based on Edutopia & standard academic paragraph models
+        const expositoryBlocks = [
+            { id: 1, title: "1. The Hook", hint: "Grab the reader's attention with a question, surprising fact, or engaging quote." },
+            { id: 2, title: "2. Introduction & Main Idea", hint: "Introduce the topic broadly, then state your specific focus in one clear sentence." },
+            { id: 3, title: "3. Core Concept 1", hint: "Introduce your first main point. Support it with facts, examples, or quotes." },
+            { id: 4, title: "4. Core Concept 2", hint: "Introduce your second main point. How does it connect to the first?" },
+            { id: 5, title: "5. Deep Dive", hint: "Explore your most interesting or complex piece of evidence in detail." },
+            { id: 6, title: "6. Summary", hint: "Bring your main points together in a new way. Do not just copy the introduction." },
+            { id: 7, title: "7. Final Thought", hint: "Leave the reader with something to think about (a future prediction or a lasting thought)." }
+        ];
+
+        const persuasiveBlocks = [
+            { id: 1, title: "1. The Hook", hint: "Grab the reader's attention with a strong statement, question, or statistic." },
+            { id: 2, title: "2. Introduction & Claim", hint: "Introduce the issue and clearly state your position (your claim) in one clear sentence." },
+            { id: 3, title: "3. Supporting Reason 1", hint: "State your first main reason. Support it with strong evidence." },
+            { id: 4, title: "4. Supporting Reason 2", hint: "State your second main reason. Build upon your argument." },
+            { id: 5, title: "5. Counterclaim & Rebuttal", hint: "Acknowledge the opposing side (Counterclaim), then explain why your argument is still stronger (Rebuttal)." },
+            { id: 6, title: "6. Summary", hint: "Restate your claim in a new way and summarize your main reasons." },
+            { id: 7, title: "7. Call to Action", hint: "Tell the reader what they should do or think next based on your argument." }
+        ];
+
+        const linkingWords = {
+            "Sequencing & Adding": [
+                "first", "second", "third", "next", "then", "after that", "finally", 
+                "also", "in addition", "additionally", "besides", "as well as", 
+                "further", "furthermore", "moreover", "in the first place"
+            ],
+            "Examples & Emphasis": [
+                "for example", "for instance", "in other words", "for the most part", 
+                "equally important", "especially", "generally", "usually", 
+                "particularly", "not to mention", "in this case", "including"
+            ],
+            "Comparing & Contrasting": [
+                "likewise", "similarly", "on the other hand", "in contrast", 
+                "however", "although", "even though", "otherwise", "rather", "except"
+            ],
+            "Cause, Effect & Conclusion": [
+                "therefore", "consequently", "because", "in order to", "for this reason", 
+                "as a result", "in conclusion", "overall", "in any event", "in short", 
+                "in summary", "to sum up", "to wrap up"
+            ]
+        };
+
+        // --- GLOBAL CATEGORY STYLES ---
+        const CATEGORY_STYLES = {
+            "Fact": { bg: "bg-blue-100", text: "text-blue-900", border: "border-blue-200", icon: "text-blue-600", lightBg: "bg-blue-50" },
+            "Statistic / Data": { bg: "bg-emerald-100", text: "text-emerald-900", border: "border-emerald-200", icon: "text-emerald-600", lightBg: "bg-emerald-50" },
+            "Direct Quote": { bg: "bg-amber-100", text: "text-amber-900", border: "border-amber-200", icon: "text-amber-600", lightBg: "bg-amber-50" },
+            "Example / Anecdote": { bg: "bg-purple-100", text: "text-purple-900", border: "border-purple-200", icon: "text-purple-600", lightBg: "bg-purple-50" },
+            "Opposing View": { bg: "bg-rose-100", text: "text-rose-900", border: "border-rose-200", icon: "text-rose-600", lightBg: "bg-rose-50" },
+            "Key Term": { bg: "bg-teal-100", text: "text-teal-900", border: "border-teal-200", icon: "text-teal-600", lightBg: "bg-teal-50" }, // For Vocab
+            "Default": { bg: "bg-slate-100", text: "text-slate-900", border: "border-slate-200", icon: "text-slate-600", lightBg: "bg-slate-50" }
+        };
+
+        const getCategoryStyle = (category) => CATEGORY_STYLES[category] || CATEGORY_STYLES["Default"];
+
+        // --- Components ---
+
+        const MindWeb = ({ ideas, setIdeas, onOrganize }) => {
+            const [newIdea, setNewIdea] = useState("");
+            const [newType, setNewType] = useState("Fact");
+            const containerRef = useRef(null);
+            const [draggingId, setDraggingId] = useState(null);
+            const dragOffset = useRef({ x: 0, y: 0 });
+
+            const addIdea = () => {
+                if (newIdea.trim()) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const minRadius = 30; 
+                    const maxRadius = 45; 
+                    const radius = minRadius + Math.random() * (maxRadius - minRadius);
+                    
+                    const x = 50 + radius * Math.cos(angle);
+                    const y = 50 + radius * Math.sin(angle);
+
+                    setIdeas([...ideas, { 
+                        id: Date.now(), 
+                        text: newIdea, 
+                        type: newType,
+                        x: x, 
+                        y: y,
+                        rotate: Math.random() * 6 - 3
+                    }]);
+                    setNewIdea("");
+                }
+            };
+
+            const removeIdea = (id) => {
+                setIdeas(ideas.filter(idea => idea.id !== id));
+            };
+
+            // Dragging Logic
+            const handleMouseDown = (e, id) => {
+                e.stopPropagation();
+                e.preventDefault(); 
+                
+                const item = ideas.find(i => i.id === id);
+                if(!item || !containerRef.current) return;
+
+                const containerRect = containerRef.current.getBoundingClientRect();
+                
+                const mouseXPercent = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+                const mouseYPercent = ((e.clientY - containerRect.top) / containerRect.height) * 100;
+
+                setDraggingId(id);
+                dragOffset.current = {
+                    x: mouseXPercent - item.x,
+                    y: mouseYPercent - item.y
+                };
+            };
+
+            const handleMouseMove = (e) => {
+                if (!draggingId || !containerRef.current) return;
+                e.preventDefault();
+
+                const containerRect = containerRef.current.getBoundingClientRect();
+                
+                let newX = ((e.clientX - containerRect.left) / containerRect.width) * 100 - dragOffset.current.x;
+                let newY = ((e.clientY - containerRect.top) / containerRect.height) * 100 - dragOffset.current.y;
+
+                newX = Math.max(2, Math.min(90, newX)); 
+                newY = Math.max(2, Math.min(90, newY));
+
+                setIdeas(ideas.map(idea => 
+                    idea.id === draggingId ? { ...idea, x: newX, y: newY } : idea
+                ));
+            };
+
+            const handleMouseUp = () => {
+                setDraggingId(null);
+            };
+
+            const handleSnapshot = () => {
+                saveAsImage("mind-web-capture", "My_Topic_Web");
+            };
+
+            return (
+                <div className="w-full h-full flex flex-col relative">
+                    <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                        <input 
+                            type="text" 
+                            className="flex-1 px-5 py-3 border-2 border-slate-200 rounded-xl focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 outline-none transition-all shadow-sm text-base"
+                            placeholder="Add a subtopic or detail to your web..."
+                            value={newIdea}
+                            onChange={(e) => setNewIdea(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && addIdea()}
+                        />
+                        <select 
+                            className="px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 outline-none bg-white font-medium text-slate-700 w-full sm:w-48"
+                            value={newType}
+                            onChange={e => setNewType(e.target.value)}
+                        >
+                            <option>Fact</option>
+                            <option>Statistic / Data</option>
+                            <option>Direct Quote</option>
+                            <option>Example / Anecdote</option>
+                            <option>Opposing View</option>
+                        </select>
+                        <button onClick={addIdea} className="bg-cyan-600 text-white p-3 px-6 rounded-xl hover:bg-cyan-700 transition shadow-md flex items-center justify-center gap-2 font-bold whitespace-nowrap">
+                            <Icon name="plus" size={20} /> <span className="sm:hidden md:inline">Add</span>
+                        </button>
+                    </div>
+
+                    <div id="mind-web-capture" className="relative p-2 rounded-3xl bg-white flex-1 min-h-0">
+                        <div 
+                            ref={containerRef}
+                            className="relative w-full h-[50vh] min-h-[400px] bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden mb-4 select-none touch-none"
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={handleMouseUp}
+                            onMouseLeave={handleMouseUp}
+                        >
+                            <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
+                                backgroundImage: 'radial-gradient(#0891b2 1px, transparent 1px)',
+                                backgroundSize: '24px 24px'
+                            }}></div>
+
+                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                                <div className="bg-white border-4 border-cyan-100 p-6 md:p-8 rounded-full shadow-2xl flex items-center justify-center w-32 h-32 md:w-48 md:h-48 animate-float">
+                                    <div className="text-center">
+                                        <span className="block text-2xl md:text-4xl mb-2">🎯</span>
+                                        <span className="font-heading font-bold text-cyan-900 text-base md:text-xl">Main Topic</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {ideas.map((idea, index) => {
+                                // Fallback for older saves that used a random color class
+                                const style = idea.type ? getCategoryStyle(idea.type) : { bg: idea.color, text: 'text-slate-800', border: 'border-black/5', icon: 'text-slate-500' };
+                                return (
+                                <div 
+                                    key={idea.id}
+                                    onMouseDown={(e) => handleMouseDown(e, idea.id)}
+                                    className={`absolute ${style.bg} p-3 md:p-4 rounded-xl shadow-md border ${style.border} max-w-[140px] md:max-w-[180px] cursor-move transition-transform ${draggingId === idea.id ? 'z-50 scale-105 shadow-xl' : 'hover:scale-110 hover:z-20'}`}
+                                    style={{ 
+                                        top: `${idea.y}%`, 
+                                        left: `${idea.x}%`,
+                                        transform: `rotate(${idea.rotate}deg)`
+                                    }}
+                                >
+                                    {idea.type && <div className={`text-[10px] uppercase font-bold ${style.icon} mb-1 leading-none opacity-80`}>{idea.type}</div>}
+                                    <div className={`handwritten text-base md:text-xl leading-tight ${style.text} pointer-events-none`}>{idea.text}</div>
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); removeIdea(idea.id); }}
+                                        className="absolute -top-2 -right-2 bg-white text-rose-500 rounded-full p-1 shadow-sm hover:bg-rose-50 border border-rose-100 cursor-pointer"
+                                    >
+                                        <Icon name="plus" size={12} className="rotate-45" />
+                                    </button>
+                                </div>
+                                );
+                            })}
+                            
+                            {ideas.length === 0 && (
+                                <div className="absolute bottom-4 left-0 right-0 text-center text-slate-400 text-xs md:text-sm pointer-events-none px-4 font-medium">
+                                    Start brainstorming! Add subtopics related to your prompt.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {/* Action Bar */}
+                    <div className="flex flex-col sm:flex-row justify-between items-center mt-2 gap-3">
+                        <button 
+                            onClick={handleSnapshot}
+                            className="w-full sm:w-auto bg-white text-slate-600 font-bold py-3 px-6 rounded-2xl shadow-sm border border-slate-200 hover:bg-slate-50 hover:text-cyan-600 transition-all flex items-center justify-center gap-2"
+                            title="Save as Image"
+                        >
+                            <Icon name="camera" size={20} /> <span>Save Web</span>
+                        </button>
+
+                        {ideas.length > 0 && (
+                            <div className="w-full sm:w-auto animate-bounce-subtle">
+                                <button 
+                                    onClick={onOrganize}
+                                    className="w-full sm:w-auto bg-amber-400 text-amber-950 font-bold py-3 px-8 rounded-2xl shadow-lg hover:bg-amber-300 hover:shadow-amber-200/50 transition-all flex items-center justify-center gap-2 text-lg transform hover:-translate-y-1"
+                                >
+                                    <Icon name="check" size={24} /> Start Drafting
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Fluid Note Component for Evidence/Vocab ---
+        const FluidCard = ({ item, onRemove, onUpdateDetails }) => {
+            const [newDetail, setNewDetail] = useState("");
+            
+            const getRandomStyle = () => {
+                const rotate = Math.random() * 4 - 2;
+                const colors = ['bg-yellow-50', 'bg-blue-50', 'bg-green-50', 'bg-pink-50'];
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                return { rotate, color };
+            };
+
+            const addDetail = () => {
+                if (!newDetail.trim()) return;
+                const style = getRandomStyle();
+                const detail = {
+                    id: Date.now(),
+                    text: newDetail,
+                    ...style
+                };
+                const currentDetails = item.details || [];
+                onUpdateDetails(item.id, [...currentDetails, detail]);
+                setNewDetail("");
+            };
+
+            const removeDetail = (detailId) => {
+                const currentDetails = item.details || [];
+                onUpdateDetails(item.id, currentDetails.filter(d => d.id !== detailId));
+            };
+
+            const isEvidence = item.type === 'evidence';
+            const iconName = isEvidence ? "fileSearch" : "tag";
+            const style = getCategoryStyle(item.category);
+
+            return (
+                <div className="bg-white border-2 border-slate-100 rounded-3xl p-4 md:p-6 shadow-sm hover:shadow-md transition relative group">
+                    <button 
+                        onClick={() => onRemove(item.id)}
+                        className="absolute top-4 right-4 text-slate-300 hover:text-rose-500 transition p-1"
+                    >
+                        <Icon name="trash" size={20} />
+                    </button>
+                    
+                    <div className="flex items-center gap-3 mb-6 pr-8">
+                        <div className={`p-3 rounded-2xl ${style.bg} ${style.icon}`}>
+                            <Icon name={iconName} size={24} />
+                        </div>
+                        <div className="overflow-hidden">
+                            <h4 className="font-heading font-bold text-xl md:text-2xl text-slate-800 leading-none truncate">{item.name}</h4>
+                            <span className={`text-xs font-bold uppercase tracking-wide ${style.icon}`}>
+                                {item.category || "Category"}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="mb-4">
+                        <input 
+                            className={`w-full ${style.lightBg} border-b-2 ${style.border} p-3 rounded-t-lg focus:border-cyan-500 focus:bg-white outline-none transition-colors text-base`}
+                            placeholder={isEvidence ? "Paste a quote or fact here..." : "Type definition here..."}
+                            value={newDetail}
+                            onChange={(e) => setNewDetail(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && addDetail()}
+                        />
+                    </div>
+
+                    <div className={`min-h-[150px] ${style.lightBg} bg-opacity-50 rounded-xl p-4 border ${style.border} relative overflow-hidden`}>
+                        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(#64748b 1px, transparent 1px)', backgroundSize: '16px 16px' }}></div>
+                        
+                        <div className="relative flex flex-col gap-2 content-start">
+                            {(item.details || []).length === 0 && (
+                                <div className="w-full text-center text-slate-400 text-sm py-8 italic pointer-events-none">
+                                    Type above and press Enter to add notes!
+                                </div>
+                            )}
+                            {(item.details || []).map(detail => (
+                                <div 
+                                    key={detail.id}
+                                    className={`${detail.color} px-4 py-3 rounded-lg shadow-sm border border-slate-200/50 transform transition group/note relative cursor-default`}
+                                >
+                                    <span className="font-medium text-sm text-slate-800 leading-relaxed block pr-4">{detail.text}</span>
+                                    <button 
+                                        onClick={() => removeDetail(detail.id)}
+                                        className="absolute top-2 right-2 bg-white text-rose-500 rounded-full p-0.5 shadow-sm opacity-0 group-hover/note:opacity-100 transition-opacity border border-rose-100"
+                                    >
+                                        <Icon name="plus" size={10} className="rotate-45" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Evidence Board (Replacing Characters) ---
+        const EvidenceBoard = ({ evidence, setEvidence }) => {
+            const [newSource, setNewSource] = useState("");
+            const [newType, setNewType] = useState("Fact");
+
+            const addEvidence = () => {
+                if (!newSource.trim()) return;
+                const newEv = {
+                    id: Date.now(),
+                    type: 'evidence',
+                    name: newSource,
+                    category: newType,
+                    details: []
+                };
+                setEvidence([...evidence, newEv]);
+                setNewSource("");
+                setNewType("Fact");
+            };
+
+            const removeEvidence = (id) => {
+                setEvidence(evidence.filter(c => c.id !== id));
+            };
+
+            const updateEvidenceDetails = (id, newDetails) => {
+                setEvidence(evidence.map(c => c.id === id ? { ...c, details: newDetails } : c));
+            };
+
+             const handleSnapshot = () => {
+                saveAsImage("evidence-capture", "My_Evidence_Board");
+            };
+
+            return (
+                <div className="space-y-8 max-w-4xl mx-auto">
+                     <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6">
+                        <div className="text-left">
+                            <h3 className="text-2xl font-heading font-bold text-slate-800">Evidence Board</h3>
+                            <p className="text-slate-500 text-sm">Collect facts, quotes, and statistics to support your thesis.</p>
+                        </div>
+                         <button 
+                            onClick={handleSnapshot}
+                            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold shadow-sm transition-all"
+                            title="Save as Image"
+                        >
+                            <Icon name="camera" size={18} /> <span className="hidden sm:inline">Image</span>
+                        </button>
+                    </div>
+
+                    {/* Add Form */}
+                    <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 shadow-sm flex flex-col md:flex-row gap-3 items-end">
+                        <div className="flex-1 w-full">
+                            <label className="block text-xs font-bold uppercase text-blue-600 mb-1">Source Name or Topic Area</label>
+                            <input 
+                                className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none" 
+                                placeholder="e.g., National Geographic, or 'Dietary Habits'"
+                                value={newSource}
+                                onChange={e => setNewSource(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && addEvidence()}
+                            />
+                        </div>
+                        <div className="w-full md:w-48">
+                            <label className="block text-xs font-bold uppercase text-blue-600 mb-1">Evidence Type</label>
+                            <select 
+                                className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none bg-white font-medium text-slate-700"
+                                value={newType}
+                                onChange={e => setNewType(e.target.value)}
+                            >
+                                <option>Fact</option>
+                                <option>Statistic / Data</option>
+                                <option>Direct Quote</option>
+                                <option>Example / Anecdote</option>
+                                <option>Opposing View</option>
+                            </select>
+                        </div>
+                        <button 
+                            onClick={addEvidence}
+                            className="bg-blue-600 text-white font-bold py-2.5 px-6 rounded-xl hover:bg-blue-700 transition w-full md:w-auto shadow-md shadow-blue-600/20"
+                        >
+                            Create
+                        </button>
+                    </div>
+
+                    <div id="evidence-capture" className="grid grid-cols-1 md:grid-cols-2 gap-6 p-2">
+                        {evidence.length === 0 && <p className="text-slate-400 text-center col-span-full py-8">No evidence collected yet. Start researching!</p>}
+                        {evidence.map(ev => (
+                            <FluidCard 
+                                key={ev.id} 
+                                item={ev} 
+                                onRemove={removeEvidence} 
+                                onUpdateDetails={updateEvidenceDetails} 
+                            />
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Vocabulary Vault (Replacing Settings) ---
+        const VocabVault = ({ vocab, setVocab }) => {
+            const [newWord, setNewWord] = useState("");
+
+            const addVocab = () => {
+                if (!newWord.trim()) return;
+                const newV = {
+                    id: Date.now(),
+                    type: 'vocab',
+                    name: newWord,
+                    category: 'Key Term',
+                    details: []
+                };
+                setVocab([...vocab, newV]);
+                setNewWord("");
+            };
+
+            const removeVocab = (id) => {
+                setVocab(vocab.filter(s => s.id !== id));
+            };
+
+            const updateVocabDetails = (id, newDetails) => {
+                setVocab(vocab.map(s => s.id === id ? { ...s, details: newDetails } : s));
+            };
+
+            const handleSnapshot = () => {
+                saveAsImage("vocab-capture", "My_Vocabulary");
+            };
+
+            return (
+                <div className="space-y-8 max-w-4xl mx-auto">
+                    <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6">
+                        <div className="text-left">
+                            <h3 className="text-2xl font-heading font-bold text-slate-800">Vocabulary Vault</h3>
+                            <p className="text-slate-500 text-sm">Define key terms your reader needs to understand your topic.</p>
+                        </div>
+                        <button 
+                            onClick={handleSnapshot}
+                            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold shadow-sm transition-all"
+                            title="Save as Image"
+                        >
+                            <Icon name="camera" size={18} /> <span className="hidden sm:inline">Image</span>
+                        </button>
+                    </div>
+
+                    <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 shadow-sm flex flex-col md:flex-row gap-3 items-end">
+                        <div className="flex-1 w-full">
+                            <label className="block text-xs font-bold uppercase text-emerald-600 mb-1">Vocabulary Word</label>
+                            <input 
+                                className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none" 
+                                placeholder="e.g., Photosynthesis"
+                                value={newWord}
+                                onChange={e => setNewWord(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && addVocab()}
+                            />
+                        </div>
+                        <button 
+                            onClick={addVocab}
+                            className="bg-emerald-600 text-white font-bold py-2.5 px-6 rounded-xl hover:bg-emerald-700 transition w-full md:w-auto shadow-md shadow-emerald-600/20"
+                        >
+                            Add Word
+                        </button>
+                    </div>
+
+                    <div id="vocab-capture" className="grid grid-cols-1 md:grid-cols-2 gap-6 p-2">
+                         {vocab.length === 0 && <p className="text-slate-400 text-center col-span-full py-8">No vocabulary words added yet.</p>}
+                         {vocab.map(v => (
+                            <FluidCard 
+                                key={v.id} 
+                                item={v} 
+                                onRemove={removeVocab} 
+                                onUpdateDetails={updateVocabDetails} 
+                            />
+                         ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // Optimized Essay Block
+        const EssayBlock = memo(({ block, index, onUpdate, onDragOver, onDragLeave, onDrop, isDragOver, total }) => {
+            const [isExpanded, setIsExpanded] = useState(false);
+
+            useEffect(() => {
+                if (isDragOver) setIsExpanded(true);
+            }, [isDragOver]);
+
+            return (
+                <div className="group relative pl-0 md:pl-8">
+                    {index !== total - 1 && (
+                        <div className="hidden md:block absolute left-[15px] top-10 bottom-[-40px] w-0.5 bg-slate-200 group-hover:bg-cyan-300 transition-colors"></div>
+                    )}
+                    
+                    <div className="hidden md:flex absolute left-0 top-0 w-8 h-8 rounded-full bg-cyan-100 text-cyan-700 font-bold items-center justify-center border-2 border-white shadow-sm z-10 group-hover:scale-110 transition-transform">
+                        {index + 1}
+                    </div>
+
+                    <div 
+                        className={`bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition-all mb-4 ${isDragOver ? 'drag-target-active border-cyan-400 ring-2 ring-cyan-100' : 'border-slate-200'}`}
+                        onDragOver={(e) => onDragOver(e, block.id)}
+                        onDragLeave={onDragLeave}
+                        onDrop={(e) => onDrop(e, block.id)}
+                    >
+                        <div 
+                            onClick={() => setIsExpanded(!isExpanded)}
+                            className="bg-slate-50/80 p-3 md:p-4 border-b border-slate-100 flex flex-row justify-between items-center gap-2 cursor-pointer select-none hover:bg-slate-100 transition-colors"
+                        >
+                            <div className="flex items-center gap-3 flex-1">
+                                <span className="md:hidden w-6 h-6 rounded-full bg-cyan-100 text-cyan-700 font-bold flex items-center justify-center text-xs border border-cyan-200">{index + 1}</span>
+                                <div>
+                                    <h4 className="font-heading font-bold text-slate-800 text-base md:text-lg">{block.title}</h4>
+                                    <p className="text-xs md:text-sm text-slate-500 font-medium">{block.hint}</p>
+                                </div>
+                            </div>
+                            <div className={`text-slate-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                                <Icon name="chevronDown" size={20} />
+                            </div>
+                        </div>
+                        
+                        {isExpanded && (
+                            <div className="p-1 animate-fadeIn bg-white">
+                                <textarea 
+                                    className="w-full min-h-[140px] p-5 bg-white block w-full border-0 focus:ring-0 resize-y text-lg text-slate-800 placeholder-slate-300 leading-relaxed font-serif"
+                                    placeholder="Draft this paragraph here. Drag and drop evidence from your toolkit to build your points..."
+                                    value={block.content || ''}
+                                    onChange={(e) => onUpdate(block.id, e.target.value)}
+                                    autoFocus
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        });
+
+        // Sidebar Mini Cards
+        const EvidenceMiniCard = ({ item, onDragStart }) => {
+            const style = getCategoryStyle(item.category);
+            return (
+                <div className={`bg-white border ${style.border} rounded-xl p-3 shadow-sm hover:shadow-md transition-all relative`}>
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className={`${style.bg} ${style.icon} p-1.5 rounded-lg`}>
+                            <Icon name="fileSearch" size={14} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <h5 className="font-heading font-bold text-slate-800 text-sm truncate leading-tight">{item.name}</h5>
+                            <span className={`text-[10px] uppercase font-bold ${style.icon} tracking-wide`}>{item.category}</span>
+                        </div>
+                    </div>
+                    {(item.details || []).length > 0 && (
+                        <div className="flex flex-col gap-1 mt-2">
+                            {item.details.map(d => (
+                                <div 
+                                    key={d.id} 
+                                    draggable="true"
+                                    onDragStart={(e) => {
+                                        e.stopPropagation();
+                                        e.dataTransfer.effectAllowed = "copy";
+                                        // If it's a quote, format it with quotation marks when dropping
+                                        const dragText = item.category === "Direct Quote" ? `"${d.text}"` : d.text;
+                                        onDragStart(e, dragText);
+                                    }}
+                                    className={`text-xs ${style.lightBg} text-slate-700 p-2 rounded border ${style.border} cursor-grab active:cursor-grabbing hover:opacity-80 transition-opacity pointer-events-auto flex gap-2`}
+                                >
+                                    <Icon name="grip" size={12} className={`${style.icon} mt-0.5 flex-shrink-0 opacity-50`} />
+                                    <span className="line-clamp-2">{d.text}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const VocabMiniCard = ({ item, onDragStart }) => {
+            const style = getCategoryStyle(item.category);
+            return (
+                <div className={`bg-white border ${style.border} rounded-xl p-3 shadow-sm hover:shadow-md transition-all relative`}>
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className={`${style.bg} ${style.icon} p-1.5 rounded-lg`}>
+                            <Icon name="tag" size={14} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <h5 className="font-heading font-bold text-slate-800 text-sm truncate leading-tight">{item.name}</h5>
+                        </div>
+                    </div>
+                    {(item.details || []).length > 0 && (
+                        <div className="flex flex-col gap-1 mt-2">
+                            {item.details.map(d => (
+                                <div 
+                                    key={d.id} 
+                                    draggable="true"
+                                    onDragStart={(e) => {
+                                        e.stopPropagation();
+                                        e.dataTransfer.effectAllowed = "copy";
+                                        const dragText = `${item.name}: ${d.text}`;
+                                        onDragStart(e, dragText);
+                                    }}
+                                    className={`text-xs ${style.lightBg} text-slate-700 p-2 rounded border ${style.border} cursor-grab active:cursor-grabbing hover:opacity-80 transition-opacity pointer-events-auto flex gap-2`}
+                                >
+                                    <Icon name="grip" size={12} className={`${style.icon} mt-0.5 flex-shrink-0 opacity-50`} />
+                                    <span className="line-clamp-2">{d.text}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const EssayBuilder = ({ blocks, setBlocks, ideas, evidence, vocab }) => {
+            const [draggedIdea, setDraggedIdea] = useState(null);
+            const [dragOverBlock, setDragOverBlock] = useState(null);
+            const [notification, setNotification] = useState(null);
+            const [toolkitTab, setToolkitTab] = useState('subtopics'); // subtopics, evidence, vocab, linking
+
+            const handleUpdateBlock = useCallback((id, text) => {
+                setBlocks(prevBlocks => prevBlocks.map(b => b.id === id ? { ...b, content: text } : b));
+            }, [setBlocks]);
+
+            const handleDragStart = (e, text) => {
+                e.dataTransfer.setData('text/plain', text);
+                e.dataTransfer.effectAllowed = "copy";
+                setDraggedIdea(text);
+            };
+
+            const handleDragOver = useCallback((e, blockId) => {
+                e.preventDefault();
+                setDragOverBlock(blockId);
+            }, []);
+
+            const handleDragLeave = useCallback((e) => {
+                setDragOverBlock(null);
+            }, []);
+
+            const handleDrop = useCallback((e, blockId) => {
+                e.preventDefault();
+                const text = e.dataTransfer.getData('text/plain');
+                setBlocks(prevBlocks => {
+                    const block = prevBlocks.find(b => b.id === blockId);
+                    if (!block) return prevBlocks;
+                    const newContent = block.content ? `${block.content} ${text}` : text;
+                    return prevBlocks.map(b => b.id === blockId ? { ...b, content: newContent } : b);
+                });
+                setDragOverBlock(null);
+                setDraggedIdea(null);
+            }, [setBlocks]);
+
+            const getFullEssay = () => {
+                return blocks
+                    .filter(b => b.content.trim() !== '')
+                    .map(b => b.content)
+                    .join('\n\n'); // Standard format, just paragraphs
+            };
+
+            const handleCopy = () => {
+                const text = getFullEssay();
+                if (!text) {
+                    showNotification("Draft something first!", "error");
+                    return;
+                }
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showNotification("Draft copied to clipboard!", "success");
+                } catch (err) {
+                    showNotification("Failed to copy.", "error");
+                }
+                document.body.removeChild(textArea);
+            };
+
+            const handleExport = () => {
+                const text = getFullEssay();
+                if (!text) {
+                    showNotification("Draft something first!", "error");
+                    return;
+                }
+                const element = document.createElement("a");
+                const file = new Blob([text], {type: 'text/plain'});
+                element.href = URL.createObjectURL(file);
+                element.download = "my_draft.txt";
+                document.body.appendChild(element); 
+                element.click();
+                document.body.removeChild(element);
+                showNotification("Draft downloaded as text!", "success");
+            };
+
+            const showNotification = (msg, type) => {
+                setNotification({ msg, type });
+                setTimeout(() => setNotification(null), 3000);
+            };
+
+            return (
+                <div className="max-w-6xl mx-auto relative">
+                    {notification && (
+                        <div className={`fixed top-24 right-8 z-50 px-6 py-3 rounded-xl shadow-2xl font-bold animate-float ${notification.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
+                            {notification.msg}
+                        </div>
+                    )}
+                    
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50 p-4 rounded-2xl border border-slate-200 gap-4 mb-6">
+                         <div className="text-left">
+                            <h3 className="text-xl md:text-2xl font-heading font-bold text-slate-800">Drafting Organizer</h3>
+                            <p className="text-slate-500 text-sm">Drag your research into paragraphs to build your piece.</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                            <button 
+                                onClick={handleCopy}
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold shadow-sm transition-all"
+                                title="Copy Draft"
+                            >
+                                <Icon name="copy" size={18} /> <span className="inline">Copy Draft</span>
+                            </button>
+                            <button 
+                                onClick={handleExport}
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-semibold shadow-sm transition-all"
+                                title="Download Text File"
+                            >
+                                <Icon name="download" size={18} /> <span className="inline">.txt</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="essay-builder-capture" className="flex flex-col lg:flex-row gap-8 items-start">
+                        
+                        {/* SIDEBAR: Research Toolkit */}
+                        <div className="w-full lg:w-80 flex-shrink-0 lg:sticky lg:top-8 space-y-4 order-2 lg:order-2 bg-slate-50/80 p-5 rounded-2xl border border-slate-200">
+                             <div className="flex items-center gap-2 pb-2">
+                                <span className="text-xl">🗂️</span>
+                                <h4 className="font-heading font-bold text-slate-700">Research Toolkit</h4>
+                            </div>
+
+                            {/* Toolkit Tabs - Fixed to a 2x2 Grid */}
+                            <div className="grid grid-cols-2 bg-slate-200/60 p-1 rounded-lg gap-1">
+                                <button onClick={() => setToolkitTab('subtopics')} className={`px-2 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition-all ${toolkitTab === 'subtopics' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Subtopics ({ideas.length})</button>
+                                <button onClick={() => setToolkitTab('evidence')} className={`px-2 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition-all ${toolkitTab === 'evidence' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Evidence ({evidence.length})</button>
+                                <button onClick={() => setToolkitTab('vocab')} className={`px-2 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition-all ${toolkitTab === 'vocab' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Vocab ({vocab.length})</button>
+                                <button onClick={() => setToolkitTab('linking')} className={`px-2 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition-all ${toolkitTab === 'linking' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Linking Words</button>
+                            </div>
+
+                            <div className="max-h-[500px] overflow-y-auto scrollbar-thin pr-1 pb-4">
+                                {/* Ideas Section */}
+                                {toolkitTab === 'subtopics' && (
+                                    <div>
+                                        {ideas.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {ideas.map(idea => {
+                                                    const style = idea.type ? getCategoryStyle(idea.type) : { bg: 'bg-white', border: 'border-slate-200', text: 'text-slate-700' };
+                                                    return (
+                                                    <div 
+                                                        key={idea.id} 
+                                                        draggable="true"
+                                                        onDragStart={(e) => handleDragStart(e, idea.text)}
+                                                        className={`${style.bg} px-3 py-1.5 rounded-lg shadow-sm ${style.text} border ${style.border} cursor-grab active:cursor-grabbing hover:opacity-80 transition-all flex items-center gap-2 text-sm font-medium`}
+                                                    >
+                                                        <Icon name="grip" size={12} className="opacity-50" /> {idea.text}
+                                                    </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-slate-400 italic text-center py-4">No subtopics in Mind Web.</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Evidence Section */}
+                                {toolkitTab === 'evidence' && (
+                                    <div>
+                                        {evidence.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {evidence.map(ev => <EvidenceMiniCard key={ev.id} item={ev} onDragStart={handleDragStart} />)}
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-slate-400 italic text-center py-4">No evidence collected yet.</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Vocab Section */}
+                                {toolkitTab === 'vocab' && (
+                                    <div>
+                                        {vocab.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {vocab.map(v => <VocabMiniCard key={v.id} item={v} onDragStart={handleDragStart} />)}
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-slate-400 italic text-center py-4">No terms in Vocabulary Vault.</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Linking Words Section */}
+                                {toolkitTab === 'linking' && (
+                                    <div className="space-y-5">
+                                        <p className="text-xs text-slate-500 font-medium text-center">Drag transition phrases to connect your paragraphs and ideas.</p>
+                                        {Object.entries(linkingWords).map(([category, words]) => (
+                                            <div key={category} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                                                <h6 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-full bg-indigo-400"></span> {category}
+                                                </h6>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {words.map((word, idx) => (
+                                                        <div 
+                                                            key={idx}
+                                                            draggable="true"
+                                                            onDragStart={(e) => handleDragStart(e, word)}
+                                                            className="bg-indigo-50 px-2 py-1.5 rounded shadow-sm text-indigo-800 border border-indigo-100 cursor-grab active:cursor-grabbing hover:bg-indigo-100 hover:border-indigo-300 transition-colors text-xs font-semibold flex items-center gap-1"
+                                                        >
+                                                            <Icon name="grip" size={10} className="text-indigo-400 opacity-70" /> {word}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* MAIN CONTENT: Blocks */}
+                        <div className="flex-1 w-full order-1 lg:order-1">
+                            {blocks.map((block, index) => (
+                                <EssayBlock 
+                                    key={block.id}
+                                    block={block}
+                                    index={index}
+                                    total={blocks.length}
+                                    onUpdate={handleUpdateBlock}
+                                    onDragOver={handleDragOver}
+                                    onDragLeave={handleDragLeave}
+                                    onDrop={handleDrop}
+                                    isDragOver={dragOverBlock === block.id}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [view, setView] = useState('home'); 
+            const [mode, setMode] = useState('expository'); // 'expository' or 'persuasive'
+            const [selectedPrompt, setSelectedPrompt] = useState(null);
+            const [isCustomPrompt, setIsCustomPrompt] = useState(false);
+            const [customPromptText, setCustomPromptText] = useState("");
+            const [activeTab, setActiveTab] = useState('web');
+            const [promptIndex, setPromptIndex] = useState(0);
+
+            // Dynamically get current prompts based on mode
+            const currentPrompts = mode === 'expository' ? expositoryPrompts : persuasivePrompts;
+
+            // Data States
+            const [ideas, setIdeas] = useState([]);
+            const [blocks, setBlocks] = useState(expositoryBlocks.map(b => ({ ...b, content: '' })));
+            const [evidence, setEvidence] = useState([]);
+            const [vocab, setVocab] = useState([]);
+
+            const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+            useEffect(() => {
+                if (ideas.length > 0 || blocks.some(b => b.content.trim() !== '') || evidence.length > 0 || vocab.length > 0) {
+                    setHasUnsavedChanges(true);
+                }
+            }, [ideas, blocks, evidence, vocab]);
+
+            useEffect(() => {
+                const handleBeforeUnload = (e) => {
+                    if (hasUnsavedChanges) {
+                        e.preventDefault();
+                        e.returnValue = '';
+                    }
+                };
+                window.addEventListener('beforeunload', handleBeforeUnload);
+                return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+            }, [hasUnsavedChanges]);
+
+            const handlePromptSelect = (prompt) => {
+                setSelectedPrompt(prompt);
+                setView('workspace');
+            };
+
+            const nextPrompt = () => setPromptIndex((prev) => (prev + 1) % currentPrompts.length);
+            const prevPrompt = () => setPromptIndex((prev) => (prev - 1 + currentPrompts.length) % currentPrompts.length);
+            const randomPrompt = () => {
+                setPromptIndex(Math.floor(Math.random() * currentPrompts.length));
+                setIsCustomPrompt(false);
+            };
+
+            const goToOrganizer = () => setActiveTab('blocks');
+
+            const startMode = (selectedMode) => {
+                setMode(selectedMode);
+                setBlocks((selectedMode === 'expository' ? expositoryBlocks : persuasiveBlocks).map(b => ({ ...b, content: '' })));
+                setPromptIndex(0);
+                setIsCustomPrompt(false);
+                setView('prompts');
+            };
+
+            // --- Project Save/Load Logic (.info) ---
+            const saveProject = () => {
+                const projectData = {
+                    version: "1.1",
+                    type: "writing-engine",
+                    mode: mode,
+                    date: new Date().toISOString(),
+                    prompt: selectedPrompt,
+                    ideas: ideas,
+                    blocks: blocks,
+                    evidence: evidence,
+                    vocab: vocab
+                };
+                
+                const blob = new Blob([JSON.stringify(projectData, null, 2)], {type: "application/json"});
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `research_project_${new Date().toISOString().split('T')[0]}.info`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setHasUnsavedChanges(false); 
+            };
+
+            const loadProject = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (data.mode) {
+                            setMode(data.mode);
+                        } else if (data.type === 'expository') {
+                            setMode('expository');
+                        }
+                        if (data.prompt) setSelectedPrompt(data.prompt);
+                        if (data.ideas) setIdeas(data.ideas);
+                        if (data.blocks) setBlocks(data.blocks);
+                        if (data.evidence) setEvidence(data.evidence);
+                        if (data.vocab) setVocab(data.vocab);
+                        setView('workspace');
+                        setHasUnsavedChanges(false);
+                        alert("Research Project loaded successfully!");
+                    } catch (err) {
+                        alert("Error loading file. Make sure it's a valid .info or JSON project file.");
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            return (
+                <div className="min-h-screen text-slate-800 selection:bg-cyan-100 selection:text-cyan-900">
+                    <header className="glass-panel sticky top-0 z-50 px-6 py-4">
+                        <div className="max-w-7xl mx-auto flex justify-between items-center">
+                            <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setView('home')}>
+                                <div className="bg-gradient-to-br from-cyan-600 to-teal-600 p-2.5 rounded-xl text-white shadow-lg group-hover:shadow-cyan-500/30 transition-all duration-300 group-hover:scale-105">
+                                    <Icon name="lightbulb" size={20} />
+                                </div>
+                                <h1 className="text-xl md:text-2xl font-heading font-extrabold text-slate-800 tracking-tight hidden sm:block">InfoSpark <span className="text-cyan-600 font-medium">Writing Engine</span></h1>
+                                <h1 className="text-xl font-heading font-extrabold text-slate-800 tracking-tight sm:hidden">InfoSpark</h1>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 md:gap-3">
+                                {view !== 'home' && (
+                                    <button 
+                                        onClick={() => setView('home')}
+                                        className="text-sm font-semibold text-slate-500 hover:text-cyan-600 flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg transition-colors shadow-sm"
+                                        title="Return to Home"
+                                    >
+                                        <Icon name="home" size={16} /> <span className="hidden sm:inline">Home</span>
+                                    </button>
+                                )}
+                                
+                                <label className="cursor-pointer bg-white text-cyan-700 px-3 md:px-4 py-2 rounded-lg font-bold border border-cyan-100 hover:bg-cyan-50 transition flex items-center gap-2 shadow-sm text-sm">
+                                    <Icon name="upload" size={16} /> <span className="hidden sm:inline">Load Project</span>
+                                    <input type="file" accept=".info,.json" className="hidden" onChange={loadProject} />
+                                </label>
+
+                                {view === 'workspace' && (
+                                    <>
+                                        <button 
+                                            onClick={saveProject}
+                                            className="bg-cyan-600 text-white px-3 md:px-4 py-2 rounded-lg font-bold hover:bg-cyan-700 transition flex items-center gap-2 shadow-md text-sm"
+                                        >
+                                            <Icon name="save" size={16} /> <span className="hidden sm:inline">Save</span>
+                                        </button>
+                                        <button 
+                                            onClick={() => setView('prompts')}
+                                            className="text-sm font-semibold text-slate-500 hover:text-cyan-600 flex items-center gap-2 bg-slate-100 px-3 md:px-4 py-2 rounded-lg transition-colors shadow-sm"
+                                            title="Select New Prompt"
+                                        >
+                                            <Icon name="refresh" size={16} /> <span className="hidden sm:inline">Topics</span>
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="max-w-7xl mx-auto p-4 md:p-8">
+                        {view === 'home' && (
+                            <div className="py-12 md:py-20">
+                                <div className="text-center space-y-8 max-w-4xl mx-auto">
+                                    <div className="inline-block px-4 py-1.5 bg-cyan-50 text-cyan-800 rounded-full font-semibold text-sm mb-4 border border-cyan-100 uppercase tracking-widest">
+                                        Research • Organize • Write
+                                    </div>
+                                    <h2 className="text-5xl md:text-7xl font-heading font-extrabold text-slate-900 leading-tight">
+                                        Master the Writing Process with <br/>
+                                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-emerald-500">InfoSpark</span>
+                                    </h2>
+                                    <p className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
+                                        Choose your path. Collect evidence, define key terms, and construct powerful paragraphs block by block for expository or persuasive writing.
+                                    </p>
+                                    
+                                    <div className="pt-8 flex flex-col sm:flex-row justify-center gap-4">
+                                        <button 
+                                            onClick={() => startMode('expository')}
+                                            className="group bg-slate-900 text-white text-lg font-bold py-4 px-8 rounded-full shadow-2xl hover:bg-slate-800 hover:shadow-slate-900/30 hover:-translate-y-1 transition-all duration-300 inline-flex items-center justify-center gap-3"
+                                        >
+                                            <Icon name="book" size={20} /> Informational Writing <Icon name="arrowRight" className="group-hover:translate-x-1 transition-transform" />
+                                        </button>
+                                        <button 
+                                            onClick={() => startMode('persuasive')}
+                                            className="group bg-violet-600 text-white text-lg font-bold py-4 px-8 rounded-full shadow-2xl hover:bg-violet-700 hover:shadow-violet-600/30 hover:-translate-y-1 transition-all duration-300 inline-flex items-center justify-center gap-3"
+                                        >
+                                            <Icon name="lightbulb" size={20} /> Persuasive Writing <Icon name="arrowRight" className="group-hover:translate-x-1 transition-transform" />
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-20 text-left">
+                                        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                                            <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 mb-6"><Icon name="fileSearch" size={24} /></div>
+                                            <h3 className="font-heading font-bold text-xl mb-3 text-slate-800">Evidence Board</h3>
+                                            <p className="text-slate-500 leading-relaxed">Categorize your research into facts, statistics, and quotes using a fluid, drag-and-drop board.</p>
+                                        </div>
+                                        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                                            <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 mb-6"><Icon name="tag" size={24} /></div>
+                                            <h3 className="font-heading font-bold text-xl mb-3 text-slate-800">Vocab Vault</h3>
+                                            <p className="text-slate-500 leading-relaxed">Build a glossary of terms for your topic, ready to be dropped into your paragraphs.</p>
+                                        </div>
+                                        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                                            <div className="w-12 h-12 bg-cyan-100 rounded-2xl flex items-center justify-center text-cyan-600 mb-6"><Icon name="book" size={24} /></div>
+                                            <h3 className="font-heading font-bold text-xl mb-3 text-slate-800">Scaffolded Drafting</h3>
+                                            <p className="text-slate-500 leading-relaxed">Follow structured blocks designed by educators to craft clear hooks, thesis statements, and conclusions.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'prompts' && (
+                            <div className="max-w-5xl mx-auto py-4 md:py-8">
+                                <div className="flex flex-col md:flex-row justify-between items-center mb-6 md:mb-10 gap-4">
+                                    <h2 className="text-3xl md:text-4xl font-heading font-bold text-slate-800 text-center md:text-left">Select a Research Topic</h2>
+                                    <div className="flex flex-wrap justify-center gap-3 w-full md:w-auto">
+                                        <button 
+                                            onClick={() => setIsCustomPrompt(!isCustomPrompt)}
+                                            className={`px-4 py-3 md:px-6 rounded-xl font-bold transition-all border-2 border-cyan-100 text-sm md:text-base flex-1 md:flex-none ${isCustomPrompt ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-white text-cyan-700 hover:bg-cyan-50'}`}
+                                        >
+                                            {isCustomPrompt ? "Back to List" : "Write My Own"}
+                                        </button>
+                                        {!isCustomPrompt && (
+                                            <button onClick={randomPrompt} className="bg-amber-400 text-amber-950 px-4 py-3 md:px-6 rounded-xl font-bold hover:bg-amber-300 shadow-lg shadow-amber-400/20 transition-colors flex items-center justify-center gap-2 text-sm md:text-base flex-1 md:flex-none">
+                                                <Icon name="refresh" size={18} /> Random Topic
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-[2rem] shadow-2xl overflow-hidden min-h-[60vh] flex flex-col md:flex-row border border-slate-100">
+                                    {!isCustomPrompt && (
+                                        <div className="hidden md:block w-1/3 bg-slate-50 border-r border-slate-200 overflow-y-auto max-h-[60vh] scrollbar-thin">
+                                            {currentPrompts.map((p, i) => (
+                                                <div 
+                                                    key={i} 
+                                                    onClick={() => setPromptIndex(i)}
+                                                    className={`p-6 cursor-pointer border-b border-slate-200/50 hover:bg-white transition-all ${i === promptIndex ? 'bg-white border-l-4 border-l-cyan-500 shadow-sm' : 'border-l-4 border-l-transparent text-slate-500'}`}
+                                                >
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <span className={`text-xs font-bold uppercase tracking-wider ${i === promptIndex ? 'text-cyan-600' : 'text-slate-400'}`}>Topic {i + 1}</span>
+                                                        {i === promptIndex && <Icon name="chevronRight" size={14} className="text-cyan-500" />}
+                                                    </div>
+                                                    <p className={`text-sm line-clamp-2 ${i === promptIndex ? 'text-slate-800 font-medium' : ''}`}>{p}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    <div className="flex-1 p-6 md:p-12 flex flex-col justify-center items-center relative">
+                                        <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px] opacity-30"></div>
+                                        
+                                        <div className="relative bg-white p-6 md:p-16 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 max-w-xl w-full text-center mb-6 md:mb-0">
+                                            {isCustomPrompt ? (
+                                                <div className="space-y-6">
+                                                     <div className="bg-cyan-50 text-cyan-800 font-bold px-4 py-2 rounded-full inline-block text-sm">
+                                                        🔬 Custom Research Topic
+                                                    </div>
+                                                    <h3 className="text-2xl font-heading font-bold text-slate-800">What are you investigating?</h3>
+                                                    <textarea 
+                                                        className="w-full p-4 border-2 border-slate-200 rounded-xl text-lg md:text-xl focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 outline-none transition-all min-h-[150px] font-medium text-slate-700"
+                                                        placeholder="Type your informational topic or question here..."
+                                                        value={customPromptText}
+                                                        onChange={(e) => setCustomPromptText(e.target.value)}
+                                                        autoFocus
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className={`absolute -top-6 left-1/2 transform -translate-x-1/2 text-white text-xs md:text-sm font-bold px-4 py-1.5 rounded-full shadow-lg whitespace-nowrap ${mode === 'expository' ? 'bg-cyan-600' : 'bg-violet-600'}`}>
+                                                        {mode === 'expository' ? 'Expository Topic' : 'Persuasive Topic'} #{promptIndex + 1}
+                                                    </div>
+                                                    <p className="text-2xl md:text-4xl font-heading font-bold text-slate-800 leading-snug">
+                                                        "{currentPrompts[promptIndex]}"
+                                                    </p>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        <div className="flex gap-4 mt-6 md:mt-12 relative z-10 w-full md:w-auto justify-center">
+                                            {!isCustomPrompt && (
+                                                <button onClick={prevPrompt} className="p-4 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-800 hover:border-slate-300 transition-colors shadow-sm">
+                                                    <Icon name="arrowRight" className="rotate-180" />
+                                                </button>
+                                            )}
+                                            
+                                            <button 
+                                                onClick={() => {
+                                                    if (isCustomPrompt && !customPromptText.trim()) {
+                                                        alert("Please write a topic first!");
+                                                        return;
+                                                    }
+                                                    handlePromptSelect(isCustomPrompt ? customPromptText : currentPrompts[promptIndex]);
+                                                }}
+                                                className={`text-white font-bold py-4 px-8 md:px-10 rounded-full shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-2 whitespace-nowrap text-lg ${mode === 'expository' ? 'bg-slate-900 hover:bg-slate-800' : 'bg-violet-900 hover:bg-violet-800'}`}
+                                            >
+                                                Begin Research <Icon name="lightbulb" size={18} />
+                                            </button>
+
+                                            {!isCustomPrompt && (
+                                                <button onClick={nextPrompt} className="p-4 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-800 hover:border-slate-300 transition-colors shadow-sm">
+                                                    <Icon name="arrowRight" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'workspace' && (
+                            <div className="pb-20">
+                                <div className="bg-slate-900 text-white p-6 md:p-10 rounded-3xl shadow-xl mb-6 md:mb-10 relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 opacity-5 transform translate-x-20 -translate-y-10 group-hover:scale-110 transition-transform duration-700">
+                                        <Icon name="book" size={300} />
+                                    </div>
+                                    <div className="relative z-10">
+                                        <h3 className="text-cyan-300 font-bold uppercase tracking-wider text-xs mb-3 flex items-center gap-2">
+                                            <span className="w-8 h-[1px] bg-cyan-300"></span> Active Topic
+                                        </h3>
+                                        <p className="text-xl md:text-3xl font-heading font-bold leading-relaxed">"{selectedPrompt}"</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-6">
+                                    {/* Horizontal Tabs */}
+                                    <div className="w-full">
+                                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-2 md:grid-cols-4 gap-2">
+                                            <button 
+                                                onClick={() => setActiveTab('web')}
+                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'web' ? 'bg-cyan-50 text-cyan-700' : 'text-slate-500 hover:bg-slate-50'}`}
+                                            >
+                                                <div className={`p-1.5 rounded-lg ${activeTab === 'web' ? 'bg-cyan-200 text-cyan-800' : 'bg-slate-100 text-slate-400'}`}>
+                                                    <Icon name="brain" size={16} /> 
+                                                </div>
+                                                <span className="text-sm md:text-base">Mind Web</span>
+                                            </button>
+                                            <button 
+                                                onClick={() => setActiveTab('evidence')}
+                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'evidence' ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:bg-slate-50'}`}
+                                            >
+                                                <div className={`p-1.5 rounded-lg ${activeTab === 'evidence' ? 'bg-blue-200 text-blue-800' : 'bg-slate-100 text-slate-400'}`}>
+                                                    <Icon name="fileSearch" size={16} /> 
+                                                </div>
+                                                <span className="text-sm md:text-base">Evidence</span>
+                                            </button>
+                                            <button 
+                                                onClick={() => setActiveTab('vocab')}
+                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'vocab' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500 hover:bg-slate-50'}`}
+                                            >
+                                                <div className={`p-1.5 rounded-lg ${activeTab === 'vocab' ? 'bg-emerald-200 text-emerald-800' : 'bg-slate-100 text-slate-400'}`}>
+                                                    <Icon name="tag" size={16} /> 
+                                                </div>
+                                                <span className="text-sm md:text-base">Vocabulary</span>
+                                            </button>
+                                            <button 
+                                                onClick={() => setActiveTab('blocks')}
+                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'blocks' ? 'bg-amber-50 text-amber-700' : 'text-slate-500 hover:bg-slate-50'}`}
+                                            >
+                                                <div className={`p-1.5 rounded-lg ${activeTab === 'blocks' ? 'bg-amber-200 text-amber-800' : 'bg-slate-100 text-slate-400'}`}>
+                                                    <Icon name="book" size={16} /> 
+                                                </div>
+                                                <span className="text-sm md:text-base">Drafting</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Main Workspace */}
+                                    <div className="w-full">
+                                        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-4 md:p-8 min-h-[50vh] border border-slate-100">
+                                            {activeTab === 'web' && <MindWeb ideas={ideas} setIdeas={setIdeas} onOrganize={goToOrganizer} />}
+                                            {activeTab === 'evidence' && <EvidenceBoard evidence={evidence} setEvidence={setEvidence} />}
+                                            {activeTab === 'vocab' && <VocabVault vocab={vocab} setVocab={setVocab} />}
+                                            {activeTab === 'blocks' && <EssayBuilder blocks={blocks} setBlocks={setBlocks} ideas={ideas} evidence={evidence} vocab={vocab} />}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Educational References Footer */}
+                    <footer className="text-center bg-slate-100 py-8 border-t border-slate-200 mt-10">
+                        <div className="max-w-4xl mx-auto px-6">
+                            <h4 className="font-heading font-bold text-slate-700 mb-2">Built on Educational Best Practices</h4>
+                            <p className="text-sm text-slate-500 leading-relaxed mb-4">
+                                The scaffolding in this application is inspired by pedagogical frameworks championed by organizations like <a href="https://www.edutopia.org/article/scaffolding-writing-process" target="_blank" className="text-cyan-600 hover:underline">Edutopia</a>, focusing on graphic organizers, evidence categorization, and structured paragraph building for both expository and persuasive writing.
+                            </p>
+                            <p className="text-xs text-slate-400 font-medium tracking-wide uppercase">
+                                © 2024 MacGregor Maltais InfoSpark • Designed for modern classrooms.
+                            </p>
+                        </div>
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
