@@ -638,7 +638,7 @@
                     <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6">
                         <div className="text-left">
                             <h3 className="text-2xl font-heading font-bold text-slate-800">Vocabulary Vault</h3>
-                            <p className="text-slate-500 text-sm">Define key terms your reader needs to understand your topic.</p>
+                            <p className="text-slate-500 text-sm">To become an expert, you need some subject-related background knowledge that will also inform your readers. List some vocabulary words you and your readers need to know about.</p>
                         </div>
                         <button 
                             onClick={handleSnapshot}
@@ -878,22 +878,6 @@
                 document.body.removeChild(textArea);
             };
 
-            const handleExport = () => {
-                const text = getFullEssay();
-                if (!text) {
-                    showNotification("Draft something first!", "error");
-                    return;
-                }
-                const element = document.createElement("a");
-                const file = new Blob([text], {type: 'text/plain'});
-                element.href = URL.createObjectURL(file);
-                element.download = "my_draft.txt";
-                document.body.appendChild(element); 
-                element.click();
-                document.body.removeChild(element);
-                showNotification("Draft downloaded as text!", "success");
-            };
-
             const showNotification = (msg, type) => {
                 setNotification({ msg, type });
                 setTimeout(() => setNotification(null), 3000);
@@ -912,20 +896,13 @@
                             <h3 className="text-xl md:text-2xl font-heading font-bold text-slate-800">Drafting Organizer</h3>
                             <p className="text-slate-500 text-sm">Drag your research into paragraphs to build your piece.</p>
                         </div>
-                        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                        <div className="flex w-full sm:w-auto">
                             <button 
                                 onClick={handleCopy}
-                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-semibold shadow-sm transition-all"
-                                title="Copy Draft"
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-semibold shadow-sm transition-all"
+                                title="Copy Entire Draft"
                             >
-                                <Icon name="copy" size={18} /> <span className="inline">Copy Draft</span>
-                            </button>
-                            <button 
-                                onClick={handleExport}
-                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-semibold shadow-sm transition-all"
-                                title="Download Text File"
-                            >
-                                <Icon name="download" size={18} /> <span className="inline">.txt</span>
+                                <Icon name="copy" size={18} /> <span className="inline">Copy Document</span>
                             </button>
                         </div>
                     </div>
@@ -1048,6 +1025,136 @@
             );
         };
 
+        const FreewriteBuilder = ({ blocks, freewriteText, setFreewriteText }) => {
+            const [notification, setNotification] = useState(null);
+            const [sidebarTab, setSidebarTab] = useState('structure'); // 'structure' or 'linking'
+
+            const handleDragStart = (e, text) => {
+                e.dataTransfer.setData('text/plain', text);
+                e.dataTransfer.effectAllowed = "copy";
+            };
+
+            const handleCopy = () => {
+                if (!freewriteText.trim()) {
+                    showNotification("Write something first!", "error");
+                    return;
+                }
+                const textArea = document.createElement("textarea");
+                textArea.value = freewriteText;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showNotification("Freewrite copied to clipboard!", "success");
+                } catch (err) {
+                    showNotification("Failed to copy.", "error");
+                }
+                document.body.removeChild(textArea);
+            };
+
+            const showNotification = (msg, type) => {
+                setNotification({ msg, type });
+                setTimeout(() => setNotification(null), 3000);
+            };
+
+            return (
+                <div className="max-w-6xl mx-auto relative">
+                    {notification && (
+                        <div className={`fixed top-24 right-8 z-50 px-6 py-3 rounded-xl shadow-2xl font-bold animate-float ${notification.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
+                            {notification.msg}
+                        </div>
+                    )}
+                    
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50 p-4 rounded-2xl border border-slate-200 gap-4 mb-6">
+                         <div className="text-left">
+                            <h3 className="text-xl md:text-2xl font-heading font-bold text-slate-800">Freewrite Space</h3>
+                            <p className="text-slate-500 text-sm">Write freely without constraints, using the structure guide to stay on track.</p>
+                        </div>
+                        <div className="flex w-full sm:w-auto">
+                            <button 
+                                onClick={handleCopy}
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-semibold shadow-sm transition-all"
+                                title="Copy Document"
+                            >
+                                <Icon name="copy" size={18} /> <span className="inline">Copy Document</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div className="flex flex-col lg:flex-row gap-8 items-start">
+                        
+                        {/* MAIN CONTENT: Piece of Paper Text Area */}
+                        <div className="flex-1 w-full order-1 lg:order-1">
+                            <textarea 
+                                className="w-full min-h-[70vh] p-8 md:p-12 bg-white border border-slate-200 shadow-sm hover:shadow-md focus:shadow-md focus:border-cyan-400 focus:ring-4 focus:ring-cyan-50 outline-none resize-y text-lg text-slate-800 placeholder-slate-300 leading-loose font-serif rounded-3xl"
+                                placeholder="Once upon a time... or start with your hook here..."
+                                value={freewriteText}
+                                onChange={(e) => setFreewriteText(e.target.value)}
+                                autoFocus
+                            />
+                        </div>
+
+                        {/* SIDEBAR: Structure Guide & Linking Words */}
+                        <div className="w-full lg:w-80 flex-shrink-0 lg:sticky lg:top-8 space-y-4 order-2 lg:order-2 bg-slate-50/80 p-5 rounded-2xl border border-slate-200">
+                             <div className="flex items-center gap-2 pb-2">
+                                <span className="text-xl">🗺️</span>
+                                <h4 className="font-heading font-bold text-slate-700">Writing Guide</h4>
+                            </div>
+
+                            {/* Sidebar Tabs */}
+                            <div className="grid grid-cols-2 bg-slate-200/60 p-1 rounded-lg gap-1">
+                                <button onClick={() => setSidebarTab('structure')} className={`px-2 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition-all ${sidebarTab === 'structure' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Structure</button>
+                                <button onClick={() => setSidebarTab('linking')} className={`px-2 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition-all ${sidebarTab === 'linking' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Linking Words</button>
+                            </div>
+
+                            <div className="max-h-[600px] overflow-y-auto scrollbar-thin pr-2">
+                                {sidebarTab === 'structure' && (
+                                    <div className="space-y-3">
+                                        {blocks.map((block, index) => (
+                                            <div key={block.id} className="bg-white p-3 rounded-xl shadow-sm border border-slate-100 flex gap-3 opacity-90 hover:opacity-100 transition-opacity">
+                                                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-cyan-100 text-cyan-700 font-bold flex items-center justify-center text-xs border border-cyan-200">
+                                                    {index + 1}
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-heading font-bold text-slate-800 text-sm leading-tight">{block.title}</h5>
+                                                    <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{block.hint}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {sidebarTab === 'linking' && (
+                                    <div className="space-y-5 pb-4">
+                                        <p className="text-xs text-slate-500 font-medium text-center">Drag transition phrases directly into your writing.</p>
+                                        {Object.entries(linkingWords).map(([category, words]) => (
+                                            <div key={category} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                                                <h6 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-full bg-indigo-400"></span> {category}
+                                                </h6>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {words.map((word, idx) => (
+                                                        <div 
+                                                            key={idx}
+                                                            draggable="true"
+                                                            onDragStart={(e) => handleDragStart(e, word)}
+                                                            className="bg-indigo-50 px-2 py-1.5 rounded shadow-sm text-indigo-800 border border-indigo-100 cursor-grab active:cursor-grabbing hover:bg-indigo-100 hover:border-indigo-300 transition-colors text-xs font-semibold flex items-center gap-1"
+                                                        >
+                                                            <Icon name="grip" size={10} className="text-indigo-400 opacity-70" /> {word}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         const App = () => {
             const [view, setView] = useState('home'); 
             const [mode, setMode] = useState('expository'); // 'expository' or 'persuasive'
@@ -1065,14 +1172,15 @@
             const [blocks, setBlocks] = useState(expositoryBlocks.map(b => ({ ...b, content: '' })));
             const [evidence, setEvidence] = useState([]);
             const [vocab, setVocab] = useState([]);
+            const [freewriteText, setFreewriteText] = useState("");
 
             const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
             useEffect(() => {
-                if (ideas.length > 0 || blocks.some(b => b.content.trim() !== '') || evidence.length > 0 || vocab.length > 0) {
+                if (ideas.length > 0 || blocks.some(b => b.content.trim() !== '') || evidence.length > 0 || vocab.length > 0 || freewriteText.trim() !== '') {
                     setHasUnsavedChanges(true);
                 }
-            }, [ideas, blocks, evidence, vocab]);
+            }, [ideas, blocks, evidence, vocab, freewriteText]);
 
             useEffect(() => {
                 const handleBeforeUnload = (e) => {
@@ -1104,13 +1212,14 @@
                 setBlocks((selectedMode === 'expository' ? expositoryBlocks : persuasiveBlocks).map(b => ({ ...b, content: '' })));
                 setPromptIndex(0);
                 setIsCustomPrompt(false);
+                setFreewriteText("");
                 setView('prompts');
             };
 
             // --- Project Save/Load Logic (.info) ---
             const saveProject = () => {
                 const projectData = {
-                    version: "1.1",
+                    version: "1.2",
                     type: "writing-engine",
                     mode: mode,
                     date: new Date().toISOString(),
@@ -1118,7 +1227,8 @@
                     ideas: ideas,
                     blocks: blocks,
                     evidence: evidence,
-                    vocab: vocab
+                    vocab: vocab,
+                    freewriteText: freewriteText
                 };
                 
                 const blob = new Blob([JSON.stringify(projectData, null, 2)], {type: "application/json"});
@@ -1150,6 +1260,7 @@
                         if (data.blocks) setBlocks(data.blocks);
                         if (data.evidence) setEvidence(data.evidence);
                         if (data.vocab) setVocab(data.vocab);
+                        if (data.freewriteText) setFreewriteText(data.freewriteText);
                         setView('workspace');
                         setHasUnsavedChanges(false);
                         alert("Research Project loaded successfully!");
@@ -1376,7 +1487,7 @@
                                 <div className="flex flex-col gap-6">
                                     {/* Horizontal Tabs */}
                                     <div className="w-full">
-                                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-2 md:grid-cols-4 gap-2">
+                                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-2 md:grid-cols-5 gap-2">
                                             <button 
                                                 onClick={() => setActiveTab('web')}
                                                 className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'web' ? 'bg-cyan-50 text-cyan-700' : 'text-slate-500 hover:bg-slate-50'}`}
@@ -1413,6 +1524,15 @@
                                                 </div>
                                                 <span className="text-sm md:text-base">Drafting</span>
                                             </button>
+                                            <button 
+                                                onClick={() => setActiveTab('freewrite')}
+                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'freewrite' ? 'bg-purple-50 text-purple-700' : 'text-slate-500 hover:bg-slate-50'}`}
+                                            >
+                                                <div className={`p-1.5 rounded-lg ${activeTab === 'freewrite' ? 'bg-purple-200 text-purple-800' : 'bg-slate-100 text-slate-400'}`}>
+                                                    <Icon name="pencil" size={16} /> 
+                                                </div>
+                                                <span className="text-sm md:text-base">Freewrite</span>
+                                            </button>
                                         </div>
                                     </div>
 
@@ -1423,6 +1543,7 @@
                                             {activeTab === 'evidence' && <EvidenceBoard evidence={evidence} setEvidence={setEvidence} />}
                                             {activeTab === 'vocab' && <VocabVault vocab={vocab} setVocab={setVocab} />}
                                             {activeTab === 'blocks' && <EssayBuilder blocks={blocks} setBlocks={setBlocks} ideas={ideas} evidence={evidence} vocab={vocab} />}
+                                            {activeTab === 'freewrite' && <FreewriteBuilder blocks={blocks} freewriteText={freewriteText} setFreewriteText={setFreewriteText} />}
                                         </div>
                                     </div>
                                 </div>
