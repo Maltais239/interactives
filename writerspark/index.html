@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MacGregor Maltais Magic Writer Spark 2.2</title>
+    <title>MacGregor Maltais Magic Writer Spark 2.3</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
@@ -107,7 +107,7 @@
             if(!element) return;
             try {
                 const canvas = await window.html2canvas(element, { 
-                    scale: 2, // Better resolution
+                    scale: 2, 
                     backgroundColor: '#ffffff',
                     logging: false,
                     useCORS: true
@@ -168,6 +168,18 @@
             { id: 6, title: "Main Event", hint: "S-L-O-W M-O-T-I-O-N. The climax! Tell it in detail." },
             { id: 7, title: "Ending", hint: "Wrap it up and celebrate. What happens next?" },
             { id: 8, title: "Extended Ending", hint: "Your character reflects on the experience. What did they learn?" }
+        ];
+
+        const suspenseWords = [
+            "Suddenly", 
+            "Just then", 
+            "All of a sudden",
+            "A moment later", 
+            "In the blink of an eye", 
+            "Without warning",
+            "The next thing they knew", 
+            "Instantly", 
+            "To their surprise"
         ];
 
         // --- Components ---
@@ -341,11 +353,9 @@
             );
         };
 
-        // --- Fluid Note Component for Characters/Settings ---
         const FluidCard = ({ item, onRemove, onUpdateDetails }) => {
             const [newDetail, setNewDetail] = useState("");
             
-            // Generate random styles for new details
             const getRandomStyle = () => {
                 const rotate = Math.random() * 6 - 3;
                 const colors = ['bg-yellow-100', 'bg-blue-100', 'bg-green-100', 'bg-pink-100', 'bg-orange-100', 'bg-purple-100'];
@@ -356,12 +366,7 @@
             const addDetail = () => {
                 if (!newDetail.trim()) return;
                 const style = getRandomStyle();
-                const detail = {
-                    id: Date.now(),
-                    text: newDetail,
-                    ...style
-                };
-                // Ensure item.details exists before spreading
+                const detail = { id: Date.now(), text: newDetail, ...style };
                 const currentDetails = item.details || [];
                 onUpdateDetails(item.id, [...currentDetails, detail]);
                 setNewDetail("");
@@ -433,7 +438,6 @@
             );
         };
 
-        // --- Character Builder (Refactored) ---
         const CharacterBuilder = ({ characters, setCharacters }) => {
             const [newName, setNewName] = useState("");
             const [newRole, setNewRole] = useState("Hero");
@@ -445,7 +449,7 @@
                     type: 'character',
                     name: newName,
                     role: newRole,
-                    details: [] // Array for fluid notes
+                    details: []
                 };
                 setCharacters([...characters, newChar]);
                 setNewName("");
@@ -480,7 +484,6 @@
                         </button>
                     </div>
 
-                    {/* Add Form */}
                     <div className="bg-orange-50/50 p-4 rounded-2xl border border-orange-100 shadow-sm flex flex-col md:flex-row gap-3 items-end">
                         <div className="flex-1 w-full">
                             <label className="block text-xs font-bold uppercase text-orange-500 mb-1">Name</label>
@@ -514,7 +517,6 @@
                         </button>
                     </div>
 
-                    {/* Character List */}
                     <div id="character-capture" className="grid grid-cols-1 md:grid-cols-2 gap-6 p-2">
                         {characters.length === 0 && <p className="text-slate-400 text-center col-span-full py-8">No characters yet. Create one above!</p>}
                         {characters.map(char => (
@@ -530,7 +532,6 @@
             );
         };
 
-        // --- Setting Builder (Refactored) ---
         const SettingBuilder = ({ settings, setSettings }) => {
             const [newName, setNewName] = useState("");
 
@@ -540,7 +541,7 @@
                     id: Date.now(),
                     type: 'setting',
                     name: newName,
-                    details: [] // Array for fluid notes
+                    details: []
                 };
                 setSettings([...settings, newSetting]);
                 setNewName("");
@@ -574,7 +575,6 @@
                         </button>
                     </div>
 
-                    {/* Add Form */}
                     <div className="bg-teal-50/50 p-4 rounded-2xl border border-teal-100 shadow-sm flex flex-col md:flex-row gap-3 items-end">
                         <div className="flex-1 w-full">
                             <label className="block text-xs font-bold uppercase text-teal-600 mb-1">Setting Name</label>
@@ -594,7 +594,6 @@
                         </button>
                     </div>
 
-                    {/* Settings List */}
                     <div id="setting-capture" className="grid grid-cols-1 md:grid-cols-2 gap-6 p-2">
                          {settings.length === 0 && <p className="text-slate-400 text-center col-span-full py-8">No settings created yet.</p>}
                          {settings.map(setting => (
@@ -610,17 +609,12 @@
             );
         };
 
-        // Optimized Block Component with Accordion Logic
         const StoryBlock = memo(({ block, index, onUpdate, onDragOver, onDragLeave, onDrop, isDragOver, total }) => {
             const [isExpanded, setIsExpanded] = useState(false);
 
-            // Auto-expand if something is dragged over this specific block
             useEffect(() => {
                 if (isDragOver) setIsExpanded(true);
             }, [isDragOver]);
-
-            // Auto-expand if it has content initially or whenever content changes significantly? 
-            // For now, let's stick to user controlled or drag controlled to save real estate.
 
             return (
                 <div className="group relative pl-0 md:pl-8">
@@ -670,7 +664,6 @@
             );
         });
 
-        // Sidebar Card Components (Extracted for better performance & reliability)
         const CharacterMiniCard = ({ char, onDragStart }) => {
             const handleCopyData = (e) => {
                 e.stopPropagation(); 
@@ -683,9 +676,7 @@
                 try {
                     document.execCommand('copy');
                     alert(`Copied ${char.name} data!`);
-                } catch (err) {
-                    // Fail silently or log
-                }
+                } catch (err) {}
                 document.body.removeChild(textArea);
             };
 
@@ -703,7 +694,6 @@
                             <h5 className="font-heading font-bold text-slate-800 text-sm truncate leading-tight">{char.name}</h5>
                             <span className="text-[10px] uppercase font-bold text-orange-400 tracking-wide">{char.role}</span>
                         </div>
-                        {/* Copy Button */}
                         <button 
                             onClick={handleCopyData}
                             className="text-slate-300 hover:text-indigo-600 p-1 hover:bg-indigo-50 rounded transition-colors"
@@ -720,8 +710,8 @@
                                     key={d.id} 
                                     draggable="true"
                                     onDragStart={(e) => {
-                                        e.stopPropagation(); // Critical: Stop the card itself from dragging
-                                        e.dataTransfer.effectAllowed = "copy"; // Be explicit about copy action
+                                        e.stopPropagation(); 
+                                        e.dataTransfer.effectAllowed = "copy"; 
                                         onDragStart(e, d.text);
                                     }}
                                     className="text-[10px] bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded-md border border-orange-100/50 break-words max-w-full cursor-grab active:cursor-grabbing hover:bg-orange-100 hover:border-orange-200 transition-colors pointer-events-auto"
@@ -736,7 +726,7 @@
         };
 
         const SettingMiniCard = ({ set, onDragStart }) => {
-                const handleCopyData = (e) => {
+            const handleCopyData = (e) => {
                 e.stopPropagation(); 
                 const text = `Setting Name: ${set.name}\nDetails: ${set.details.map(d => d.text).join(', ')}`;
                 
@@ -747,9 +737,7 @@
                 try {
                     document.execCommand('copy');
                     alert(`Copied ${set.name} data!`);
-                } catch (err) {
-                    // Fail silently
-                }
+                } catch (err) {}
                 document.body.removeChild(textArea);
             };
 
@@ -766,7 +754,6 @@
                         <div className="min-w-0 flex-1">
                             <h5 className="font-heading font-bold text-slate-800 text-sm truncate leading-tight">{set.name}</h5>
                         </div>
-                            {/* Copy Button */}
                         <button 
                             onClick={handleCopyData}
                             className="text-slate-300 hover:text-indigo-600 p-1 hover:bg-indigo-50 rounded transition-colors"
@@ -783,7 +770,7 @@
                                     key={d.id} 
                                     draggable="true"
                                     onDragStart={(e) => {
-                                        e.stopPropagation(); // Critical: Stop the card itself from dragging
+                                        e.stopPropagation(); 
                                         e.dataTransfer.effectAllowed = "copy";
                                         onDragStart(e, d.text);
                                     }}
@@ -798,7 +785,6 @@
             );
         };
 
-        // StoryBuilder component start
         const StoryBuilder = ({ blocks, setBlocks, ideas, characters, settings }) => {
             const [draggedIdea, setDraggedIdea] = useState(null);
             const [dragOverBlock, setDragOverBlock] = useState(null);
@@ -810,7 +796,7 @@
 
             const handleDragStart = (e, text) => {
                 e.dataTransfer.setData('text/plain', text);
-                e.dataTransfer.effectAllowed = "copy"; // Ensure copy cursor shows
+                e.dataTransfer.effectAllowed = "copy";
                 setDraggedIdea(text);
             };
 
@@ -895,7 +881,6 @@
                         </div>
                     )}
                     
-                    {/* Toolbar */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50 p-4 rounded-2xl border border-slate-200 gap-4 mb-6">
                          <div className="text-left">
                             <h3 className="text-xl md:text-2xl font-heading font-bold text-slate-800">Story Organizer</h3>
@@ -927,15 +912,12 @@
                     </div>
                     
                     <div id="story-builder-capture" className="flex flex-col lg:flex-row gap-8 items-start">
-                        
-                        {/* SIDEBAR: Story Toolkit */}
                         <div className="w-full lg:w-80 flex-shrink-0 lg:sticky lg:top-8 space-y-6 order-2 lg:order-2 bg-slate-50/50 p-4 rounded-2xl border border-slate-200">
                              <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
                                 <span className="text-xl">🧰</span>
                                 <h4 className="font-heading font-bold text-slate-700">Story Toolkit</h4>
                             </div>
 
-                            {/* Ideas Section */}
                             <div>
                                 <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3 flex items-center justify-between">
                                     Mind Web Ideas <span className="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-md">{ideas.length}</span>
@@ -958,7 +940,6 @@
                                 )}
                             </div>
 
-                            {/* Characters Section */}
                             <div>
                                 <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3 flex items-center justify-between">
                                     Cast <span className="bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-md">{characters.length}</span>
@@ -972,7 +953,6 @@
                                 )}
                             </div>
 
-                             {/* Settings Section */}
                             <div>
                                 <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3 flex items-center justify-between">
                                     World <span className="bg-teal-100 text-teal-600 px-1.5 py-0.5 rounded-md">{settings.length}</span>
@@ -987,7 +967,6 @@
                             </div>
                         </div>
 
-                        {/* MAIN CONTENT: Blocks */}
                         <div className="flex-1 w-full order-1 lg:order-1">
                             {blocks.map((block, index) => (
                                 <StoryBlock 
@@ -1008,6 +987,122 @@
             );
         };
 
+        // --- NEW: Freewrite Component ---
+        const FreewriteSpace = ({ text, setText, blocks }) => {
+            const [guideTab, setGuideTab] = useState('structure');
+            const [notification, setNotification] = useState(null);
+
+            const handleCopy = () => {
+                if (!text) {
+                    showNotification("Write something first!", "error");
+                    return;
+                }
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showNotification("Document copied!", "success");
+                } catch (err) {
+                    showNotification("Failed to copy.", "error");
+                }
+                document.body.removeChild(textArea);
+            };
+
+            const showNotification = (msg, type) => {
+                setNotification({ msg, type });
+                setTimeout(() => setNotification(null), 3000);
+            };
+
+            return (
+                <div className="flex flex-col gap-6 relative">
+                    {notification && (
+                        <div className={`fixed top-24 right-8 z-50 px-6 py-3 rounded-xl shadow-2xl font-bold animate-float ${notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                            {notification.msg}
+                        </div>
+                    )}
+
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50 p-4 rounded-2xl border border-slate-200 gap-4">
+                        <div className="text-left">
+                            <h3 className="text-xl md:text-2xl font-heading font-bold text-slate-800">Freewrite Space</h3>
+                            <p className="text-slate-500 text-sm">Write freely without constraints, using the structure guide to stay on track.</p>
+                        </div>
+                        <button 
+                            onClick={handleCopy} 
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold shadow-sm transition-all"
+                        >
+                            <Icon name="copy" size={18} /> Copy Document
+                        </button>
+                    </div>
+
+                    <div className="flex flex-col lg:flex-row gap-6">
+                        {/* Text Area */}
+                        <div className="flex-1 bg-white rounded-3xl shadow-sm border-2 border-slate-100 p-6 min-h-[65vh] flex flex-col transition-all focus-within:border-indigo-200 focus-within:shadow-md">
+                            <textarea
+                                className="w-full flex-1 resize-none outline-none text-xl text-slate-700 placeholder-slate-300 handwritten leading-relaxed"
+                                placeholder="Once upon a time... or start with your hook here..."
+                                value={text}
+                                onChange={(e) => setText(e.target.value)}
+                            />
+                        </div>
+
+                        {/* Guide Sidebar */}
+                        <div className="w-full lg:w-80 flex-shrink-0 bg-slate-50/50 p-4 rounded-3xl border border-slate-200 h-[65vh] flex flex-col">
+                            <div className="flex items-center gap-2 mb-4 px-1">
+                                <Icon name="book" size={20} className="text-indigo-600" />
+                                <h4 className="font-heading font-bold text-slate-800">Writing Guide</h4>
+                            </div>
+
+                            <div className="flex bg-slate-200 p-1 rounded-xl mb-4">
+                                <button
+                                    className={`flex-1 text-sm font-bold py-2 rounded-lg transition-colors ${guideTab === 'structure' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    onClick={() => setGuideTab('structure')}
+                                >
+                                    Structure
+                                </button>
+                                <button
+                                    className={`flex-1 text-sm font-bold py-2 rounded-lg transition-colors ${guideTab === 'suspense' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    onClick={() => setGuideTab('suspense')}
+                                >
+                                    Suspense Sparks
+                                </button>
+                            </div>
+
+                            <div className="overflow-y-auto scrollbar-thin flex-1 pr-2 space-y-4">
+                                {guideTab === 'structure' ? (
+                                    blocks.map((b, i) => (
+                                        <div key={b.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex gap-3 relative overflow-hidden group">
+                                            {/* Decorative side line */}
+                                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-100 group-hover:bg-indigo-400 transition-colors"></div>
+                                            <div className="w-7 h-7 rounded-full bg-indigo-50 text-indigo-600 font-bold flex items-center justify-center text-xs flex-shrink-0 border border-indigo-100 mt-0.5">{i + 1}</div>
+                                            <div>
+                                                <h5 className="font-bold text-sm text-slate-800">{b.title}</h5>
+                                                <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{b.hint}</p>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="bg-white p-5 rounded-2xl border border-rose-100 shadow-sm">
+                                        <p className="text-sm text-slate-600 mb-4 font-medium leading-relaxed">
+                                            Want to keep your reader on the edge of their seat? Sprinkle these <strong className="text-rose-600">Suspense Sparks</strong> into your story to build anticipation and tension!
+                                        </p>
+                                        <div className="flex flex-col gap-2">
+                                            {suspenseWords.map((word, i) => (
+                                                <div key={i} className="bg-rose-50 text-rose-700 border border-rose-100 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-rose-100 transition-colors cursor-default text-center">
+                                                    {word}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         const App = () => {
             const [view, setView] = useState('home'); 
             const [selectedPrompt, setSelectedPrompt] = useState(null);
@@ -1019,23 +1114,19 @@
             const [ideas, setIdeas] = useState([]);
             const [blocks, setBlocks] = useState(storyBlocks.map(b => ({ ...b, content: '' })));
             
-            // New States for Characters and Settings
             const [characters, setCharacters] = useState([]);
             const [settings, setSettings] = useState([]);
+            const [freewriteText, setFreewriteText] = useState("");
 
-            // To track unsaved changes
             const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-
             const [promptIndex, setPromptIndex] = useState(0);
 
-            // Effect to track changes for warning
             useEffect(() => {
-                if (ideas.length > 0 || blocks.some(b => b.content.trim() !== '') || characters.length > 0 || settings.length > 0) {
+                if (ideas.length > 0 || blocks.some(b => b.content.trim() !== '') || characters.length > 0 || settings.length > 0 || freewriteText.trim() !== '') {
                     setHasUnsavedChanges(true);
                 }
-            }, [ideas, blocks, characters, settings]);
+            }, [ideas, blocks, characters, settings, freewriteText]);
 
-            // Unload warning listener
             useEffect(() => {
                 const handleBeforeUnload = (e) => {
                     if (hasUnsavedChanges) {
@@ -1070,16 +1161,16 @@
                 setActiveTab('blocks');
             };
 
-            // --- Project Save/Load Logic ---
             const saveProject = () => {
                 const projectData = {
-                    version: "1.2",
+                    version: "2.3",
                     date: new Date().toISOString(),
                     prompt: selectedPrompt,
                     ideas: ideas,
                     blocks: blocks,
                     characters: characters,
-                    settings: settings
+                    settings: settings,
+                    freewriteText: freewriteText
                 };
                 
                 const blob = new Blob([JSON.stringify(projectData, null, 2)], {type: "application/json"});
@@ -1090,7 +1181,7 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                setHasUnsavedChanges(false); // Reset warning
+                setHasUnsavedChanges(false); 
             };
 
             const loadProject = (event) => {
@@ -1104,9 +1195,9 @@
                         if (data.prompt) setSelectedPrompt(data.prompt);
                         if (data.ideas) setIdeas(data.ideas);
                         if (data.blocks) setBlocks(data.blocks);
-                        // Handle migration for old character/setting structures if needed (simplified here)
                         if (data.characters) setCharacters(data.characters);
                         if (data.settings) setSettings(data.settings);
+                        if (data.freewriteText !== undefined) setFreewriteText(data.freewriteText);
                         setView('workspace');
                         setHasUnsavedChanges(false);
                         alert("Project loaded successfully!");
@@ -1125,11 +1216,10 @@
                                 <div className="bg-gradient-to-br from-indigo-600 to-violet-600 p-2.5 rounded-xl text-white shadow-lg group-hover:shadow-indigo-500/30 transition-all duration-300 group-hover:scale-105">
                                     <Icon name="sparkles" size={20} />
                                 </div>
-                                <h1 className="text-2xl font-heading font-extrabold text-slate-800 tracking-tight">MacGregor Maltais Magic Writer Spark 2.2</h1>
+                                <h1 className="text-2xl font-heading font-extrabold text-slate-800 tracking-tight">MacGregor Maltais Magic Writer Spark 2.3</h1>
                             </div>
                             
                             <div className="flex items-center gap-3">
-                                {/* Global Save/Load Buttons */}
                                 <label className="cursor-pointer bg-white text-indigo-600 px-4 py-2 rounded-lg font-bold border border-indigo-100 hover:bg-indigo-50 transition flex items-center gap-2 shadow-sm text-sm">
                                     <Icon name="upload" size={16} /> Load Project
                                     <input type="file" accept=".spark,.json" className="hidden" onChange={loadProject} />
@@ -1167,7 +1257,7 @@
                                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">Storytelling Spark</span>
                                     </h2>
                                     <p className="text-xl md:text-2xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
-                                        Don't let the blank page scare you. Spin the wheel, map your mind, and build your story block by block.
+                                        Don't let the blank page scare you. Spin the wheel, map your mind, and build your story block by block, or freewrite it all out!
                                     </p>
                                     
                                     <div className="pt-8 flex justify-center gap-4">
@@ -1179,21 +1269,26 @@
                                         </button>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-20 text-left">
-                                        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                                            <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-2xl mb-6">🤔</div>
-                                            <h3 className="font-heading font-bold text-xl mb-3">Prompt Bank</h3>
-                                            <p className="text-slate-500">Stuck? Choose from our curated list of creative story starters.</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-20 text-left">
+                                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                                            <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-2xl mb-4">🤔</div>
+                                            <h3 className="font-heading font-bold text-lg mb-2">Prompt Bank</h3>
+                                            <p className="text-slate-500 text-sm">Stuck? Choose from curated story starters.</p>
                                         </div>
-                                        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                                            <div className="w-12 h-12 bg-pink-100 rounded-2xl flex items-center justify-center text-2xl mb-6">🧠</div>
-                                            <h3 className="font-heading font-bold text-xl mb-3">Mind Web</h3>
-                                            <p className="text-slate-500">Brainstorm ideas visually and connect the dots for your story.</p>
+                                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                                            <div className="w-12 h-12 bg-pink-100 rounded-2xl flex items-center justify-center text-2xl mb-4">🧠</div>
+                                            <h3 className="font-heading font-bold text-lg mb-2">Mind Web</h3>
+                                            <p className="text-slate-500 text-sm">Brainstorm ideas visually and connect the dots.</p>
                                         </div>
-                                        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                                            <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-2xl mb-6">📝</div>
-                                            <h3 className="font-heading font-bold text-xl mb-3">Story Organizer</h3>
-                                            <p className="text-slate-500">Structure your narrative with our guided block-by-block method.</p>
+                                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                                            <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-2xl mb-4">📝</div>
+                                            <h3 className="font-heading font-bold text-lg mb-2">Story Organizer</h3>
+                                            <p className="text-slate-500 text-sm">Structure your narrative block-by-block.</p>
+                                        </div>
+                                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                                            <div className="w-12 h-12 bg-violet-100 rounded-2xl flex items-center justify-center text-2xl mb-4">✍️</div>
+                                            <h3 className="font-heading font-bold text-lg mb-2">Freewrite Space</h3>
+                                            <p className="text-slate-500 text-sm">Let your words flow without constraints.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1314,12 +1409,11 @@
                                 </div>
 
                                 <div className="flex flex-col gap-6">
-                                    {/* Horizontal Tabs */}
                                     <div className="w-full">
-                                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-2 md:grid-cols-4 gap-2">
+                                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 grid grid-cols-2 md:grid-cols-5 gap-2">
                                             <button 
                                                 onClick={() => setActiveTab('web')}
-                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'web' ? 'bg-pink-50 text-pink-700' : 'text-slate-500 hover:bg-slate-50'}`}
+                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'web' ? 'bg-pink-50 text-pink-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                                             >
                                                 <div className={`p-1.5 rounded-lg ${activeTab === 'web' ? 'bg-pink-200 text-pink-700' : 'bg-slate-100 text-slate-400'}`}>
                                                     <Icon name="brain" size={16} /> 
@@ -1328,7 +1422,7 @@
                                             </button>
                                             <button 
                                                 onClick={() => setActiveTab('characters')}
-                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'characters' ? 'bg-orange-50 text-orange-700' : 'text-slate-500 hover:bg-slate-50'}`}
+                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'characters' ? 'bg-orange-50 text-orange-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                                             >
                                                 <div className={`p-1.5 rounded-lg ${activeTab === 'characters' ? 'bg-orange-200 text-orange-700' : 'bg-slate-100 text-slate-400'}`}>
                                                     <Icon name="user" size={16} /> 
@@ -1337,7 +1431,7 @@
                                             </button>
                                             <button 
                                                 onClick={() => setActiveTab('settings')}
-                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'settings' ? 'bg-teal-50 text-teal-700' : 'text-slate-500 hover:bg-slate-50'}`}
+                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'settings' ? 'bg-teal-50 text-teal-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                                             >
                                                 <div className={`p-1.5 rounded-lg ${activeTab === 'settings' ? 'bg-teal-200 text-teal-700' : 'bg-slate-100 text-slate-400'}`}>
                                                     <Icon name="map" size={16} /> 
@@ -1346,23 +1440,32 @@
                                             </button>
                                             <button 
                                                 onClick={() => setActiveTab('blocks')}
-                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'blocks' ? 'bg-amber-50 text-amber-700' : 'text-slate-500 hover:bg-slate-50'}`}
+                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'blocks' ? 'bg-amber-50 text-amber-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                                             >
                                                 <div className={`p-1.5 rounded-lg ${activeTab === 'blocks' ? 'bg-amber-200 text-amber-700' : 'bg-slate-100 text-slate-400'}`}>
                                                     <Icon name="book" size={16} /> 
                                                 </div>
                                                 <span className="text-sm md:text-base">Story Org.</span>
                                             </button>
+                                            <button 
+                                                onClick={() => setActiveTab('freewrite')}
+                                                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold transition-all ${activeTab === 'freewrite' ? 'bg-violet-50 text-violet-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+                                            >
+                                                <div className={`p-1.5 rounded-lg ${activeTab === 'freewrite' ? 'bg-violet-200 text-violet-700' : 'bg-slate-100 text-slate-400'}`}>
+                                                    <Icon name="pencil" size={16} /> 
+                                                </div>
+                                                <span className="text-sm md:text-base">Freewrite</span>
+                                            </button>
                                         </div>
                                     </div>
 
-                                    {/* Main Workspace */}
                                     <div className="w-full">
                                         <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-4 md:p-8 min-h-[50vh] border border-slate-100">
                                             {activeTab === 'web' && <MindWeb ideas={ideas} setIdeas={setIdeas} onOrganize={goToOrganizer} />}
                                             {activeTab === 'characters' && <CharacterBuilder characters={characters} setCharacters={setCharacters} />}
                                             {activeTab === 'settings' && <SettingBuilder settings={settings} setSettings={setSettings} />}
                                             {activeTab === 'blocks' && <StoryBuilder blocks={blocks} setBlocks={setBlocks} ideas={ideas} characters={characters} settings={settings} />}
+                                            {activeTab === 'freewrite' && <FreewriteSpace text={freewriteText} setText={setFreewriteText} blocks={blocks} />}
                                         </div>
                                     </div>
                                 </div>
@@ -1382,4 +1485,3 @@
     </script>
 </body>
 </html>
- 
