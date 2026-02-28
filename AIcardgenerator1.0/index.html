@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Awesome Card Generator v1.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- JSZip for creating zip files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #f0f4f8;
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+        .loader {
+            border: 3px solid #e2e8f0; 
+            border-top: 3px solid #6366f1;
+            border-radius: 50%; 
+            width: 32px; 
+            height: 32px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Smooth Transitions */
+        .btn-hover { transition: all 0.2s ease-in-out; }
+        .btn-hover:hover { transform: translateY(-2px); filter: brightness(110%); }
+        .btn-hover:active { transform: translateY(0px); }
+
+        /* Custom Scrollbar for Textarea */
+        textarea::-webkit-scrollbar { width: 8px; }
+        textarea::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        textarea::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        textarea::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* --- Print Styles (Robust Fixes Preserved) --- */
+        @media print {
+            body { 
+                background-color: #ffffff; 
+                background-image: none;
+                padding: 0 !important; 
+                margin: 0 !important; 
+                display: block;
+                height: 100%;
+            }
+            html { height: 100%; }
+            body > *:not(#main-container) {
+                display: none !important;
+            }
+            /* Hide modal in print */
+            #edit-modal { display: none !important; }
+
+            #main-container {
+                padding: 0;
+                margin: 0;
+                display: block;
+                width: 100%;
+            }
+            #main-container > .page-container {
+                margin-top: 0 !important; 
+                margin-bottom: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+                width: 100% !important;
+                /* Reduce height slightly to prevent rounding error spillover */
+                height: 98% !important; 
+                max-height: 100vh !important;
+                overflow: hidden !important;
+            }
+            
+            #controls, .regenerate-btn, .hint-input, .upload-btn, .edit-btn { display: none !important; }
+            .page-container {
+                box-shadow: none; 
+                padding: 0 !important; 
+                margin: 0 !important; 
+                border-radius: 0;
+                page-break-after: always !important;
+                page-break-inside: avoid !important;
+            }
+            .page-container:last-child { page-break-after: avoid !important; }
+            
+            .card, .card-back { 
+                page-break-inside: avoid; 
+                border-width: 4px !important; 
+                height: 100% !important;
+            }
+            .card-label { color-adjust: exact; -webkit-print-color-adjust: exact; }
+            
+             @page { size: landscape; margin: 0.25in; }
+
+            /* FIX: Remove padding and shadows from the image container and image */
+            .card .image-container {
+                padding: 0 !important; /* Remove the white frame */
+            }
+            .card .image-container img {
+                border: none !important; 
+                outline: none !important;
+                box-shadow: none !important; /* Remove any shadow artifact */
+                filter: none !important; /* CRITICAL: Removes drop-shadow filter in print */
+            }
+        }
+    </style>
+</head>
+<body class="p-8 flex flex-col items-center space-y-8 text-slate-800">
+
+    <!-- EDIT MODAL -->
+    <div id="edit-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform transition-all scale-100 ring-1 ring-slate-900/10">
+            <h3 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                ✏️ Edit Card Text
+            </h3>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Term</label>
+                    <input type="text" id="edit-term" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-bold focus:ring-2 focus:ring-purple-500 outline-none">
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Definition</label>
+                    <textarea id="edit-def" rows="4" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:ring-2 focus:ring-purple-500 outline-none resize-none"></textarea>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 mt-6">
+                <button onclick="closeEditModal()" class="px-4 py-2 text-slate-500 font-bold hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
+                <button onclick="saveEdit()" class="px-6 py-2 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 shadow-lg shadow-purple-200 transition-transform active:scale-95">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="controls" class="w-full max-w-5xl p-8 bg-white/95 backdrop-blur rounded-2xl shadow-xl border border-white/50 space-y-6 ring-1 ring-slate-900/5">
+        <!-- Header Section -->
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center text-white text-xl shadow-lg shadow-purple-200">
+                🎨
+            </div>
+            <div>
+                <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Awesome Card Generator v1.0</h2>
+                <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">AI Generation + Custom Uploads + French Translation</p>
+            </div>
+        </div>
+
+        <!-- Configuration Section -->
+        <div class="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 mb-6 flex flex-col sm:flex-row gap-4">
+            <div class="flex-1">
+                <label class="block text-xs font-bold text-indigo-800 uppercase tracking-wide mb-1">Gemini API Key 🔑</label>
+                <input type="password" id="api-key-input" class="w-full p-2.5 bg-white border border-indigo-200 rounded-lg text-slate-800 font-mono text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Paste your AI Studio API key...">
+                <p class="text-[10px] text-indigo-600 mt-1">Required. Your key stays in your browser and is not stored or shared.</p>
+            </div>
+            <div class="flex-1">
+                <label class="block text-xs font-bold text-indigo-800 uppercase tracking-wide mb-1">AI Image Model 🎨</label>
+                <select id="model-select" class="w-full p-2.5 bg-white border border-indigo-200 rounded-lg text-slate-800 font-medium text-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer">
+                    <option value="gemini-2.5-flash-image-preview">Flash Image Preview (Fastest)</option>
+                    <option value="gemini-3-pro-image-preview">Nano Banana 2 (Best Quality & Consistency)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Input Section -->
+        <div>
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-3">
+                <p class="text-sm text-slate-600 leading-relaxed">
+                    <strong>How to use:</strong> Enter terms and definitions (one per line). Use a colon <code class="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-purple-600 font-mono text-xs">:</code> to separate them.
+                    <br>
+                    <span class="text-xs text-slate-500 mt-1 block">
+                        Tip: Add image prompts in parentheses! E.g., <code class="text-purple-600">Metis Sash (traditional woven finger sash): A symbol of...</code>
+                    </span>
+                </p>
+            </div>
+            
+            <textarea id="custom-vocab-input" 
+                class="w-full h-40 p-4 mt-2 bg-white border-2 border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none transition-all font-mono text-sm shadow-inner" 
+                placeholder="Canyon: A deep valley with very steep sides...&#10;Metis Sash: A traditional woven belt...&#10;Inuksuk: A stone landmark used by the Inuit..."></textarea>
+            
+            <button id="generate-btn" class="btn-hover w-full mt-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-purple-200 flex items-center justify-center gap-2">
+                <span>✨ Generate Flashcards</span>
+            </button>
+        </div>
+
+        <!-- Export Section -->
+        <div class="border-t border-slate-100 pt-6 mt-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider">Export & Tools</h2>
+                 <!-- New Translation Button -->
+                 <button id="translate-btn" class="btn-hover hidden bg-indigo-600 text-white border-2 border-indigo-600 hover:bg-indigo-700 font-bold py-1.5 px-4 rounded-lg shadow-md shadow-indigo-200 text-sm flex items-center gap-2 transition-all">
+                    <span>🇫🇷 Translate to French</span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button id="save-btn" class="btn-hover bg-white border-2 border-slate-200 text-slate-700 hover:border-green-500 hover:text-green-600 font-bold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-2">
+                    🖨️ Print / Save PDF
+                </button>
+                 <button id="download-zip-btn" class="btn-hover bg-white border-2 border-slate-200 text-slate-700 hover:border-purple-500 hover:text-purple-600 font-bold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-2">
+                    📦 Download Images (.zip)
+                </button>
+                 <button id="export-json-btn" class="btn-hover bg-white border-2 border-slate-200 text-slate-700 hover:border-orange-500 hover:text-orange-600 font-bold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-2">
+                    💾 Export Data (.json)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Container for dynamically generated pages -->
+    <div id="main-container" class="w-full flex flex-col items-center space-y-8 pb-12"></div>
+    
+    <script>
+        // --- Configuration ---
+        function getApiKey() { return document.getElementById('api-key-input').value.trim(); }
+        let allCardsData = [];
+        let currentLanguage = 'en'; // 'en' or 'fr'
+        // Updated aesthetic colors (Tailwind classes)
+        const colors = ['green-500', 'blue-500', 'orange-500', 'red-500', 'purple-500', 'cyan-500', 'pink-500', 'indigo-500'];
+        
+        // --- Edit Modal Logic ---
+        let editingCard = null;
+
+        function openEditModal(card) {
+            editingCard = card;
+            const isFrench = currentLanguage === 'fr' && card.french;
+            
+            document.getElementById('edit-term').value = isFrench ? card.french.term : card.term;
+            document.getElementById('edit-def').value = isFrench ? card.french.definition : card.definition;
+            
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').classList.add('hidden');
+            editingCard = null;
+        }
+
+        function saveEdit() {
+            if(!editingCard) return;
+            const newTerm = document.getElementById('edit-term').value;
+            const newDef = document.getElementById('edit-def').value;
+            
+            if (currentLanguage === 'fr' && editingCard.french) {
+                editingCard.french.term = newTerm;
+                editingCard.french.definition = newDef;
+            } else {
+                editingCard.term = newTerm;
+                editingCard.definition = newDef;
+            }
+            
+            closeEditModal();
+            generateAllPages(); // Re-render pages with updated text
+        }
+
+        // --- AI Text Translation (Using Gemini 2.5 Flash) ---
+        async function translateTextWithAI(cards) {
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                alert("Please enter your Gemini API Key in the configuration section to use translation.");
+                return null;
+            }
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            // Prepare a minimal data structure for translation to save tokens/complexity
+            const dataToTranslate = cards.map(c => ({ term: c.term, definition: c.definition }));
+            
+            const prompt = `
+                You are a professional educational translator for Canadian classrooms. 
+                Translate the following JSON array of flashcards from English to French.
+                
+                Rules:
+                1. Context is crucial. E.g., "Bat" (animal) -> "Chauve-souris", not "Bâton".
+                2. Keep definitions concise and age-appropriate (similar level to the English source).
+                3. Return ONLY valid JSON. No markdown, no "json" tags.
+                4. The output must be an array of objects with keys "term" and "definition".
+                
+                Input JSON:
+                ${JSON.stringify(dataToTranslate)}
+            `;
+
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }]
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error(`Translation API Error: ${response.status}`);
+                
+                const result = await response.json();
+                const text = result.candidates[0].content.parts[0].text;
+                
+                // Clean the response (sometimes models add markdown \`\`\`json blocks)
+                const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                return JSON.parse(cleanJson);
+                
+            } catch (error) {
+                console.error("Translation Failed:", error);
+                alert("Translation failed. Please try again or check your API key.");
+                return null;
+            }
+        }
+
+        // --- AI Image Generation (Using Gemini 2.5 Flash Image Preview) ---
+        async function generateImageWithRetry(card, maxRetries = 3) {
+            const apiKey = getApiKey();
+            if (!apiKey) return null; // Fails gracefully, UI shows "Generation Failed"
+            
+            const selectedModel = document.getElementById('model-select').value;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+            
+            let newPrompt;
+            const promptText = card.customPrompt || '';
+            const styleKeywords = ['style', 'painting', 'drawing', 'photo', 'realistic', 'art', 'gogh', 'picasso', 'monet', 'dali', 'sketch', '3d', 'map', 'shape', 'outline', 'silhouette', 'border'];
+            const isArtisticStyle = styleKeywords.some(keyword => promptText.toLowerCase().includes(keyword));
+
+            // STRENGTHENED NEGATIVE PROMPT INJECTION
+            const negativeConstraints = `Do not spell the word "${card.term}". Do not include the text "${card.term}". No text, no letters, no numbers, no typography, no signage, no labels, no watermarks, no writing inside the image. Symbolism only.`;
+
+            if (isArtisticStyle) {
+                // Artistic/Custom override
+                newPrompt = `A strictly wordless, text-free image of ${card.term}, ${promptText}. High quality, detailed. Visual depiction only. Unlabeled. ${negativeConstraints}`;
+            } else {
+                // Clean Clipart default
+                if (promptText) {
+                    newPrompt = `A strictly wordless, text-free clipart icon of ${card.term} described as ${promptText}. Isolated on white background. Vector style, vibrant colors. Visual depiction only. Unlabeled. ${negativeConstraints}`;
+                } else {
+                    newPrompt = `A strictly wordless, text-free clipart icon of ${card.term}. Isolated on white background. Vector style, vibrant colors. Visual depiction only. Unlabeled. ${negativeConstraints}`;
+                }
+            }
+
+            const payload = { 
+                contents: [{parts: [{ text: newPrompt }]}],
+                generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+            };
+
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                    const result = await response.json();
+                    const inlineData = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData;
+                    
+                    if (inlineData && inlineData.data) {
+                        return `data:${inlineData.mimeType || 'image/png'};base64,${inlineData.data}`;
+                    } else {
+                        throw new Error('Invalid response structure from API.');
+                    }
+                } catch (error) {
+                    console.error(`Attempt ${i + 1} for "${card.term}" failed:`, error);
+                    if (i === maxRetries - 1) { return null; } 
+                    await new Promise(res => setTimeout(res, 1000 * (i + 1))); 
+                }
+            }
+            return null; 
+        }
+        
+        // --- Card and Page Rendering ---
+        function createCardFront(card, index) {
+            const color = colors[index % colors.length];
+            // Determine text based on current language
+            const displayTerm = currentLanguage === 'fr' && card.french ? card.french.term : card.term;
+
+            const cardEl = document.createElement('div');
+            // Added group class for hover effects
+            cardEl.className = `card group h-full bg-white rounded-2xl border-[6px] border-${color} shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden flex flex-col relative`;
+            cardEl.dataset.term = card.term;
+            
+            cardEl.innerHTML = `
+                <div class="image-container flex-1 min-h-0 flex items-center justify-center p-1 overflow-hidden bg-white w-full">
+                    ${card.image ? `<img src="${card.image}" alt="${displayTerm}" class="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500">` : '<div class="loader"></div>'}
+                </div>
+                <div class="card-label text-center text-white flex items-center justify-center px-2 bg-${color} z-10" style="flex-basis: 4.5rem;">
+                    <h2 class="text-xl font-bold tracking-wide drop-shadow-md">${displayTerm}</h2>
+                </div>
+                <div class="absolute top-2 right-2 flex flex-col items-end space-y-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20">
+                     <!-- NEW: Upload Button -->
+                    <button class="upload-btn bg-white/90 backdrop-blur text-purple-600 border border-purple-100 hover:bg-purple-50 px-3 py-1.5 text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-1 mb-1">
+                        <span>📁 Upload Image</span>
+                    </button>
+                    <input type="file" class="file-input hidden" accept="image/*">
+
+                    <!-- NEW: Edit Button -->
+                    <button class="edit-btn bg-white/90 backdrop-blur text-blue-600 border border-blue-100 hover:bg-blue-50 px-3 py-1.5 text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-1 mb-1">
+                        <span>✏️ Edit Text</span>
+                    </button>
+
+                    <button class="regenerate-btn bg-white/90 backdrop-blur text-indigo-600 border border-indigo-100 hover:bg-indigo-50 px-3 py-1.5 text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-1">
+                        <span>⚡ Regenerate</span>
+                    </button>
+                    <input type="text" class="hint-input bg-white/90 backdrop-blur w-36 text-xs p-1.5 rounded-lg border border-slate-200 shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Add hint (e.g. 'red car')..." value="${card.customPrompt || ''}">
+                </div>
+            `;
+
+            const regenerateBtn = cardEl.querySelector('.regenerate-btn');
+            const uploadBtn = cardEl.querySelector('.upload-btn');
+            const editBtn = cardEl.querySelector('.edit-btn');
+            const fileInput = cardEl.querySelector('.file-input');
+            const imageContainer = cardEl.querySelector('.image-container');
+            const hintInput = cardEl.querySelector('.hint-input');
+
+            // --- REGENERATE LOGIC ---
+            regenerateBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                regenerateBtn.disabled = true;
+                hintInput.disabled = true;
+                regenerateBtn.innerHTML = '<span>⏳ Generating...</span>';
+                imageContainer.innerHTML = '<div class="loader"></div>';
+
+                const cardData = allCardsData.find(c => c.term === card.term);
+                if (!cardData) return;
+
+                const currentHint = hintInput.value.trim();
+                cardData.customPrompt = currentHint;
+                
+                const newImageUrl = await generateImageWithRetry(cardData);
+                
+                cardData.image = newImageUrl;
+
+                if (newImageUrl) {
+                     imageContainer.innerHTML = `<img src="${newImageUrl}" alt="${displayTerm}" class="max-h-full max-w-full object-contain">`;
+                } else {
+                     imageContainer.innerHTML = '<p class="text-red-400 font-bold text-sm">Generation Failed</p>';
+                }
+               
+                regenerateBtn.disabled = false;
+                hintInput.disabled = false;
+                regenerateBtn.innerHTML = '<span>⚡ Regenerate</span>';
+            });
+
+            // --- UPLOAD LOGIC ---
+            uploadBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const base64Image = event.target.result;
+                    const cardData = allCardsData.find(c => c.term === card.term);
+                    
+                    if (cardData) {
+                        cardData.image = base64Image;
+                        imageContainer.innerHTML = `<img src="${base64Image}" alt="${displayTerm}" class="max-h-full max-w-full object-contain">`;
+                        
+                        // Optional visual feedback that upload worked
+                        uploadBtn.innerHTML = '<span>✅ Uploaded</span>';
+                        setTimeout(() => { uploadBtn.innerHTML = '<span>📁 Upload Image</span>'; }, 2000);
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+
+            // --- EDIT LOGIC ---
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openEditModal(card);
+            });
+
+            return cardEl;
+        }
+
+        function createCardBack(card, index) {
+            const color = colors[index % colors.length];
+            // Determine text based on current language
+            const displayTerm = currentLanguage === 'fr' && card.french ? card.french.term : card.term;
+            const displayDef = currentLanguage === 'fr' && card.french ? card.french.definition : card.definition;
+
+            const cardEl = document.createElement('div');
+            cardEl.className = `card-back h-full bg-white rounded-2xl border-[6px] border-${color} shadow-sm overflow-hidden flex flex-col items-center justify-center p-8 relative`;
+            // Added subtle pattern to back
+            cardEl.innerHTML = `
+                <div class="absolute inset-0 opacity-5 bg-[radial-gradient(#${color}_1px,transparent_1px)] [background-size:16px_16px]"></div>
+                <h3 class="text-xl font-bold text-slate-800 mb-3 relative z-10 border-b-2 border-${color}/20 pb-1">${displayTerm}</h3>
+                <p class="text-center text-slate-600 text-lg font-medium leading-relaxed relative z-10">${displayDef}</p>
+            `;
+            return cardEl;
+        }
+        
+        function populatePage(grid, cards, isBack) {
+            let cardsToRender = [...cards];
+            if (isBack) {
+                 const reordered = [];
+                 for (let i = 0; i < cardsToRender.length; i += 3) {
+                     reordered.push(...cardsToRender.slice(i, i + 3).reverse());
+                 }
+                 cardsToRender = reordered;
+            }
+            cardsToRender.forEach((cardData) => {
+                const originalIndex = allCardsData.findIndex(c => c.term === cardData.term);
+                const element = isBack ? createCardBack(cardData, originalIndex) : createCardFront(cardData, originalIndex);
+                grid.appendChild(element);
+            });
+        }
+        
+        function generateAllPages() {
+            const mainContainer = document.getElementById('main-container');
+            mainContainer.innerHTML = '';
+            if (allCardsData.length === 0) return;
+
+            const cardsPerPage = 6;
+            const numPages = Math.ceil(allCardsData.length / cardsPerPage);
+
+            for (let i = 0; i < numPages; i++) {
+                const pageCards = allCardsData.slice(i * cardsPerPage, (i * cardsPerPage) + cardsPerPage);
+                // Aesthetic tweak: Added ring to page container
+                const frontPageContainer = document.createElement('div');
+                frontPageContainer.className = "page-container w-full max-w-5xl aspect-[11/8.5] bg-white p-8 rounded-lg shadow-2xl ring-1 ring-slate-900/5 mb-8";
+                const frontGrid = document.createElement('div');
+                frontGrid.className = "grid grid-cols-3 grid-rows-2 gap-6 h-full";
+                frontPageContainer.appendChild(frontGrid);
+                mainContainer.appendChild(frontPageContainer);
+                populatePage(frontGrid, pageCards, false);
+
+                const backPageContainer = document.createElement('div');
+                backPageContainer.className = "page-container w-full max-w-5xl aspect-[11/8.5] bg-white p-8 rounded-lg shadow-2xl ring-1 ring-slate-900/5 mb-8";
+                const backGrid = document.createElement('div');
+                backGrid.className = "grid grid-cols-3 grid-rows-2 gap-6 h-full";
+                backPageContainer.appendChild(backGrid);
+                mainContainer.appendChild(backPageContainer);
+                populatePage(backGrid, pageCards, true);
+            }
+        }
+        
+        // --- Main Logic ---
+        async function handleCardGeneration() {
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                alert("⚠️ Please enter your Gemini API Key at the top before generating flashcards!");
+                return;
+            }
+
+            const generateBtn = document.getElementById('generate-btn');
+            const input = document.getElementById('custom-vocab-input').value;
+            const lines = input.split('\n').filter(line => line.includes(':'));
+            
+            // Reset
+            currentLanguage = 'en';
+            const translateBtn = document.getElementById('translate-btn');
+            translateBtn.innerHTML = '<span>🇫🇷 Translate to French</span>';
+            translateBtn.classList.remove('hidden');
+
+            allCardsData = lines.map(line => {
+                const lineParts = line.split(':');
+                const termAndPrompt = lineParts[0].trim();
+                const definition = lineParts.slice(1).join(':').trim();
+
+                let term = termAndPrompt;
+                let customPrompt = null;
+
+                const promptMatch = termAndPrompt.match(/(.*?)\s*\((.*?)\)/);
+                if (promptMatch && promptMatch.length === 3) {
+                    term = promptMatch[1].trim();
+                    customPrompt = promptMatch[2].trim();
+                }
+
+                return { 
+                    term, 
+                    definition, 
+                    customPrompt, 
+                    image: null,
+                    french: null // Placeholder for french translation
+                };
+            }).filter(c => c.term && c.definition);
+
+            generateAllPages(); 
+
+            generateBtn.disabled = true;
+
+            // Loop through and call AI Generator immediately for every card
+            const imagePromises = allCardsData.map(async (card, i) => {
+                generateBtn.innerHTML = `<span>⏳ Generating Art ${i + 1}/${allCardsData.length}...</span>`;
+                
+                // Call AI Generation immediately
+                const imageUrl = await generateImageWithRetry(card);
+                card.image = imageUrl;
+
+                const cardEl = document.querySelector(`.card[data-term="${card.term}"]`);
+                if (cardEl) {
+                    const imageContainer = cardEl.querySelector('.image-container');
+                    if (imageUrl) {
+                        // Re-render image (use current language text for alt tag)
+                        const altText = currentLanguage === 'fr' && card.french ? card.french.term : card.term;
+                        imageContainer.innerHTML = `<img src="${imageUrl}" alt="${altText}" class="max-h-full max-w-full object-contain">`;
+                    } else {
+                        imageContainer.innerHTML = '<p class="text-red-400 font-bold text-sm">Generation Failed</p>';
+                    }
+                }
+            });
+
+            await Promise.all(imagePromises);
+            
+            generateBtn.disabled = false;
+            generateBtn.innerHTML = '<span>✨ Generate Flashcards</span>';
+        }
+
+        document.getElementById('generate-btn').addEventListener('click', handleCardGeneration);
+
+        // --- Translation Logic ---
+        document.getElementById('translate-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('translate-btn');
+            
+            if (currentLanguage === 'en') {
+                // Switch to French
+                
+                // Check if we need to fetch translations first
+                const needsTranslation = allCardsData.some(c => !c.french);
+                
+                if (needsTranslation) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span>⏳ Translating...</span>';
+                    
+                    const frenchData = await translateTextWithAI(allCardsData);
+                    
+                    if (frenchData && frenchData.length === allCardsData.length) {
+                        // Merge translations
+                        frenchData.forEach((item, index) => {
+                            allCardsData[index].french = item;
+                        });
+                    } else {
+                        btn.disabled = false;
+                        btn.innerHTML = '<span>⚠️ Translation Failed</span>';
+                        setTimeout(() => { btn.innerHTML = '<span>🇫🇷 Translate to French</span>'; }, 2000);
+                        return;
+                    }
+                }
+                
+                currentLanguage = 'fr';
+                btn.innerHTML = '<span>🇬🇧 Switch to English</span>';
+                btn.classList.remove('bg-indigo-600', 'border-indigo-600', 'hover:bg-indigo-700', 'shadow-indigo-200');
+                btn.classList.add('bg-red-600', 'border-red-600', 'hover:bg-red-700', 'shadow-red-200'); // Change style for toggle back
+                btn.disabled = false;
+                
+            } else {
+                // Switch back to English
+                currentLanguage = 'en';
+                btn.innerHTML = '<span>🇫🇷 Switch to French</span>';
+                btn.classList.remove('bg-red-600', 'border-red-600', 'hover:bg-red-700', 'shadow-red-200');
+                btn.classList.add('bg-indigo-600', 'border-indigo-600', 'hover:bg-indigo-700', 'shadow-indigo-200');
+            }
+            
+            // Re-render all pages with new language
+            generateAllPages();
+        });
+        
+        function triggerDownload(blob, filename) {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        }
+
+        document.getElementById('download-zip-btn').addEventListener('click', () => {
+            // Check if any data exists and if all cards have an image
+            const validCards = allCardsData.filter(c => c.image && c.image.startsWith('data:image'));
+            
+            if (validCards.length === 0) {
+                console.error('Download failed: Please generate flashcards and ensure images are created first.');
+                return;
+            }
+
+            const zip = new JSZip();
+            const promises = validCards.map(card => {
+                const base64Data = card.image.split(',')[1];
+                // Use Current Language Term for filename
+                const termToUse = currentLanguage === 'fr' && card.french ? card.french.term : card.term;
+                const safeFilename = termToUse.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                
+                let ext = 'png';
+                if(card.image.includes('image/jpeg')) ext = 'jpg';
+                if(card.image.includes('image/webp')) ext = 'webp';
+
+                zip.file(`${safeFilename}.${ext}`, base64Data, { base64: true });
+                return Promise.resolve();
+            });
+
+            Promise.all(promises).then(() => {
+                zip.generateAsync({ type: 'blob' }).then(content => {
+                    const zipName = currentLanguage === 'fr' ? 'flashcards-fr.zip' : 'flashcards-en.zip';
+                    triggerDownload(content, zipName);
+                });
+            });
+        });
+
+        document.getElementById('export-json-btn').addEventListener('click', () => {
+            if (allCardsData.length === 0) {
+                console.error('Export failed: No flashcard data has been generated yet.');
+                return;
+            }
+            
+            // Only export data that has a term and definition
+            const exportData = allCardsData
+                .filter(c => c.term && c.definition)
+                .map((c) => {
+                    const isFr = currentLanguage === 'fr' && c.french;
+                    return { 
+                        term: isFr ? c.french.term : c.term, 
+                        definition: isFr ? c.french.definition : c.definition, 
+                        // Export imageSrc only if it exists
+                        imageSrc: c.image || 'N/A' 
+                    };
+                });
+            
+            if (exportData.length === 0) {
+                console.error('Export failed: No valid flashcard data found.');
+                return;
+            }
+
+            const jsonString = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const fileName = currentLanguage === 'fr' ? 'flashcard-data-fr.json' : 'flashcard-data-en.json';
+            triggerDownload(blob, fileName);
+        });
+
+        // --- Print function ---
+        function saveForPrinting() {
+             if (allCardsData.length === 0) {
+                console.warn('Cannot print: No flashcards have been generated yet.');
+                return;
+            }
+            
+            // Use current language in title
+            const langSuffix = currentLanguage === 'fr' ? 'FR' : 'EN';
+            
+             const printableHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashcards (${langSuffix})</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Outfit', sans-serif; }
+        @media print {
+            /* Full page print overrides */
+            body { 
+                background-color: #ffffff; 
+                padding: 0 !important; 
+                margin: 0 !important; 
+                display: block;
+                height: 100%;
+            }
+            html { height: 100%; }
+            body > *:not(#main-container) {
+                display: none !important;
+            }
+            #main-container {
+                padding: 0;
+                margin: 0;
+                display: block;
+                width: 100%;
+            }
+            #main-container > .page-container {
+                margin-top: 0 !important; 
+                margin-bottom: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+                width: 100% !important;
+                /* The critical fix for blank pages: */
+                height: 98% !important; 
+                max-height: 100vh !important;
+                overflow: hidden !important;
+            }
+
+            /* Card structure overrides */
+            #controls, .regenerate-btn, .hint-input, .upload-btn, .edit-btn { display: none !important; } 
+            .page-container {
+                box-shadow: none; 
+                padding: 0 !important; 
+                margin: 0 !important; 
+                border-radius: 0;
+                page-break-after: always !important;
+                page-break-inside: avoid !important;
+            }
+            .page-container:last-child { page-break-after: avoid !important; }
+            .card, .card-back { 
+                page-break-inside: avoid; 
+                border-width: 4px !important; 
+                height: 100% !important;
+            }
+            .card-label { color-adjust: exact; -webkit-print-color-adjust: exact; }
+            @page { size: landscape; margin: 0.25in; }
+            
+            /* The fix for the image box */
+            .card .image-container {
+                padding: 0 !important; 
+            }
+            .card .image-container img {
+                border: none !important; 
+                outline: none !important;
+                box-shadow: none !important; 
+                filter: none !important; 
+            }
+        }
+    </style>
+</head>
+<body class="p-8 flex flex-col items-center space-y-8">
+    
+
+<div id="main-container" class="w-full flex flex-col items-center space-y-8">${document.getElementById('main-container').innerHTML}</div>
+</body>
+</html>`;
+            const blob = new Blob([printableHtml.trim()], { type: 'text/html' });
+            triggerDownload(blob, `flashcards-print-${currentLanguage}.html`);
+        }
+
+        document.getElementById('save-btn').addEventListener('click', saveForPrinting);
+    </script>
+</body>
+</html>
