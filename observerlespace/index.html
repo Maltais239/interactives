@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Outils pour observer l'espace</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800;900&display=swap');
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #050b14;
+            background-image: radial-gradient(ellipse at top, #0a162c 0%, #03060a 100%);
+            color: white;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Starry background effect */
+        .stars {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100%; height: 100%;
+            display: block;
+            background: transparent url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><circle cx="20" cy="20" r="1" fill="white" opacity="0.6"/><circle cx="200" cy="80" r="1.5" fill="white" opacity="0.9"/><circle cx="80" cy="200" r="1" fill="white" opacity="0.4"/><circle cx="300" cy="250" r="2" fill="white" opacity="0.7"/><circle cx="350" cy="50" r="1" fill="white" opacity="0.5"/></svg>') repeat;
+            z-index: -1;
+            animation: twinkle 30s linear infinite;
+        }
+
+        @keyframes twinkle {
+            from { background-position: 0 0; }
+            to { background-position: -400px 400px; }
+        }
+
+        /* Draggable Card Styles */
+        .draggable-card {
+            cursor: grab;
+            transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .draggable-card:active {
+            cursor: grabbing;
+            transform: scale(0.95);
+        }
+
+        .draggable-card.dragging {
+            opacity: 0.6;
+            transform: scale(1.05);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.6);
+            z-index: 50;
+        }
+
+        .draggable-card.selected-for-mobile {
+            border-color: #ff00ff;
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.8);
+            transform: scale(1.05);
+            z-index: 10;
+        }
+
+        /* Drop Zone Styles */
+        .drop-zone {
+            transition: all 0.3s ease;
+        }
+
+        .drop-zone.drag-over {
+            background-color: rgba(93, 228, 245, 0.15);
+            border-color: #8be0ed;
+            box-shadow: inset 0 0 20px rgba(93, 228, 245, 0.4);
+        }
+
+        .drop-zone.drop-error {
+            animation: shake 0.5s;
+            border-color: #ff4d4d;
+            box-shadow: inset 0 0 15px rgba(255, 77, 77, 0.5);
+        }
+
+        /* CSS Magic to hide the placeholder when cards are dropped inside */
+        .drop-content:not(:empty) ~ .drop-placeholder {
+            display: none;
+        }
+
+        /* Animations */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .card-placed {
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border-color: #5de4f5 !important;
+            box-shadow: none !important;
+            cursor: default;
+            margin-bottom: 0.5rem;
+        }
+        
+        /* Remove the move icon once placed */
+        .card-placed .move-icon {
+            display: none;
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #03060a; }
+        ::-webkit-scrollbar-thumb { background: #36798a; border-radius: 4px; }
+        
+        .mobile-instruction { display: none; }
+        @media (max-width: 768px) {
+            .mobile-instruction { display: block; }
+            .desktop-instruction { display: none; }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 flex flex-col items-center">
+    <div class="stars"></div>
+
+    <div class="max-w-7xl w-full z-10 relative">
+        <!-- Header Section -->
+        <header class="mb-10 text-left px-2">
+            <h1 class="text-3xl md:text-5xl font-black text-[#8be0ed] tracking-tight mb-2 flex items-center">
+                <svg class="w-8 h-8 md:w-10 md:h-10 mr-3 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+                Outils pour observer les objets dans l'espace
+            </h1>
+            <h2 class="text-2xl md:text-4xl font-extrabold text-white mb-2">Comparons</h2>
+            <p class="text-base md:text-lg text-gray-200 desktop-instruction font-medium">
+                Utilise ce que tu as appris pour associer les descriptions aux principaux outils pour observer les objets dans l'espace.
+            </p>
+            <p class="text-base md:text-lg text-pink-300 mobile-instruction font-medium">
+                Touche une description, puis touche l'outil correspondant pour la déplacer.
+            </p>
+            <div id="progress-container" class="mt-4 flex items-center gap-2 text-[#8be0ed] font-bold text-lg bg-[#0a162c] border border-[#36798a] rounded-full px-4 py-1 w-max shadow-[0_0_10px_rgba(139,224,237,0.2)]">
+                Progression : <span id="score" class="text-white ml-1">0</span> / 10
+            </div>
+        </header>
+
+        <!-- Descriptions (Draggable Items) -->
+        <div id="cards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-12 px-2">
+            <!-- Cards will be injected here by JS -->
+        </div>
+
+        <!-- Drop Zones (Categories) -->
+        <div id="categories-container" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-10 px-2 mt-8">
+            <!-- Categories will be injected here by JS -->
+        </div>
+    </div>
+
+    <!-- Victory Modal -->
+    <div id="victory-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-85 backdrop-blur-sm transition-opacity">
+        <div class="bg-gradient-to-b from-[#0a162c] to-[#050b14] border-2 border-[#5de4f5] shadow-[0_0_30px_rgba(93,228,245,0.6)] p-10 rounded-3xl text-center max-w-lg mx-4 animate-[popIn_0.5s_ease-out]">
+            <div class="text-7xl mb-6">🚀🌌✨</div>
+            <h2 class="text-4xl font-black text-[#8be0ed] mb-4">Mission Accomplie !</h2>
+            <p class="text-lg text-gray-200 mb-8 font-medium">Tu as correctement associé tous les outils d'observation spatiale.</p>
+            <button onclick="resetGame()" class="px-8 py-3 bg-[#8be0ed] hover:bg-[#5de4f5] text-[#050b14] font-black rounded-full shadow-[0_0_15px_rgba(139,224,237,0.6)] transform transition hover:scale-105 active:scale-95 uppercase tracking-wider">
+                Rejouer
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Data Structure with custom SVG badges
+        const categoriesData = [
+            {
+                id: 'jumelles',
+                name: 'Jumelles',
+                icon: '<svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>'
+            },
+            {
+                id: 'telescopes',
+                name: 'Télescopes',
+                icon: '<svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/></svg>'
+            },
+            {
+                id: 'planetariums',
+                name: 'Planétariums',
+                icon: '<svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+            },
+            {
+                id: 'satellites',
+                name: 'Satellites',
+                icon: '<svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>'
+            },
+            {
+                id: 'sondes',
+                name: 'Sondes',
+                icon: '<svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>'
+            }
+        ];
+
+        const cardsData = [
+            { id: 'c1', target: 'jumelles', text: "Facile à tenir et à transporter." },
+            { id: 'c2', target: 'jumelles', text: "Utilisé pour grossir des objets pas trop loin." },
+            { id: 'c3', target: 'telescopes', text: "Utilisé pour voir des objets très éloignés." },
+            { id: 'c4', target: 'telescopes', text: "La plupart fonctionnent avec des miroirs courbés pour recueillir la lumière." },
+            { id: 'c5', target: 'planetariums', text: "Utilisé pour projeter l'espace sur un plafond en forme de dôme." },
+            { id: 'c6', target: 'planetariums', text: "Nécessite beaucoup d'espace pour l'installation." },
+            { id: 'c7', target: 'satellites', text: "En orbite autour de la Terre pour prendre des photos et relayer des communications." },
+            { id: 'c8', target: 'satellites', text: "Permet d'étudier la météo et le climat de notre planète depuis l'espace." },
+            { id: 'c9', target: 'sondes', text: "Envoyée dans l'espace lointain pour explorer d'autres planètes et lunes." },
+            { id: 'c10', target: 'sondes', text: "Voyage sans équipage humain pour collecter des données extraterrestres." }
+        ];
+
+        let score = 0;
+        const totalCards = cardsData.length;
+        let selectedMobileCard = null;
+
+        function shuffleArray(array) {
+            let curId = array.length;
+            while (0 !== curId) {
+                let randId = Math.floor(Math.random() * curId);
+                curId -= 1;
+                let tmp = array[curId];
+                array[curId] = array[randId];
+                array[randId] = tmp;
+            }
+            return array;
+        }
+
+        function initGame() {
+            const cardsContainer = document.getElementById('cards-container');
+            const categoriesContainer = document.getElementById('categories-container');
+            
+            cardsContainer.innerHTML = '';
+            categoriesContainer.innerHTML = '';
+            score = 0;
+            updateScore();
+            selectedMobileCard = null;
+
+            // Render Categories matching the image style
+            categoriesData.forEach(cat => {
+                const dropWrapper = document.createElement('div');
+                dropWrapper.className = 'flex flex-col h-full';
+                
+                dropWrapper.innerHTML = `
+                    <div class="bg-gradient-to-r from-[#8be0ed] to-[#5de4f5] text-[#03060a] h-12 flex items-center rounded-t-xl relative shadow-[0_2px_15px_rgba(93,228,245,0.3)]">
+                        <div class="absolute -left-3 -top-5 w-14 h-14 bg-gradient-to-br from-[#1b3452] to-[#0a162c] rounded-full border-[3px] border-[#5de4f5] flex items-center justify-center shadow-[0_0_15px_rgba(93,228,245,0.5)] z-20">
+                            ${cat.icon}
+                        </div>
+                        <h3 class="font-extrabold text-xl ml-14 tracking-tight drop-shadow-sm">${cat.name}</h3>
+                    </div>
+                    <div class="drop-zone flex-1 bg-gradient-to-b from-[#0a162c] to-[#070e1a] border-2 border-[#36798a] border-t-0 rounded-b-xl p-3 flex flex-col relative transition-all duration-300 min-h-[140px]" data-id="${cat.id}">
+                        <div class="drop-content relative z-10 w-full flex flex-col gap-2 empty:hidden"></div>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center opacity-40 pointer-events-none drop-placeholder text-[#8be0ed]">
+                            <svg class="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                            <span class="text-xs font-bold uppercase tracking-widest">Déposer ici</span>
+                        </div>
+                    </div>
+                `;
+
+                const dropZone = dropWrapper.querySelector('.drop-zone');
+                dropZone.addEventListener('dragover', handleDragOver);
+                dropZone.addEventListener('dragleave', handleDragLeave);
+                dropZone.addEventListener('drop', handleDrop);
+                dropZone.addEventListener('click', () => handleMobileDrop(dropZone));
+
+                categoriesContainer.appendChild(dropWrapper);
+            });
+
+            // Render Draggable Cards matching the image style
+            const shuffledCards = shuffleArray([...cardsData]);
+            shuffledCards.forEach(card => {
+                const cardEl = document.createElement('div');
+                cardEl.className = 'draggable-card relative bg-gradient-to-br from-[#11243d] to-[#0a162c] rounded-xl p-3 md:p-4 border-2 border-[#5de4f5] flex flex-col items-center justify-center text-center font-semibold text-white hover:brightness-125 transition-all shadow-[0_0_12px_rgba(93,228,245,0.4)] min-h-[90px]';
+                cardEl.draggable = true;
+                cardEl.dataset.id = card.id;
+                cardEl.dataset.target = card.target;
+                
+                cardEl.innerHTML = `
+                    <svg class="move-icon absolute top-2 left-2 w-5 h-5 text-[#5de4f5] opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m0-16l-3 3m3-3l3 3m-3 13l-3-3m3 3l3-3M4 12h16m-16 0l3-3m-3 3l3 3m13-3l-3-3m3 3l-3 3"/></svg>
+                    <span class="mt-2 text-sm md:text-base leading-snug px-4">${card.text}</span>
+                `;
+
+                cardEl.addEventListener('dragstart', handleDragStart);
+                cardEl.addEventListener('dragend', handleDragEnd);
+                cardEl.addEventListener('click', (e) => handleMobileSelect(e, cardEl));
+
+                cardsContainer.appendChild(cardEl);
+            });
+        }
+
+        // Standard Drag and Drop Handlers
+        function handleDragStart(e) {
+            e.dataTransfer.setData('text/plain', e.currentTarget.dataset.id);
+            e.currentTarget.classList.add('dragging');
+            if(selectedMobileCard) {
+                selectedMobileCard.classList.remove('selected-for-mobile');
+                selectedMobileCard = null;
+            }
+        }
+
+        function handleDragEnd(e) {
+            e.currentTarget.classList.remove('dragging');
+            document.querySelectorAll('.drop-zone').forEach(zone => {
+                zone.classList.remove('drag-over');
+            });
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const dropZone = e.currentTarget;
+            dropZone.classList.remove('drag-over');
+            
+            const cardId = e.dataTransfer.getData('text/plain');
+            const cardEl = document.querySelector(`.draggable-card[data-id="${cardId}"]`);
+            
+            if (cardEl) {
+                processMove(cardEl, dropZone);
+            }
+        }
+
+        // Mobile Click-to-Move Handlers
+        function handleMobileSelect(e, cardEl) {
+            if (cardEl.closest('#cards-container') === null) return; // Only select if in top container
+
+            if (selectedMobileCard === cardEl) {
+                cardEl.classList.remove('selected-for-mobile');
+                selectedMobileCard = null;
+            } else {
+                if (selectedMobileCard) {
+                    selectedMobileCard.classList.remove('selected-for-mobile');
+                }
+                cardEl.classList.add('selected-for-mobile');
+                selectedMobileCard = cardEl;
+            }
+        }
+
+        function handleMobileDrop(dropZone) {
+            if (selectedMobileCard) {
+                processMove(selectedMobileCard, dropZone);
+                selectedMobileCard = null;
+            }
+        }
+
+        // Core Game Logic
+        function processMove(cardEl, dropZone) {
+            cardEl.classList.remove('selected-for-mobile');
+
+            if (cardEl.dataset.target === dropZone.dataset.id) {
+                // Correct Match
+                const contentArea = dropZone.querySelector('.drop-content');
+                contentArea.appendChild(cardEl);
+                
+                // Update styling for placed card
+                cardEl.draggable = false;
+                cardEl.classList.remove('hover:brightness-125', 'cursor-grab', 'active:scale-95');
+                cardEl.classList.add('card-placed');
+                cardEl.style.background = 'transparent';
+                
+                cardEl.removeEventListener('click', handleMobileSelect);
+                
+                score++;
+                updateScore();
+                checkWinCondition();
+            } else {
+                // Incorrect Match
+                dropZone.classList.add('drop-error');
+                setTimeout(() => {
+                    dropZone.classList.remove('drop-error');
+                }, 500);
+            }
+        }
+
+        function updateScore() {
+            document.getElementById('score').textContent = score;
+        }
+
+        function checkWinCondition() {
+            if (score === totalCards) {
+                setTimeout(() => {
+                    const modal = document.getElementById('victory-modal');
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                }, 400);
+            }
+        }
+
+        function resetGame() {
+            const modal = document.getElementById('victory-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            initGame();
+        }
+
+        window.onload = initGame;
+    </script>
+</body>
+</html>
