@@ -38,7 +38,7 @@
         /* Draggable Card Styles */
         .draggable-card {
             cursor: grab;
-            transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s, filter 0.2s, border-color 0.3s;
             user-select: none;
             touch-action: manipulation;
         }
@@ -56,8 +56,8 @@
         }
 
         .draggable-card.selected-for-mobile {
-            border-color: #ff00ff;
-            box-shadow: 0 0 20px rgba(255, 0, 255, 0.8);
+            border-color: #ff00ff !important;
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.8) !important;
             transform: scale(1.05);
             z-index: 10;
         }
@@ -73,10 +73,9 @@
             box-shadow: inset 0 0 20px rgba(93, 228, 245, 0.4);
         }
 
-        .drop-zone.drop-error {
-            animation: shake 0.5s;
-            border-color: #ff4d4d;
-            box-shadow: inset 0 0 15px rgba(255, 77, 77, 0.5);
+        #cards-container {
+            transition: background-color 0.3s;
+            min-height: 120px;
         }
 
         /* CSS Magic to hide the placeholder when cards are dropped inside */
@@ -96,19 +95,6 @@
             100% { transform: scale(1); opacity: 1; }
         }
 
-        .card-placed {
-            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            border-color: #5de4f5 !important;
-            box-shadow: none !important;
-            cursor: default;
-            margin-bottom: 0.5rem;
-        }
-        
-        /* Remove the move icon once placed */
-        .card-placed .move-icon {
-            display: none;
-        }
-
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #03060a; }
         ::-webkit-scrollbar-thumb { background: #36798a; border-radius: 4px; }
@@ -120,7 +106,7 @@
         }
     </style>
 </head>
-<body class="p-4 md:p-8 flex flex-col items-center">
+<body class="p-4 md:p-8 flex flex-col items-center pb-20">
     <div class="stars"></div>
 
     <div class="max-w-7xl w-full z-10 relative">
@@ -132,24 +118,34 @@
             </h1>
             <h2 class="text-2xl md:text-4xl font-extrabold text-white mb-2">Comparons</h2>
             <p class="text-base md:text-lg text-gray-200 desktop-instruction font-medium">
-                Utilise ce que tu as appris pour associer les descriptions aux principaux outils pour observer les objets dans l'espace.
+                Glisse chaque description dans la catégorie qui lui correspond, puis vérifie tes réponses !
             </p>
             <p class="text-base md:text-lg text-pink-300 mobile-instruction font-medium">
-                Touche une description, puis touche l'outil correspondant pour la déplacer.
+                Touche une description, puis touche l'outil correspondant pour la déplacer. Vérifie tes réponses à la fin !
             </p>
             <div id="progress-container" class="mt-4 flex items-center gap-2 text-[#8be0ed] font-bold text-lg bg-[#0a162c] border border-[#36798a] rounded-full px-4 py-1 w-max shadow-[0_0_10px_rgba(139,224,237,0.2)]">
                 Progression : <span id="score" class="text-white ml-1">0</span> / 10
             </div>
         </header>
 
-        <!-- Descriptions (Draggable Items) -->
-        <div id="cards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-12 px-2">
+        <!-- Descriptions (Draggable Items starting zone) -->
+        <div id="cards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-12 px-2 p-4 rounded-2xl border-2 border-dashed border-transparent">
             <!-- Cards will be injected here by JS -->
         </div>
 
         <!-- Drop Zones (Categories) -->
         <div id="categories-container" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-10 px-2 mt-8">
             <!-- Categories will be injected here by JS -->
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="mt-12 flex flex-col sm:flex-row justify-center items-center gap-4 px-2">
+            <button onclick="checkAnswers()" class="px-8 py-4 bg-[#5de4f5] hover:bg-[#8be0ed] text-[#03060a] font-black rounded-full shadow-[0_0_15px_rgba(93,228,245,0.4)] transform transition hover:scale-105 active:scale-95 uppercase tracking-wider w-full sm:w-auto">
+                Vérifier les réponses
+            </button>
+            <button onclick="resetGame()" class="px-8 py-4 bg-transparent border-2 border-pink-500 text-pink-400 hover:bg-pink-500 hover:text-white font-black rounded-full shadow-[0_0_15px_rgba(236,72,153,0.2)] transform transition hover:scale-105 active:scale-95 uppercase tracking-wider w-full sm:w-auto">
+                Réinitialiser
+            </button>
         </div>
     </div>
 
@@ -234,6 +230,23 @@
             updateScore();
             selectedMobileCard = null;
 
+            // Make the source container a drop zone so cards can be returned
+            cardsContainer.addEventListener('dragover', (e) => { e.preventDefault(); cardsContainer.classList.add('bg-[#0a162c]/60', 'border-[#36798a]'); });
+            cardsContainer.addEventListener('dragleave', () => { cardsContainer.classList.remove('bg-[#0a162c]/60', 'border-[#36798a]'); });
+            cardsContainer.addEventListener('drop', (e) => {
+                e.preventDefault();
+                cardsContainer.classList.remove('bg-[#0a162c]/60', 'border-[#36798a]');
+                const cardId = e.dataTransfer.getData('text/plain');
+                const cardEl = document.querySelector(`.draggable-card[data-id="${cardId}"]`);
+                if (cardEl) moveCardToContainer(cardEl, cardsContainer);
+            });
+            cardsContainer.addEventListener('click', (e) => {
+                if (e.target === cardsContainer && selectedMobileCard) {
+                    moveCardToContainer(selectedMobileCard, cardsContainer);
+                    selectedMobileCard = null;
+                }
+            });
+
             // Render Categories matching the image style
             categoriesData.forEach(cat => {
                 const dropWrapper = document.createElement('div');
@@ -268,7 +281,7 @@
             const shuffledCards = shuffleArray([...cardsData]);
             shuffledCards.forEach(card => {
                 const cardEl = document.createElement('div');
-                cardEl.className = 'draggable-card relative bg-gradient-to-br from-[#11243d] to-[#0a162c] rounded-xl p-3 md:p-4 border-2 border-[#5de4f5] flex flex-col items-center justify-center text-center font-semibold text-white hover:brightness-125 transition-all shadow-[0_0_12px_rgba(93,228,245,0.4)] min-h-[90px]';
+                cardEl.className = 'draggable-card relative bg-gradient-to-br from-[#11243d] to-[#0a162c] rounded-xl p-3 md:p-4 border-2 border-[#5de4f5] flex flex-col items-center justify-center text-center font-semibold text-white hover:brightness-125 transition-all shadow-[0_0_12px_rgba(93,228,245,0.4)] min-h-[90px] mb-2';
                 cardEl.draggable = true;
                 cardEl.dataset.id = card.id;
                 cardEl.dataset.target = card.target;
@@ -327,8 +340,7 @@
 
         // Mobile Click-to-Move Handlers
         function handleMobileSelect(e, cardEl) {
-            if (cardEl.closest('#cards-container') === null) return; // Only select if in top container
-
+            e.stopPropagation();
             if (selectedMobileCard === cardEl) {
                 cardEl.classList.remove('selected-for-mobile');
                 selectedMobileCard = null;
@@ -348,47 +360,75 @@
             }
         }
 
-        // Core Game Logic
-        function processMove(cardEl, dropZone) {
-            cardEl.classList.remove('selected-for-mobile');
+        // Move a card back to the starting container
+        function moveCardToContainer(cardEl, container) {
+            resetCardStyles(cardEl);
+            cardEl.style.background = '';
+            container.appendChild(cardEl);
+        }
 
-            if (cardEl.dataset.target === dropZone.dataset.id) {
-                // Correct Match
-                const contentArea = dropZone.querySelector('.drop-content');
-                contentArea.appendChild(cardEl);
+        // Move a card to a drop zone
+        function processMove(cardEl, dropZone) {
+            resetCardStyles(cardEl);
+            const contentArea = dropZone.querySelector('.drop-content');
+            contentArea.appendChild(cardEl);
+            cardEl.style.background = 'transparent';
+        }
+
+        // Reset error/success styling on a single card
+        function resetCardStyles(cardEl) {
+            cardEl.classList.remove(
+                'selected-for-mobile', 
+                'border-green-400', 
+                'border-red-500', 
+                'shadow-[0_0_15px_rgba(74,222,128,0.7)]', 
+                'shadow-[0_0_15px_rgba(239,68,68,0.7)]'
+            );
+            cardEl.classList.add('border-[#5de4f5]');
+            cardEl.style.animation = 'none';
+        }
+
+        // Validate all current placements
+        function checkAnswers() {
+            let currentScore = 0;
+            const allCards = document.querySelectorAll('.draggable-card');
+            
+            allCards.forEach(card => {
+                const parentZone = card.closest('.drop-zone');
+                resetCardStyles(card); // Clear previous checks
                 
-                // Update styling for placed card
-                cardEl.draggable = false;
-                cardEl.classList.remove('hover:brightness-125', 'cursor-grab', 'active:scale-95');
-                cardEl.classList.add('card-placed');
-                cardEl.style.background = 'transparent';
-                
-                cardEl.removeEventListener('click', handleMobileSelect);
-                
-                score++;
-                updateScore();
-                checkWinCondition();
-            } else {
-                // Incorrect Match
-                dropZone.classList.add('drop-error');
+                if (parentZone) {
+                    // It's in a category box
+                    if (card.dataset.target === parentZone.dataset.id) {
+                        // Correct!
+                        card.classList.remove('border-[#5de4f5]');
+                        card.classList.add('border-green-400', 'shadow-[0_0_15px_rgba(74,222,128,0.7)]');
+                        currentScore++;
+                    } else {
+                        // Incorrect
+                        card.classList.remove('border-[#5de4f5]');
+                        card.classList.add('border-red-500', 'shadow-[0_0_15px_rgba(239,68,68,0.7)]');
+                        // Trigger shake animation
+                        card.offsetHeight; /* trigger reflow */
+                        card.style.animation = 'shake 0.5s';
+                    }
+                }
+            });
+
+            score = currentScore;
+            updateScore();
+            
+            if (score === totalCards) {
                 setTimeout(() => {
-                    dropZone.classList.remove('drop-error');
+                    const modal = document.getElementById('victory-modal');
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
                 }, 500);
             }
         }
 
         function updateScore() {
             document.getElementById('score').textContent = score;
-        }
-
-        function checkWinCondition() {
-            if (score === totalCards) {
-                setTimeout(() => {
-                    const modal = document.getElementById('victory-modal');
-                    modal.classList.remove('hidden');
-                    modal.classList.add('flex');
-                }, 400);
-            }
         }
 
         function resetGame() {
