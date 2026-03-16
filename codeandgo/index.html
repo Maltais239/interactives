@@ -75,31 +75,33 @@
             align-items: flex-start;
             justify-content: center;
         }
-    }
-
-    .bottom-action-bar {
-        display: flex;
-        flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: center;
-        align-items: center;
-        gap: 40px;
-        margin-top: 5px;
+        .palette-panel {
+            flex-direction: column !important;
+        }
     }
 
     .palette-panel {
         display: flex;
         flex-direction: row;
-        gap: 15px;
+        gap: 10px;
+        background: #FFF;
+        padding: 15px;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         justify-content: center;
     }
 
     .palette-card {
-        width: 75px;
-        height: 75px;
+        width: 60px;
+        height: 60px;
         cursor: pointer;
         transition: transform 0.1s;
         touch-action: none;
+        border-radius: 10px;
+        background: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     .palette-card:active {
         transform: scale(0.95);
@@ -170,14 +172,17 @@
     .absolute-layer {
         position: absolute;
         top: 0; left: 0;
-        pointer-events: none; /* Let clicks pass through if needed */
+        pointer-events: none;
     }
 
     #mouse-sprite, #cheese-sprite {
         width: 100%;
         height: 100%;
-        padding: 10%;
+        padding: 5%;
         box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     #cheese-sprite svg {
@@ -332,6 +337,7 @@
         border: 6px solid #00AEEF;
         transform: scale(1);
         transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        max-width: 90%;
     }
 
     .modal-overlay.hidden .modal-content {
@@ -367,6 +373,14 @@
     </div>
     
     <div class="game-content">
+        <!-- Palette (Drag Source) -->
+        <div class="palette-panel">
+            <div class="palette-card" draggable="true" data-cmd="forward" title="Forward"></div>
+            <div class="palette-card" draggable="true" data-cmd="backward" title="Backward"></div>
+            <div class="palette-card" draggable="true" data-cmd="left" title="Turn Left"></div>
+            <div class="palette-card" draggable="true" data-cmd="right" title="Turn Right"></div>
+        </div>
+
         <!-- Board -->
         <div class="board-panel">
             <div id="grid-container" class="grid-container">
@@ -376,6 +390,7 @@
                 <div id="cheese-container" class="absolute-layer">
                     <div id="cheese-sprite">
                         <svg viewBox="0 0 100 100">
+                            <!-- Simple Swiss Cheese SVG -->
                             <path d="M 10 80 L 90 80 L 50 15 Z" fill="#F7931E" />
                             <path d="M 10 80 L 90 80 L 50 25 Z" fill="#FBB03B" />
                             <circle cx="35" cy="70" r="7" fill="#D4730A"/>
@@ -397,28 +412,16 @@
         </div>
     </div>
 
-    <!-- Sequence Builder & Controls -->
+    <!-- Sequence Builder -->
     <div class="sequence-panel">
         <div class="slots-wrapper" id="slots-wrapper">
             <div id="slots-container" class="slots-container">
                 <!-- Javascript will inject sequence icons here -->
             </div>
         </div>
-        
-        <div class="bottom-action-bar">
-            <!-- Palette (Drag Source) -->
-            <div class="palette-panel">
-                <div class="palette-card" draggable="true" data-cmd="forward" title="Forward"></div>
-                <div class="palette-card" draggable="true" data-cmd="backward" title="Backward"></div>
-                <div class="palette-card" draggable="true" data-cmd="left" title="Turn Left"></div>
-                <div class="palette-card" draggable="true" data-cmd="right" title="Turn Right"></div>
-            </div>
-
-            <!-- Action Buttons -->
-            <div class="controls">
-                <button class="clear-btn" onclick="clearSequence()">Clear</button>
-                <button id="btn-go" onclick="executeSequence()">GO!</button>
-            </div>
+        <div class="controls">
+            <button class="clear-btn" onclick="clearSequence()">Clear</button>
+            <button id="btn-go" onclick="executeSequence()">GO!</button>
         </div>
     </div>
 </div>
@@ -433,7 +436,7 @@
 </div>
 
 <script>
-    // --- SVG Data for Cards ---
+    // --- User Images Data for Cards ---
     const CARD_SVGS = {
         forward: `<img src="https://raw.githubusercontent.com/Maltais239/Images/main/forward.png" alt="Forward" draggable="false" />`,
         backward: `<img src="https://raw.githubusercontent.com/Maltais239/Images/main/Back.png" alt="Backward" draggable="false" />`,
@@ -441,28 +444,38 @@
         right: `<img src="https://raw.githubusercontent.com/Maltais239/Images/main/right.png" alt="Right" draggable="false" />`
     };
 
-    // --- Level Configurations ---
+    // --- Redesigned Level Configurations (Real Mazes!) ---
     const levels = [
-        { size: 3, start: {x: 1, y: 2, f: 0}, cheese: {x: 1, y: 0}, walls: [], tunnels: [] }, // 1
-        { size: 3, start: {x: 0, y: 2, f: 0}, cheese: {x: 2, y: 2}, walls: [], tunnels: [] }, // 2
-        { size: 4, start: {x: 0, y: 3, f: 0}, cheese: {x: 2, y: 1}, walls: ["0,1-0,2", "1,1-1,2"], tunnels: [] }, // 3
-        { size: 4, start: {x: 0, y: 3, f: 1}, cheese: {x: 3, y: 0}, walls: ["1,2-1,3", "1,2-2,2", "2,1-3,1"], tunnels: [] }, // 4
-        { size: 5, start: {x: 0, y: 4, f: 1}, cheese: {x: 4, y: 0}, walls: ["0,2-0,3", "1,2-1,3", "2,2-2,3", "3,2-3,3"], tunnels: [{x:4, y:2}] }, // 5
-        { size: 5, start: {x: 2, y: 4, f: 0}, cheese: {x: 2, y: 0}, walls: ["1,3-2,3", "2,3-3,3", "1,1-2,1", "2,1-3,1", "0,2-1,2"], tunnels: [{x:4, y:2}, {x:0, y:1}] }, // 6
-        { size: 5, start: {x: 0, y: 0, f: 1}, cheese: {x: 4, y: 4}, walls: ["1,0-1,1", "2,0-2,1", "3,0-3,1", "1,2-2,2", "3,2-4,2"], tunnels: [{x:2, y:2}] }, // 7
-        { size: 5, start: {x: 0, y: 4, f: 1}, cheese: {x: 4, y: 0}, walls: ["0,3-0,4", "1,3-1,4", "2,3-2,4", "2,1-2,2", "3,1-3,2", "4,1-4,2"], tunnels: [{x:4, y:3}] }, // 8
-        { size: 6, start: {x: 0, y: 5, f: 0}, cheese: {x: 5, y: 0}, walls: ["0,4-1,4", "1,3-2,3", "2,2-3,2", "3,1-4,1", "4,0-5,0"], tunnels: [{x:3, y:3}] }, // 9
-        { size: 6, start: {x: 3, y: 5, f: 0}, cheese: {x: 3, y: 0}, walls: ["2,1-3,1", "2,2-3,2", "2,3-3,3", "3,1-4,1", "3,2-4,2", "3,3-4,3"], tunnels: [{x:1, y:2}, {x:5, y:2}] }, // 10
-        { size: 6, start: {x: 0, y: 0, f: 1}, cheese: {x: 5, y: 5}, walls: ["1,0-1,1", "1,1-1,2", "3,2-3,3", "3,3-3,4", "1,4-1,5"], tunnels: [{x:2, y:4}] }, // 11
-        { size: 6, start: {x: 0, y: 3, f: 1}, cheese: {x: 5, y: 3}, walls: ["1,2-2,2", "1,3-2,3", "1,4-2,4", "3,1-4,1", "3,2-4,2", "3,3-4,3", "3,4-4,4"], tunnels: [] }, // 12
-        { size: 7, start: {x: 0, y: 6, f: 0}, cheese: {x: 6, y: 0}, walls: ["1,5-2,5", "3,3-4,3", "5,1-6,1", "1,1-1,2", "3,5-3,6", "4,5-4,6"], tunnels: [{x:2, y:2}, {x:5, y:5}] }, // 13
-        { size: 7, start: {x: 3, y: 6, f: 0}, cheese: {x: 3, y: 3}, walls: ["2,3-3,3", "3,3-4,3", "3,2-3,3", "2,4-3,4", "3,4-4,4"], tunnels: [{x:3, y:5}] }, // 14
-        { size: 7, start: {x: 0, y: 0, f: 1}, cheese: {x: 6, y: 6}, walls: ["2,0-2,1", "2,1-2,2", "2,2-2,3", "4,3-4,4", "4,4-4,5", "4,5-4,6", "0,4-1,4", "1,4-2,4"], tunnels: [{x:1, y:6}] }, // 15
-        { size: 7, start: {x: 6, y: 6, f: 3}, cheese: {x: 0, y: 0}, walls: ["1,0-1,1", "1,1-2,1", "2,1-2,2", "2,2-3,2", "3,2-3,3", "3,3-4,3", "4,3-4,4", "4,4-5,4", "5,4-5,5"], tunnels: [{x:0, y:3}] }, // 16
-        { size: 8, start: {x: 0, y: 7, f: 0}, cheese: {x: 7, y: 0}, walls: ["0,4-0,5", "1,4-1,5", "2,4-2,5", "3,4-3,5", "4,3-4,4", "5,3-5,4", "6,3-6,4", "7,3-7,4"], tunnels: [{x:2, y:2}, {x:6, y:6}] }, // 17
-        { size: 8, start: {x: 4, y: 7, f: 0}, cheese: {x: 4, y: 0}, walls: ["2,5-3,5", "3,5-4,5", "4,5-5,5", "2,3-3,3", "3,3-4,3", "4,3-5,3", "2,1-3,1", "3,1-4,1", "4,1-5,1"], tunnels: [{x:1, y:4}, {x:7, y:4}] }, // 18
-        { size: 8, start: {x: 0, y: 0, f: 1}, cheese: {x: 7, y: 7}, walls: ["1,0-1,1", "3,0-3,1", "5,0-5,1", "0,2-1,2", "2,2-3,2", "4,2-5,2", "6,2-7,2", "1,4-1,5", "3,4-3,5", "5,4-5,5", "0,6-1,6", "2,6-3,6", "4,6-5,6", "6,6-7,6"], tunnels: [{x:7, y:1}, {x:0, y:5}] }, // 19
-        { size: 8, start: {x: 0, y: 7, f: 1}, cheese: {x: 7, y: 7}, walls: ["0,6-0,7", "1,6-1,7", "2,6-2,7", "3,6-3,7", "4,6-4,7", "5,6-5,7", "6,6-6,7", "1,4-1,5", "2,4-2,5", "3,4-3,5", "4,4-4,5", "5,4-5,5", "6,4-6,5", "7,4-7,5", "1,2-1,3", "2,2-2,3", "3,2-3,3", "4,2-4,3", "5,2-5,3", "6,2-6,3"], tunnels: [{x:7, y:5}, {x:0, y:3}] } // 20
+        // Level 1: Basic straight (Learn the controls)
+        { size: 3, start: {x: 0, y: 2, f: 1}, cheese: {x: 2, y: 2}, walls: [], tunnels: [] }, 
+        
+        // Level 2: Around the block (Center tile is completely blocked)
+        { size: 3, start: {x: 0, y: 2, f: 0}, cheese: {x: 2, y: 0}, 
+          walls: ["1,0-1,1", "1,1-2,1", "0,1-1,1", "1,1-1,2"], tunnels: [] }, 
+          
+        // Level 3: The U-Turn (A dividing wall forces you all the way down and back up)
+        { size: 4, start: {x: 0, y: 0, f: 2}, cheese: {x: 1, y: 0}, 
+          walls: ["0,0-1,0", "0,1-1,1", "0,2-1,2"], tunnels: [] }, 
+          
+        // Level 4: The S-Snake (Weave back and forth across the entire board)
+        { size: 4, start: {x: 0, y: 3, f: 1}, cheese: {x: 0, y: 0}, 
+          walls: ["0,2-0,3", "1,2-1,3", "2,2-2,3", "1,1-1,2", "2,1-2,2", "3,1-3,2", "0,0-0,1", "1,0-1,1", "2,0-2,1"], tunnels: [] }, 
+          
+        // Level 5: Tunnel Detour (Must go out of your way to use the tunnel)
+        { size: 5, start: {x: 2, y: 4, f: 0}, cheese: {x: 2, y: 0}, 
+          walls: ["2,3-2,4", "0,2-0,3", "1,2-1,3", "3,2-3,3", "4,2-4,3", "2,0-2,1"], tunnels: [{x:2, y:2}] }, 
+          
+        // Level 6: The Grand Spiral (Wind your way from the outside corner into the center)
+        { size: 5, start: {x: 0, y: 4, f: 1}, cheese: {x: 2, y: 2}, 
+          walls: [
+            "0,3-0,4", "1,3-1,4", "2,3-2,4", "3,3-3,4", // block row 4 going north except at x=4
+            "3,1-4,1", "3,2-4,2", "3,3-4,3",            // block col 4 going west except at y=0
+            "1,0-1,1", "2,0-2,1", "3,0-3,1",            // block row 0 going south except at x=0
+            "0,1-1,1", "0,2-1,2",                       // block col 0 going east except at y=3
+            "1,2-1,3", "2,2-2,3",                       // block row 3 going north except at x=3
+            "2,2-3,2",                                  // block col 3 going west except at y=1
+            "2,1-2,2"                                   // block row 1 going south except at x=1
+          ], tunnels: [] } 
     ];
 
     // --- Game State ---
@@ -475,7 +488,7 @@
     // Mouse specific state
     let mousePos = {x: 0, y: 0};
     let mouseFacing = 0; // 0=N, 1=E, 2=S, 3=W
-    let currentRotation = 0; // Keeps track of continuous rotation to prevent snap-back spinning
+    let currentRotation = 0; 
 
     // --- DOM Elements ---
     const mouseWrapper = document.getElementById('mouse-wrapper');
@@ -483,9 +496,8 @@
     const mouseShaker = document.getElementById('mouse-shaker');
     const slotsContainer = document.getElementById('slots-container');
 
-    // --- Initialization ---
+    // --- Game Logic ---
     function init() {
-        // Load SVG into palette
         document.querySelectorAll('.palette-card').forEach(card => {
             let cmd = card.dataset.cmd;
             card.innerHTML = CARD_SVGS[cmd];
@@ -496,7 +508,7 @@
                 e.dataTransfer.setData('text/plain', cmd);
             });
             
-            // Click to add (mobile friendly)
+            // Click to add
             card.addEventListener('click', () => {
                 if (!isExecuting) {
                     sequence.push(cmd);
@@ -540,9 +552,8 @@
         // Setup Grid Rows/Cols
         grid.style.gridTemplateColumns = `repeat(${lvl.size}, 1fr)`;
         grid.style.gridTemplateRows = `repeat(${lvl.size}, 1fr)`;
-        grid.innerHTML = '';
+        grid.innerHTML = ''; // clear old grid
         
-        // Remove old dynamic walls and tunnels
         document.querySelectorAll('.grid-wall, .grid-tunnel').forEach(e => e.remove());
         
         // Create Tiles
@@ -561,14 +572,19 @@
             let wall = document.createElement('div');
             wall.className = 'grid-wall';
             
-            // horizontal wall separates cells vertically
+            // Horizontal wall (same X, different Y) or Vertical Wall (same Y, different X)
+            // Wait, my data format is x,y - x,y. 
+            // If y is same, it's a vertical wall between columns.
+            // If x is same, it's a horizontal wall between rows.
             if (p1[0] === p2[0]) {
+                // Horizontal wall between rows
                 wall.style.width = (100 / lvl.size) + '%';
                 wall.style.height = '10px';
                 wall.style.left = (p1[0] * 100 / lvl.size) + '%';
                 wall.style.top = (Math.max(p1[1], p2[1]) * 100 / lvl.size) + '%';
                 wall.style.transform = 'translateY(-50%)';
             } else {
+                // Vertical wall between columns
                 wall.style.height = (100 / lvl.size) + '%';
                 wall.style.width = '10px';
                 wall.style.top = (p1[1] * 100 / lvl.size) + '%';
@@ -589,11 +605,10 @@
             gridContainer.appendChild(tun);
         });
 
-        // Place Cheese & Resize layers
+        // Set Cheese Position
         let cheeseEl = document.getElementById('cheese-container');
         cheeseEl.style.width = (100 / lvl.size) + '%';
         cheeseEl.style.height = (100 / lvl.size) + '%';
-        // Cheese doesn't need smooth transition
         cheeseEl.style.transition = 'none';
         cheeseEl.style.transform = `translate(${lvl.cheese.x * 100}%, ${lvl.cheese.y * 100}%)`;
         
@@ -615,17 +630,16 @@
     function renderSequence() {
         slotsContainer.innerHTML = '';
         if (sequence.length === 0) {
-            slotsContainer.innerHTML = '<div class="placeholder-text">Drag or click commands to build your program!</div>';
+            slotsContainer.innerHTML = '<div class="placeholder-text">Drag or click command cards to build your program!</div>';
             return;
         }
         
         sequence.forEach((cmd, idx) => {
             let el = document.createElement('div');
-            el.className = `slot card-${cmd}`;
+            el.className = `slot`;
             el.innerHTML = CARD_SVGS[cmd];
             el.title = "Click to remove";
             
-            // Remove on click
             el.onclick = () => {
                 if(!isExecuting) {
                     sequence.splice(idx, 1);
@@ -635,7 +649,7 @@
             slotsContainer.appendChild(el);
         });
         
-        // Auto scroll to latest
+        // Auto scroll to end
         let wrapper = document.getElementById('slots-wrapper');
         wrapper.scrollLeft = wrapper.scrollWidth;
     }
@@ -651,18 +665,18 @@
         let lvl = levels[currentLevel];
         mousePos = {x: lvl.start.x, y: lvl.start.y};
         mouseFacing = lvl.start.f;
+        // Convert facing to degrees. 0=N(0deg), 1=E(90deg), 2=S(180deg), 3=W(270deg)
         currentRotation = mouseFacing * 90;
         
-        // Disable transitions to snap to start
         mouseWrapper.style.transition = 'none';
         mouseSprite.style.transition = 'none';
         
         applyMouseTransform();
         
         // Force reflow
-        void mouseWrapper.offsetWidth;
+        void mouseWrapper.offsetWidth; 
         
-        // Re-enable transitions
+        // Restore transition
         mouseWrapper.style.transition = 'transform 0.4s ease-in-out';
         mouseSprite.style.transition = 'transform 0.4s ease-in-out';
     }
@@ -672,7 +686,6 @@
         mouseSprite.style.transform = `rotate(${currentRotation}deg)`;
     }
 
-    // Check if there is a wall between (x1, y1) and (x2, y2)
     function hasWall(x1, y1, x2, y2) {
         let lvl = levels[currentLevel];
         let w1 = `${x1},${y1}-${x2},${y2}`;
@@ -694,18 +707,17 @@
             
             if (cmd === 'forward' || cmd === 'backward') {
                 let step = (cmd === 'forward') ? 1 : -1;
-                // 0=N, 1=E, 2=S, 3=W
-                if (mouseFacing === 0) newY -= step;
-                else if (mouseFacing === 1) newX += step;
-                else if (mouseFacing === 2) newY += step;
-                else if (mouseFacing === 3) newX -= step;
+                if (mouseFacing === 0) newY -= step;      // North
+                else if (mouseFacing === 1) newX += step; // East
+                else if (mouseFacing === 2) newY += step; // South
+                else if (mouseFacing === 3) newX -= step; // West
                 
-                // Check Bounds
+                // Bounds check
                 if (newX < 0 || newX >= size || newY < 0 || newY >= size) {
                     resolve(false);
                     return;
                 }
-                // Check Walls
+                // Wall check
                 if (hasWall(oldX, oldY, newX, newY)) {
                     resolve(false);
                     return;
@@ -714,7 +726,7 @@
                 mousePos.x = newX;
                 mousePos.y = newY;
                 applyMouseTransform();
-                setTimeout(() => resolve(true), 450); // wait for move animation
+                setTimeout(() => resolve(true), 450);
             } 
             else if (cmd === 'left') {
                 mouseFacing = (mouseFacing + 3) % 4;
@@ -736,9 +748,9 @@
         if (sequence.length === 0) return;
         
         isExecuting = true;
-        resetMouse(); // Always start from beginning of sequence
-        await sleep(300); 
-
+        resetMouse(); // Reset to start position before running
+        await sleep(300); // small delay before start
+        
         const slots = document.querySelectorAll('.slot');
         let successAll = true;
         
@@ -769,30 +781,24 @@
             let pointsEarned = 100 + (triesLeft * 50);
             score += pointsEarned;
             updateStatsUI();
-            isExecuting = false;
             showModal("Great Job!", `You got the cheese!\n+${pointsEarned} Points`, "Next Level", nextLevel);
         } else {
-            if(successAll) {
-                // Ran out of instructions but didn't crash
-                mouseShaker.classList.add('crash');
-                await sleep(400);
-                mouseShaker.classList.remove('crash');
-            }
-
             triesLeft--;
             updateStatsUI();
-            isExecuting = false;
             
             if (triesLeft <= 0) {
                 showModal("Game Over", "You ran out of tries! Better luck next time.", "Restart Game", resetGame);
             } else {
-                let failText = successAll ? "You ran out of moves before reaching the cheese." : "Oops! You bumped into a wall or fell off the edge.";
-                showModal("Not Quite!", failText, "Try Again", () => {
-                    document.getElementById('modal-overlay').classList.add('hidden');
-                    resetMouse(); // Snaps mouse back to the start
-                });
+                if(successAll) {
+                    // Ran out of instructions but didn't crash into a wall
+                    mouseShaker.classList.add('crash');
+                    await sleep(400);
+                    mouseShaker.classList.remove('crash');
+                }
             }
         }
+        
+        isExecuting = false;
     }
 
     // --- Modal Logic ---
