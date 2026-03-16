@@ -39,6 +39,39 @@
         margin-bottom: 10px;
     }
 
+    .tabs {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+
+    button.tab-btn {
+        background: #E0E0E0;
+        color: #666;
+        padding: 10px 25px;
+        border-radius: 20px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 16px;
+        border: none;
+        box-shadow: 0 4px 0 #BDBDBD;
+        text-transform: none;
+        letter-spacing: normal;
+        transition: all 0.1s;
+    }
+
+    button.tab-btn.active {
+        background: #00838F;
+        color: white;
+        box-shadow: 0 4px 0 #005662;
+    }
+
+    button.tab-btn:active {
+        transform: translateY(4px);
+        box-shadow: 0 0 0 transparent;
+    }
+
     .header h1 {
         margin: 0;
         color: #00838F;
@@ -276,7 +309,7 @@
         gap: 20px;
     }
 
-    button {
+    button.action-btn {
         background: #39B54A;
         color: white;
         border: none;
@@ -291,18 +324,21 @@
         letter-spacing: 1px;
     }
 
-    button:active {
+    button.action-btn:active {
         transform: translateY(6px);
-        box-shadow: 0 0 0 #2A8A36;
+        box-shadow: 0 0 0 transparent;
     }
 
-    button.clear-btn { 
+    button.action-btn.clear-btn { 
         background: #FFF200; 
         color: #333; 
         box-shadow: 0 6px 0 #D4C900; 
     }
-    button.clear-btn:active { 
-        box-shadow: 0 0 0 #D4C900; 
+    
+    button.action-btn.modal-btn {
+        margin-top: 20px;
+        background: #00AEEF;
+        box-shadow: 0 6px 0 #0082B3;
     }
 
     .crash {
@@ -356,23 +392,18 @@
         margin-top: 0;
     }
 
-    #modal-btn {
-        margin-top: 20px;
-        background: #00AEEF;
-        box-shadow: 0 6px 0 #0082B3;
-    }
-    #modal-btn:active {
-        box-shadow: 0 0 0 #0082B3;
-    }
-
 </style>
 </head>
 <body>
 
 <div class="app">
     <div class="header">
+        <div class="tabs">
+            <button id="tab-levels" class="tab-btn active" onclick="setMode('levels')">Curriculum</button>
+            <button id="tab-playground" class="tab-btn" onclick="setMode('playground')">Playground</button>
+        </div>
         <h1 id="level-title">Code & Go - Level 1</h1>
-        <div class="stats-panel">
+        <div class="stats-panel" id="stats-panel">
             <span>Score: <span id="score-val">0</span></span>
             <span>Tries: <span id="tries-val">3</span></span>
         </div>
@@ -428,8 +459,8 @@
             </div>
 
             <div class="controls">
-                <button class="clear-btn" onclick="clearSequence()">Clear</button>
-                <button id="btn-go" onclick="executeSequence()">GO!</button>
+                <button class="action-btn clear-btn" onclick="clearSequence()">Clear</button>
+                <button class="action-btn" id="btn-go" onclick="executeSequence()">GO!</button>
             </div>
         </div>
     </div>
@@ -440,7 +471,7 @@
     <div class="modal-content">
         <h2 id="modal-title">Great Job!</h2>
         <p id="modal-text">You got the cheese!</p>
-        <button id="modal-btn" onclick="nextLevel()">Next Level</button>
+        <button class="action-btn modal-btn" id="modal-btn" onclick="nextLevel()">Next Level</button>
     </div>
 </div>
 
@@ -520,7 +551,11 @@
           ], tunnels: [{x:2, y:3}] }
     ];
 
+    // Playground Level Configuration
+    const playgroundLevel = { size: 5, start: {x: 2, y: 4, f: 0}, cheese: null, walls: [], tunnels: [] };
+
     // --- Game State ---
+    let gameMode = 'levels'; // 'levels' or 'playground'
     let currentLevel = 0;
     let sequence = [];
     let isExecuting = false;
@@ -582,14 +617,33 @@
         loadLevel();
     }
 
+    function setMode(mode) {
+        if (isExecuting) return;
+        gameMode = mode;
+        
+        // Update Tab UI
+        document.getElementById('tab-levels').classList.toggle('active', mode === 'levels');
+        document.getElementById('tab-playground').classList.toggle('active', mode === 'playground');
+        
+        clearSequence();
+        loadLevel();
+    }
+
     function loadLevel() {
-        let lvl = levels[currentLevel];
+        let lvl = gameMode === 'levels' ? levels[currentLevel] : playgroundLevel;
         let grid = document.getElementById('grid');
         let gridContainer = document.getElementById('grid-container');
         
-        // Reset tries for the new level
-        triesLeft = 3;
-        updateStatsUI();
+        // Update Game Header/Stats UI depending on mode
+        if (gameMode === 'levels') {
+            document.getElementById('level-title').innerText = `Level ${currentLevel + 1}`;
+            document.getElementById('stats-panel').style.display = 'inline-flex';
+            triesLeft = 3;
+            updateStatsUI();
+        } else {
+            document.getElementById('level-title').innerText = `Playground`;
+            document.getElementById('stats-panel').style.display = 'none';
+        }
         
         // Setup Grid Rows/Cols
         grid.style.gridTemplateColumns = `repeat(${lvl.size}, 1fr)`;
@@ -614,10 +668,6 @@
             let wall = document.createElement('div');
             wall.className = 'grid-wall';
             
-            // Horizontal wall (same X, different Y) or Vertical Wall (same Y, different X)
-            // Wait, my data format is x,y - x,y. 
-            // If y is same, it's a vertical wall between columns.
-            // If x is same, it's a horizontal wall between rows.
             if (p1[0] === p2[0]) {
                 // Horizontal wall between rows
                 wall.style.width = (100 / lvl.size) + '%';
@@ -647,17 +697,20 @@
             gridContainer.appendChild(tun);
         });
 
-        // Set Cheese Position
+        // Set Cheese Position (or hide it for playground)
         let cheeseEl = document.getElementById('cheese-container');
-        cheeseEl.style.width = (100 / lvl.size) + '%';
-        cheeseEl.style.height = (100 / lvl.size) + '%';
-        cheeseEl.style.transition = 'none';
-        cheeseEl.style.transform = `translate(${lvl.cheese.x * 100}%, ${lvl.cheese.y * 100}%)`;
+        if (lvl.cheese) {
+            cheeseEl.style.display = 'block';
+            cheeseEl.style.width = (100 / lvl.size) + '%';
+            cheeseEl.style.height = (100 / lvl.size) + '%';
+            cheeseEl.style.transition = 'none';
+            cheeseEl.style.transform = `translate(${lvl.cheese.x * 100}%, ${lvl.cheese.y * 100}%)`;
+        } else {
+            cheeseEl.style.display = 'none';
+        }
         
         mouseWrapper.style.width = (100 / lvl.size) + '%';
         mouseWrapper.style.height = (100 / lvl.size) + '%';
-        
-        document.getElementById('level-title').innerText = `Level ${currentLevel + 1}`;
         
         sequence = [];
         renderSequence();
@@ -704,7 +757,7 @@
     }
 
     function resetMouse() {
-        let lvl = levels[currentLevel];
+        let lvl = gameMode === 'levels' ? levels[currentLevel] : playgroundLevel;
         mousePos = {x: lvl.start.x, y: lvl.start.y};
         mouseFacing = lvl.start.f;
         // Convert facing to degrees. 0=N(0deg), 1=E(90deg), 2=S(180deg), 3=W(270deg)
@@ -729,7 +782,7 @@
     }
 
     function hasWall(x1, y1, x2, y2) {
-        let lvl = levels[currentLevel];
+        let lvl = gameMode === 'levels' ? levels[currentLevel] : playgroundLevel;
         let w1 = `${x1},${y1}-${x2},${y2}`;
         let w2 = `${x2},${y2}-${x1},${y1}`;
         return lvl.walls.includes(w1) || lvl.walls.includes(w2);
@@ -741,7 +794,7 @@
 
     function performCommand(cmd) {
         return new Promise(resolve => {
-            let size = levels[currentLevel].size;
+            let size = gameMode === 'levels' ? levels[currentLevel].size : playgroundLevel.size;
             let oldX = mousePos.x;
             let oldY = mousePos.y;
             let newX = oldX;
@@ -817,7 +870,19 @@
         
         slots.forEach(s => s.classList.remove('active'));
         
-        // Check Win Condition
+        // Playground Mode End Condition
+        if (gameMode === 'playground') {
+            if(!successAll) {
+                // Ran out of instructions but didn't crash into a wall
+                mouseShaker.classList.add('crash');
+                await sleep(400);
+                mouseShaker.classList.remove('crash');
+            }
+            isExecuting = false;
+            return; // Exit here for playground
+        }
+
+        // Levels Check Win Condition
         let lvl = levels[currentLevel];
         if (mousePos.x === lvl.cheese.x && mousePos.y === lvl.cheese.y) {
             let pointsEarned = 100 + (triesLeft * 50);
