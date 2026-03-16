@@ -392,6 +392,69 @@
         margin-top: 0;
     }
 
+    /* Toggle Switch Styles */
+    .switch-container {
+        display: none; /* hidden by default */
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+    }
+    
+    .switch-label {
+        font-weight: bold;
+        color: #00838F;
+        font-size: 16px;
+    }
+
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 46px;
+        height: 24px;
+    }
+
+    .switch input { 
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: .4s;
+    }
+
+    input:checked + .slider {
+        background-color: #39B54A;
+    }
+
+    input:checked + .slider:before {
+        transform: translateX(22px);
+    }
+
+    .slider.round {
+        border-radius: 24px;
+    }
+
+    .slider.round:before {
+        border-radius: 50%;
+    }
+
 </style>
 </head>
 <body>
@@ -406,6 +469,13 @@
         <div class="stats-panel" id="stats-panel">
             <span>Score: <span id="score-val">0</span></span>
             <span>Tries: <span id="tries-val">3</span></span>
+        </div>
+        <div class="switch-container" id="draw-toggle-container">
+            <span class="switch-label">Draw Path</span>
+            <label class="switch">
+                <input type="checkbox" id="draw-toggle" onchange="toggleDrawing()">
+                <span class="slider round"></span>
+            </label>
         </div>
     </div>
     
@@ -429,6 +499,9 @@
                         </svg>
                     </div>
                 </div>
+                
+                <!-- Path Layer -->
+                <svg id="path-layer" class="absolute-layer" style="z-index: 4; width: 100%; height: 100%;" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
                 
                 <div id="mouse-wrapper" class="absolute-layer" style="z-index: 5;">
                     <div id="mouse-shaker" style="width:100%;height:100%">
@@ -562,6 +635,10 @@
     let score = 0;
     let triesLeft = 3;
     
+    // Path drawing state
+    let isDrawingEnabled = false;
+    let currentPath = [];
+    
     // Mouse specific state
     let mousePos = {x: 0, y: 0};
     let mouseFacing = 0; // 0=N, 1=E, 2=S, 3=W
@@ -624,6 +701,9 @@
         // Update Tab UI
         document.getElementById('tab-levels').classList.toggle('active', mode === 'levels');
         document.getElementById('tab-playground').classList.toggle('active', mode === 'playground');
+        
+        // Show/Hide Draw Toggle
+        document.getElementById('draw-toggle-container').style.display = mode === 'playground' ? 'flex' : 'none';
         
         clearSequence();
         loadLevel();
@@ -756,6 +836,30 @@
         resetMouse();
     }
 
+    function toggleDrawing() {
+        isDrawingEnabled = document.getElementById('draw-toggle').checked;
+        renderPath();
+    }
+
+    function renderPath() {
+        const pathSvg = document.getElementById('path-layer');
+        if (!isDrawingEnabled || currentPath.length === 0 || gameMode !== 'playground') {
+            pathSvg.innerHTML = '';
+            return;
+        }
+        
+        let size = playgroundLevel.size;
+        let d = '';
+        currentPath.forEach((pt, i) => {
+            let cx = (pt.x + 0.5) * (100 / size);
+            let cy = (pt.y + 0.5) * (100 / size);
+            if (i === 0) d += `M ${cx} ${cy} `;
+            else d += `L ${cx} ${cy} `;
+        });
+        
+        pathSvg.innerHTML = `<path d="${d}" stroke="#FF1493" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4,4" />`;
+    }
+
     function resetMouse() {
         let lvl = gameMode === 'levels' ? levels[currentLevel] : playgroundLevel;
         mousePos = {x: lvl.start.x, y: lvl.start.y};
@@ -774,6 +878,12 @@
         // Restore transition
         mouseWrapper.style.transition = 'transform 0.4s ease-in-out';
         mouseSprite.style.transition = 'transform 0.4s ease-in-out';
+        
+        // Clear path if we are resetting manually
+        if (!isExecuting) {
+            currentPath = [];
+            renderPath();
+        }
     }
 
     function applyMouseTransform() {
@@ -820,20 +930,31 @@
                 
                 mousePos.x = newX;
                 mousePos.y = newY;
+                
+                // Start the visual animation
                 applyMouseTransform();
-                setTimeout(() => resolve(true), 450);
+                
+                // Wait for the 0.4s animation to finish before drawing the trail and resolving
+                setTimeout(() => {
+                    // Track path after it moves
+                    if (gameMode === 'playground') {
+                        currentPath.push({x: newX, y: newY});
+                        renderPath();
+                    }
+                    resolve(true);
+                }, 400); 
             } 
             else if (cmd === 'left') {
                 mouseFacing = (mouseFacing + 3) % 4;
                 currentRotation -= 90;
                 applyMouseTransform();
-                setTimeout(() => resolve(true), 450);
+                setTimeout(() => resolve(true), 400);
             }
             else if (cmd === 'right') {
                 mouseFacing = (mouseFacing + 1) % 4;
                 currentRotation += 90;
                 applyMouseTransform();
-                setTimeout(() => resolve(true), 450);
+                setTimeout(() => resolve(true), 400);
             }
         });
     }
@@ -844,6 +965,11 @@
         
         isExecuting = true;
         resetMouse(); // Reset to start position before running
+        
+        // Initialize path tracking
+        currentPath = [{x: mousePos.x, y: mousePos.y}];
+        renderPath();
+        
         await sleep(300); // small delay before start
         
         const slots = document.querySelectorAll('.slot');
