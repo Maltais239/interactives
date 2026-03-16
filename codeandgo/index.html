@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Code & Go Interactive Maze</title>
+<style>
+    :root {
+        --grid-gap: 4px;
+        --tile-color: #8CC63F;
+        --tile-shadow: #5E9B30;
+        --wall-color: #662D91;
+        --tunnel-border: #D4730A;
+    }
+
+    body {
+        background: radial-gradient(circle at center, #E0F7FA 0%, #B2EBF2 100%);
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, 'Comic Sans MS', sans-serif;
+        color: #333;
+        min-height: 100vh;
+        overflow-x: hidden;
+    }
+
+    .app {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        max-width: 900px;
+        padding: 10px;
+        box-sizing: border-box;
+    }
+
+    .header {
+        text-align: center;
+        margin-bottom: 10px;
+    }
+
+    .header h1 {
+        margin: 0;
+        color: #00838F;
+        font-size: 28px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        text-shadow: 1px 1px 0px #FFF;
+    }
+
+    .stats-panel {
+        display: inline-flex;
+        justify-content: center;
+        gap: 30px;
+        margin-top: 10px;
+        font-size: 18px;
+        font-weight: bold;
+        color: #00838F;
+        background: rgba(255, 255, 255, 0.8);
+        padding: 8px 25px;
+        border-radius: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+
+    .game-content {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        align-items: center;
+    }
+
+    @media (min-width: 768px) {
+        .game-content {
+            flex-direction: row;
+            align-items: flex-start;
+            justify-content: center;
+        }
+    }
+
+    .bottom-action-bar {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 40px;
+        margin-top: 5px;
+    }
+
+    .palette-panel {
+        display: flex;
+        flex-direction: row;
+        gap: 15px;
+        justify-content: center;
+    }
+
+    .palette-card {
+        width: 75px;
+        height: 75px;
+        cursor: pointer;
+        transition: transform 0.1s;
+        touch-action: none;
+    }
+    .palette-card:active {
+        transform: scale(0.95);
+    }
+    .palette-card img, .palette-card svg {
+        width: 100%;
+        height: 100%;
+        filter: drop-shadow(0 4px 2px rgba(0,0,0,0.2));
+        border-radius: 15px;
+        object-fit: contain;
+        mix-blend-mode: multiply; /* Removes white background */
+    }
+
+    .board-panel {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        max-width: 500px;
+    }
+
+    .grid-container {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1;
+        background: #333;
+        border: 8px solid #444;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+    .grid-layout {
+        display: grid;
+        width: 100%;
+        height: 100%;
+    }
+
+    .grid-tile {
+        background-color: var(--tile-color);
+        border-radius: 4px;
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.15), 0 3px 0 var(--tile-shadow);
+        margin: var(--grid-gap);
+        box-sizing: border-box;
+    }
+
+    .grid-wall {
+        position: absolute;
+        background: var(--wall-color);
+        border-radius: 4px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.4);
+        z-index: 8;
+    }
+
+    .grid-tunnel {
+        position: absolute;
+        background: linear-gradient(135deg, rgba(247,147,30,0.6), rgba(212,115,10,0.6));
+        border: 4px solid var(--tunnel-border);
+        border-bottom: none;
+        border-radius: 50% 50% 0 0;
+        box-sizing: border-box;
+        z-index: 10;
+        box-shadow: inset 0 8px 10px rgba(255,255,255,0.3), 0 10px 15px rgba(0,0,0,0.4);
+        pointer-events: none;
+    }
+
+    .absolute-layer {
+        position: absolute;
+        top: 0; left: 0;
+        pointer-events: none; /* Let clicks pass through if needed */
+    }
+
+    #mouse-sprite, #cheese-sprite {
+        width: 100%;
+        height: 100%;
+        padding: 10%;
+        box-sizing: border-box;
+    }
+
+    #cheese-sprite svg {
+        width: 100%;
+        height: 100%;
+        filter: drop-shadow(2px 4px 4px rgba(0,0,0,0.4));
+    }
+
+    #mouse-sprite {
+        transition: transform 0.4s ease-in-out; 
+    }
+    
+    #mouse-sprite img, #mouse-sprite svg {
+        width: 100%;
+        height: 100%;
+        filter: drop-shadow(0px 8px 6px rgba(0,0,0,0.5));
+        object-fit: contain;
+    }
+
+    .sequence-panel {
+        margin-top: 20px;
+        background: #FFF;
+        padding: 15px;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .slots-wrapper {
+        background: #F0F0F0;
+        padding: 10px;
+        border-radius: 10px;
+        min-height: 70px;
+        box-shadow: inset 0 3px 6px rgba(0,0,0,0.1);
+        overflow-x: auto;
+    }
+
+    .slots-container {
+        display: flex;
+        gap: 8px;
+        min-width: 100%;
+        align-items: center;
+    }
+
+    .placeholder-text {
+        color: #999;
+        font-style: italic;
+        margin: auto;
+        padding: 20px 0;
+    }
+
+    .slot {
+        width: 50px;
+        height: 50px;
+        flex-shrink: 0;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        background: transparent;
+    }
+    
+    .slot img, .slot svg {
+        width: 100%;
+        height: 100%;
+        border-radius: 12px;
+        object-fit: contain;
+        mix-blend-mode: multiply; /* Removes white background */
+    }
+
+    .slot:hover {
+        transform: scale(1.05) translateY(-2px);
+    }
+
+    .slot.active {
+        transform: scale(1.1);
+        filter: brightness(1.2);
+        outline: 3px solid #FF4500;
+        border-radius: 8px;
+    }
+
+    .controls {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+    }
+
+    button {
+        background: #39B54A;
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        font-size: 20px;
+        font-weight: bold;
+        border-radius: 50px;
+        cursor: pointer;
+        box-shadow: 0 6px 0 #2A8A36;
+        transition: all 0.1s;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    button:active {
+        transform: translateY(6px);
+        box-shadow: 0 0 0 #2A8A36;
+    }
+
+    button.clear-btn { 
+        background: #FFF200; 
+        color: #333; 
+        box-shadow: 0 6px 0 #D4C900; 
+    }
+    button.clear-btn:active { 
+        box-shadow: 0 0 0 #D4C900; 
+    }
+
+    .crash {
+        animation: wiggle 0.4s ease;
+    }
+
+    @keyframes wiggle {
+        0% { transform: translateX(0); }
+        25% { transform: translateX(-5px) rotate(-5deg); }
+        50% { transform: translateX(5px) rotate(5deg); }
+        75% { transform: translateX(-5px) rotate(-5deg); }
+        100% { transform: translateX(0); }
+    }
+
+    .modal-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.6);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        opacity: 1;
+        transition: opacity 0.3s;
+    }
+
+    .modal-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .modal-content {
+        background: white;
+        padding: 30px 50px;
+        border-radius: 20px;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        border: 6px solid #00AEEF;
+        transform: scale(1);
+        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .modal-overlay.hidden .modal-content {
+        transform: scale(0.8);
+    }
+
+    .modal-content h2 {
+        color: #FF4500;
+        font-size: 32px;
+        margin-top: 0;
+    }
+
+    #modal-btn {
+        margin-top: 20px;
+        background: #00AEEF;
+        box-shadow: 0 6px 0 #0082B3;
+    }
+    #modal-btn:active {
+        box-shadow: 0 0 0 #0082B3;
+    }
+
+</style>
+</head>
+<body>
+
+<div class="app">
+    <div class="header">
+        <h1 id="level-title">Code & Go - Level 1</h1>
+        <div class="stats-panel">
+            <span>Score: <span id="score-val">0</span></span>
+            <span>Tries: <span id="tries-val">3</span></span>
+        </div>
+    </div>
+    
+    <div class="game-content">
+        <!-- Board -->
+        <div class="board-panel">
+            <div id="grid-container" class="grid-container">
+                <div id="grid" class="grid-layout"></div>
+                
+                <!-- Objects layer -->
+                <div id="cheese-container" class="absolute-layer">
+                    <div id="cheese-sprite">
+                        <svg viewBox="0 0 100 100">
+                            <path d="M 10 80 L 90 80 L 50 15 Z" fill="#F7931E" />
+                            <path d="M 10 80 L 90 80 L 50 25 Z" fill="#FBB03B" />
+                            <circle cx="35" cy="70" r="7" fill="#D4730A"/>
+                            <circle cx="65" cy="65" r="5" fill="#D4730A"/>
+                            <circle cx="50" cy="50" r="6" fill="#D4730A"/>
+                            <circle cx="45" cy="40" r="3" fill="#D4730A"/>
+                        </svg>
+                    </div>
+                </div>
+                
+                <div id="mouse-wrapper" class="absolute-layer" style="z-index: 5;">
+                    <div id="mouse-shaker" style="width:100%;height:100%">
+                        <div id="mouse-sprite">
+                            <img src="https://raw.githubusercontent.com/Maltais239/Images/main/mouse%20no%20bg.png" alt="Robot Mouse" draggable="false" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sequence Builder & Controls -->
+    <div class="sequence-panel">
+        <div class="slots-wrapper" id="slots-wrapper">
+            <div id="slots-container" class="slots-container">
+                <!-- Javascript will inject sequence icons here -->
+            </div>
+        </div>
+        
+        <div class="bottom-action-bar">
+            <!-- Palette (Drag Source) -->
+            <div class="palette-panel">
+                <div class="palette-card" draggable="true" data-cmd="forward" title="Forward"></div>
+                <div class="palette-card" draggable="true" data-cmd="backward" title="Backward"></div>
+                <div class="palette-card" draggable="true" data-cmd="left" title="Turn Left"></div>
+                <div class="palette-card" draggable="true" data-cmd="right" title="Turn Right"></div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="controls">
+                <button class="clear-btn" onclick="clearSequence()">Clear</button>
+                <button id="btn-go" onclick="executeSequence()">GO!</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal-content">
+        <h2 id="modal-title">Great Job!</h2>
+        <p id="modal-text">You got the cheese!</p>
+        <button id="modal-btn" onclick="nextLevel()">Next Level</button>
+    </div>
+</div>
+
+<script>
+    // --- SVG Data for Cards ---
+    const CARD_SVGS = {
+        forward: `<img src="https://raw.githubusercontent.com/Maltais239/Images/main/forward.png" alt="Forward" draggable="false" />`,
+        backward: `<img src="https://raw.githubusercontent.com/Maltais239/Images/main/Back.png" alt="Backward" draggable="false" />`,
+        left: `<img src="https://raw.githubusercontent.com/Maltais239/Images/main/Left.png" alt="Left" draggable="false" />`,
+        right: `<img src="https://raw.githubusercontent.com/Maltais239/Images/main/right.png" alt="Right" draggable="false" />`
+    };
+
+    // --- Level Configurations ---
+    const levels = [
+        { size: 3, start: {x: 1, y: 2, f: 0}, cheese: {x: 1, y: 0}, walls: [], tunnels: [] }, // Simple straight
+        { size: 3, start: {x: 0, y: 2, f: 0}, cheese: {x: 2, y: 2}, walls: [], tunnels: [] }, // Needs a turn
+        { size: 4, start: {x: 0, y: 3, f: 0}, cheese: {x: 2, y: 1}, walls: ["0,1-0,2", "1,1-1,2"], tunnels: [] }, // Simple wall bypass
+        { size: 4, start: {x: 0, y: 3, f: 1}, cheese: {x: 3, y: 0}, walls: ["1,2-1,3", "1,2-2,2", "2,1-3,1"], tunnels: [] }, // Maze
+        { size: 5, start: {x: 0, y: 4, f: 1}, cheese: {x: 4, y: 0}, walls: ["0,2-0,3", "1,2-1,3", "2,2-2,3", "3,2-3,3"], tunnels: [{x:4, y:2}] }, // Intro to Tunnels
+        { size: 5, start: {x: 2, y: 4, f: 0}, cheese: {x: 2, y: 0}, walls: ["1,3-2,3", "2,3-3,3", "1,1-2,1", "2,1-3,1", "0,2-1,2"], tunnels: [{x:4, y:2}, {x:0, y:1}] } // Complex 
+    ];
+
+    // --- Game State ---
+    let currentLevel = 0;
+    let sequence = [];
+    let isExecuting = false;
+    let score = 0;
+    let triesLeft = 3;
+    
+    // Mouse specific state
+    let mousePos = {x: 0, y: 0};
+    let mouseFacing = 0; // 0=N, 1=E, 2=S, 3=W
+    let currentRotation = 0; // Keeps track of continuous rotation to prevent snap-back spinning
+
+    // --- DOM Elements ---
+    const mouseWrapper = document.getElementById('mouse-wrapper');
+    const mouseSprite = document.getElementById('mouse-sprite');
+    const mouseShaker = document.getElementById('mouse-shaker');
+    const slotsContainer = document.getElementById('slots-container');
+
+    // --- Initialization ---
+    function init() {
+        // Load SVG into palette
+        document.querySelectorAll('.palette-card').forEach(card => {
+            let cmd = card.dataset.cmd;
+            card.innerHTML = CARD_SVGS[cmd];
+            
+            // Drag and drop event
+            card.addEventListener('dragstart', (e) => {
+                if (isExecuting) { e.preventDefault(); return; }
+                e.dataTransfer.setData('text/plain', cmd);
+            });
+            
+            // Click to add (mobile friendly)
+            card.addEventListener('click', () => {
+                if (!isExecuting) {
+                    sequence.push(cmd);
+                    renderSequence();
+                }
+            });
+        });
+
+        // Setup drop zone
+        const slotsWrapper = document.getElementById('slots-wrapper');
+        slotsWrapper.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            if(!isExecuting) slotsWrapper.style.backgroundColor = '#E0E0E0';
+        });
+        slotsWrapper.addEventListener('dragleave', (e) => {
+            slotsWrapper.style.backgroundColor = '#F0F0F0';
+        });
+        slotsWrapper.addEventListener('drop', (e) => {
+            e.preventDefault();
+            slotsWrapper.style.backgroundColor = '#F0F0F0';
+            if (isExecuting) return;
+            let cmd = e.dataTransfer.getData('text/plain');
+            if (cmd && CARD_SVGS[cmd]) {
+                sequence.push(cmd);
+                renderSequence();
+            }
+        });
+
+        loadLevel();
+    }
+
+    function loadLevel() {
+        let lvl = levels[currentLevel];
+        let grid = document.getElementById('grid');
+        let gridContainer = document.getElementById('grid-container');
+        
+        // Reset tries for the new level
+        triesLeft = 3;
+        updateStatsUI();
+        
+        // Setup Grid Rows/Cols
+        grid.style.gridTemplateColumns = `repeat(${lvl.size}, 1fr)`;
+        grid.style.gridTemplateRows = `repeat(${lvl.size}, 1fr)`;
+        grid.innerHTML = '';
+        
+        // Remove old dynamic walls and tunnels
+        document.querySelectorAll('.grid-wall, .grid-tunnel').forEach(e => e.remove());
+        
+        // Create Tiles
+        for(let i=0; i<lvl.size * lvl.size; i++) {
+            let tile = document.createElement('div');
+            tile.className = 'grid-tile';
+            grid.appendChild(tile);
+        }
+        
+        // Draw Walls
+        lvl.walls.forEach(w => {
+            let parts = w.split('-');
+            let p1 = parts[0].split(',').map(Number);
+            let p2 = parts[1].split(',').map(Number);
+            
+            let wall = document.createElement('div');
+            wall.className = 'grid-wall';
+            
+            // horizontal wall separates cells vertically
+            if (p1[0] === p2[0]) {
+                wall.style.width = (100 / lvl.size) + '%';
+                wall.style.height = '10px';
+                wall.style.left = (p1[0] * 100 / lvl.size) + '%';
+                wall.style.top = (Math.max(p1[1], p2[1]) * 100 / lvl.size) + '%';
+                wall.style.transform = 'translateY(-50%)';
+            } else {
+                wall.style.height = (100 / lvl.size) + '%';
+                wall.style.width = '10px';
+                wall.style.top = (p1[1] * 100 / lvl.size) + '%';
+                wall.style.left = (Math.max(p1[0], p2[0]) * 100 / lvl.size) + '%';
+                wall.style.transform = 'translateX(-50%)';
+            }
+            gridContainer.appendChild(wall);
+        });
+        
+        // Draw Tunnels
+        lvl.tunnels.forEach(t => {
+            let tun = document.createElement('div');
+            tun.className = 'grid-tunnel';
+            tun.style.width = (100 / lvl.size) + '%';
+            tun.style.height = (100 / lvl.size) + '%';
+            tun.style.left = (t.x * 100 / lvl.size) + '%';
+            tun.style.top = (t.y * 100 / lvl.size) + '%';
+            gridContainer.appendChild(tun);
+        });
+
+        // Place Cheese & Resize layers
+        let cheeseEl = document.getElementById('cheese-container');
+        cheeseEl.style.width = (100 / lvl.size) + '%';
+        cheeseEl.style.height = (100 / lvl.size) + '%';
+        // Cheese doesn't need smooth transition
+        cheeseEl.style.transition = 'none';
+        cheeseEl.style.transform = `translate(${lvl.cheese.x * 100}%, ${lvl.cheese.y * 100}%)`;
+        
+        mouseWrapper.style.width = (100 / lvl.size) + '%';
+        mouseWrapper.style.height = (100 / lvl.size) + '%';
+        
+        document.getElementById('level-title').innerText = `Level ${currentLevel + 1}`;
+        
+        sequence = [];
+        renderSequence();
+        resetMouse();
+    }
+
+    function updateStatsUI() {
+        document.getElementById('score-val').innerText = score;
+        document.getElementById('tries-val').innerText = triesLeft;
+    }
+
+    function renderSequence() {
+        slotsContainer.innerHTML = '';
+        if (sequence.length === 0) {
+            slotsContainer.innerHTML = '<div class="placeholder-text">Drag or click commands to build your program!</div>';
+            return;
+        }
+        
+        sequence.forEach((cmd, idx) => {
+            let el = document.createElement('div');
+            el.className = `slot card-${cmd}`;
+            el.innerHTML = CARD_SVGS[cmd];
+            el.title = "Click to remove";
+            
+            // Remove on click
+            el.onclick = () => {
+                if(!isExecuting) {
+                    sequence.splice(idx, 1);
+                    renderSequence();
+                }
+            };
+            slotsContainer.appendChild(el);
+        });
+        
+        // Auto scroll to latest
+        let wrapper = document.getElementById('slots-wrapper');
+        wrapper.scrollLeft = wrapper.scrollWidth;
+    }
+
+    function clearSequence() {
+        if (isExecuting) return;
+        sequence = [];
+        renderSequence();
+        resetMouse();
+    }
+
+    function resetMouse() {
+        let lvl = levels[currentLevel];
+        mousePos = {x: lvl.start.x, y: lvl.start.y};
+        mouseFacing = lvl.start.f;
+        currentRotation = mouseFacing * 90;
+        
+        // Disable transitions to snap to start
+        mouseWrapper.style.transition = 'none';
+        mouseSprite.style.transition = 'none';
+        
+        applyMouseTransform();
+        
+        // Force reflow
+        void mouseWrapper.offsetWidth;
+        
+        // Re-enable transitions
+        mouseWrapper.style.transition = 'transform 0.4s ease-in-out';
+        mouseSprite.style.transition = 'transform 0.4s ease-in-out';
+    }
+
+    function applyMouseTransform() {
+        mouseWrapper.style.transform = `translate(${mousePos.x * 100}%, ${mousePos.y * 100}%)`;
+        mouseSprite.style.transform = `rotate(${currentRotation}deg)`;
+    }
+
+    // Check if there is a wall between (x1, y1) and (x2, y2)
+    function hasWall(x1, y1, x2, y2) {
+        let lvl = levels[currentLevel];
+        let w1 = `${x1},${y1}-${x2},${y2}`;
+        let w2 = `${x2},${y2}-${x1},${y1}`;
+        return lvl.walls.includes(w1) || lvl.walls.includes(w2);
+    }
+
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function performCommand(cmd) {
+        return new Promise(resolve => {
+            let size = levels[currentLevel].size;
+            let oldX = mousePos.x;
+            let oldY = mousePos.y;
+            let newX = oldX;
+            let newY = oldY;
+            
+            if (cmd === 'forward' || cmd === 'backward') {
+                let step = (cmd === 'forward') ? 1 : -1;
+                // 0=N, 1=E, 2=S, 3=W
+                if (mouseFacing === 0) newY -= step;
+                else if (mouseFacing === 1) newX += step;
+                else if (mouseFacing === 2) newY += step;
+                else if (mouseFacing === 3) newX -= step;
+                
+                // Check Bounds
+                if (newX < 0 || newX >= size || newY < 0 || newY >= size) {
+                    resolve(false);
+                    return;
+                }
+                // Check Walls
+                if (hasWall(oldX, oldY, newX, newY)) {
+                    resolve(false);
+                    return;
+                }
+                
+                mousePos.x = newX;
+                mousePos.y = newY;
+                applyMouseTransform();
+                setTimeout(() => resolve(true), 450); // wait for move animation
+            } 
+            else if (cmd === 'left') {
+                mouseFacing = (mouseFacing + 3) % 4;
+                currentRotation -= 90;
+                applyMouseTransform();
+                setTimeout(() => resolve(true), 450);
+            }
+            else if (cmd === 'right') {
+                mouseFacing = (mouseFacing + 1) % 4;
+                currentRotation += 90;
+                applyMouseTransform();
+                setTimeout(() => resolve(true), 450);
+            }
+        });
+    }
+
+    async function executeSequence() {
+        if (isExecuting) return;
+        if (sequence.length === 0) return;
+        
+        isExecuting = true;
+        resetMouse(); // Always start from beginning of sequence
+        await sleep(300); 
+
+        const slots = document.querySelectorAll('.slot');
+        let successAll = true;
+        
+        for (let i = 0; i < sequence.length; i++) {
+            // Highlight current step
+            slots.forEach(s => s.classList.remove('active'));
+            if(slots[i]) slots[i].classList.add('active');
+            
+            let cmd = sequence[i];
+            let success = await performCommand(cmd);
+            
+            if (!success) {
+                successAll = false;
+                // Crash animation
+                mouseShaker.classList.add('crash');
+                await sleep(400);
+                mouseShaker.classList.remove('crash');
+                break; // Stop executing further
+            }
+            await sleep(150); // slight pause between moves
+        }
+        
+        slots.forEach(s => s.classList.remove('active'));
+        
+        // Check Win Condition
+        let lvl = levels[currentLevel];
+        if (mousePos.x === lvl.cheese.x && mousePos.y === lvl.cheese.y) {
+            let pointsEarned = 100 + (triesLeft * 50);
+            score += pointsEarned;
+            updateStatsUI();
+            isExecuting = false;
+            showModal("Great Job!", `You got the cheese!\n+${pointsEarned} Points`, "Next Level", nextLevel);
+        } else {
+            if(successAll) {
+                // Ran out of instructions but didn't crash
+                mouseShaker.classList.add('crash');
+                await sleep(400);
+                mouseShaker.classList.remove('crash');
+            }
+
+            triesLeft--;
+            updateStatsUI();
+            isExecuting = false;
+            
+            if (triesLeft <= 0) {
+                showModal("Game Over", "You ran out of tries! Better luck next time.", "Restart Game", resetGame);
+            } else {
+                let failText = successAll ? "You ran out of moves before reaching the cheese." : "Oops! You bumped into a wall or fell off the edge.";
+                showModal("Not Quite!", failText, "Try Again", () => {
+                    document.getElementById('modal-overlay').classList.add('hidden');
+                    resetMouse(); // Snaps mouse back to the start
+                });
+            }
+        }
+    }
+
+    // --- Modal Logic ---
+    function showModal(title, text, btnText, btnAction) {
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-text').innerText = text;
+        const btn = document.getElementById('modal-btn');
+        btn.innerText = btnText;
+        btn.onclick = btnAction;
+        document.getElementById('modal-overlay').classList.remove('hidden');
+    }
+
+    function nextLevel() {
+        document.getElementById('modal-overlay').classList.add('hidden');
+        currentLevel++;
+        if (currentLevel >= levels.length) {
+            showModal("You Win!", `Amazing! You've beaten all levels with a final score of ${score}!`, "Play Again", resetGame);
+            return;
+        }
+        loadLevel();
+    }
+
+    function resetGame() {
+        document.getElementById('modal-overlay').classList.add('hidden');
+        currentLevel = 0;
+        score = 0;
+        loadLevel();
+    }
+
+    // Run game setup
+    window.onload = init;
+
+</script>
+</body>
+</html>
