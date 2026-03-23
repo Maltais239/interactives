@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grade 5 Digital Storyboard Race</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .drag-over { border: 4px dashed #3b82f6; background-color: #eff6ff; }
+        .image-card { cursor: grab; transition: transform 0.2s; }
+        .image-card:active { cursor: grabbing; }
+        .drop-zone { min-height: 150px; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .timer-low { color: #ef4444; animation: pulse 1s infinite; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans text-slate-900">
+
+    <!-- Header / Navigation -->
+    <header class="bg-blue-600 text-white p-4 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold flex items-center gap-2">
+                <span class="text-3xl">📝</span> Storyboard Race: Grade 5
+            </h1>
+            <div class="flex gap-4">
+                <button onclick="showView('game')" class="hover:underline font-medium">Race Track</button>
+                <button onclick="showView('curriculum')" class="hover:underline font-medium">Alberta Curriculum</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-4 md:p-8">
+       
+        <!-- START SCREEN -->
+        <section id="start-view" class="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-lg text-center">
+            <h2 class="text-3xl font-bold mb-4 text-blue-800">Ready to Race?</h2>
+            <p class="mb-6 text-slate-600">You have 10 minutes to arrange 5 random images and write an "Inciting Incident" that connects them all. Use your best transition words!</p>
+            <div class="bg-blue-50 p-4 rounded-lg mb-6 text-left border-l-4 border-blue-400">
+                <h3 class="font-bold mb-2">🏆 Challenge Rules:</h3>
+                <ul class="list-disc ml-5 text-sm space-y-1">
+                    <li>Sequence all 5 images in a logical order.</li>
+                    <li>Write a "Hook" that grabs the reader's attention.</li>
+                    <li>Use at least two <strong>Tier 2 Vocabulary</strong> words (e.g., <i>consequently, mysterious, frantic</i>).</li>
+                </ul>
+            </div>
+            <button onclick="startGame()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-10 rounded-full text-xl transition-all transform hover:scale-105 shadow-lg">
+                Start the Race!
+            </button>
+        </section>
+
+        <!-- GAME VIEW -->
+        <section id="game-view" class="hidden">
+            <div class="flex flex-col lg:flex-row gap-8">
+               
+                <!-- Left: Toolbox / Images -->
+                <div class="lg:w-1/3">
+                    <div class="sticky top-4">
+                        <div id="timer-display" class="text-4xl font-mono font-bold text-center mb-4 bg-white p-4 rounded-lg shadow border-2 border-blue-200">
+                            10:00
+                        </div>
+                       
+                        <div class="bg-white p-4 rounded-lg shadow">
+                            <h3 class="font-bold border-b pb-2 mb-4">Image Bank</h3>
+                            <p class="text-xs text-slate-500 mb-4">Drag these into the storyboard slots below.</p>
+                            <div id="image-bank" class="grid grid-cols-2 gap-3">
+                                <!-- Images will be injected here -->
+                            </div>
+                        </div>
+
+                        <div class="mt-4 bg-amber-50 p-4 rounded-lg border border-amber-200">
+                            <h3 class="font-bold text-amber-800 text-sm mb-2">💡 Writer's Toolbox</h3>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="bg-white px-2 py-1 rounded text-xs border border-amber-300">Meanwhile</span>
+                                <span class="bg-white px-2 py-1 rounded text-xs border border-amber-300">Suddenly</span>
+                                <span class="bg-white px-2 py-1 rounded text-xs border border-amber-300">Consequently</span>
+                                <span class="bg-white px-2 py-1 rounded text-xs border border-amber-300">Desperately</span>
+                                <span class="bg-white px-2 py-1 rounded text-xs border border-amber-300">Incredibly</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: The Storyboard -->
+                <div class="lg:w-2/3">
+                    <div id="storyboard-slots" class="space-y-6">
+                        <!-- 5 Slots -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+                                <span class="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">1</span>
+                                The Sequence
+                            </h3>
+                            <div id="drop-zone-container" class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+                                <div class="drop-zone border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center bg-slate-50" data-index="0"></div>
+                                <div class="drop-zone border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center bg-slate-50" data-index="1"></div>
+                                <div class="drop-zone border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center bg-slate-50" data-index="2"></div>
+                                <div class="drop-zone border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center bg-slate-50" data-index="3"></div>
+                                <div class="drop-zone border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center bg-slate-50" data-index="4"></div>
+                            </div>
+
+                            <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+                                <span class="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">2</span>
+                                The Narrative Hook
+                            </h3>
+                            <textarea id="story-text" placeholder="Write your inciting incident here... Connect all the images into one exciting opening!" class="w-full h-48 p-4 border-2 border-slate-200 rounded-lg focus:border-blue-500 focus:outline-none text-lg"></textarea>
+                           
+                            <div class="mt-6 flex justify-end">
+                                <button onclick="finishGame()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition-colors">
+                                    Submit Story
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FINISH VIEW -->
+        <section id="finish-view" class="hidden max-w-4xl mx-auto">
+            <div class="bg-white p-8 rounded-xl shadow-lg border-t-8 border-green-500">
+                <div class="text-center mb-8">
+                    <h2 class="text-4xl font-bold text-slate-800">🏁 Race Complete!</h2>
+                    <p class="text-slate-500 mt-2">Here is your story draft for Grade 5 ELAL Portfolio</p>
+                </div>
+               
+                <div id="final-preview" class="space-y-6">
+                    <!-- Final result injected here -->
+                </div>
+
+                <div class="mt-8 flex justify-center gap-4 no-print">
+                    <button onclick="location.reload()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2 px-6 rounded-lg">Try New Challenge</button>
+                    <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Print to PDF</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- CURRICULUM VIEW -->
+        <section id="curriculum-view" class="hidden max-w-4xl mx-auto bg-white p-8 rounded-xl shadow">
+            <h2 class="text-2xl font-bold mb-6 text-blue-800">Alberta ELAL Curriculum Mapping (Grade 5)</h2>
+            <div class="space-y-6">
+                <div class="p-4 border-l-4 border-blue-500 bg-blue-50">
+                    <h3 class="font-bold">Organizing Ideas (Writing)</h3>
+                    <p class="text-sm">Students organize ideas and information to create a coherent narrative with a logical sequence of events.</p>
+                </div>
+                <div class="p-4 border-l-4 border-green-500 bg-green-50">
+                    <h3 class="font-bold">Vocabulary & Word Choice</h3>
+                    <p class="text-sm">Students select and use Tier 2 vocabulary and transition words to enhance clarity and engagement in their writing.</p>
+                </div>
+                <div class="p-4 border-l-4 border-purple-500 bg-purple-50">
+                    <h3 class="font-bold">Text Structures</h3>
+                    <p class="text-sm">Students identify and use narrative elements like the "Inciting Incident" or "Hook" to establish purpose in text.</p>
+                </div>
+            </div>
+            <button onclick="showView('game')" class="mt-8 text-blue-600 font-bold hover:underline">← Back to Activity</button>
+        </section>
+
+    </main>
+
+    <script>
+        // Game State
+        let timerSeconds = 600; // 10 minutes
+        let timerInterval;
+        let draggedElement = null;
+
+        const assetList = [
+            { id: 1, emoji: '🏔️', label: 'Mysterious Mountain' },
+            { id: 2, emoji: '🗝️', label: 'Rusty Key' },
+            { id: 3, emoji: '🛶', label: 'Broken Canoe' },
+            { id: 4, emoji: '📜', label: 'Ancient Map' },
+            { id: 5, emoji: '⛈️', label: 'Approaching Storm' },
+            { id: 6, emoji: '🦉', label: 'Silent Owl' },
+            { id: 7, emoji: '🔦', label: 'Flickering Flashlight' },
+            { id: 8, emoji: '🎒', label: 'Heavy Backpack' }
+        ];
+
+        // UI Management
+        function showView(viewId) {
+            document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+            document.getElementById(viewId + '-view').classList.remove('hidden');
+        }
+
+        function startGame() {
+            showView('game');
+            setupImageBank();
+            startTimer();
+        }
+
+        function setupImageBank() {
+            const bank = document.getElementById('image-bank');
+            bank.innerHTML = '';
+           
+            // Randomly pick 5 assets
+            const shuffled = [...assetList].sort(() => 0.5 - Math.random());
+            const selected = shuffled.slice(0, 5);
+
+            selected.forEach(asset => {
+                const div = document.createElement('div');
+                div.className = 'image-card bg-slate-100 p-4 rounded-lg text-center border-2 border-slate-200 hover:border-blue-400 shadow-sm';
+                div.draggable = true;
+                div.id = `asset-${asset.id}`;
+                div.innerHTML = `<div class="text-4xl mb-1">${asset.emoji}</div><div class="text-[10px] uppercase font-bold text-slate-500">${asset.label}</div>`;
+               
+                div.addEventListener('dragstart', (e) => {
+                    draggedElement = div;
+                    e.dataTransfer.setData('text/plain', asset.id);
+                });
+
+                bank.appendChild(div);
+            });
+
+            // Setup drop zones
+            const zones = document.querySelectorAll('.drop-zone');
+            zones.forEach(zone => {
+                zone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    zone.classList.add('drag-over');
+                });
+                zone.addEventListener('dragleave', () => {
+                    zone.classList.remove('drag-over');
+                });
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    zone.classList.remove('drag-over');
+                    if (draggedElement) {
+                        // Swap or place
+                        if (zone.firstChild) {
+                            const current = zone.firstChild;
+                            // Basic implementation: replace
+                            zone.innerHTML = '';
+                        }
+                        zone.appendChild(draggedElement);
+                        draggedElement = null;
+                    }
+                });
+            });
+        }
+
+        function startTimer() {
+            const display = document.getElementById('timer-display');
+            timerInterval = setInterval(() => {
+                timerSeconds--;
+                const mins = Math.floor(timerSeconds / 60);
+                const secs = timerSeconds % 60;
+                display.innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
+               
+                if (timerSeconds < 60) display.classList.add('timer-low');
+                if (timerSeconds <= 0) {
+                    clearInterval(timerInterval);
+                    finishGame();
+                }
+            }, 1000);
+        }
+
+        function finishGame() {
+            clearInterval(timerInterval);
+            const story = document.getElementById('story-text').value;
+            const slots = document.querySelectorAll('.drop-zone');
+            const preview = document.getElementById('final-preview');
+           
+            showView('finish');
+
+            let imagesHtml = '<div class="flex justify-center gap-4 flex-wrap">';
+            slots.forEach(slot => {
+                if(slot.firstChild) {
+                    imagesHtml += `<div class="p-4 bg-slate-50 border rounded shadow-sm text-center">${slot.firstChild.innerHTML}</div>`;
+                }
+            });
+            imagesHtml += '</div>';
+
+            preview.innerHTML = `
+                <div class="bg-slate-50 p-6 rounded-lg border italic text-lg leading-relaxed text-slate-700">
+                    "${story || '[No text provided]'}"
+                </div>
+                <div class="mt-8">
+                    <h4 class="font-bold text-sm text-slate-400 uppercase tracking-widest mb-4">Visual Sequence</h4>
+                    ${imagesHtml}
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
