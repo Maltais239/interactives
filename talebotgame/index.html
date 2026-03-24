@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talebot V1's Adventure</title>
+<style>
+    :root {
+        /* V1 Exact Colors */
+        --btn-forward: #27A146; 
+        --btn-backward: #ED1C24;
+        --btn-left: #00AEEF;
+        --btn-right: #FFC107;
+        --btn-play: #FF8C00;
+        
+        --grid-bg: #E3F2FD;
+        --cell-border: #BBDEFB;
+        --panel-bg: #FFFFFF;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        background: #B3E5FC;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+        user-select: none;
+    }
+
+    .header {
+        text-align: center;
+        padding: 15px 0 5px 0;
+        color: #01579B;
+    }
+
+    .header h1 {
+        margin: 0;
+        font-size: 28px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+    }
+
+    .level-info {
+        font-size: 16px;
+        font-weight: bold;
+        margin-top: 5px;
+        background: white;
+        padding: 5px 20px;
+        border-radius: 20px;
+        display: inline-block;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    /* Responsive Side-by-Side Layout */
+    .game-container {
+        display: flex;
+        flex-direction: column;
+        gap: 40px;
+        align-items: center;
+        width: 100%;
+        max-width: 900px;
+        padding: 20px;
+        box-sizing: border-box;
+    }
+
+    @media (min-width: 768px) {
+        .game-container {
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-evenly;
+        }
+    }
+
+    /* Grid Board */
+    .board-wrapper {
+        width: 100%;
+        max-width: 450px;
+        aspect-ratio: 1;
+        background: white;
+        border: 8px solid #E0E0E0;
+        border-radius: 15px;
+        position: relative;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        overflow: hidden;
+        flex-grow: 1;
+    }
+
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: repeat(4, 1fr);
+        width: 100%;
+        height: 100%;
+    }
+
+    .cell {
+        border: 2px dashed var(--cell-border);
+        background: var(--grid-bg);
+        box-sizing: border-box;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+    }
+
+    /* Game Entities */
+    .sprite {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 25%; /* 1/4 of board */
+        height: 25%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 5;
+    }
+
+    .sprite-inner {
+        width: 80%;
+        height: 80%;
+        position: relative;
+    }
+
+    #talebot {
+        z-index: 10;
+        transition: transform 0.4s ease-in-out;
+    }
+
+    #talebot img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        filter: drop-shadow(0 6px 4px rgba(0,0,0,0.4));
+    }
+
+    .star svg {
+        width: 100%;
+        height: 100%;
+        filter: drop-shadow(0 3px 3px rgba(255, 193, 7, 0.5));
+        animation: float 2s infinite ease-in-out;
+    }
+
+    .rock svg {
+        width: 100%;
+        height: 100%;
+        filter: drop-shadow(0 4px 2px rgba(0,0,0,0.4));
+    }
+
+    @keyframes float {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-5px) scale(1.05); }
+    }
+
+    /* =========================================
+       MINI TALEBOT V1 CONSOLE UI
+       ========================================= */
+    .console-wrapper {
+        position: relative;
+        margin: 0;
+        width: 320px;
+        flex-shrink: 0;
+        z-index: 1;
+        filter: drop-shadow(0 15px 25px rgba(0,0,0,0.15));
+    }
+
+    /* Orange side panels (wheels) */
+    .console-wrapper::before, .console-wrapper::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 40px;
+        height: 180px;
+        background: #FF8C00;
+        z-index: -1;
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.15);
+    }
+    .console-wrapper::before {
+        left: -15px;
+        border-radius: 100px 0 0 100px;
+    }
+    .console-wrapper::after {
+        right: -15px;
+        border-radius: 0 100px 100px 0;
+    }
+
+    .bot-panel {
+        background: var(--panel-bg);
+        width: 100%;
+        border-radius: 50px;
+        padding: 20px;
+        box-shadow: 
+            inset 0 -8px 15px rgba(0,0,0,0.05),
+            inset 0 8px 15px rgba(255,255,255,0.9);
+        box-sizing: border-box;
+        border: 2px solid #F5F5F5;
+        position: relative;
+        z-index: 2;
+    }
+
+    /* Robot Eyes at the top */
+    .bot-eyes {
+        display: flex;
+        justify-content: center;
+        gap: 30px;
+        margin-bottom: 25px;
+        margin-top: -5px;
+    }
+    .eye {
+        width: 50px;
+        height: 25px;
+        background: #222;
+        border-radius: 50px 50px 15px 15px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: inset 0 3px 5px rgba(0,0,0,0.6);
+    }
+    .pupil-left {
+        width: 14px; height: 14px; background: white; border-radius: 50%;
+        position: absolute; top: 4px; right: 12px;
+    }
+    .pupil-right {
+        width: 14px; height: 14px; background: white; border-radius: 50%;
+        position: absolute; top: 4px; left: 12px;
+    }
+
+    /* LEDs */
+    .led-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 25px;
+    }
+
+    .led-row-main {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+
+    .led {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #B0BEC5;
+        box-shadow: inset 0 2px 3px rgba(0,0,0,0.2);
+        transition: all 0.2s;
+    }
+
+    .led-row-small {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .black-dot {
+        width: 6px; height: 6px; border-radius: 50%; background: #333; margin-right: 5px;
+    }
+
+    .led-small {
+        width: 16px;
+        height: 6px;
+        border-radius: 4px;
+        background: #CFD8DC;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+    }
+
+    /* Active LED Colors mapping */
+    .led.active-forward { background: var(--btn-forward); box-shadow: 0 0 8px var(--btn-forward), inset 0 2px 4px rgba(255,255,255,0.4); }
+    .led.active-backward { background: var(--btn-backward); box-shadow: 0 0 8px var(--btn-backward), inset 0 2px 4px rgba(255,255,255,0.4); }
+    .led.active-left { background: var(--btn-left); box-shadow: 0 0 8px var(--btn-left), inset 0 2px 4px rgba(255,255,255,0.4); }
+    .led.active-right { background: var(--btn-right); box-shadow: 0 0 8px var(--btn-right), inset 0 2px 4px rgba(255,255,255,0.4); }
+    
+    .led.executing {
+        transform: scale(1.4);
+        filter: brightness(1.2);
+    }
+
+    /* V1 Accurate 3x3 Controls Grid */
+    .bot-controls {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+        gap: 15px;
+        justify-items: center;
+        align-items: center;
+    }
+
+    /* Base button styles */
+    .btn {
+        border: none;
+        cursor: pointer;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: transform 0.1s, box-shadow 0.1s;
+        outline: none;
+        padding: 0;
+    }
+    .btn:active {
+        transform: translateY(4px);
+    }
+
+    /* Specific Button Shapes & Colors based on V1 */
+    .btn-round {
+        width: 52px; height: 52px;
+        border-radius: 50%;
+        background: #FFFFFF;
+        box-shadow: 0 4px 0 #E0E0E0, 0 5px 10px rgba(0,0,0,0.05);
+        border: 2px solid #F5F5F5;
+    }
+    .btn-round:active { box-shadow: 0 0 0 #E0E0E0; }
+
+    .btn-sq {
+        width: 60px; height: 60px;
+        border-radius: 18px;
+    }
+
+    .btn-up { background: var(--btn-forward); box-shadow: 0 5px 0 #1B7832; }
+    .btn-up:active { box-shadow: 0 0 0 #1B7832; }
+
+    .btn-down { background: var(--btn-backward); box-shadow: 0 5px 0 #B01018; }
+    .btn-down:active { box-shadow: 0 0 0 #B01018; }
+
+    .btn-play { background: var(--btn-play); box-shadow: 0 5px 0 #C46A00; }
+    .btn-play:active { box-shadow: 0 0 0 #C46A00; }
+
+    .btn-lft { 
+        background: var(--btn-left); 
+        width: 65px; height: 60px; 
+        border-radius: 35px 15px 15px 35px; 
+        box-shadow: 0 5px 0 #007CA8; 
+    }
+    .btn-lft:active { box-shadow: 0 0 0 #007CA8; }
+
+    .btn-rgt { 
+        background: var(--btn-right); 
+        width: 65px; height: 60px; 
+        border-radius: 15px 35px 35px 15px; 
+        box-shadow: 0 5px 0 #C79600; 
+    }
+    .btn-rgt:active { box-shadow: 0 0 0 #C79600; }
+
+    /* Modal Styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.6);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s;
+    }
+
+    .modal-overlay.show {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .modal-content {
+        background: white;
+        padding: 30px;
+        border-radius: 20px;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        transform: scale(0.8);
+        transition: transform 0.3s;
+        border: 5px solid var(--btn-play);
+        max-width: 80%;
+    }
+
+    .modal-overlay.show .modal-content {
+        transform: scale(1);
+    }
+
+    .modal-btn {
+        background: var(--btn-play);
+        color: white;
+        border: none;
+        padding: 10px 25px;
+        font-size: 18px;
+        font-weight: bold;
+        border-radius: 15px;
+        cursor: pointer;
+        margin-top: 15px;
+        box-shadow: 0 4px 0 #C46A00;
+    }
+    
+    .modal-btn:active {
+        transform: translateY(4px);
+        box-shadow: 0 0 0 transparent;
+    }
+
+    .crash {
+        animation: crashAnim 0.4s ease;
+    }
+
+    @keyframes crashAnim {
+        0%, 100% { transform: scale(1) rotate(0); }
+        25% { transform: scale(0.9) rotate(-10deg); filter: sepia(1) hue-rotate(-50deg) saturate(3); }
+        50% { transform: scale(1.1) rotate(10deg); }
+        75% { transform: scale(0.9) rotate(-10deg); }
+    }
+    
+    .celebrate {
+        animation: celebrateAnim 0.6s ease 2;
+    }
+    
+    @keyframes celebrateAnim {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-20px); }
+    }
+
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Talebot V1's Adventure</h1>
+    <div class="level-info" id="level-display">Level 1 - Stars: 0/1</div>
+</div>
+
+<div class="game-container">
+    
+    <!-- Game Board (Left side on Desktop) -->
+    <div class="board-wrapper">
+        <div class="grid" id="grid">
+            <!-- Cells injected by JS -->
+        </div>
+        
+        <!-- Objects Container -->
+        <div id="objects-container" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none;"></div>
+        
+        <!-- Talebot Sprite -->
+        <div id="talebot" class="sprite">
+            <div class="sprite-inner" id="talebot-shaker" style="width: 85%; height: 85%;">
+                <img src="https://raw.githubusercontent.com/Maltais239/interactives/main/Talebot.png" alt="Mini Talebot" id="bot-img" draggable="false" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><rect width=\'80\' height=\'80\' x=\'10\' y=\'10\' rx=\'20\' fill=\'%23FFF\' stroke=\'%23F7931E\' stroke-width=\'5\'/><circle cx=\'35\' cy=\'40\' r=\'10\' fill=\'%23333\'/><circle cx=\'65\' cy=\'40\' r=\'10\' fill=\'%23333\'/><rect width=\'20\' height=\'40\' x=\'-5\' y=\'30\' rx=\'10\' fill=\'%23F7931E\'/><rect width=\'20\' height=\'40\' x=\'85\' y=\'30\' rx=\'10\' fill=\'%23F7931E\'/></svg>'">
+            </div>
+        </div>
+    </div>
+
+    <!-- Mini Talebot Console Panel (Right side on Desktop) -->
+    <div class="console-wrapper">
+        <div class="bot-panel">
+            
+            <!-- Bot Eyes -->
+            <div class="bot-eyes">
+                <div class="eye"><div class="pupil-left"></div></div>
+                <div class="eye"><div class="pupil-right"></div></div>
+            </div>
+
+            <!-- LED Indicators -->
+            <div class="led-panel">
+                <div class="led-row-main" id="led-row">
+                    <!-- 8 Main LEDs -->
+                    <div class="led" id="led-0"></div><div class="led" id="led-1"></div>
+                    <div class="led" id="led-2"></div><div class="led" id="led-3"></div>
+                    <div class="led" id="led-4"></div><div class="led" id="led-5"></div>
+                    <div class="led" id="led-6"></div><div class="led" id="led-7"></div>
+                </div>
+                <div class="led-row-small">
+                    <!-- Black dot + 4 small indicators -->
+                    <div class="black-dot"></div>
+                    <div class="led-small" id="sled-0"></div><div class="led-small" id="sled-1"></div>
+                    <div class="led-small" id="sled-2"></div><div class="led-small" id="sled-3"></div>
+                </div>
+            </div>
+
+            <!-- V1 Control Buttons (3x3) -->
+            <div class="bot-controls">
+                
+                <!-- Row 1: Mic | Up | Dance -->
+                <button class="btn btn-round" onclick="dummyAction('mic')" title="Mic">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64B5F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                </button>
+                <button class="btn btn-sq btn-up" onclick="addCommand('forward')" title="Forward">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+                </button>
+                <button class="btn btn-round" onclick="dummyAction('dance')" title="Dance">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#BA68C8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2" fill="#BA68C8" stroke="none"/><path d="M12 8l-4-3m4 3l4-3m-4 3v6m0 0l-4 6m4-6l4 6"/></svg>
+                </button>
+
+                <!-- Row 2: Left | Play | Right -->
+                <button class="btn btn-lft" onclick="addCommand('left')" title="Turn Left">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="13" y1="12" x2="5" y2="12"/><polyline points="9 16 5 12 9 8"/><circle cx="17" cy="12" r="1.5" fill="#FFF" stroke="none"/><circle cx="21" cy="12" r="1.5" fill="#FFF" stroke="none"/></svg>
+                </button>
+                <button class="btn btn-sq btn-play" onclick="executeSequence()" title="Play">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="#FFF" style="margin-left: 3px;"><polygon points="6,4 20,12 6,20"/></svg>
+                </button>
+                <button class="btn btn-rgt" onclick="addCommand('right')" title="Turn Right">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="11" y1="12" x2="19" y2="12"/><polyline points="15 8 19 12 15 16"/><circle cx="7" cy="12" r="1.5" fill="#FFF" stroke="none"/><circle cx="3" cy="12" r="1.5" fill="#FFF" stroke="none"/></svg>
+                </button>
+
+                <!-- Row 3: Clear | Down | Repeat -->
+                <button class="btn btn-round" onclick="clearSequence()" title="Clear Memory">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ED1C24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+                <button class="btn btn-sq btn-down" onclick="addCommand('backward')" title="Backward">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+                </button>
+                <button class="btn btn-round" onclick="toggleLoop()" title="Repeat Loop">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="3"/><polyline points="16 2 20 6 16 10"/></svg>
+                </button>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+    <div class="modal-content">
+        <h2 id="modal-title" style="color: #01579B; margin-top:0;">Level Complete!</h2>
+        <p id="modal-desc">You collected all the stars!</p>
+        <button class="modal-btn" onclick="nextLevel()" id="modal-btn">Next Level</button>
+    </div>
+</div>
+
+<script>
+    // SVGs for game elements
+    const SVG_STAR = `<svg viewBox="0 0 24 24"><path fill="#FFC107" stroke="#FF9800" stroke-width="1.5" stroke-linejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`;
+    const SVG_ROCK = `<svg viewBox="0 0 100 100"><path fill="#757575" d="M20,80 Q10,50 40,30 T80,40 Q90,70 70,85 T20,80 Z"/><path fill="#9E9E9E" d="M30,70 Q25,50 45,40 T70,50 Q75,65 60,75 T30,70 Z"/></svg>`;
+
+    // Level Designs (4x4 Grid)
+    // f: facing direction (0=N, 1=E, 2=S, 3=W)
+    const levels = [
+        // Level 1: Straight up (North)
+        { start: {x: 0, y: 3, f: 0}, stars: [{x: 0, y: 1}], rocks: [] },
+        // Level 2: Up and Right around a rock
+        { start: {x: 0, y: 3, f: 0}, stars: [{x: 2, y: 1}], rocks: [{x: 1, y: 2}] },
+        // Level 3: Navigate the bottom rocks
+        { start: {x: 0, y: 3, f: 0}, stars: [{x: 3, y: 2}], rocks: [{x: 1, y: 3}, {x: 2, y: 3}] },
+        // Level 4: The Loop Challenge! Perimeter run requires >8 commands!
+        { start: {x: 0, y: 3, f: 0}, stars: [{x: 3, y: 3}], rocks: [{x: 1, y: 1}, {x: 1, y: 2}, {x: 2, y: 1}, {x: 2, y: 2}] },
+        // Level 5: The Zig-Zag
+        { start: {x: 0, y: 3, f: 1}, stars: [{x: 3, y: 0}], rocks: [{x: 1, y: 3}, {x: 1, y: 1}, {x: 2, y: 2}, {x: 3, y: 1}] },
+        // Level 6: The U-Turn
+        { start: {x: 0, y: 0, f: 2}, stars: [{x: 3, y: 0}], rocks: [{x: 1, y: 0}, {x: 1, y: 1}, {x: 1, y: 2}, {x: 2, y: 2}] },
+        // Level 7: Multi-Star Collection
+        { start: {x: 2, y: 2, f: 0}, stars: [{x: 0, y: 0}, {x: 3, y: 3}], rocks: [{x: 1, y: 1}, {x: 2, y: 1}, {x: 1, y: 2}] },
+        // Level 8: The Staircase Loop! (Requires loop to win: Forward, Right, Forward, Left x3)
+        { start: {x: 0, y: 3, f: 0}, stars: [{x: 3, y: 0}], rocks: [{x: 0, y: 1}, {x: 1, y: 3}, {x: 2, y: 2}, {x: 3, y: 1}] }
+    ];
+
+    // Game State
+    let currentLevelIdx = 0;
+    let botState = { x: 0, y: 0, f: 0, rotation: 0 };
+    let sequence = []; // Max 8
+    let loopCount = 0; // 0 to 4
+    const MAX_COMMANDS = 8;
+    let isExecuting = false;
+    let starsToCollect = 0;
+    let starsCollected = 0;
+
+    // DOM Elements
+    const gridEl = document.getElementById('grid');
+    const objectsEl = document.getElementById('objects-container');
+    const talebotEl = document.getElementById('talebot');
+    const talebotShaker = document.getElementById('talebot-shaker');
+    const levelDisplay = document.getElementById('level-display');
+
+    // Initialize Game
+    function init() {
+        createGrid();
+        loadLevel(currentLevelIdx);
+    }
+
+    // Create 4x4 background cells
+    function createGrid() {
+        gridEl.innerHTML = '';
+        for (let i = 0; i < 16; i++) {
+            let cell = document.createElement('div');
+            cell.className = 'cell';
+            gridEl.appendChild(cell);
+        }
+    }
+
+    // Load a specific level
+    function loadLevel(idx) {
+        clearSequence();
+        isExecuting = false;
+        const lvl = levels[idx];
+        
+        botState.x = lvl.start.x;
+        botState.y = lvl.start.y;
+        botState.f = lvl.start.f;
+        botState.rotation = botState.f * 90;
+        
+        objectsEl.innerHTML = '';
+        
+        lvl.rocks.forEach(r => {
+            let rock = document.createElement('div');
+            rock.className = 'sprite rock';
+            rock.style.left = (r.x * 25) + '%';
+            rock.style.top = (r.y * 25) + '%';
+            rock.innerHTML = `<div class="sprite-inner">${SVG_ROCK}</div>`;
+            objectsEl.appendChild(rock);
+        });
+
+        starsToCollect = lvl.stars.length;
+        starsCollected = 0;
+        lvl.stars.forEach((s, i) => {
+            let star = document.createElement('div');
+            star.className = 'sprite star';
+            star.id = `star-${s.x}-${s.y}`;
+            star.style.left = (s.x * 25) + '%';
+            star.style.top = (s.y * 25) + '%';
+            star.innerHTML = `<div class="sprite-inner">${SVG_STAR}</div>`;
+            objectsEl.appendChild(star);
+        });
+
+        updateUI();
+        updateBotPosition(false);
+    }
+
+    function updateUI() {
+        levelDisplay.innerText = `Level ${currentLevelIdx + 1} - Stars: ${starsCollected}/${starsToCollect}`;
+    }
+
+    function updateBotPosition(animate = true) {
+        talebotEl.style.transition = animate ? 'transform 0.4s ease-in-out' : 'none';
+        talebotEl.style.transform = `translate(${botState.x * 100}%, ${botState.y * 100}%) rotate(${botState.rotation}deg)`;
+        if (!animate) void talebotEl.offsetWidth; 
+    }
+
+    // --- Sequence & LED Logic ---
+
+    function addCommand(cmd) {
+        if (isExecuting) return;
+        if (sequence.length >= MAX_COMMANDS) {
+            flashLEDs();
+            showModal("Memory Full!", "You've reached the 8-step limit! Try using the green Repeat button to loop a shorter pattern.", "Got it!", hideModal);
+            return;
+        }
+        sequence.push(cmd);
+        renderLEDs();
+    }
+
+    function clearSequence() {
+        if (isExecuting) return;
+        sequence = [];
+        loopCount = 0;
+        renderLEDs();
+        renderLoopLEDs();
+        
+        const lvl = levels[currentLevelIdx];
+        botState.x = lvl.start.x;
+        botState.y = lvl.start.y;
+        botState.f = lvl.start.f;
+        botState.rotation = botState.f * 90;
+        updateBotPosition(false);
+        
+        starsCollected = 0;
+        document.querySelectorAll('.star').forEach(el => el.style.display = 'flex');
+        updateUI();
+    }
+
+    function renderLEDs() {
+        for (let i = 0; i < MAX_COMMANDS; i++) {
+            const led = document.getElementById(`led-${i}`);
+            led.className = 'led'; 
+            if (i < sequence.length) {
+                led.classList.add(`active-${sequence[i]}`);
+            }
+        }
+    }
+
+    function flashLEDs() {
+        for (let i = 0; i < MAX_COMMANDS; i++) {
+            const led = document.getElementById(`led-${i}`);
+            led.style.filter = 'brightness(2) drop-shadow(0 0 5px white)';
+            setTimeout(() => led.style.filter = '', 200);
+        }
+    }
+
+    // Toggle Loop Count (0 to 4)
+    function toggleLoop() {
+        if(isExecuting) return;
+        loopCount = (loopCount + 1) % 5;
+        renderLoopLEDs();
+    }
+
+    // Render the 4 small repeat LEDs
+    function renderLoopLEDs() {
+        for(let i=0; i<4; i++) {
+            let sled = document.getElementById(`sled-${i}`);
+            if (i < loopCount) {
+                sled.style.background = '#4CAF50';
+                sled.style.boxShadow = '0 0 5px #4CAF50';
+            } else {
+                sled.style.background = '#CFD8DC';
+                sled.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.2)';
+            }
+        }
+    }
+
+    // Add fun visual actions for the decorative V1 buttons
+    function dummyAction(type) {
+        // Removed the check that prevented this while executing, so you can do this anytime!
+        
+        if (type === 'dance') {
+            // Instantly snap back to 0 so we can spam the button
+            talebotShaker.style.transition = 'none';
+            talebotShaker.style.transform = `rotate(0deg)`;
+            
+            // Tiny delay to let the browser register the reset before animating again
+            setTimeout(() => {
+                talebotShaker.style.transition = 'transform 0.8s ease-in-out';
+                talebotShaker.style.transform = `rotate(360deg)`;
+            }, 10);
+
+            // Clean up the transition when done
+            setTimeout(() => {
+                talebotShaker.style.transition = 'none';
+                talebotShaker.style.transform = `rotate(0deg)`;
+            }, 810);
+            
+        } else if (type === 'mic') {
+            talebotShaker.style.transition = 'none';
+            talebotShaker.style.transform = 'scale(1)';
+            
+            setTimeout(() => {
+                talebotShaker.style.transition = 'transform 0.15s ease';
+                talebotShaker.style.transform = 'scale(1.15)';
+            }, 10);
+            
+            setTimeout(() => { talebotShaker.style.transform = 'scale(1)'; }, 160);
+        }
+    }
+
+    // --- Execution Logic ---
+
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+    async function executeSequence() {
+        if (isExecuting || sequence.length === 0) return;
+        isExecuting = true;
+
+        const lvl = levels[currentLevelIdx];
+        botState.x = lvl.start.x;
+        botState.y = lvl.start.y;
+        botState.f = lvl.start.f;
+        botState.rotation = botState.f * 90;
+        starsCollected = 0;
+        document.querySelectorAll('.star').forEach(el => el.style.display = 'flex');
+        updateBotPosition(false);
+        updateUI();
+
+        await sleep(300);
+
+        let crashed = false;
+        let totalRuns = 1 + loopCount; // 1 normal run + extra loops
+
+        outerLoop:
+        for (let run = 0; run < totalRuns; run++) {
+            for (let i = 0; i < sequence.length; i++) {
+                let cmd = sequence[i];
+                
+                const curLed = document.getElementById(`led-${i}`);
+                curLed.classList.add('executing');
+
+                let success = await performMove(cmd);
+                
+                curLed.classList.remove('executing');
+
+                if (!success) {
+                    talebotShaker.classList.add('crash');
+                    await sleep(400);
+                    talebotShaker.classList.remove('crash');
+                    crashed = true;
+                    break outerLoop;
+                }
+
+                checkCollection();
+                
+                if (starsCollected === starsToCollect) {
+                    break outerLoop; 
+                }
+
+                await sleep(200); 
+            }
+            
+            // Brief pause between loops if we are running multiple times
+            if (run < totalRuns - 1 && starsCollected !== starsToCollect && !crashed) {
+                await sleep(400); 
+            }
+        }
+
+        if (starsCollected === starsToCollect) {
+            talebotShaker.classList.add('celebrate');
+            await sleep(1200);
+            talebotShaker.classList.remove('celebrate');
+            showModal("Level Complete!", "Talebot V1 collected all the stars!", "Next Level", nextLevel);
+        } else if (!crashed) {
+            talebotShaker.classList.add('crash');
+            await sleep(400);
+            talebotShaker.classList.remove('crash');
+        }
+
+        isExecuting = false;
+    }
+
+    function performMove(cmd) {
+        return new Promise(resolve => {
+            let newX = botState.x;
+            let newY = botState.y;
+
+            if (cmd === 'forward' || cmd === 'backward') {
+                let step = cmd === 'forward' ? 1 : -1;
+                if (botState.f === 0) newY -= step;
+                else if (botState.f === 1) newX += step;
+                else if (botState.f === 2) newY += step;
+                else if (botState.f === 3) newX -= step;
+
+                if (newX < 0 || newX > 3 || newY < 0 || newY > 3) {
+                    resolve(false);
+                    return;
+                }
+
+                let lvl = levels[currentLevelIdx];
+                let hitRock = lvl.rocks.some(r => r.x === newX && r.y === newY);
+                if (hitRock) {
+                    resolve(false);
+                    return;
+                }
+
+                botState.x = newX;
+                botState.y = newY;
+                updateBotPosition(true);
+                setTimeout(() => resolve(true), 400);
+
+            } else if (cmd === 'left') {
+                botState.f = (botState.f + 3) % 4;
+                botState.rotation -= 90;
+                updateBotPosition(true);
+                setTimeout(() => resolve(true), 400);
+
+            } else if (cmd === 'right') {
+                botState.f = (botState.f + 1) % 4;
+                botState.rotation += 90;
+                updateBotPosition(true);
+                setTimeout(() => resolve(true), 400);
+            }
+        });
+    }
+
+    function checkCollection() {
+        let starEl = document.getElementById(`star-${botState.x}-${botState.y}`);
+        if (starEl && starEl.style.display !== 'none') {
+            starEl.style.display = 'none';
+            starsCollected++;
+            updateUI();
+        }
+    }
+
+    // --- Modal & Level Navigation ---
+
+    function showModal(title, desc, btnText, action) {
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-desc').innerText = desc;
+        let btn = document.getElementById('modal-btn');
+        btn.innerText = btnText;
+        btn.onclick = action;
+        document.getElementById('modal').classList.add('show');
+    }
+
+    function hideModal() {
+        document.getElementById('modal').classList.remove('show');
+    }
+
+    function nextLevel() {
+        hideModal();
+        currentLevelIdx++;
+        if (currentLevelIdx >= levels.length) {
+            showModal("Amazing!", "You completed all Talebot Adventures!", "Play Again", () => {
+                hideModal();
+                currentLevelIdx = 0;
+                loadLevel(0);
+            });
+            return;
+        }
+        loadLevel(currentLevelIdx);
+    }
+
+    // Start
+    window.onload = init;
+
+</script>
+
+</body>
+</html>
