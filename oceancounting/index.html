@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ocean Counting Explorer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Custom animation for fading in/out screens */
+    .fade-in { animation: fadeIn 0.3s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-b from-cyan-300 via-blue-400 to-blue-700 font-sans relative overflow-hidden text-gray-800">
+
+  <!-- Decorative Bubbles -->
+  <div class="absolute top-10 left-10 w-8 h-8 bg-white rounded-full opacity-30 animate-ping"></div>
+  <div class="absolute bottom-20 right-20 w-12 h-12 bg-white rounded-full opacity-20 animate-pulse"></div>
+  <div class="absolute top-1/3 right-10 w-6 h-6 bg-white rounded-full opacity-40 animate-bounce" style="animation-duration: 3s;"></div>
+
+  <!-- Ocean floor decoration -->
+  <div class="fixed bottom-0 left-0 w-full h-24 bg-amber-200/40 rounded-t-[100%] pointer-events-none blur-sm z-0"></div>
+
+  <!-- Main Container -->
+  <div class="relative z-10 flex flex-col items-center justify-center min-h-screen p-4 w-full">
+
+    <!-- START SCREEN -->
+    <div id="start-screen" class="bg-white/90 backdrop-blur-md rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border-4 border-cyan-100 fade-in">
+      <div class="text-7xl mb-4">🤿🌊</div>
+      <h1 class="text-4xl font-extrabold text-blue-600 mb-6 drop-shadow-sm">Ocean Counting</h1>
+      <p class="text-lg text-gray-700 mb-8 font-medium">
+        Let's explore the ocean and count the sea creatures! Find the numbers and look out for zero (0)!
+      </p>
+      <button onclick="startNewGame()" class="w-full bg-yellow-400 hover:bg-yellow-300 text-yellow-900 font-bold text-2xl py-4 px-8 rounded-full shadow-[0_6px_0_rgb(202,138,4)] hover:shadow-[0_3px_0_rgb(202,138,4)] hover:translate-y-[3px] transition-all">
+        Start Exploring!
+      </button>
+    </div>
+
+    <!-- PLAYING SCREEN -->
+    <div id="playing-screen" class="w-full max-w-2xl hidden fade-in">
+      <!-- Header Status -->
+      <div class="flex justify-between items-center mb-6 bg-white/30 backdrop-blur-sm p-4 rounded-2xl text-white font-bold text-xl">
+        <div id="round-display">Round: 1 / 10</div>
+        <div class="flex items-center gap-2">
+          <span>⭐</span> Score: <span id="score-display">0</span>
+        </div>
+      </div>
+
+      <!-- Question Card -->
+      <div class="bg-white rounded-3xl p-6 sm:p-10 shadow-2xl text-center border-4 border-cyan-100 relative overflow-hidden">
+        
+        <!-- Feedback Overlay -->
+        <div id="feedback-overlay" class="absolute inset-0 bg-white/95 flex flex-col items-center justify-center z-20 hidden transition-opacity duration-300">
+          <div id="feedback-icon" class="text-8xl mb-4"></div>
+          <h2 id="feedback-title" class="text-4xl font-bold"></h2>
+          <p id="feedback-text" class="text-xl text-gray-600 mt-2"></p>
+        </div>
+
+        <h2 id="question-prompt" class="text-2xl sm:text-3xl font-extrabold text-blue-800 mb-8"></h2>
+
+        <!-- Content Area based on Question Type -->
+        <div id="content-area" class="mb-10 min-h-[150px] flex items-center justify-center w-full">
+          <!-- Dynamic content injected here -->
+        </div>
+
+        <!-- Answer Area (Buttons or instructions injected here) -->
+        <div id="action-area" class="w-full">
+          <!-- Dynamic buttons/instructions injected here -->
+        </div>
+
+      </div>
+    </div>
+
+    <!-- END SCREEN -->
+    <div id="end-screen" class="bg-white/90 backdrop-blur-md rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border-4 border-cyan-100 hidden fade-in">
+      <div class="text-7xl mb-4">🏆</div>
+      <h1 class="text-4xl font-extrabold text-blue-600 mb-2">Great Job!</h1>
+      <p class="text-2xl text-gray-700 mb-8 font-bold">
+        You got <span id="final-score" class="text-green-500">0</span> out of <span id="max-rounds-display">10</span> correct!
+      </p>
+      <button onclick="startNewGame()" class="w-full bg-green-500 hover:bg-green-400 text-white font-bold text-2xl py-4 px-8 rounded-full shadow-[0_6px_0_rgb(21,128,61)] hover:shadow-[0_3px_0_rgb(21,128,61)] hover:translate-y-[3px] transition-all">
+        Play Again
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    // --- Game Data & Helpers ---
+    const NUMBER_WORDS = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
+    const CREATURES = [
+      { emoji: '🐟', name: 'fish' },
+      { emoji: '🦀', name: 'crabs' },
+      { emoji: '🐙', name: 'octopuses' },
+      { emoji: '🐢', name: 'turtles' },
+      { emoji: '🐡', name: 'pufferfish' },
+      { emoji: '⭐️', name: 'starfish' }
+    ];
+
+    const getRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
+
+    // --- State Variables ---
+    let score = 0;
+    let round = 1;
+    let question = null;
+    let isWaiting = false;
+    let questionSequence = [];
+    const MAX_ROUNDS = 10;
+
+    // --- Question Generators ---
+    const generateCountQuestion = (useWords = false) => {
+      const creature = getRandom(CREATURES);
+      const correctNum = Math.floor(Math.random() * 6); // 0 to 5
+      
+      let options = [correctNum];
+      while (options.length < 3) {
+        let wrong = Math.floor(Math.random() * 6);
+        if (!options.includes(wrong)) options.push(wrong);
+      }
+      options = shuffle(options);
+
+      return {
+        type: 'count',
+        prompt: `How many ${creature.name} are there?`,
+        creature: creature.emoji,
+        quantity: correctNum,
+        options: options.map(num => ({
+          value: num,
+          label: useWords ? NUMBER_WORDS[num] : num.toString()
+        })),
+        correctAnswer: correctNum
+      };
+    };
+
+    const generateZeroQuestion = () => {
+      let quantities = [0];
+      while (quantities.length < 3) {
+        let wrong = Math.floor(Math.random() * 4) + 1; // 1 to 4
+        if (!quantities.includes(wrong)) quantities.push(wrong);
+      }
+      quantities = shuffle(quantities);
+
+      return {
+        type: 'findZero',
+        prompt: `Which shell has ZERO (0) pearls?`,
+        container: '🐚',
+        item: '⚪',
+        options: quantities,
+        correctAnswer: 0
+      };
+    };
+
+    const generateMatchQuestion = (useWords = false) => {
+      const creature = getRandom(CREATURES);
+      const correctNum = Math.floor(Math.random() * 5) + 1; // 1 to 5
+      
+      let options = [correctNum];
+      while (options.length < 3) {
+        let wrong = Math.floor(Math.random() * 6); // includes 0
+        if (!options.includes(wrong)) options.push(wrong);
+      }
+      options = shuffle(options);
+
+      return {
+        type: 'match',
+        prompt: `Click on the group that has ${useWords ? NUMBER_WORDS[correctNum] : correctNum} ${creature.name}.`,
+        creature: creature.emoji,
+        targetNum: correctNum,
+        options: options,
+        correctAnswer: correctNum
+      };
+    };
+
+    // --- Game Logic ---
+    function showScreen(screenId) {
+      document.getElementById('start-screen').classList.add('hidden');
+      document.getElementById('playing-screen').classList.add('hidden');
+      document.getElementById('end-screen').classList.add('hidden');
+      document.getElementById(screenId).classList.remove('hidden');
+    }
+
+    function startNewGame() {
+      score = 0;
+      round = 1;
+      isWaiting = false;
+      document.getElementById('max-rounds-display').innerText = MAX_ROUNDS;
+      
+      const types = [
+        'countNum', 'countNum', 
+        'countWord', 'countWord', 
+        'matchNum', 'matchNum', 
+        'matchWord', 'matchWord', 
+        'findZero', 'findZero'
+      ];
+      questionSequence = shuffle(types);
+      
+      setNextQuestion(questionSequence[0]);
+      showScreen('playing-screen');
+    }
+
+    function setNextQuestion(type) {
+      if (type === 'findZero') {
+        question = generateZeroQuestion();
+      } else if (type === 'countNum') {
+        question = generateCountQuestion(false);
+      } else if (type === 'countWord') {
+        question = generateCountQuestion(true);
+      } else if (type === 'matchNum') {
+        question = generateMatchQuestion(false);
+      } else if (type === 'matchWord') {
+        question = generateMatchQuestion(true);
+      }
+      renderQuestion();
+    }
+
+    function renderCreatures(emoji, count) {
+      if (count === 0) {
+        return `
+          <div class="flex items-center justify-center h-24 w-full border-2 border-dashed border-cyan-300 rounded-xl bg-cyan-100/30">
+            <span class="text-cyan-700 font-bold opacity-50">Empty (0)</span>
+          </div>
+        `;
+      }
+      let html = '<div class="flex flex-wrap justify-center gap-2 max-w-[200px] mx-auto min-h-[6rem] items-center">';
+      for (let i = 0; i < count; i++) {
+        html += `<span class="text-4xl animate-bounce" style="animation-delay: ${i * 0.1}s">${emoji}</span>`;
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function renderQuestion() {
+      // Update header
+      document.getElementById('round-display').innerText = `Round: ${round} / ${MAX_ROUNDS}`;
+      document.getElementById('score-display').innerText = score;
+      document.getElementById('question-prompt').innerText = question.prompt;
+
+      const contentArea = document.getElementById('content-area');
+      const actionArea = document.getElementById('action-area');
+      
+      contentArea.innerHTML = '';
+      actionArea.innerHTML = '';
+
+      if (question.type === 'count') {
+        contentArea.innerHTML = `
+          <div class="bg-cyan-50 p-6 rounded-2xl w-full border-2 border-cyan-200">
+            ${renderCreatures(question.creature, question.quantity)}
+          </div>
+        `;
+        
+        let buttonsHtml = '<div class="flex flex-wrap justify-center gap-4">';
+        question.options.forEach(opt => {
+          buttonsHtml += `
+            <button onclick="handleAnswer(${opt.value})" class="min-w-[120px] bg-blue-500 hover:bg-blue-400 text-white font-bold text-3xl py-4 px-6 rounded-2xl shadow-[0_6px_0_rgb(29,78,216)] hover:shadow-[0_3px_0_rgb(29,78,216)] hover:translate-y-[3px] transition-all">
+              ${opt.label}
+            </button>
+          `;
+        });
+        buttonsHtml += '</div>';
+        actionArea.innerHTML = buttonsHtml;
+      } 
+      else if (question.type === 'findZero') {
+        let buttonsHtml = '<div class="flex flex-col sm:flex-row gap-4 w-full justify-center">';
+        question.options.forEach(qty => {
+          let itemsHtml = qty === 0 ? '' : Array(qty).fill(`<span class="text-xl">${question.item}</span>`).join('');
+          
+          buttonsHtml += `
+            <button onclick="handleAnswer(${qty})" class="flex-1 bg-amber-50 rounded-2xl p-4 border-4 border-amber-200 hover:bg-amber-100 transition-colors flex flex-col items-center gap-3 cursor-pointer">
+              <span class="text-6xl">${question.container}</span>
+              <div class="flex flex-wrap justify-center gap-1 min-h-[2rem]">
+                ${itemsHtml}
+              </div>
+            </button>
+          `;
+        });
+        buttonsHtml += '</div>';
+        contentArea.innerHTML = buttonsHtml;
+        actionArea.innerHTML = '<p class="text-gray-500 font-bold animate-pulse text-center mt-4">👆 Click on the correct picture!</p>';
+      }
+      else if (question.type === 'match') {
+        let buttonsHtml = '<div class="flex flex-col sm:flex-row gap-4 w-full justify-center">';
+        question.options.forEach(qty => {
+          buttonsHtml += `
+            <button onclick="handleAnswer(${qty})" class="flex-1 bg-cyan-50 rounded-2xl p-4 border-4 border-cyan-200 hover:bg-cyan-100 transition-colors flex flex-col items-center justify-center cursor-pointer min-h-[120px]">
+              ${renderCreatures(question.creature, qty)}
+            </button>
+          `;
+        });
+        buttonsHtml += '</div>';
+        contentArea.innerHTML = buttonsHtml;
+        actionArea.innerHTML = '<p class="text-gray-500 font-bold animate-pulse text-center mt-4">👆 Click on the correct picture!</p>';
+      }
+    }
+
+    window.handleAnswer = function(answer) {
+      if (isWaiting) return;
+      isWaiting = true;
+
+      const isCorrect = (answer === question.correctAnswer);
+      const overlay = document.getElementById('feedback-overlay');
+      const icon = document.getElementById('feedback-icon');
+      const title = document.getElementById('feedback-title');
+      const text = document.getElementById('feedback-text');
+
+      if (isCorrect) {
+        score++;
+        document.getElementById('score-display').innerText = score;
+        icon.innerText = '🎉';
+        icon.className = 'text-8xl mb-4 animate-bounce';
+        title.innerText = 'Super!';
+        title.className = 'text-4xl font-bold text-green-500';
+        text.innerText = '';
+      } else {
+        icon.innerText = '🤔';
+        icon.className = 'text-8xl mb-4';
+        title.innerText = "Let's keep trying!";
+        title.className = 'text-4xl font-bold text-orange-500';
+        text.innerText = `The answer was ${question.correctAnswer}`;
+      }
+
+      overlay.classList.remove('hidden');
+
+      setTimeout(() => {
+        overlay.classList.add('hidden');
+        if (round < MAX_ROUNDS) {
+          setNextQuestion(questionSequence[round]);
+          round++;
+          isWaiting = false;
+        } else {
+          endGame();
+        }
+      }, 2000);
+    };
+
+    function endGame() {
+      document.getElementById('final-score').innerText = score;
+      showScreen('end-screen');
+    }
+  </script>
+</body>
+</html>
