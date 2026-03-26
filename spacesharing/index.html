@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Math Explorers</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Base styles to prevent scrolling issues on mobile */
+        body { margin: 0; padding: 0; overflow-x: hidden; background-color: #0f172a; }
+        
+        /* Star animation overrides if needed */
+        @keyframes customPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .star { animation: customPulse infinite ease-in-out; }
+    </style>
+</head>
+<body class="min-h-screen text-white font-sans overflow-hidden relative flex flex-col items-center p-4">
+
+    <!-- Twinkling stars background effect -->
+    <div id="stars-container" class="absolute inset-0 z-0 pointer-events-none opacity-50"></div>
+
+    <div class="relative z-10 w-full max-w-4xl flex flex-col items-center">
+        
+        <!-- MENU SCREEN -->
+        <div id="menu-screen" class="text-center mt-20">
+            <h1 class="text-5xl md:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 mb-8 tracking-wider">
+                Space Math Explorers
+            </h1>
+            <p class="text-xl md:text-2xl text-slate-300 mb-12 max-w-lg mx-auto leading-relaxed">
+                Welcome to space! Help us organize our supplies and crew. Choose a mission:
+            </p>
+            
+            <div class="flex flex-col md:flex-row gap-6 justify-center">
+                <button onclick="startSharing()" class="group relative bg-gradient-to-b from-indigo-500 to-purple-700 p-8 rounded-3xl border-4 border-indigo-400 hover:scale-105 transition-transform shadow-[0_0_30px_rgba(99,102,241,0.5)]">
+                    <div class="text-6xl mb-4">👽 ⭐</div>
+                    <h2 class="text-3xl font-bold text-white mb-2">Sharing</h2>
+                    <p class="text-indigo-100 text-lg">Share stars equally!</p>
+                </button>
+
+                <button onclick="startGrouping()" class="group relative bg-gradient-to-b from-emerald-500 to-teal-700 p-8 rounded-3xl border-4 border-emerald-400 hover:scale-105 transition-transform shadow-[0_0_30px_rgba(16,185,129,0.5)]">
+                    <div class="text-6xl mb-4">🚀 🧑‍🚀</div>
+                    <h2 class="text-3xl font-bold text-white mb-2">Grouping</h2>
+                    <p class="text-emerald-100 text-lg">Group astronauts!</p>
+                </button>
+            </div>
+        </div>
+
+        <!-- PLAY SCREEN -->
+        <div id="play-screen" class="hidden w-full flex flex-col justify-between items-center pb-8">
+            <!-- Header / Instructions -->
+            <div class="w-full bg-slate-800/80 border-b-4 border-slate-700 p-6 rounded-3xl shadow-lg mb-8 text-center relative mt-4 md:mt-0">
+                <button onclick="showMenu()" class="absolute top-6 left-6 text-slate-400 hover:text-white transition-colors">
+                    ◀ Back
+                </button>
+                <div id="play-instructions"></div>
+                <p class="text-slate-300 mt-3 text-lg">Tap a container to add an item. Tap an item to remove it.</p>
+            </div>
+
+            <!-- Error Message -->
+            <div id="error-message" class="hidden bg-red-500/20 border-2 border-red-500 text-red-100 px-6 py-3 rounded-xl mb-6 font-bold text-xl animate-pulse"></div>
+
+            <!-- Containers Area -->
+            <div id="containers-area" class="flex flex-wrap justify-center gap-4 md:gap-8 w-full max-w-5xl mb-10"></div>
+
+            <!-- The Pool -->
+            <div class="bg-slate-800 border-4 border-yellow-500/50 rounded-3xl p-6 w-full max-w-3xl flex flex-col items-center">
+                <h3 id="pool-title" class="text-xl text-yellow-400 font-bold mb-4 uppercase tracking-widest"></h3>
+                <div id="pool-area" class="flex flex-wrap justify-center gap-3 min-h-[80px]"></div>
+            </div>
+
+            <!-- Check Button -->
+            <button onclick="checkAnswer()" class="mt-8 bg-gradient-to-r from-green-400 to-emerald-600 text-white text-3xl font-extrabold py-5 px-16 rounded-full shadow-[0_10px_0_rgb(4,120,87)] hover:translate-y-2 hover:shadow-[0_2px_0_rgb(4,120,87)] transition-all active:translate-y-4 active:shadow-none">
+                Check Answer! ✓
+            </button>
+        </div>
+
+        <!-- WIN SCREEN -->
+        <div id="win-screen" class="hidden text-center mt-20 bg-slate-800/80 p-10 rounded-3xl border-4 border-yellow-400 shadow-[0_0_50px_rgba(250,204,21,0.4)] max-w-2xl">
+            <div class="text-8xl mb-6 animate-bounce">🎉</div>
+            <h2 class="text-5xl font-bold text-yellow-400 mb-6">Mission Complete!</h2>
+            
+            <div id="win-message"></div>
+
+            <!-- Conservation of Number Highlight -->
+            <div class="bg-slate-900 rounded-xl p-6 mb-8 border-2 border-slate-600">
+                <h3 class="text-xl text-slate-300 mb-2">Look at the math:</h3>
+                <p id="win-equation" class="text-4xl font-mono text-cyan-300 font-bold mb-4"></p>
+                <p class="text-xl text-yellow-200 font-semibold">
+                    The total number stays exactly the same!
+                </p>
+            </div>
+
+            <button onclick="showMenu()" class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-2xl font-bold py-4 px-10 rounded-full hover:scale-105 transition-transform">
+                Play Again
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Background Stars Setup ---
+        function createStars() {
+            const container = document.getElementById('stars-container');
+            for (let i = 0; i < 30; i++) {
+                const star = document.createElement('div');
+                star.className = 'absolute bg-white rounded-full star';
+                star.style.top = `${Math.random() * 100}%`;
+                star.style.left = `${Math.random() * 100}%`;
+                star.style.width = `${Math.random() * 3 + 1}px`;
+                star.style.height = `${Math.random() * 3 + 1}px`;
+                star.style.animationDuration = `${Math.random() * 3 + 1}s`;
+                star.style.animationDelay = `${Math.random() * 2}s`;
+                container.appendChild(star);
+            }
+        }
+        createStars();
+
+        // --- Game State ---
+        let mode = ''; // 'share' or 'group'
+        let task = { total: 0, groups: 0, groupSize: 0 };
+        let pool = 0;
+        let containers = [];
+        let errorMsg = '';
+
+        // --- Task Data ---
+        const sharingTasks = [
+            { total: 6, groups: 2 }, { total: 8, groups: 2 }, { total: 9, groups: 3 },
+            { total: 10, groups: 2 }, { total: 12, groups: 3 }, { total: 4, groups: 2 }
+        ];
+
+        const groupingTasks = [
+            { total: 6, groupSize: 2 }, { total: 8, groupSize: 2 }, { total: 9, groupSize: 3 },
+            { total: 10, groupSize: 5 }, { total: 12, groupSize: 4 }
+        ];
+
+        // --- Navigation Functions ---
+        function switchScreen(screenId) {
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('play-screen').classList.add('hidden');
+            document.getElementById('win-screen').classList.add('hidden');
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function showMenu() {
+            switchScreen('menu-screen');
+        }
+
+        // --- Game Logic ---
+        function startSharing() {
+            let selected;
+            do {
+                selected = sharingTasks[Math.floor(Math.random() * sharingTasks.length)];
+            } while (mode === 'share' && selected.total === task.total && selected.groups === task.groups);
+            
+            mode = 'share';
+            task = selected;
+            pool = selected.total;
+            containers = Array(selected.groups).fill(0);
+            
+            setupPlayScreen();
+            switchScreen('play-screen');
+        }
+
+        function startGrouping() {
+            let selected;
+            do {
+                selected = groupingTasks[Math.floor(Math.random() * groupingTasks.length)];
+            } while (mode === 'group' && selected.total === task.total && selected.groupSize === task.groupSize);
+            
+            mode = 'group';
+            task = selected;
+            pool = selected.total;
+            
+            const containerCount = Math.max(5, (selected.total / selected.groupSize) + 2); 
+            containers = Array(containerCount).fill(0);
+            
+            setupPlayScreen();
+            switchScreen('play-screen');
+        }
+
+        function setupPlayScreen() {
+            hideError();
+            
+            // Set Instructions
+            const instructionsEl = document.getElementById('play-instructions');
+            if (mode === 'share') {
+                instructionsEl.innerHTML = `
+                    <h2 class="text-3xl md:text-4xl font-bold text-white max-w-2xl mx-auto">
+                        Share <span class="text-yellow-400">${task.total} ⭐</span> equally between <span class="text-cyan-400">${task.groups} 👽</span>.
+                    </h2>`;
+            } else {
+                instructionsEl.innerHTML = `
+                    <h2 class="text-3xl md:text-4xl font-bold text-white max-w-2xl mx-auto">
+                        Put <span class="text-yellow-400">${task.total} 🧑‍🚀</span> into the rockets. Put exactly <span class="text-emerald-400">${task.groupSize} in each rocket</span>.
+                    </h2>`;
+            }
+            
+            renderContainers();
+            renderPool();
+        }
+
+        function handleAddToContainer(index) {
+            if (pool > 0) {
+                containers[index]++;
+                pool--;
+                hideError();
+                renderContainers();
+                renderPool();
+            }
+        }
+
+        function handleRemoveFromContainer(event, index) {
+            event.stopPropagation(); // Stop parent container click
+            if (containers[index] > 0) {
+                containers[index]--;
+                pool++;
+                hideError();
+                renderContainers();
+                renderPool();
+            }
+        }
+
+        function showError(msg) {
+            const errorEl = document.getElementById('error-message');
+            errorEl.innerText = msg;
+            errorEl.classList.remove('hidden');
+        }
+
+        function hideError() {
+            document.getElementById('error-message').classList.add('hidden');
+        }
+
+        function checkAnswer() {
+            if (pool > 0) {
+                showError("Make sure to use all the items in the pool!");
+                return;
+            }
+
+            if (mode === 'share') {
+                const firstCount = containers[0];
+                const isEquallyShared = containers.every(count => count === firstCount);
+                
+                if (isEquallyShared) {
+                    setupWinScreen();
+                } else {
+                    showError("Oops! Make sure every alien gets the EXACT same amount of stars.");
+                }
+            } else if (mode === 'group') {
+                const usedContainers = containers.filter(count => count > 0);
+                const isCorrectlyGrouped = usedContainers.every(count => count === task.groupSize);
+                
+                if (usedContainers.length === 0) {
+                    showError("You need to put them in the rockets!");
+                } else if (isCorrectlyGrouped) {
+                    setupWinScreen();
+                } else {
+                    showError(`Oops! Make sure every rocket you use has exactly ${task.groupSize} astronauts in it.`);
+                }
+            }
+        }
+
+        // --- Render Functions ---
+        function renderContainers() {
+            const containerArea = document.getElementById('containers-area');
+            containerArea.innerHTML = '';
+
+            containers.forEach((count, idx) => {
+                const box = document.createElement('div');
+                box.className = 'relative bg-slate-800 border-4 border-slate-600 rounded-3xl p-4 w-40 h-56 flex flex-col items-center justify-start cursor-pointer hover:border-cyan-400 transition-colors shadow-xl overflow-hidden group';
+                box.onclick = () => handleAddToContainer(idx);
+
+                // Icon
+                const iconContainer = document.createElement('div');
+                iconContainer.className = 'text-5xl mb-4 mt-2 bg-slate-700 w-20 h-20 flex items-center justify-center rounded-full group-hover:scale-110 transition-transform';
+                iconContainer.innerText = mode === 'share' ? '👽' : '🚀';
+                box.appendChild(iconContainer);
+
+                // Items inside
+                const itemsContainer = document.createElement('div');
+                itemsContainer.className = 'flex flex-wrap justify-center gap-1 w-full z-10';
+                
+                for (let i = 0; i < count; i++) {
+                    const item = document.createElement('div');
+                    item.className = 'text-3xl cursor-pointer hover:scale-125 transition-transform hover:-translate-y-1';
+                    item.title = 'Tap to return to pool';
+                    item.innerText = mode === 'share' ? '⭐' : '🧑‍🚀';
+                    item.onclick = (e) => handleRemoveFromContainer(e, idx);
+                    itemsContainer.appendChild(item);
+                }
+                box.appendChild(itemsContainer);
+
+                // Empty Hint
+                if (count === 0) {
+                    const hint = document.createElement('div');
+                    hint.className = 'absolute bottom-6 text-slate-500 font-bold opacity-50 text-sm';
+                    hint.innerText = 'Tap to add';
+                    box.appendChild(hint);
+                }
+
+                containerArea.appendChild(box);
+            });
+        }
+
+        function renderPool() {
+            document.getElementById('pool-title').innerText = `Items Left: ${pool}`;
+            
+            const poolArea = document.getElementById('pool-area');
+            poolArea.innerHTML = '';
+
+            if (pool === 0) {
+                const emptyMsg = document.createElement('div');
+                emptyMsg.className = 'text-slate-500 italic text-xl flex items-center h-full mt-2';
+                emptyMsg.innerText = 'All items used!';
+                poolArea.appendChild(emptyMsg);
+            } else {
+                for (let i = 0; i < pool; i++) {
+                    const item = document.createElement('div');
+                    item.className = 'text-4xl animate-bounce';
+                    item.style.animationDelay = `${i * 0.1}s`;
+                    item.innerText = mode === 'share' ? '⭐' : '🧑‍🚀';
+                    poolArea.appendChild(item);
+                }
+            }
+        }
+
+        function setupWinScreen() {
+            const winMessageEl = document.getElementById('win-message');
+            const winEqEl = document.getElementById('win-equation');
+            
+            let equationStr = "";
+            
+            if (mode === 'share') {
+                const amount = containers[0];
+                equationStr = Array(task.groups).fill(amount).join(" + ") + ` = ${task.total}`;
+                
+                winMessageEl.innerHTML = `
+                    <p class="text-2xl text-white mb-6 leading-relaxed">
+                        You shared <span class="text-yellow-400 font-bold">${task.total} stars</span> equally between <span class="text-cyan-400 font-bold">${task.groups} aliens</span>. They got ${amount} each!
+                    </p>`;
+            } else {
+                const usedCount = task.total / task.groupSize;
+                equationStr = Array(usedCount).fill(task.groupSize).join(" + ") + ` = ${task.total}`;
+                
+                winMessageEl.innerHTML = `
+                    <p class="text-2xl text-white mb-6 leading-relaxed">
+                        You put <span class="text-yellow-400 font-bold">${task.total} astronauts</span> into groups of <span class="text-emerald-400 font-bold">${task.groupSize}</span>!
+                    </p>`;
+            }
+
+            winEqEl.innerText = equationStr;
+            switchScreen('win-screen');
+        }
+    </script>
+</body>
+</html>
