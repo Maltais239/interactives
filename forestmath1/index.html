@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forest Math Adventure</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom animations to match the original React component */
+        @keyframes fadeInDown {
+            0% { opacity: 0; transform: translateY(-20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-down {
+            animation: fadeInDown 0.5s ease-out;
+        }
+        
+        /* Smooth color transitions for backgrounds */
+        .transition-colors {
+            transition-property: background-color, border-color, color, fill, stroke;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 500ms;
+        }
+    </style>
+</head>
+<body class="font-sans min-h-screen bg-sky-100 selection:bg-sky-200">
+
+    <!-- === SCREEN: MENU === -->
+    <div id="menu-screen" class="min-h-screen flex flex-col items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-xl p-8 max-w-2xl w-full text-center border-4 border-sky-300">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-sky-800 mb-2">
+                🌲 Forest Math Adventure 🌲
+            </h1>
+            <p class="text-xl text-sky-600 mb-8 font-medium">Choose an animal friend to play with!</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="menu-buttons">
+                <!-- Menu buttons generated via JS -->
+            </div>
+
+            <div class="mt-12 flex justify-center items-center gap-2 text-sky-700 font-bold text-lg bg-sky-50 py-3 px-6 rounded-full inline-flex border border-sky-200 shadow-inner">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-yellow-500 fill-current" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                Total Stars: <span id="menu-stars">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- === SCREEN: PLAYING === -->
+    <div id="playing-screen" class="hidden min-h-screen flex flex-col items-center p-4 transition-colors">
+        <!-- Header -->
+        <div class="w-full max-w-4xl flex justify-between items-center p-4 bg-white/50 backdrop-blur rounded-2xl shadow-sm mb-8">
+            <button onclick="showScreen('menu')" id="btn-menu" class="flex items-center gap-2 font-bold hover:opacity-70 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                Menu
+            </button>
+            <div class="flex items-center gap-2 font-bold text-xl text-yellow-600 bg-yellow-100 px-4 py-2 rounded-full shadow-inner">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 fill-current" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <span id="playing-stars">0</span>
+            </div>
+        </div>
+
+        <!-- Main Game Area -->
+        <div class="flex-1 flex flex-col items-center justify-center w-full max-w-4xl space-y-12">
+            
+            <!-- Instruction Banner -->
+            <div class="text-center animate-fade-in-down">
+                <div id="playing-animal" class="text-8xl mb-4 animate-bounce"></div>
+                <h2 id="playing-instruction" class="text-3xl md:text-5xl font-extrabold bg-white/80 px-8 py-4 rounded-full shadow-lg border-4"></h2>
+            </div>
+
+            <!-- The Path (Sliding Window) -->
+            <div id="path-container" class="flex flex-row flex-wrap justify-center items-center gap-4 md:gap-8 bg-white/60 p-8 rounded-3xl shadow-xl w-full">
+                <!-- Path generated via JS -->
+            </div>
+
+            <!-- Feedback Message -->
+            <div class="h-12 flex items-center justify-center">
+                <p id="feedback-msg" class="text-3xl font-bold opacity-0 transition-opacity duration-300"></p>
+            </div>
+
+            <!-- Options -->
+            <div id="options-container" class="grid grid-cols-3 gap-4 md:gap-8 w-full max-w-2xl pb-8">
+                <!-- Option buttons generated via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- === SCREEN: SUCCESS === -->
+    <div id="success-screen" class="hidden min-h-screen flex flex-col items-center justify-center p-4 transition-colors">
+        <div class="bg-white/90 backdrop-blur rounded-3xl shadow-2xl p-10 max-w-lg w-full text-center relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-full pointer-events-none flex justify-around">
+                <svg class="w-12 h-12 text-yellow-400 animate-pulse mt-4" viewBox="0 0 24 24" fill="currentColor"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                <svg class="w-16 h-16 text-yellow-400 animate-bounce mt-10" viewBox="0 0 24 24" fill="currentColor"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                <svg class="w-10 h-10 text-yellow-400 animate-pulse mt-2" viewBox="0 0 24 24" fill="currentColor"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+            </div>
+            
+            <span id="success-animal" class="text-8xl block mb-6 animate-bounce"></span>
+            <h2 class="text-4xl font-extrabold text-gray-800 mb-4">Great Job!</h2>
+            <p id="success-msg" class="text-2xl text-gray-600 mb-8"></p>
+            
+            <div class="flex flex-col gap-4">
+                <button id="btn-next-level" class="text-white text-2xl font-bold py-4 px-8 rounded-full shadow-lg transform transition hover:scale-105">
+                    Play Next Level
+                </button>
+                <button onclick="showScreen('menu')" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xl font-bold py-4 px-8 rounded-full shadow transition">
+                    Back to Menu
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- === GAME LOGIC (VANILLA JS) === -->
+    <script>
+        // --- GAME CONFIGURATIONS & THEMES ---
+        const GAMES = {
+            bear: {
+                id: 'bear',
+                title: "Bear's Berry Trail",
+                instruction: "Help Bear count forward by 1s!",
+                animal: '🐻',
+                item: '🍓',
+                bg: 'bg-green-100',
+                primary: 'bg-green-500',
+                hover: 'hover:bg-green-600',
+                text: 'text-green-800',
+                border: 'border-green-500',
+            },
+            owl: {
+                id: 'owl',
+                title: "Owl's Night Flight",
+                instruction: "Help Owl count backward by 1s!",
+                animal: '🦉',
+                item: '⭐',
+                bg: 'bg-indigo-900',
+                primary: 'bg-indigo-500',
+                hover: 'hover:bg-indigo-600',
+                text: 'text-indigo-100',
+                border: 'border-indigo-400',
+            },
+            squirrel: {
+                id: 'squirrel',
+                title: "Squirrel's Acorn Stash",
+                instruction: "Help Squirrel skip count from 0!",
+                animal: '🐿️',
+                item: '🌰',
+                bg: 'bg-orange-100',
+                primary: 'bg-orange-500',
+                hover: 'hover:bg-orange-600',
+                text: 'text-orange-900',
+                border: 'border-orange-500',
+            }
+        };
+
+        // --- GLOBAL STATE ---
+        let state = {
+            view: 'menu',
+            currentGame: null,
+            sequence: [],
+            currentIndex: 1,
+            options: [],
+            stars: 0,
+            squirrelStepIndex: 0,
+            feedbackActive: false // Prevents rapid clicking
+        };
+
+        // --- DOM ELEMENTS ---
+        const screens = {
+            menu: document.getElementById('menu-screen'),
+            playing: document.getElementById('playing-screen'),
+            success: document.getElementById('success-screen')
+        };
+        const els = {
+            menuStars: document.getElementById('menu-stars'),
+            playingStars: document.getElementById('playing-stars'),
+            btnMenu: document.getElementById('btn-menu'),
+            playingAnimal: document.getElementById('playing-animal'),
+            playingInstruction: document.getElementById('playing-instruction'),
+            pathContainer: document.getElementById('path-container'),
+            feedbackMsg: document.getElementById('feedback-msg'),
+            optionsContainer: document.getElementById('options-container'),
+            successAnimal: document.getElementById('success-animal'),
+            successMsg: document.getElementById('success-msg'),
+            btnNextLevel: document.getElementById('btn-next-level')
+        };
+
+        // --- INITIALIZATION ---
+        function init() {
+            // Build Menu Buttons
+            const menuContainer = document.getElementById('menu-buttons');
+            Object.values(GAMES).forEach(game => {
+                const btn = document.createElement('button');
+                btn.className = `${game.primary} ${game.hover} transform transition-all hover:scale-105 active:scale-95 text-white rounded-2xl p-6 shadow-lg flex flex-col items-center gap-4 border-b-4 ${game.border}`;
+                btn.onclick = () => startGame(game.id);
+                btn.innerHTML = `
+                    <span class="text-6xl">${game.animal}</span>
+                    <span class="text-xl font-bold">${game.title}</span>
+                `;
+                menuContainer.appendChild(btn);
+            });
+
+            // Set up Next Level button
+            els.btnNextLevel.onclick = () => {
+                showScreen('playing');
+                startLevel(state.currentGame.id);
+            };
+
+            showScreen('menu');
+        }
+
+        // --- SCREEN MANAGEMENT ---
+        function showScreen(screenId) {
+            state.view = screenId;
+            Object.values(screens).forEach(s => s.classList.add('hidden'));
+            screens[screenId].classList.remove('hidden');
+            
+            els.menuStars.innerText = state.stars;
+            els.playingStars.innerText = state.stars;
+
+            if (screenId === 'menu') {
+                // Reset body background
+                document.body.className = "font-sans min-h-screen bg-sky-100 selection:bg-sky-200";
+            }
+        }
+
+        // --- GAME LOGIC ---
+        function startGame(gameId) {
+            state.currentGame = GAMES[gameId];
+            showScreen('playing');
+            applyTheme();
+            startLevel(gameId);
+        }
+
+        function applyTheme() {
+            const game = state.currentGame;
+            
+            // Apply background to playing and success screens
+            screens.playing.className = `min-h-screen flex flex-col items-center p-4 transition-colors ${game.bg}`;
+            screens.success.className = `min-h-screen flex flex-col items-center justify-center p-4 transition-colors ${game.bg}`;
+            
+            // Menu button text color
+            els.btnMenu.className = `flex items-center gap-2 font-bold hover:opacity-70 transition ${game.text}`;
+            
+            // Success screen buttons
+            els.btnNextLevel.className = `text-white text-2xl font-bold py-4 px-8 rounded-full shadow-lg transform transition hover:scale-105 ${game.primary} ${game.hover}`;
+        }
+
+        function startLevel(gameId) {
+            state.feedbackActive = false;
+            els.feedbackMsg.style.opacity = '0';
+            els.feedbackMsg.innerText = '';
+
+            if (gameId === 'bear') state.sequence = generateBearSequence();
+            if (gameId === 'owl') state.sequence = generateOwlSequence();
+            if (gameId === 'squirrel') state.sequence = generateSquirrelSequence();
+
+            state.currentIndex = 1;
+            generateOptions(state.sequence, 1, gameId);
+            renderPlayingArea();
+        }
+
+        // --- SEQUENCE GENERATORS ---
+        function generateBearSequence() {
+            const start = Math.floor(Math.random() * 90) + 1;
+            return Array.from({ length: 6 }, (_, i) => start + i);
+        }
+
+        function generateOwlSequence() {
+            const start = Math.floor(Math.random() * (20 - 5 + 1)) + 5;
+            return Array.from({ length: 6 }, (_, i) => start - i);
+        }
+
+        function generateSquirrelSequence() {
+            const steps = [2, 5, 10];
+            const step = steps[state.squirrelStepIndex];
+            
+            // Cycle
+            state.squirrelStepIndex = (state.squirrelStepIndex + 1) % steps.length;
+
+            let limit = 100;
+            if (step === 2) limit = 20;
+            
+            const sequenceLength = Math.floor(limit / step) + 1;
+            return Array.from({ length: sequenceLength }, (_, i) => 0 + (i * step));
+        }
+
+        // --- UI UPDATERS ---
+        function generateOptions(seq, index, gameId) {
+            const correct = seq[index];
+            let wrongs = new Set();
+            
+            let step = 1;
+            if (gameId === 'squirrel') {
+                step = seq[1] - seq[0];
+            }
+
+            while (wrongs.size < 2) {
+                const errorType = Math.floor(Math.random() * 3);
+                let wrong;
+                if (errorType === 0) wrong = correct + step;
+                else if (errorType === 1) wrong = correct - step;
+                else wrong = correct + (Math.floor(Math.random() * 3) + 1) * (Math.random() > 0.5 ? 1 : -1);
+
+                if (wrong !== correct && wrong >= 0 && wrong <= 120 && !wrongs.has(wrong)) {
+                    wrongs.add(wrong);
+                }
+            }
+
+            state.options = [correct, ...Array.from(wrongs)].sort(() => Math.random() - 0.5);
+        }
+
+        function renderPlayingArea() {
+            const game = state.currentGame;
+            
+            // Update Headers
+            els.playingAnimal.innerText = game.animal;
+            els.playingInstruction.className = `text-3xl md:text-5xl font-extrabold bg-white/80 px-8 py-4 rounded-full shadow-lg border-4 ${game.text} ${game.border}`;
+            
+            // Dynamic Instruction for Squirrel
+            if (game.id === 'squirrel' && state.sequence.length > 1) {
+                els.playingInstruction.innerText = `Help Squirrel skip count by ${state.sequence[1]}s from 0!`;
+            } else {
+                els.playingInstruction.innerText = game.instruction;
+            }
+
+            // Calculate visible sequence (sliding window)
+            const visibleStartIndex = Math.max(0, state.currentIndex - 3);
+            const visibleSequence = state.sequence.slice(visibleStartIndex, state.currentIndex);
+
+            // Render Path
+            els.pathContainer.innerHTML = '';
+            visibleSequence.forEach(num => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'flex items-center gap-2 md:gap-4';
+                itemDiv.innerHTML = `
+                    <div class="w-20 h-20 md:w-28 md:h-28 rounded-full ${game.primary} flex items-center justify-center shadow-inner border-4 border-white transform transition-all">
+                        <span class="text-3xl md:text-5xl font-black text-white">${num}</span>
+                    </div>
+                    <svg class="w-8 h-8 md:w-12 md:h-12 ${game.text} opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                `;
+                els.pathContainer.appendChild(itemDiv);
+            });
+
+            // Target (Question Mark)
+            const targetDiv = document.createElement('div');
+            targetDiv.id = 'target-bubble';
+            targetDiv.className = `w-24 h-24 md:w-32 md:h-32 rounded-full bg-white flex items-center justify-center shadow-2xl border-8 ${game.border} animate-pulse relative transition-transform`;
+            targetDiv.innerHTML = `
+                <span class="text-5xl md:text-7xl font-black ${game.text}">?</span>
+                <div class="absolute -top-4 -right-4 text-4xl">${game.item}</div>
+            `;
+            els.pathContainer.appendChild(targetDiv);
+
+            renderOptions();
+        }
+
+        function renderOptions() {
+            els.optionsContainer.innerHTML = '';
+            state.options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = `bg-white hover:bg-gray-50 text-gray-800 text-4xl md:text-6xl font-black py-8 rounded-3xl shadow-lg border-b-8 border-gray-300 transform transition-all active:translate-y-2 active:border-b-0 hover:scale-105`;
+                btn.innerText = opt;
+                btn.onclick = () => handleOptionClick(opt);
+                els.optionsContainer.appendChild(btn);
+            });
+        }
+
+        // --- INTERACTION ---
+        function handleOptionClick(selectedNumber) {
+            if (state.feedbackActive) return; // Block clicks while animating
+
+            if (selectedNumber === state.sequence[state.currentIndex]) {
+                // Correct!
+                state.feedbackActive = true;
+                els.feedbackMsg.innerText = 'Correct! 🌟';
+                els.feedbackMsg.className = 'text-3xl font-bold text-green-600 opacity-100 transition-opacity duration-300';
+                
+                // Disable option buttons visually
+                Array.from(els.optionsContainer.children).forEach(btn => {
+                    btn.classList.add('opacity-50', 'cursor-not-allowed');
+                    btn.classList.remove('hover:scale-105', 'active:translate-y-2');
+                });
+
+                setTimeout(() => {
+                    if (state.currentIndex + 1 < state.sequence.length) {
+                        state.currentIndex++;
+                        generateOptions(state.sequence, state.currentIndex, state.currentGame.id);
+                        state.feedbackActive = false;
+                        els.feedbackMsg.style.opacity = '0';
+                        renderPlayingArea();
+                    } else {
+                        state.stars++;
+                        showSuccessScreen();
+                    }
+                }, 800);
+            } else {
+                // Incorrect
+                els.feedbackMsg.innerText = 'Oops! Try again.';
+                els.feedbackMsg.className = 'text-3xl font-bold text-red-500 opacity-100 transition-opacity duration-300';
+                
+                const targetBubble = document.getElementById('target-bubble');
+                targetBubble.classList.add('animate-bounce');
+                
+                setTimeout(() => {
+                    targetBubble.classList.remove('animate-bounce');
+                }, 500);
+            }
+        }
+
+        function showSuccessScreen() {
+            const game = state.currentGame;
+            els.successAnimal.innerText = game.animal;
+            els.successMsg.innerText = `You helped the ${game.title.split("'")[0]}!`;
+            showScreen('success');
+        }
+
+        // Run Init
+        init();
+
+    </script>
+</body>
+</html>
