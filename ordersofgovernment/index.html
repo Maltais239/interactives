@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Levels of Government: Sorting Challenge</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg: #2d3436; 
+            --panel: #dfe6e9; 
+            --btn: #0984e3; 
+            --btn-hover: #74b9ff;
+            --zone-border: #636e72; 
+            --zone-bg-hover: #b2bec3; 
+            --text-light: #ffffff;
+            --text-dark: #2d3436;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; 
+            font-family: 'Poppins', sans-serif; 
+            background: var(--bg);
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 20px;
+            min-height: 100vh; 
+            touch-action: none; 
+            overscroll-behavior: none;
+        }
+        h1 { font-size: 2rem; color: var(--text-light); margin: 10px 0; text-align: center; }
+        p.subtitle { color: var(--text-light); margin: 0 0 20px; text-align: center; font-size: 0.9rem; opacity: 0.9; }
+
+        /* Game Board */
+        .game-container {
+            background: var(--panel); 
+            width: 100%; 
+            max-width: 1000px; 
+            padding: 20px; 
+            border-radius: 12px;
+            position: relative; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: block; /* Visible immediately */
+        }
+
+        #items-container {
+            display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 20px;
+            padding: 15px; background-color: rgba(255,255,255,0.8); border-radius: 8px;
+            min-height: 140px; border: 2px solid #b2bec3;
+        }
+
+        .item {
+            width: 110px; min-height: 120px;
+            background: #fff; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            cursor: grab; touch-action: none; user-select: none;
+            position: relative; padding: 10px; z-index: 10;
+        }
+        .item:active { cursor: grabbing; transform: scale(1.05); }
+        .item img { 
+            width: 65px; height: 65px; 
+            margin-bottom: 5px; pointer-events: none; 
+            object-fit: contain; image-rendering: pixelated; 
+        }
+        .item span { 
+            font-size: 0.75rem; font-weight: 600; color: #4b5563; 
+            text-align: center; line-height: 1.2; pointer-events: none; 
+        }
+        .item.dragging {
+            opacity: 0.8; position: fixed; z-index: 1000; pointer-events: none;
+            left: 0; top: 0; margin: 0;
+        }
+
+        .zones-container {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px; margin-bottom: 20px;
+        }
+        .zone-wrapper { display: flex; flex-direction: column; }
+        .zone-label {
+            font-weight: 700; margin-bottom: 8px; color: var(--text-dark); 
+            text-align: center; font-size: 1.1rem; text-transform: uppercase;
+        }
+        .drop-zone {
+            flex: 1; min-height: 180px;
+            background: #fff; border: 3px dashed var(--zone-border); border-radius: 8px;
+            padding: 15px; display: flex; flex-wrap: wrap; gap: 10px; 
+            align-content: flex-start; justify-content: center;
+            transition: background .3s;
+        }
+        .drop-zone.over { background: var(--zone-bg-hover); border-style: solid; border-color: var(--btn); }
+
+        .controls { text-align: center; margin-top: 10px; }
+        .controls button {
+            background: var(--btn); color: var(--text-light); border: none; padding: 12px 30px; 
+            border-radius: 8px; cursor: pointer; margin: 10px 5px; font-size: 1.1rem; 
+            font-weight: 600; transition: all 0.2s; box-shadow: 0 4px 0px #0652dd;
+        }
+        .controls button:hover { background: var(--btn-hover); transform: translateY(-1px); }
+        .controls button:active { transform: translateY(3px); box-shadow: 0 1px 0px #0652dd; }
+        .controls button#reset-btn { background: #e17055; box-shadow: 0 4px 0px #d63031; }
+
+        #message-area {
+            text-align: center; margin-top: 15px; font-size: 1.2rem; 
+            font-weight: 600; min-height: 1.5em; color: var(--text-dark);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Main Game -->
+    <h1>Levels of Government</h1>
+    <p class="subtitle">Drag the responsibilities and roles to their correct level of government!</p>
+
+    <div class="game-container" id="game-container">
+        <div id="items-container"></div>
+        <div class="zones-container" id="zones-container"></div>
+        <div class="controls">
+            <button id="check-btn">Check Answers</button>
+            <button id="reset-btn">Start Over</button>
+        </div>
+        <div id="message-area"></div>
+    </div>
+
+    <script>
+        // --- Game Data Configuration & Hardcoded Assets ---
+        const CATEGORIES = ["Federal", "Provincial", "Local"];
+        
+        // Helper to generate inline SVGs for instant loading
+        const getSvg = (emoji) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="80">${emoji}</text></svg>`)}`;
+
+        // All items pre-encoded into the logic
+        const loadedItems = [
+            // Federal
+            { id: "item-0", name: "Prime Minister", category: "Federal", src: getSvg("🍁") },
+            { id: "item-1", name: "Money", category: "Federal", src: getSvg("💵") },
+            { id: "item-2", name: "Defense", category: "Federal", src: getSvg("🛡️") },
+            { id: "item-3", name: "Passports", category: "Federal", src: getSvg("🛂") },
+            { id: "item-4", name: "House of Commons", category: "Federal", src: getSvg("🏛️") },
+            { id: "item-5", name: "Governor General", category: "Federal", src: getSvg("👑") },
+            
+            // Provincial
+            { id: "item-6", name: "Premier", category: "Provincial", src: getSvg("🏢") },
+            { id: "item-7", name: "Schools", category: "Provincial", src: getSvg("🏫") },
+            { id: "item-8", name: "Hospitals", category: "Provincial", src: getSvg("🏥") },
+            { id: "item-9", name: "Highways", category: "Provincial", src: getSvg("🛣️") },
+            { id: "item-10", name: "Lieutenant Governor", category: "Provincial", src: getSvg("🎖️") },
+            
+            // Local
+            { id: "item-11", name: "Mayor", category: "Local", src: getSvg("🗣️") },
+            { id: "item-12", name: "Garbage", category: "Local", src: getSvg("🗑️") },
+            { id: "item-13", name: "Fire Services", category: "Local", src: getSvg("🚒") },
+            { id: "item-14", name: "Libraries", category: "Local", src: getSvg("📚") },
+            { id: "item-15", name: "Local Parks", category: "Local", src: getSvg("🏞️") },
+            { id: "item-16", name: "First Nations Chief", category: "Local", src: getSvg("🪶") }
+        ];
+
+        // DOM Elements
+        const itemsContainer = document.getElementById('items-container');
+        const zonesContainer = document.getElementById('zones-container');
+        const messageArea = document.getElementById('message-area');
+
+        // --- 1. BUILD GAME BOARD ---
+        function buildGameBoard() {
+            // Build Categories
+            zonesContainer.innerHTML = '';
+            CATEGORIES.forEach(cat => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'zone-wrapper';
+                wrapper.innerHTML = `
+                    <div class="zone-label">${cat}</div>
+                    <div class="drop-zone" data-category="${cat}"></div>
+                `;
+                zonesContainer.appendChild(wrapper);
+            });
+
+            // Build Draggable Items (Shuffled)
+            itemsContainer.innerHTML = '';
+            const shuffled = [...loadedItems].sort(() => Math.random() - 0.5);
+            shuffled.forEach(item => {
+                const el = document.createElement('div');
+                el.className = 'item';
+                el.draggable = true;
+                el.dataset.category = item.category;
+                el.innerHTML = `<img src="${item.src}"><span>${item.name}</span>`;
+                
+                // Desktop Drag Events
+                el.addEventListener('dragstart', handleDragStart);
+                el.addEventListener('dragend', handleDragEnd);
+                
+                // Mobile Touch Events
+                el.addEventListener('touchstart', handleTouchStart, {passive: false});
+                itemsContainer.appendChild(el);
+            });
+            
+            // Drop Zone Events
+            document.querySelectorAll('.drop-zone').forEach(zone => {
+                zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('over'); });
+                zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+                zone.addEventListener('drop', handleDrop);
+            });
+            
+            messageArea.textContent = '';
+        }
+
+        // --- 2. DESKTOP DRAG & DROP ---
+        let draggedItem = null;
+        function handleDragStart(e) {
+            draggedItem = e.currentTarget;
+            setTimeout(() => e.target.style.opacity = '0.5', 0);
+        }
+        function handleDragEnd(e) {
+            e.target.style.opacity = '1';
+            document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('over'));
+            draggedItem = null;
+        }
+        function handleDrop(e) {
+            e.preventDefault();
+            const zone = e.currentTarget;
+            zone.classList.remove('over');
+            if(draggedItem) zone.appendChild(draggedItem);
+        }
+
+        // --- 3. MOBILE TOUCH DRAG & DROP ---
+        let touchItem = null;
+        let touchOffsetX = 0;
+        let touchOffsetY = 0;
+        let clone = null;
+
+        function handleTouchStart(e) {
+            e.preventDefault();
+            touchItem = e.currentTarget;
+            const rect = touchItem.getBoundingClientRect();
+            const touch = e.touches;
+            
+            touchOffsetX = touch.clientX - rect.left;
+            touchOffsetY = touch.clientY - rect.top;
+
+            clone = touchItem.cloneNode(true);
+            clone.classList.add('dragging');
+            clone.style.width = rect.width + 'px';
+            clone.style.height = rect.height + 'px';
+            clone.style.left = rect.left + 'px';
+            clone.style.top = rect.top + 'px';
+            
+            document.body.appendChild(clone);
+            touchItem.style.opacity = '0.3';
+
+            document.addEventListener('touchmove', handleTouchMove, {passive: false});
+            document.addEventListener('touchend', handleTouchEnd);
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+            if(!clone) return;
+            const touch = e.touches;
+            
+            clone.style.left = (touch.clientX - touchOffsetX) + 'px';
+            clone.style.top = (touch.clientY - touchOffsetY) + 'px';
+            
+            const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+            const zone = elemBelow ? elemBelow.closest('.drop-zone') : null;
+            
+            document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('over'));
+            if(zone) zone.classList.add('over');
+        }
+
+        function handleTouchEnd(e) {
+            document.removeEventListener('touchmove', handleTouchMove);
+            document.removeEventListener('touchend', handleTouchEnd);
+            
+            const touch = e.changedTouches;
+            const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+            const zone = elemBelow ? elemBelow.closest('.drop-zone') : null;
+
+            if(zone) {
+                zone.appendChild(touchItem);
+            }
+            
+            if(clone) clone.remove();
+            touchItem.style.opacity = '1';
+            document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('over'));
+            touchItem = null;
+            clone = null;
+        }
+
+        // --- 4. GAME LOGIC ---
+        document.getElementById('check-btn').addEventListener('click', () => {
+            let correct = 0;
+            const items = document.querySelectorAll('.item');
+            
+            items.forEach(item => {
+                const zone = item.closest('.drop-zone');
+                if(zone) {
+                    if(zone.dataset.category === item.dataset.category) {
+                        correct++;
+                        item.style.border = '3px solid #00b894';
+                    } else {
+                        item.style.border = '3px solid #d63031';
+                    }
+                } else {
+                     item.style.border = 'none'; // Not sorted yet
+                }
+            });
+
+            const totalItems = document.getElementById('items-container').children.length;
+
+            if (correct === loadedItems.length && totalItems === 0) {
+                messageArea.textContent = "Great Job! Everything is sorted correctly! 🎉";
+                messageArea.style.color = "#00b894";
+            } else if (totalItems > 0) {
+                messageArea.textContent = "Keep going! Sort all the items first.";
+                messageArea.style.color = "#e17055";
+            } else {
+                messageArea.textContent = `${correct} out of ${loadedItems.length} correct. Keep trying!`;
+                messageArea.style.color = "#d63031";
+            }
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            buildGameBoard();
+        });
+
+        // Initialize the game immediately on load
+        window.addEventListener('DOMContentLoaded', buildGameBoard);
+
+    </script>
+</body>
+</html>
