@@ -90,7 +90,11 @@
                 image: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>,
                 refresh: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>,
                 chevronDown: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>,
-                lightbulb: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+                lightbulb: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>,
+                zoomIn: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/><line x1="11" x2="11" y1="8" y2="14"/><line x1="8" x2="14" y1="11" y2="11"/></svg>,
+                spotlight: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="5"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M5 5l1.5 1.5"/><path d="M17.5 17.5L19 19"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M5 19l1.5-1.5"/><path d="M17.5 6.5L19 5"/></svg>,
+                sliderTool: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M12 5v14"/><path d="m8 10-2 2 2 2"/><path d="m16 14 2-2-2-2"/></svg>,
+                chevronLeftRight: <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18-6-6 6-6"/><path d="m15 6 6 6-6 6"/></svg>
             };
             return icons[name] || null;
         };
@@ -269,7 +273,7 @@
                             <div className="absolute top-full left-0 mt-2 w-full max-w-sm bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden dropdown-enter">
                                 <div className="flex border-b border-slate-100 bg-slate-50/50">
                                     {Object.keys(analysisPrompts).map(cat => {
-                                        const shortName = cat.split(' ')[0]; // Who, What, etc.
+                                        const shortName = cat.split(' '); // Who, What, etc.
                                         return (
                                             <button 
                                                 key={cat}
@@ -410,13 +414,50 @@
 
         const App = () => {
             // Default Image Data
-            const [imageUrl, setImageUrl] = useState("https://placehold.co/1200x600/f1f5f9/64748b?text=Visual+Analysis+Tool"); 
-            const [imageTitle, setImageTitle] = useState("Instructions: Click the image icon (top-right) to paste a link.");
+            const [imageUrl, setImageUrl] = useState("https://raw.githubusercontent.com/Maltais239/historicalimages/main/LastSpike_Craigellachie_BC_Canada.jpg"); 
+            const [imageTitle, setImageTitle] = useState("The Last Spike (1885)");
             const [showImageInput, setShowImageInput] = useState(false);
             
             // Temporary state for the input field
             const [tempUrl, setTempUrl] = useState("");
             const [tempTitle, setTempTitle] = useState("");
+
+            // Tool State
+            const [activeTool, setActiveTool] = useState("none"); // "none", "magnify", "mask", "slider"
+            const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+            const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+            const [isHovering, setIsHovering] = useState(false);
+            
+            // Slider State
+            const [sliderPos, setSliderPos] = useState(50);
+            const [isDraggingSlider, setIsDraggingSlider] = useState(false);
+            const imageRef = useRef(null);
+
+            // Global mouse up for slider dragging safety
+            useEffect(() => {
+                const handleGlobalMouseUp = () => setIsDraggingSlider(false);
+                window.addEventListener('mouseup', handleGlobalMouseUp);
+                return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+            }, []);
+
+            const handleMouseMove = (e) => {
+                if (!imageRef.current) return;
+                const rect = imageRef.current.getBoundingClientRect();
+                const currentX = e.clientX - rect.left;
+                const currentY = e.clientY - rect.top;
+                
+                setMousePos({ x: currentX, y: currentY });
+                setImageSize({ width: rect.width, height: rect.height });
+
+                if (isDraggingSlider && activeTool === 'slider') {
+                    let newSliderPos = (currentX / rect.width) * 100;
+                    setSliderPos(Math.max(0, Math.min(100, newSliderPos)));
+                }
+            };
+
+            const toggleTool = (tool) => {
+                setActiveTool(current => current === tool ? 'none' : tool);
+            };
 
             const handleUpdateImage = () => {
                 if(tempUrl) setImageUrl(tempUrl);
@@ -452,10 +493,31 @@
                             <div className="bg-slate-900 text-white rounded-3xl shadow-xl relative overflow-hidden group border border-slate-700 flex flex-col h-full min-h-[300px]">
                                  
                                  {/* Controls */}
-                                 <div className="absolute top-4 right-4 z-20 flex gap-2">
+                                 <div className="absolute top-4 right-4 z-40 flex flex-col gap-2">
+                                    <button 
+                                        onClick={() => toggleTool('magnify')}
+                                        className={`p-2 rounded-lg backdrop-blur-sm transition-colors shadow-lg border border-white/10 ${activeTool === 'magnify' ? 'bg-indigo-600 text-white' : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'}`}
+                                        title="Magnifying Glass"
+                                    >
+                                        <Icon name="zoomIn" size={20} />
+                                    </button>
+                                    <button 
+                                        onClick={() => toggleTool('mask')}
+                                        className={`p-2 rounded-lg backdrop-blur-sm transition-colors shadow-lg border border-white/10 ${activeTool === 'mask' ? 'bg-indigo-600 text-white' : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'}`}
+                                        title="Spotlight / Mask"
+                                    >
+                                        <Icon name="spotlight" size={20} />
+                                    </button>
+                                    <button 
+                                        onClick={() => toggleTool('slider')}
+                                        className={`p-2 rounded-lg backdrop-blur-sm transition-colors shadow-lg border border-white/10 ${activeTool === 'slider' ? 'bg-indigo-600 text-white' : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'}`}
+                                        title="Reveal Slider"
+                                    >
+                                        <Icon name="sliderTool" size={20} />
+                                    </button>
                                     <button 
                                         onClick={() => setShowImageInput(!showImageInput)}
-                                        className="bg-slate-800/80 hover:bg-indigo-600 text-white p-2 rounded-lg backdrop-blur-sm border border-white/10 transition-colors shadow-lg"
+                                        className={`p-2 rounded-lg backdrop-blur-sm transition-colors shadow-lg border border-white/10 ${showImageInput ? 'bg-indigo-600 text-white' : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'}`}
                                         title="Change Image"
                                     >
                                         <Icon name={showImageInput ? "refresh" : "image"} size={20} />
@@ -463,7 +525,13 @@
                                  </div>
 
                                  {/* Image Display */}
-                                 <div className="relative w-full flex-1 bg-black flex items-center justify-center overflow-hidden">
+                                 <div 
+                                    ref={imageRef}
+                                    className={`relative w-full flex-1 bg-black flex items-center justify-center overflow-hidden ${(activeTool === 'magnify' || activeTool === 'mask') ? 'cursor-crosshair' : ''}`}
+                                    onMouseMove={handleMouseMove}
+                                    onMouseEnter={() => setIsHovering(true)}
+                                    onMouseLeave={() => { setIsHovering(false); setIsDraggingSlider(false); }}
+                                 >
                                     <img 
                                         src={imageUrl} 
                                         alt={imageTitle}
@@ -471,7 +539,66 @@
                                         className="w-full h-full object-contain"
                                         onError={(e) => { e.target.src = "https://placehold.co/800x400?text=Image+Load+Error"; }}
                                     />
-                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-6 pt-12 pointer-events-none">
+                                    
+                                    {/* Reveal Slider Dark Overlay (Curtain) */}
+                                    {activeTool === 'slider' && (
+                                        <div 
+                                            className="absolute inset-0 bg-slate-900/95 backdrop-blur-sm z-20 pointer-events-none"
+                                            style={{
+                                                clipPath: `polygon(${sliderPos}% 0, 100% 0, 100% 100%, ${sliderPos}% 100%)`
+                                            }}
+                                        />
+                                    )}
+
+                                    {/* Slider Handle */}
+                                    {activeTool === 'slider' && (
+                                        <div 
+                                            className="absolute top-0 bottom-0 z-30"
+                                            style={{ left: `${sliderPos}%` }}
+                                        >
+                                            {/* Center Line */}
+                                            <div className="absolute top-0 bottom-0 w-0.5 bg-indigo-500 shadow-[0_0_10px_rgba(79,70,229,0.8)] -ml-[1px]"></div>
+                                            
+                                            {/* Grabby Hand Handle */}
+                                            <div 
+                                                className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-white border-2 border-indigo-500 rounded-full shadow-xl flex items-center justify-center transition-transform z-40 select-none ${isDraggingSlider ? 'cursor-grabbing scale-110 bg-indigo-50' : 'cursor-grab hover:scale-110'}`}
+                                                onMouseDown={() => setIsDraggingSlider(true)}
+                                            >
+                                                <Icon name="chevronLeftRight" size={18} className="text-indigo-600" />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Mask Overlay */}
+                                    {activeTool === 'mask' && (
+                                        <div 
+                                            className="absolute inset-0 bg-black/95 z-20 pointer-events-none transition-opacity duration-300"
+                                            style={{
+                                                WebkitMaskImage: isHovering ? `radial-gradient(circle at ${mousePos.x}px ${mousePos.y}px, transparent 0, transparent 80px, black 120px)` : 'black',
+                                                maskImage: isHovering ? `radial-gradient(circle at ${mousePos.x}px ${mousePos.y}px, transparent 0, transparent 80px, black 120px)` : 'black'
+                                            }}
+                                        />
+                                    )}
+
+                                    {/* Magnifier Overlay */}
+                                    {activeTool === 'magnify' && isHovering && (
+                                         <div className="absolute w-[200px] h-[200px] border-4 border-indigo-500 shadow-[0_0_20px_rgba(0,0,0,0.8)] rounded-full overflow-hidden pointer-events-none z-30 bg-black"
+                                             style={{ left: mousePos.x - 100, top: mousePos.y - 100 }}>
+                                             <div style={{
+                                                 position: 'absolute',
+                                                 width: imageSize.width,
+                                                 height: imageSize.height,
+                                                 left: -mousePos.x + 100,
+                                                 top: -mousePos.y + 100,
+                                                 transform: 'scale(2.5)',
+                                                 transformOrigin: `${mousePos.x}px ${mousePos.y}px`
+                                             }}>
+                                                 <img src={imageUrl} className="w-full h-full object-contain" crossOrigin="anonymous" />
+                                             </div>
+                                        </div>
+                                    )}
+
+                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-6 pt-12 pointer-events-none z-10">
                                         <h2 className="text-lg md:text-2xl font-heading font-bold text-white text-center shadow-black drop-shadow-md">{imageTitle}</h2>
                                     </div>
                                  </div>
