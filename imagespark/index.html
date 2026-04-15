@@ -176,7 +176,6 @@
             
             // Prompt Menu State
             const [activeCategory, setActiveCategory] = useState(null);
-            const [selectedCategoryColor, setSelectedCategoryColor] = useState(null);
 
             const addIdea = () => {
                 if (newIdea.trim()) {
@@ -188,8 +187,8 @@
                     const x = 50 + radius * Math.cos(angle);
                     const y = 50 + radius * Math.sin(angle);
 
-                    // Default to classic yellow if no specific W category is active
-                    const stickyColor = selectedCategoryColor || 'bg-yellow-100';
+                    // Use the active category color if a tab is open, otherwise default to yellow
+                    const stickyColor = activeCategory ? categoryColors[activeCategory].bg : 'bg-yellow-100';
 
                     setIdeas([...ideas, { 
                         id: Date.now(), 
@@ -200,7 +199,6 @@
                         color: stickyColor
                     }]);
                     setNewIdea("");
-                    setSelectedCategoryColor(null);
                 }
             };
 
@@ -212,12 +210,6 @@
                 if(confirm("Clear the current observations?")) {
                     setIdeas([]);
                 }
-            };
-
-            const selectPrompt = (text, category) => {
-                setNewIdea(text);
-                setSelectedCategoryColor(categoryColors[category].bg);
-                setActiveCategory(null);
             };
 
             const saveAsText = () => {
@@ -300,13 +292,12 @@
                             <div className={`mt-2 p-2.5 rounded-xl border-2 ${categoryColors[activeCategory].bg} ${categoryColors[activeCategory].activeBorder} border-opacity-40 shadow-inner animate-fadeIn`}>
                                 <div className="flex flex-col gap-1.5">
                                     {analysisPrompts[activeCategory].map((prompt, idx) => (
-                                        <button 
+                                        <div 
                                             key={idx}
-                                            onClick={() => selectPrompt(prompt, activeCategory)}
-                                            className="text-left text-xs bg-white/90 hover:bg-white px-3 py-2 rounded-lg shadow-sm border border-white transition-all text-slate-700 hover:shadow-md hover:scale-[1.01]"
+                                            className="text-left text-xs bg-white/90 px-3 py-2 rounded-lg shadow-sm border border-white text-slate-700"
                                         >
                                             {prompt}
-                                        </button>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
@@ -320,10 +311,7 @@
                             className="flex-1 px-4 py-2 border-2 border-slate-200 rounded-full focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all shadow-sm text-sm text-slate-700 font-medium"
                             placeholder="I notice..."
                             value={newIdea}
-                            onChange={(e) => {
-                                setNewIdea(e.target.value);
-                                if(e.target.value === "") setSelectedCategoryColor(null);
-                            }}
+                            onChange={(e) => setNewIdea(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && addIdea()}
                         />
                         <button onClick={addIdea} className="bg-indigo-600 text-white p-2 px-5 rounded-full hover:bg-indigo-700 transition shadow-md flex items-center justify-center gap-2 font-bold whitespace-nowrap transform hover:scale-105 active:scale-95 text-sm">
@@ -420,9 +408,12 @@
         };
 
         const App = () => {
+            const defaultImageUrl = "https://raw.githubusercontent.com/Maltais239/historicalimages/main/LastSpike_Craigellachie_BC_Canada.jpg";
+            const defaultImageTitle = "The Last Spike (1885)";
+
             // Default Image Data
-            const [imageUrl, setImageUrl] = useState("https://raw.githubusercontent.com/Maltais239/historicalimages/main/LastSpike_Craigellachie_BC_Canada.jpg"); 
-            const [imageTitle, setImageTitle] = useState("The Last Spike (1885)");
+            const [imageUrl, setImageUrl] = useState(defaultImageUrl); 
+            const [imageTitle, setImageTitle] = useState(defaultImageTitle);
             const [showImageInput, setShowImageInput] = useState(false);
             
             // Temporary state for the input field
@@ -469,6 +460,14 @@
             const handleUpdateImage = () => {
                 if(tempUrl) setImageUrl(tempUrl);
                 if(tempTitle) setImageTitle(tempTitle);
+                setShowImageInput(false);
+            };
+
+            const handleResetDefaultImage = () => {
+                setImageUrl(defaultImageUrl);
+                setImageTitle(defaultImageTitle);
+                setTempUrl("");
+                setTempTitle("");
                 setShowImageInput(false);
             };
 
@@ -542,7 +541,6 @@
                                     <img 
                                         src={imageUrl} 
                                         alt={imageTitle}
-                                        crossOrigin="anonymous" 
                                         className="w-full h-full object-contain"
                                         onError={(e) => { e.target.src = "https://placehold.co/800x400?text=Image+Load+Error"; }}
                                     />
@@ -600,7 +598,7 @@
                                                  transform: 'scale(2.5)',
                                                  transformOrigin: `${mousePos.x}px ${mousePos.y}px`
                                              }}>
-                                                 <img src={imageUrl} className="w-full h-full object-contain" crossOrigin="anonymous" />
+                                                 <img src={imageUrl} className="w-full h-full object-contain" />
                                              </div>
                                         </div>
                                     )}
@@ -635,19 +633,27 @@
                                                     />
                                                 </div>
                                             </div>
-                                            <div className="flex justify-end gap-2">
+                                            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-2">
                                                 <button 
-                                                    onClick={() => setShowImageInput(false)}
-                                                    className="px-4 py-2 text-slate-400 hover:text-white transition-colors text-sm"
+                                                    onClick={handleResetDefaultImage}
+                                                    className="text-slate-400 hover:text-indigo-400 text-xs transition-colors flex items-center gap-1"
                                                 >
-                                                    Cancel
+                                                    <Icon name="refresh" size={14} /> Reset to Default
                                                 </button>
-                                                <button 
-                                                    onClick={handleUpdateImage}
-                                                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition-transform hover:scale-105 text-sm"
-                                                >
-                                                    Update View
-                                                </button>
+                                                <div className="flex gap-2 w-full sm:w-auto justify-end">
+                                                    <button 
+                                                        onClick={() => setShowImageInput(false)}
+                                                        className="px-4 py-2 text-slate-400 hover:text-white transition-colors text-sm"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button 
+                                                        onClick={handleUpdateImage}
+                                                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg transition-transform hover:scale-105 text-sm"
+                                                    >
+                                                        Update View
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
