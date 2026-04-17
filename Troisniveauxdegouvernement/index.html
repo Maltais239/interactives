@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trois niveaux de gouvernement - Canada</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #f3f4f6;
+            color: #1f2937;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: manipulation;
+        }
+        .minecraft-font {
+            text-shadow: 1px 1px #ccc;
+        }
+        .drop-zone {
+            transition: all 0.3s ease;
+        }
+        .sub-drop-zone {
+            min-height: 110px;
+            transition: all 0.2s ease;
+            border: 2px dashed #d1d5db;
+            background-color: rgba(255, 255, 255, 0.5);
+        }
+        .sub-drop-zone.drag-over {
+            background-color: #ecfdf5;
+            border-color: #10b981;
+        }
+        .draggable-item {
+            cursor: grab;
+            transition: transform 0.2s;
+            user-select: none;
+            touch-action: none;
+        }
+        .draggable-item:active {
+            cursor: grabbing;
+        }
+        /* Specific card colors adjusted for light mode */
+        .card-leader { 
+            background-color: #4f46e5; 
+            border-color: #4338ca; 
+            color: white;
+        } 
+        .card-responsibility { 
+            background-color: #ffffff; 
+            border-color: #d1d5db; 
+            color: #1f2937;
+        } 
+        
+        .success-bg { 
+            background-color: #059669 !important; 
+            border-color: #047857 !important; 
+            color: white !important;
+        }
+        .error-bg { 
+            background-color: #dc2626 !important; 
+            border-color: #b91c1c !important; 
+            color: white !important;
+        }
+        
+        #modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 50;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Icon/Image sizing - Increased for visibility */
+        .card-img {
+            width: 44px;
+            height: 44px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        .pm-asset-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .building-icon {
+            font-size: 1.75rem;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold minecraft-font text-red-600 mb-2">Trois niveaux de gouvernement</h1>
+            <p class="text-lg text-gray-600 font-medium">Triez les <span class="text-indigo-600 font-bold">Dirigeants</span> indigo et les <span class="text-gray-500 font-bold">Responsabilités</span> blanches !</p>
+        </header>
+
+        <!-- Stats Bar -->
+        <div class="flex justify-between items-center mb-6 bg-white p-4 rounded-lg border-b-4 border-gray-200 shadow-sm">
+            <div class="text-xl font-bold text-gray-700">Score : <span id="score" class="text-green-600">0</span> / 12</div>
+            <button onclick="resetGame()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold transition shadow-md">Réinitialiser</button>
+        </div>
+
+        <!-- Inventory / Items Pool -->
+        <div id="items-pool" class="flex flex-wrap gap-3 justify-center mb-12 p-6 bg-white rounded-xl border-4 border-dashed border-gray-300 min-h-[160px] shadow-inner">
+            <!-- Items will be injected here -->
+        </div>
+
+        <!-- ROW 1: LEADERS -->
+        <div class="mb-8">
+            <div class="flex items-center gap-2 mb-4">
+                <div class="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center text-black font-bold text-xl shadow-sm">👤</div>
+                <h2 class="text-2xl font-bold text-gray-800 minecraft-font">DIRIGEANTS DU GOUVERNEMENT</h2>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Federal Leader -->
+                <div class="sub-drop-zone rounded-xl p-4 bg-red-50 border-red-200 border-2 shadow-sm" data-level="Federal" data-type="Leader">
+                    <p class="text-sm font-black text-red-600 uppercase mb-3 text-center">Dirigeant fédéral</p>
+                    <div class="zone-content flex flex-col gap-2"></div>
+                </div>
+                <!-- Provincial Leader -->
+                <div class="sub-drop-zone rounded-xl p-4 bg-blue-50 border-blue-200 border-2 shadow-sm" data-level="Provincial" data-type="Leader">
+                    <p class="text-sm font-black text-blue-600 uppercase mb-3 text-center">Dirigeant provincial</p>
+                    <div class="zone-content flex flex-col gap-2"></div>
+                </div>
+                <!-- Municipal Leader -->
+                <div class="sub-drop-zone rounded-xl p-4 bg-green-50 border-green-200 border-2 shadow-sm" data-level="Municipal" data-type="Leader">
+                    <p class="text-sm font-black text-green-600 uppercase mb-3 text-center">Dirigeant municipal</p>
+                    <div class="zone-content flex flex-col gap-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 2: RESPONSIBILITIES -->
+        <div>
+            <div class="flex items-center gap-2 mb-4">
+                <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-700 font-bold text-xl shadow-sm">🛠️</div>
+                <h2 class="text-2xl font-bold text-gray-800 minecraft-font">RESPONSABILITÉS DU GOUVERNEMENT</h2>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Federal Responsibilities -->
+                <div class="sub-drop-zone rounded-xl p-4 bg-red-50 border-red-200 border-2 shadow-sm" data-level="Federal" data-type="Responsibility">
+                    <p class="text-sm font-black text-red-600 uppercase mb-3 text-center">Services fédéraux</p>
+                    <div class="zone-content flex flex-col gap-2 min-h-[120px]"></div>
+                </div>
+                <!-- Provincial Responsibilities -->
+                <div class="sub-drop-zone rounded-xl p-4 bg-blue-50 border-blue-200 border-2 shadow-sm" data-level="Provincial" data-type="Responsibility">
+                    <p class="text-sm font-black text-blue-600 uppercase mb-3 text-center">Services provinciaux</p>
+                    <div class="zone-content flex flex-col gap-2 min-h-[120px]"></div>
+                </div>
+                <!-- Municipal Responsibilities -->
+                <div class="sub-drop-zone rounded-xl p-4 bg-green-50 border-green-200 border-2 shadow-sm" data-level="Municipal" data-type="Responsibility">
+                    <p class="text-sm font-black text-green-600 uppercase mb-3 text-center">Services municipaux</p>
+                    <div class="zone-content flex flex-col gap-2 min-h-[120px]"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feedback Modal -->
+    <div id="modal-overlay">
+        <div class="bg-white border-4 border-yellow-400 p-8 rounded-2xl max-w-sm text-center shadow-2xl">
+            <h2 id="modal-title" class="text-3xl font-bold mb-4 text-gray-800">Travail parfait !</h2>
+            <p id="modal-message" class="text-lg mb-6 text-gray-600"></p>
+            <button onclick="closeModal()" class="bg-yellow-400 text-black font-bold px-8 py-3 rounded-lg hover:bg-yellow-500 transition shadow-md">D'accord !</button>
+        </div>
+    </div>
+
+    <script>
+        const gameData = [
+            { 
+                id: 1, 
+                text: "Premier ministre", 
+                level: "Federal", 
+                category: "Leader", 
+                // Updated to a highly reliable and clear Unsplash ID for a maple leaf
+                asset: "https://images.unsplash.com/photo-1542468301-4993172e9d93?q=80&w=200&auto=format&fit=crop", 
+                type: "pm_special" 
+            },
+            { id: 2, text: "Monnaie", level: "Federal", category: "Responsibility", asset: "💰", type: "emoji" },
+            { id: 3, text: "L'armée", level: "Federal", category: "Responsibility", asset: "🛡️", type: "emoji" },
+            { id: 4, text: "Passeport", level: "Federal", category: "Responsibility", asset: "📖", type: "emoji" },
+            { id: 9, text: "Maire", level: "Municipal", category: "Leader", asset: "🏘️", type: "emoji" },
+            { id: 5, text: "Premier ministre (provincial)", level: "Provincial", category: "Leader", asset: "🏛️", type: "emoji" },
+            { id: 6, text: "Écoles", level: "Provincial", category: "Responsibility", asset: "🏫", type: "emoji" },
+            { id: 7, text: "Hôpitaux", level: "Provincial", category: "Responsibility", asset: "🏥", type: "emoji" },
+            { id: 8, text: "Autoroutes", level: "Provincial", category: "Responsibility", asset: "🛣️", type: "emoji" },
+            { id: 10, text: "Camion à ordures", level: "Municipal", category: "Responsibility", asset: "🚛", type: "emoji" },
+            { id: 11, text: "Parc local", level: "Municipal", category: "Responsibility", asset: "🌳", type: "emoji" },
+            { id: 12, text: "Caserne de pompiers", level: "Municipal", category: "Responsibility", asset: "👨‍🚒", type: "emoji" }
+        ];
+
+        let score = 0;
+        const pool = document.getElementById('items-pool');
+        const scoreDisplay = document.getElementById('score');
+        const modal = document.getElementById('modal-overlay');
+
+        function initItems() {
+            pool.innerHTML = '';
+            const shuffled = [...gameData].sort(() => Math.random() - 0.5);
+            
+            shuffled.forEach(item => {
+                const el = document.createElement('div');
+                const cardClass = item.category === 'Leader' ? 'card-leader' : 'card-responsibility';
+                
+                el.className = `draggable-item ${cardClass} p-3 rounded-lg border-2 shadow-sm flex items-center gap-3 w-52 shrink-0`;
+                el.draggable = true;
+                el.dataset.id = item.id;
+                
+                let visualHtml = '';
+                if (item.type === 'pm_special') {
+                    visualHtml = `
+                        <div class="pm-asset-container">
+                            <span class="building-icon" title="Colline du Parlement">🏛️</span>
+                            <img src="${item.asset}" class="card-img" alt="feuille d'érable" 
+                                 onload="this.style.display='block'"
+                                 onerror="this.parentElement.innerHTML='🏛️ 🍁'">
+                        </div>
+                    `;
+                } else if (item.type === 'emoji') {
+                    visualHtml = `<span class="text-3xl">${item.asset}</span>`;
+                }
+                
+                el.innerHTML = `
+                    <div class="flex items-center justify-center shrink-0">${visualHtml}</div>
+                    <span class="font-bold text-sm leading-tight">${item.text}</span>
+                `;
+                
+                el.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', item.id);
+                    el.classList.add('opacity-50');
+                });
+
+                el.addEventListener('dragend', () => el.classList.remove('opacity-50'));
+
+                el.addEventListener('touchstart', handleTouchStart, {passive: false});
+                el.addEventListener('touchmove', handleTouchMove, {passive: false});
+                el.addEventListener('touchend', handleTouchEnd, {passive: false});
+
+                pool.appendChild(el);
+            });
+        }
+
+        document.querySelectorAll('.sub-drop-zone').forEach(zone => {
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                zone.classList.add('drag-over');
+            });
+
+            zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+                const id = e.dataTransfer.getData('text/plain');
+                handleDrop(id, zone);
+            });
+        });
+
+        function handleDrop(id, zone) {
+            const item = gameData.find(d => d.id == id);
+            const levelMatch = item.level === zone.dataset.level;
+            const categoryMatch = item.category === zone.dataset.type;
+            const element = document.querySelector(`[data-id="${id}"]`);
+
+            if (levelMatch && categoryMatch) {
+                if (!zone.querySelector(`.zone-content [data-id="${id}"]`)) {
+                    score++;
+                    scoreDisplay.innerText = score;
+                    element.classList.remove('card-leader', 'card-responsibility', 'w-52', 'shadow-sm');
+                element.classList.add('success-bg', 'cursor-default', 'w-full');
+                element.draggable = false;
+                zone.querySelector('.zone-content').appendChild(element);
+                
+                if(score === 12) {
+                    showModal("Tri parfait !", "Vous avez correctement identifié chaque dirigeant et service ! 🇨🇦");
+                }
+            }
+        } else {
+            element.classList.add('error-bg');
+                setTimeout(() => element.classList.remove('error-bg'), 500);
+            }
+        }
+
+        let activeTouchElement = null;
+        function handleTouchStart(e) { 
+            activeTouchElement = e.currentTarget; 
+            e.currentTarget.style.zIndex = '1000'; 
+        }
+        function handleTouchMove(e) {
+            if (!activeTouchElement) return;
+            e.preventDefault();
+            const touch = e.touches;
+            activeTouchElement.style.position = 'fixed';
+            activeTouchElement.style.left = (touch.clientX - 50) + 'px';
+            activeTouchElement.style.top = (touch.clientY - 25) + 'px';
+        }
+        function handleTouchEnd(e) {
+            if (!activeTouchElement) return;
+            const touch = e.changedTouches;
+            activeTouchElement.style.position = '';
+            activeTouchElement.style.left = ''; activeTouchElement.style.top = '';
+            activeTouchElement.style.zIndex = '';
+            const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+            const zone = dropTarget?.closest('.sub-drop-zone');
+            if (zone) handleDrop(activeTouchElement.dataset.id, zone);
+            activeTouchElement = null;
+        }
+
+        function showModal(title, message) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-message').innerText = message;
+            modal.style.display = 'flex';
+        }
+        function closeModal() { modal.style.display = 'none'; }
+        function resetGame() {
+            score = 0; scoreDisplay.innerText = score;
+            document.querySelectorAll('.zone-content').forEach(z => z.innerHTML = '');
+            initItems();
+        }
+
+        window.onload = initItems;
+    </script>
+</body>
+</html>
