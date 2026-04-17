@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Match Commerce et Transports</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg: #f0f4f8; 
+            --panel: #ffffff; 
+            --btn: #2b6cb0; 
+            --btn-hover: #2c5282;
+            --zone-border: #a0aec0; 
+            --zone-bg-hover: #e2e8f0; 
+            --text-dark: #1a202c;
+            --text-light: #ffffff;
+            --success: #38a169;
+            --error: #e53e3e;
+            --warning: #dd6b20;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; 
+            font-family: 'Inter', sans-serif; 
+            background: var(--bg);
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 20px;
+            min-height: 100vh; 
+            touch-action: none; 
+            overscroll-behavior: none;
+            color: var(--text-dark);
+        }
+        h1 { font-size: 2.2rem; margin: 10px 0; text-align: center; color: #2c5282; font-weight: 800; }
+        p.subtitle { 
+            max-width: 800px; text-align: center; font-size: 1rem; 
+            margin: 0 0 25px; line-height: 1.5; color: #4a5568; 
+            background: #e2e8f0; padding: 15px; border-radius: 8px; border-left: 5px solid #2b6cb0;
+        }
+
+        /* Game Board */
+        .game-container {
+            background: var(--panel); 
+            width: 100%; 
+            max-width: 1100px; 
+            padding: 25px; 
+            border-radius: 12px;
+            position: relative; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        }
+
+        #items-container {
+            display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 30px;
+            padding: 20px; background-color: #edf2f7; border-radius: 8px;
+            min-height: 140px; border: 2px dashed #cbd5e0;
+        }
+
+        .item {
+            width: 115px; min-height: 120px;
+            background: #fff; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.08);
+            cursor: grab; touch-action: none; user-select: none;
+            position: relative; padding: 10px; z-index: 10;
+            border: 2px solid transparent;
+            transition: transform 0.1s;
+        }
+        .item:active { cursor: grabbing; transform: scale(1.05); }
+        .item img { 
+            width: 55px; height: 55px; 
+            margin-bottom: 8px; pointer-events: none; 
+            object-fit: contain; image-rendering: pixelated; 
+        }
+        .item span { 
+            font-size: 0.75rem; font-weight: 600; color: #2d3748; 
+            text-align: center; line-height: 1.25; pointer-events: none; 
+        }
+        .item.dragging {
+            opacity: 0.9; position: fixed; z-index: 1000; pointer-events: none;
+            left: 0; top: 0; margin: 0; box-shadow: 0 15px 25px rgba(0,0,0,0.2);
+        }
+
+        @keyframes popOut {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+        .item.poof {
+            animation: popOut 0.3s forwards;
+            pointer-events: none;
+        }
+
+        .item.selected {
+            border: 3px solid var(--btn);
+            transform: scale(1.05);
+            box-shadow: 0 8px 15px rgba(43,108,176,0.2);
+            background-color: #ebf8ff;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0) scale(1.05); }
+            25% { transform: translateX(-5px) scale(1.05); }
+            75% { transform: translateX(5px) scale(1.05); }
+        }
+        .item.shake {
+            animation: shake 0.4s;
+            border-color: var(--error);
+            background-color: #fff5f5;
+        }
+
+        .zones-container {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px; margin-bottom: 20px;
+        }
+        .transport-btn {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: #fff; border: 2px solid var(--zone-border); border-radius: 10px;
+            padding: 15px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .transport-btn:hover { background: var(--zone-bg-hover); border-color: var(--btn); transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0,0,0.1); }
+        .transport-btn:active { transform: translateY(0); }
+        .transport-btn .icon { font-size: 2.5rem; margin-bottom: 5px; }
+        .transport-btn .label { font-weight: 800; color: #2b6cb0; font-size: 1.1rem; }
+
+        .controls { text-align: center; margin-top: 20px; }
+        .controls button {
+            background: var(--btn); color: var(--text-light); border: none; padding: 12px 30px; 
+            border-radius: 8px; cursor: pointer; margin: 10px 5px; font-size: 1.1rem; 
+            font-weight: 600; transition: all 0.2s; box-shadow: 0 4px 0px #2a4365;
+        }
+        .controls button:hover { background: var(--btn-hover); transform: translateY(-2px); }
+        .controls button:active { transform: translateY(2px); box-shadow: 0 2px 0px #2a4365; }
+        .controls button#reset-btn { background: #e53e3e; box-shadow: 0 4px 0px #9b2c2c; }
+        .controls button#reset-btn:hover { background: #c53030; }
+
+        #message-area {
+            text-align: center; margin-top: 20px; font-size: 1.2rem; 
+            font-weight: 800; min-height: 1.5em; color: var(--text-dark);
+            padding: 10px; border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Jeu Principal -->
+    <h1>Commerce et Transports en Alberta</h1>
+    <p class="subtitle">
+        <strong>Objectif :</strong> Le commerce implique le transport de ressources naturelles et de marchandises de diverses manières.<br>
+        <strong>Comment jouer :</strong> Cliquez sur un produit ou une ressource de l'Alberta, puis cliquez sur le mode de transport utilisé pour son importation ou son exportation !
+    </p>
+
+    <div class="game-container" id="game-container">
+        <div id="items-container"></div>
+        <div class="zones-container" id="zones-container"></div>
+        <div class="controls">
+            <button id="reset-btn">Recommencer</button>
+        </div>
+        <div id="message-area"></div>
+    </div>
+
+    <script>
+        // Helper to generate inline SVGs for instant loading
+        const getSvg = (emoji) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="80">${emoji}</text></svg>`)}`;
+
+        // Define Categories and their icons
+        const CATEGORIES = [
+            { id: "Train", label: "Train", icon: "🚂" },
+            { id: "Avion", label: "Avion", icon: "✈️" },
+            { id: "Camion", label: "Camion", icon: "🚚" },
+            { id: "Navire", label: "Navire", icon: "🚢" },
+            { id: "Pipeline", label: "Pipeline", icon: "🛢️" } 
+        ];
+
+        // Items mapping to the learning outcome
+        const loadedItems = [
+            { id: "i1", name: "Pétrole", categories: ["Pipeline", "Train"], src: getSvg("🛢️") },
+            { id: "i2", name: "Gaz naturel", categories: ["Pipeline", "Camion", "Train"], src: getSvg("💨") },
+            { id: "i4", name: "Voitures", categories: ["Navire", "Camion", "Train"], src: getSvg("🚗") },
+            { id: "i13", name: "Jouets", categories: ["Navire", "Avion", "Camion", "Train"], src: getSvg("🧸") },
+            { id: "i5", name: "Charbon", categories: ["Train", "Navire", "Camion"], src: getSvg("🪨") },
+            { id: "i6", name: "Blé / Grains", categories: ["Train", "Camion"], src: getSvg("🌾") },
+            { id: "i7", name: "Bois / Bois d'œuvre", categories: ["Train", "Camion", "Navire"], src: getSvg("🪵") },
+            { id: "i8", name: "Bananes", categories: ["Camion", "Navire"], src: getSvg("🍌") },
+            { id: "i14", name: "Avocats", categories: ["Camion"], src: getSvg("🥑") },
+            { id: "i9", name: "Bœuf", categories: ["Camion", "Train"], src: getSvg("🥩") },
+            { id: "i10", name: "Meubles et produits manufacturés", categories: ["Camion", "Navire", "Train"], src: getSvg("🛋️") },
+            { id: "i12", name: "Électronique et puces", categories: ["Avion", "Navire", "Camion"], src: getSvg("💻") }
+        ];
+
+        // Mapping for localized categories to match ID logic
+        const categoryMap = {
+            "Train": "Train",
+            "Avion": "Avion",
+            "Camion": "Camion",
+            "Navire": "Navire",
+            "Pipeline": "Pipeline"
+        };
+
+        // DOM Elements
+        const itemsContainer = document.getElementById('items-container');
+        const zonesContainer = document.getElementById('zones-container');
+        const messageArea = document.getElementById('message-area');
+
+        let itemsRemaining = 0;
+        let messageTimeout;
+        let selectedItem = null;
+
+        function showTemporaryMessage(msg, type) {
+            messageArea.textContent = msg;
+            if (type === 'error') {
+                messageArea.style.color = "var(--error)";
+                messageArea.style.backgroundColor = "#fff5f5";
+            } else if (type === 'success') {
+                messageArea.style.color = "var(--success)";
+                messageArea.style.backgroundColor = "#f0fff4";
+            } else if (type === 'warning') {
+                messageArea.style.color = "var(--warning)";
+                messageArea.style.backgroundColor = "#fffaf0";
+            } else if (type === 'info') {
+                messageArea.style.color = '#2b6cb0';
+                messageArea.style.backgroundColor = '#ebf8ff';
+            }
+            clearTimeout(messageTimeout);
+            messageTimeout = setTimeout(() => {
+                if (itemsRemaining > 0 && selectedItem === null) {
+                    messageArea.textContent = '';
+                    messageArea.style.backgroundColor = 'transparent';
+                }
+            }, 2500);
+        }
+
+        function handleCorrectMatch(itemElement) {
+            itemElement.classList.remove('selected');
+            itemElement.classList.add('poof');
+            setTimeout(() => {
+                itemElement.remove();
+                itemsRemaining--;
+                if (itemsRemaining === 0) {
+                    showTemporaryMessage("Excellent travail ! Tous les produits et ressources sont correctement acheminés ! 🚚✈️🚢🚂🛢️", "success");
+                } else {
+                    showTemporaryMessage("Match correct !", "success");
+                }
+            }, 300);
+        }
+
+        // --- 1. BUILD GAME BOARD ---
+        function buildGameBoard() {
+            itemsRemaining = loadedItems.length;
+            selectedItem = null;
+            
+            // Build Categories (Transport Buttons)
+            zonesContainer.innerHTML = '';
+            CATEGORIES.forEach(cat => {
+                const btn = document.createElement('div');
+                btn.className = 'transport-btn';
+                btn.dataset.category = cat.id;
+                btn.innerHTML = `
+                    <div class="icon">${cat.icon}</div>
+                    <div class="label">${cat.label}</div>
+                `;
+                btn.addEventListener('click', () => handleTransportClick(cat.id));
+                zonesContainer.appendChild(btn);
+            });
+
+            // Build Items to Match (Shuffled)
+            itemsContainer.innerHTML = '';
+            const shuffled = [...loadedItems].sort(() => Math.random() - 0.5);
+            shuffled.forEach(item => {
+                const el = document.createElement('div');
+                el.className = 'item';
+                el.dataset.categories = item.categories.join(',');
+                el.dataset.name = item.name;
+                el.innerHTML = `<img src="${item.src}"><span>${item.name}</span>`;
+                
+                // Click Event
+                el.addEventListener('click', () => handleItemClick(el));
+                itemsContainer.appendChild(el);
+            });
+            
+            messageArea.textContent = '';
+            messageArea.style.background = 'transparent';
+        }
+
+        // --- 2. MATCHING LOGIC ---
+        function handleItemClick(element) {
+            // Deselect previous
+            if (selectedItem) {
+                selectedItem.classList.remove('selected');
+                selectedItem.classList.remove('shake');
+            }
+            
+            // If clicking the same item, just deselect
+            if (selectedItem === element) {
+                selectedItem = null;
+                messageArea.textContent = '';
+                messageArea.style.backgroundColor = 'transparent';
+                return;
+            }
+
+            // Select new item
+            selectedItem = element;
+            selectedItem.classList.add('selected');
+            showTemporaryMessage(`Sélectionné : ${element.dataset.name}. Cliquez sur un mode de transport !`, 'info');
+        }
+
+        function handleTransportClick(transportCategory) {
+            if (!selectedItem) {
+                showTemporaryMessage("Veuillez d'abord cliquer sur un produit ou une ressource !", "warning");
+                return;
+            }
+
+            const validCategories = selectedItem.dataset.categories.split(',');
+
+            if (validCategories.includes(transportCategory)) {
+                handleCorrectMatch(selectedItem);
+                selectedItem = null;
+            } else {
+                const itemName = selectedItem.dataset.name;
+                showTemporaryMessage(`Oups ! ${itemName} n'est pas habituellement transporté par ${transportCategory}.`, "error");
+                
+                // Shake effect for wrong answer
+                selectedItem.classList.remove('shake');
+                void selectedItem.offsetWidth; // trigger reflow
+                selectedItem.classList.add('shake');
+            }
+        }
+
+        // --- 3. GAME LOGIC ---
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            buildGameBoard();
+        });
+
+        // Initialize the game immediately on load
+        window.onload = function() {
+            buildGameBoard();
+        };
+
+    </script>
+</body>
+</html>
