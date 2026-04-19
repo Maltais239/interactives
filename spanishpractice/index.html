@@ -601,9 +601,10 @@ function buildCard(word,i,pool) {
   const dir = i%2===0?'es-en':'en-es';
   // cloze = gap-fill in a real sentence context (~1 in 5 cards when phrases available)
   const hasPhrases = typeof PHRASES !== 'undefined' && PHRASES.length > 0;
+  // Equal distribution — each type ~20%
   const types = p.length>=4
-    ? (hasPhrases ? ['typed','typed','mcq','listen','dictation','cloze'] : ['typed','typed','mcq','listen','dictation'])
-    : ['typed','typed','listen','dictation'];
+    ? (hasPhrases ? ['typed','mcq','listen','dictation','cloze'] : ['typed','mcq','listen','dictation'])
+    : ['typed','mcq','listen'];
   const ex  = types[0|Math.random()*types.length];
   if(ex==='cloze'){
     // Find a phrase containing this Spanish word, blank it out
@@ -621,10 +622,10 @@ function buildCard(word,i,pool) {
           hint:`Sentence: "${pen}"`};
       }
     }
-    // Fallback to typed if no phrase found
+    // Fallback to mcq if no phrase found (keeps distribution balanced)
     return dir==='es-en'
-      ? {...word,ex:'typed',promptLabel:'Typed recall: Spanish → English',taskText:'Type the English meaning. Include articles (the / a) if part of the answer.',prompt:word.spanish,answer:word.english,speak:word.spanish,ph:'Type the English meaning…'}
-      : {...word,ex:'typed',promptLabel:'Typed recall: English → Spanish',taskText:'Type the Spanish answer. Include el / la / un / una if shown.',prompt:word.english,answer:word.spanish,speak:word.spanish,ph:'Type the Spanish answer…'};
+      ? {...word,ex:'mcq',promptLabel:'Multiple choice: Spanish → English',taskText:'Choose the correct English meaning.',prompt:word.spanish,answer:word.english,speak:word.spanish,choices:sampleChoices(word.english,p,'english')}
+      : {...word,ex:'mcq',promptLabel:'Multiple choice: English → Spanish',taskText:'Choose the correct Spanish word.',prompt:word.english,answer:word.spanish,speak:word.spanish,choices:sampleChoices(word.spanish,p,'spanish')};
   }
   if(ex==='listen')    return {...word,ex,promptLabel:'Listening recognition',taskText:'Tap Play Spanish, then choose the English meaning.',prompt:'Listen to the Spanish word.',answer:word.english,speak:word.spanish,choices:sampleChoices(word.english,p,'english')};
   if(ex==='dictation') return {...word,ex,promptLabel:'Dictation',taskText:'Tap Play Spanish, then type what you hear.',prompt:word.english,answer:word.spanish,speak:word.spanish,ph:'Type the Spanish you hear.'};
@@ -830,7 +831,7 @@ function renderReview() {
   const isLong=card.prompt.length>35;
   // For cloze: render the blank visually
   const promptHTML = card.ex==='cloze'
-    ? `<div class="cloze-prompt">${esc(card.prompt).replace('_____','<span class=\"cloze-blank\">_____</span>')}</div>`
+    ? `<div class="cloze-prompt">${esc(card.prompt).replace('_____','<span class=\"cloze-blank\">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>')}</div>`
     : `<div class="prompt${isLong?' long':''}">${esc(card.prompt)}</div>`;
   host.innerHTML=`<div class="card review-card anim-pop">
     <div class="ex-label">
