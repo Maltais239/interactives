@@ -142,6 +142,9 @@ body{margin:0;font-family:'Nunito',ui-sans-serif,system-ui,sans-serif;background
 @keyframes pop-in{0%{transform:scale(.88);opacity:0}60%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}
 @keyframes bounce{0%,100%{transform:translateY(0)}40%{transform:translateY(-14px)}70%{transform:translateY(-6px)}}
 @keyframes shake{0%,100%{transform:translateX(0)}15%{transform:translateX(-7px)}35%{transform:translateX(7px)}55%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.cloze-prompt{font-size:clamp(1.1rem,3.5vw,1.8rem);font-weight:800;line-height:1.5;background:linear-gradient(135deg,#f0fde4,#e8f7ff);border:2px solid #b8e6a0;border-radius:14px;padding:16px 20px;margin:0 auto 4px;max-width:600px;text-align:center}
+.cloze-blank{display:inline-block;min-width:80px;border-bottom:3px solid var(--green);padding:0 8px;color:var(--green);font-style:italic}
+.cloze-hint{font-size:.82rem;color:var(--muted);font-weight:700;margin-top:6px;font-style:italic}
 .anim-pop{animation:pop-in .22s ease-out both}
 .anim-shake{animation:shake .4s ease both}
 @media(max-width:680px){
@@ -344,7 +347,12 @@ const RAW = [
   [32,[['¿dónde?','where?'],['¿qué?','what?'],['¿a qué hora?','at what time?'],['¿cuándo?','when?'],['¿cómo?','how?'],['¿cuál?','which?'],['¿cuánto?','how much?'],['¿cuántos?','how many? (masc.)'],['¿cuántas?','how many? (fem.)'],['puedo','I can'],['puede','he / she can / can you?'],['debo','I should / must'],['debe','he / she should'],['quiero','I want'],['quiere','wants / do you want'],['va a','is going to'],['voy a','I\'m going to'],['comer','to eat'],['beber','to drink'],['pedir','to order'],['probar','to try'],['hacer','to do / make'],['ir','to go'],['pagar','to pay'],['alquilar','to rent'],['tomar','to take / have'],['tener','to have'],['cambiar','to change'],['comprar','to buy'],['comenzar','to start'],['salir','to leave'],['traer','to bring'],['gastar','to spend'],['pasar','to pass / spend time'],['quedarse','to stay'],['encontrar','to find'],['decir','to say'],['ver','to see'],['esta noche','tonight'],['mañana','tomorrow'],['hoy','today'],['ahora','now'],['más tarde','later'],['en Madrid','in Madrid'],['a Madrid','to Madrid'],['al restaurante','to the restaurant'],['aquí','here'],['no','not / no']]],
   // ── Perfect tense & past ──────────────────────────────────────────────────
   [33,[['he pedido','I have ordered'],['he comido','I have eaten'],['fue','it was / he went (past)'],['estuvo','it / he was (past, estar)'],['ayer','yesterday'],['el postre','dessert']]],
-  [35,[],{'Illnesses':[['artritis','arthritis'],['tos','cough'],['fiebre','fever']],'Medicine':[['una pastilla','tablet'],['una aspirina','aspirin']],'Parts of the body':[['el pecho','chest'],['una mano','hand'],['la nariz','nose']]}],
+  // ── More / another & drinks ───────────────────────────────────────────────
+  [34,[['la misma cosa','the same thing'],['uno más','one more'],['otro','another (masculine)'],['otra','another (feminine)'],['un vaso de agua','a glass of water'],['una copa de vino','a glass of wine'],['una copa','a glass / a drink'],['posible','possible'],['¿es posible?','is it possible?'],['el jugo','juice (Latin America)'],['el zumo','juice (Spain)']]],
+  // ── Health & illness ──────────────────────────────────────────────────────
+  [35,[['me duele','it hurts / I have a pain in'],['me duele la cabeza','I have a headache'],['me duelen los ojos','my eyes hurt'],['me he roto...','I have broken...'],['la pierna','the leg'],['el dedo','the finger / toe'],['un medicamento','a medicine'],['he cogido un resfriado','I have caught a cold'],['de nuevo','again / back'],['la gripe','the flu'],['me siento','I feel'],['no me siento bien','I don\'t feel well'],['enfermo','ill / sick (masculine)'],['enferma','ill / sick (feminine)'],['mi pie','my foot'],['mi pierna','my leg']],
+      {'Illnesses':[['artritis','arthritis'],['tos','cough'],['fiebre','fever']],'Medicine':[['una pastilla','tablet'],['una aspirina','aspirin']],'Parts of the body':[['el pecho','chest'],['una mano','hand'],['la nariz','nose']]}],
+  [36,[],{'Family and friends':[['mi madre','mother'],['mi padre','father'],['mi hermano','brother'],['mi hermana','sister'],['mi hijo','son'],['mi hija','daughter']]}],
   [36,[],{'Family and friends':[['mi madre','mother'],['mi padre','father'],['mi hermano','brother'],['mi hermana','sister'],['mi hijo','son'],['mi hija','daughter']]}],
 ];
 
@@ -591,8 +599,33 @@ function sampleChoices(correct,pool,field,n=4) {
 function buildCard(word,i,pool) {
   const p   = pool.length>=4?pool:allWords();
   const dir = i%2===0?'es-en':'en-es';
-  const types = p.length>=4?['typed','typed','mcq','listen','dictation']:['typed','typed','listen','dictation'];
+  // cloze = gap-fill in a real sentence context (~1 in 5 cards when phrases available)
+  const hasPhrases = typeof PHRASES !== 'undefined' && PHRASES.length > 0;
+  const types = p.length>=4
+    ? (hasPhrases ? ['typed','typed','mcq','listen','dictation','cloze'] : ['typed','typed','mcq','listen','dictation'])
+    : ['typed','typed','listen','dictation'];
   const ex  = types[0|Math.random()*types.length];
+  if(ex==='cloze'){
+    // Find a phrase containing this Spanish word, blank it out
+    const sp = word.spanish.toLowerCase().replace(/[¿?¡!]/g,'').trim();
+    const matching = PHRASES.filter(([psp])=>psp.toLowerCase().includes(sp));
+    if(matching.length){
+      const [psp,pen] = matching[0|Math.random()*matching.length];
+      // Find the word position and blank it (case-insensitive, preserving punctuation)
+      const re = new RegExp('(' + sp.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'i');
+      const blanked = psp.replace(re,'_____');
+      if(blanked !== psp){ // only use if we could blank something
+        return {...word,ex:'cloze',promptLabel:'Fill in the blank',
+          taskText:'Type the missing Spanish word.',
+          prompt:blanked, answer:sp, speak:psp, ph:'Type the missing word…',
+          hint:`Sentence: "${pen}"`};
+      }
+    }
+    // Fallback to typed if no phrase found
+    return dir==='es-en'
+      ? {...word,ex:'typed',promptLabel:'Typed recall: Spanish → English',taskText:'Type the English meaning. Include articles (the / a) if part of the answer.',prompt:word.spanish,answer:word.english,speak:word.spanish,ph:'Type the English meaning…'}
+      : {...word,ex:'typed',promptLabel:'Typed recall: English → Spanish',taskText:'Type the Spanish answer. Include el / la / un / una if shown.',prompt:word.english,answer:word.spanish,speak:word.spanish,ph:'Type the Spanish answer…'};
+  }
   if(ex==='listen')    return {...word,ex,promptLabel:'Listening recognition',taskText:'Tap Play Spanish, then choose the English meaning.',prompt:'Listen to the Spanish word.',answer:word.english,speak:word.spanish,choices:sampleChoices(word.english,p,'english')};
   if(ex==='dictation') return {...word,ex,promptLabel:'Dictation',taskText:'Tap Play Spanish, then type what you hear.',prompt:word.english,answer:word.spanish,speak:word.spanish,ph:'Type the Spanish you hear.'};
   if(ex==='mcq') return dir==='es-en'
@@ -777,12 +810,13 @@ function renderReview() {
     return;
   }
 
-  const isInput=['typed','dictation'].includes(card.ex);
+  const isInput=['typed','dictation','cloze'].includes(card.ex);
   const isChoice=['mcq','listen'].includes(card.ex);
-  const exColors={typed:'blue',mcq:'purple',listen:'yellow',dictation:'blue'};
+  const exColors={typed:'blue',mcq:'purple',listen:'yellow',dictation:'blue',cloze:'green'};
 
   const speakHTML=card.speak?`<div class="speak-row"><button class="speak-btn" id="speakBtn">🔊 Play Spanish</button></div>`:'';
   const inputHTML=isInput?`<div class="ans-wrap"><input id="ans" placeholder="${esc(card.ph||'Type your answer…')}" value="${esc(rev.typed)}" autocomplete="off" autocorrect="off" spellcheck="false"/></div>`:'';
+  const hintHTML=card.hint?`<div class="cloze-hint">💡 ${esc(card.hint)}</div>`:'';
   const choicesHTML=isChoice?`<div class="choices">${card.choices.map(c=>`<button class="choice" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>`:'';
   const actionHTML=isInput
     ?`<div class="action-row"><button class="btn primary" id="checkBtn">Check ✓</button><button class="btn" id="revealBtn">Show answer</button><button class="btn" id="skipBtn">Skip</button></div>`
@@ -794,13 +828,18 @@ function renderReview() {
     :'';
 
   const isLong=card.prompt.length>35;
+  // For cloze: render the blank visually
+  const promptHTML = card.ex==='cloze'
+    ? `<div class="cloze-prompt">${esc(card.prompt).replace('_____','<span class=\"cloze-blank\">_____</span>')}</div>`
+    : `<div class="prompt${isLong?' long':''}">${esc(card.prompt)}</div>`;
   host.innerHTML=`<div class="card review-card anim-pop">
     <div class="ex-label">
       <span class="pill ${exColors[card.ex]||'blue'}">${esc(card.promptLabel)}</span>
       <span class="pill gray">${esc(card.lessonTitle)}</span>
     </div>
     <div class="task-hint">${esc(card.taskText)}</div>
-    <div class="prompt${isLong?' long':''}">${esc(card.prompt)}</div>
+    ${promptHTML}
+    ${hintHTML||''}
     ${speakHTML}${inputHTML}${choicesHTML}${actionHTML}${feedbackHTML}
   </div>`;
 
