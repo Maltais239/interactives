@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Civilizations of the World — Alberta Curriculum Map</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --primary: #b45309;
+      --primary-light: #fef3c7;
+      --primary-dark: #78350f;
+      --bg-panel: #ffffff;
+      --text-main: #334155;
+      --text-muted: #64748b;
+    }
+
+    body, html {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      display: flex; font-family: 'Inter', sans-serif;
+      background-color: #f8fafc; color: var(--text-main); overflow: hidden;
+    }
+
+    h1, h2, h3, h4, .group-label, .filter-chip {
+      font-family: 'Nunito', sans-serif; /* Softer, friendlier font for headings */
+    }
+
+    .leaflet-container { background: #bae6fd; } /* Brighter water color */
+    
+    #map-container {
+      flex: 1; height: 100%; position: relative;
+    }
+    
+    #map { 
+      width: 100%; height: 100%; border-right: 2px solid #cbd5e1; 
+    }
+
+    /* ---------- Timeline Control Panel (Student Friendly) ---------- */
+    #timeline-panel {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000; /* Above Leaflet */
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(5px);
+      padding: 15px 25px;
+      border-radius: 20px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+      border: 2px solid var(--primary-light);
+      width: 80%;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: all 0.3s ease;
+    }
+
+    .timeline-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 700;
+      color: var(--primary-dark);
+    }
+
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    #year-display {
+      font-size: 1.2rem;
+      background: var(--primary-light);
+      padding: 4px 12px;
+      border-radius: 12px;
+      color: var(--primary-dark);
+      min-width: 120px;
+      text-align: center;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 24px;
+      width: 24px;
+      border-radius: 50%;
+      background: var(--primary);
+      cursor: pointer;
+      margin-top: -8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 8px;
+      cursor: pointer;
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    
+    input[type=range]:disabled::-webkit-slider-thumb {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+
+    /* ---------- Info Panel ---------- */
+    #info-panel {
+      width: 440px; max-width: 45%;
+      padding: 1.5rem 2rem 2rem;
+      background: var(--bg-panel);
+      border-left: 6px solid var(--primary);
+      overflow-y: auto;
+      box-shadow: -5px 0 20px rgba(0,0,0,0.08);
+      display: flex; flex-direction: column;
+    }
+
+    #info-panel h2 {
+      margin: 0 0 0.5rem; color: var(--primary-dark);
+      font-size: 1.7rem; font-weight: 800;
+      border-bottom: 3px solid var(--primary-light);
+      padding-bottom: 0.5rem;
+    }
+
+    #info-content h3 {
+      font-size: 1.5rem; font-weight: 700; color: var(--primary);
+      margin: 0 0 0.25rem;
+    }
+
+    #info-content .era {
+      display: inline-block; font-size: 0.85rem; font-weight: 600;
+      color: var(--primary-dark); background: var(--primary-light);
+      padding: 4px 12px; border-radius: 999px;
+      margin-bottom: 1rem;
+    }
+
+    #info-content h4 {
+      font-size: 1.05rem; font-weight: 700; color: var(--primary-dark);
+      margin: 1.2rem 0 0.4rem;
+      border-bottom: 2px solid var(--primary-light); padding-bottom: 0.2rem;
+    }
+
+    #info-content p {
+      font-size: 0.95rem; line-height: 1.6; margin: 0 0 0.75rem;
+    }
+
+    /* ---------- Filter chips ---------- */
+    #filters {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin-bottom: 1rem;
+    }
+    .filter-chip {
+      font-size: 0.85rem; font-weight: 700;
+      padding: 6px 12px;
+      border: 2px solid #e2e8f0;
+      background: #f8fafc; color: #475569;
+      border-radius: 12px; cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .filter-chip:hover { background: var(--primary-light); border-color: #fbbf24; transform: translateY(-1px); }
+    .filter-chip.active {
+      background: var(--primary); color: #ffffff; border-color: var(--primary);
+    }
+
+    /* ---------- Sidebar civ list ---------- */
+    .civ-list {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 6px; margin-bottom: 0.8rem;
+    }
+    .civ-list button {
+      font-family: 'Inter', sans-serif; text-align: left;
+      font-size: 0.85rem; font-weight: 500;
+      padding: 8px 8px 8px 28px;
+      background: #f8fafc; border: 2px solid #e2e8f0;
+      border-radius: 10px; cursor: pointer;
+      color: #334155; position: relative;
+      transition: all 0.2s;
+      line-height: 1.3;
+    }
+    .civ-list button::before {
+      content: ""; position: absolute;
+      left: 10px; top: 50%; transform: translateY(-50%);
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--swatch, #ccc);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .civ-list button:hover { background: var(--primary-light); border-color: #fbbf24; }
+    .civ-list button.active {
+      background: var(--primary-light); border-color: var(--primary); font-weight: 700;
+      color: var(--primary-dark);
+    }
+    .group-label {
+      font-size: 1rem; font-weight: 800;
+      color: var(--primary-dark);
+      margin: 1rem 0 0.4rem;
+    }
+
+    /* ---------- Focus mode banner ---------- */
+    #focus-banner {
+      display: none;
+      background: var(--primary-light); color: var(--primary-dark);
+      padding: 10px 14px; border-radius: 10px;
+      font-size: 0.9rem; font-weight: 600; margin-bottom: 1rem;
+      cursor: pointer;
+      border: 2px solid #fbbf24;
+      text-align: center;
+    }
+    #focus-banner:hover { background: #fde68a; transform: translateY(-1px); }
+    #focus-banner.visible { display: block; }
+
+    /* ---------- Leaflet popup ---------- */
+    .leaflet-popup-content-wrapper {
+      background: #ffffff; color: var(--primary-dark);
+      border-radius: 12px;
+      border: 2px solid var(--primary-light);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .leaflet-popup-content {
+      font-family: 'Nunito', sans-serif;
+      font-weight: 700; font-size: 1.05rem;
+      margin: 10px 15px; text-align: center;
+    }
+    .leaflet-popup-tip { background: #ffffff; }
+
+    @media (max-width: 768px) {
+      body, html { flex-direction: column; }
+      #map-container { height: 50vh; border-right: none; border-bottom: 2px solid #cbd5e1; }
+      #info-panel { width: 100%; max-width: 100%; height: 50vh; padding: 1.5rem; }
+      #timeline-panel { width: 95%; bottom: 15px; padding: 10px 15px; }
+      #year-display { font-size: 1rem; min-width: 100px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="map-container">
+    <div id="map"></div>
+    
+    <!-- Timeline Control Panel -->
+    <div id="timeline-panel">
+      <div class="timeline-header">
+        <label class="toggle-container">
+          <input type="checkbox" id="use-timeline" style="width:18px; height:18px; accent-color: #b45309;">
+          <span>⏳ Time Machine Mode</span>
+        </label>
+        <span id="year-display">Year: All</span>
+      </div>
+      <input type="range" id="timeline-slider" min="-3000" max="2024" value="0" step="50" disabled>
+    </div>
+  </div>
+
+  <div id="info-panel">
+    <h2>🗺️ World Civilizations</h2>
+    <div id="info-content"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script>
+    // ====================================================================
+    // 1. MAP
+    // ====================================================================
+    const map = L.map('map', { zoomControl: true, minZoom: 2 })
+                 .setView([20, -20], 2);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      subdomains: 'abcd', maxZoom: 19
+    }).addTo(map);
+
+    // ====================================================================
+    // 2. COLORS
+    // ====================================================================
+    const civColors = {
+      egypt:         '#e0a96d', kush:          '#c47e4d', axum:          '#a05a2c',
+      indus:         '#d4a647', maurya:        '#c8801f', han:           '#a23b3b',
+      greece:        '#7b6cb8', rome_republic: '#d49bab', rome_empire:   '#732436',
+      persia:        '#5b7a99', umayyad:       '#3a8194', abbasid:       '#26506b',
+      ghana:         '#d4a017', mali:          '#5b8c3e', songhai:       '#1f6e8c',
+      benin:         '#a4c065', olmec:         '#6b4423', teotihuacan:   '#c97064',
+      maya:          '#2d8e6e', aztec:         '#d4502b', inca:          '#b8851f',
+      inuit:         '#8eb5c9', tlingit:       '#3e6b5c', haida:         '#2c4f5e',
+      coast_salish:  '#5a8a8a', blackfoot:     '#8b3a3a', plains_cree:   '#a0633a',
+      haudenosaunee: '#5d4a8c', algonquin:     '#6e8b3d', powhatan:      '#8b6b3a',
+      cherokee:      '#7a5c3a', muscogee:      '#a07a4a', pueblos:       '#c47b4f',
+    };
+
+    // ====================================================================
+    // 3. CONTENT & TIMELINE DATES
+    // (Dates added for the Time Machine feature. Negative = BCE, Positive = CE)
+    // ====================================================================
+    const civData = {
+      egypt: { start: -3100, end: -30, summary: "One of the world's earliest and longest-lasting civilizations...", geography: "The Nile flooded predictably...", trade: "Traded gold, papyrus, linen...", society: "A pharaoh ruled as a god-king...", legacy: "Hieroglyphic writing, papyrus, 365-day calendar..." },
+      indus: { start: -3300, end: -1300, summary: "The Indus Valley Civilization was one of the three earliest cradles of urban life...", geography: "Cities clustered along the Indus River...", trade: "Traded cotton textiles and beads...", society: "Cities were remarkably planned...", legacy: "Standardized weights, urban planning..." },
+      greece: { start: -800, end: -146, summary: "Ancient Greece was a network of independent city-states...", geography: "Mountainous terrain divided communities...", trade: "Founded colonies from Spain to the Black Sea...", society: "Athens developed direct democracy...", legacy: "Democracy, philosophy, the Olympics..." },
+      persia: { start: -550, end: -330, summary: "The largest empire the world had yet seen...", geography: "Centered on the Iranian plateau...", trade: "Darius I built the Royal Road...", society: "Organized into satrapies...", legacy: "Provincial administration, postal service..." },
+      maurya: { start: -322, end: -180, summary: "The first empire to unite most of the Indian subcontinent...", geography: "Centered on the fertile Ganges plain...", trade: "Crossroads of land and sea trade routes...", society: "Emperor Ashoka converted to Buddhism...", legacy: "The spread of Buddhism across Asia..." },
+      han: { start: -202, end: 220, summary: "Ruled China for over 400 years in a golden age...", geography: "Centered on the Yellow River and Yangtze...", trade: "Opened the Silk Road...", society: "Adopted Confucianism for government...", legacy: "Paper-making, compass, civil-service exam..." },
+      rome_republic: { start: -509, end: -27, summary: "The government of Rome before it became an empire...", geography: "Began on the Tiber River in Italy...", trade: "Controlled the western Mediterranean...", society: "Power was shared among elected officials...", legacy: "The idea of a republic, Roman law..." },
+      rome_empire: { start: -27, end: 476, summary: "Stretching from Britain to the Persian Gulf...", geography: "Encircled the entire Mediterranean Sea...", trade: "Created a 'globalized' economy...", society: "Power was concentrated in the emperor...", legacy: "Latin language, aqueducts, calendar..." },
+      kush: { start: -1070, end: 350, summary: "A powerful African civilization in Nubia...", geography: "Centered on the Nile River south of Egypt...", trade: "Controlled trade in gold and ivory...", society: "Built more pyramids than Egypt...", legacy: "Early large state with its own writing..." },
+      axum: { start: 100, end: 940, summary: "A major trading civilization in the Ethiopian highlands...", geography: "Highlands of modern Ethiopia...", trade: "Middleman in Indian Ocean trade...", society: "Among the first to convert to Christianity...", legacy: "Ethiopian Orthodox Church, Ge'ez alphabet..." },
+      umayyad: { start: 661, end: 750, summary: "The first hereditary Islamic dynasty...", geography: "From Spain to the Indus River...", trade: "Connected trade networks under one currency...", society: "Society organized around Islam...", legacy: "Spread of Islam and Arabic..." },
+      abbasid: { start: 750, end: 1258, summary: "The heart of the Islamic Golden Age...", geography: "Centered on the Tigris–Euphrates valley...", trade: "Dominated trade across the Indian Ocean...", society: "Founded the House of Wisdom...", legacy: "Algebra, modern numeral system..." },
+      ghana: { start: 300, end: 1200, summary: "The first great West African trade empire...", geography: "Located in the Sahel...", trade: "Controlled the gold and salt trade...", society: "Ruled by a powerful king...", legacy: "Introduced Islam to West Africa peacefully..." },
+      mali: { start: 1230, end: 1670, summary: "Famous for Emperor Mansa Musa...", geography: "Centered on the Niger River...", trade: "Dominated the Trans-Saharan trade...", society: "Timbuktu became a learning center...", legacy: "Timbuktu's libraries, spread of literacy..." },
+      songhai: { start: 1464, end: 1591, summary: "The largest empire in African history at its time...", geography: "Extended from the Atlantic to modern Nigeria...", trade: "Standardized weights and measures...", society: "Organized into provinces with a professional army...", legacy: "Fell suddenly to a Moroccan army with firearms..." },
+      benin: { start: 1180, end: 1897, summary: "Powerful West African forest kingdom...", geography: "Tropical forests near the Atlantic...", trade: "Traded inland and later with Europeans...", society: "Ruled by a divine king, the Oba...", legacy: "The famous Benin Bronzes..." },
+      olmec: { start: -1200, end: -400, summary: "The 'mother culture' of Mesoamerica...", geography: "Gulf Coast of southern Mexico...", trade: "Wide trade network in obsidian and jade...", society: "Built large ceremonial centers...", legacy: "Ritual calendar, ballgame, colossal heads..." },
+      teotihuacan: { start: -100, end: 650, summary: "A massive city in the Valley of Mexico...", geography: "High-altitude valley...", trade: "Obsidian traded across Mesoamerica...", society: "Multi-family apartment compounds...", legacy: "Urban planning, Pyramid of the Sun..." },
+      maya: { start: 250, end: 900, summary: "Network of independent city-states...", geography: "Spread across the Yucatán Peninsula...", trade: "Traded jade, cacao, salt...", society: "Ruled by divine kings...", legacy: "Concept of zero, astronomy, full writing script..." },
+      aztec: { start: 1428, end: 1521, summary: "Ruled central Mexico from their island capital...", geography: "Centered on the Valley of Mexico...", trade: "Enormous markets trading everything...", society: "Compulsory education for boys and girls...", legacy: "Words like chocolate and tomato..." },
+      inca: { start: 1438, end: 1533, summary: "The largest empire in pre-Columbian America...", geography: "Andes mountains...", trade: "Built 40,000 km of roads...", society: "State organized everything, no money used...", legacy: "Machu Picchu, the potato, Quechua language..." },
+      
+      // Indigenous Nations are set to run up to present day (2024) to show continuous presence
+      inuit: { start: -2000, end: 2024, summary: "Indigenous peoples of the Arctic...", geography: "Spread across the Arctic sea ice and tundra...", trade: "Traded sea-mammal products...", society: "Lived in kin-based bands...", legacy: "Living languages, Nunavut..." },
+      tlingit: { start: -2000, end: 2024, summary: "Pacific Northwest Coast people...", geography: "Coastal forests and fjords...", trade: "Controlled routes from coast to interior...", society: "Matrilineal clans, potlatches...", legacy: "Living culture, totem poles..." },
+      haida: { start: -2000, end: 2024, summary: "Renowned for monumental art...", geography: "Archipelago off BC coast...", trade: "Traded in ocean-going canoes...", society: "Wealth displayed through potlatches...", legacy: "Co-management of Haida Gwaii..." },
+      coast_salish: { start: -2000, end: 2024, summary: "Nations around the Salish Sea...", geography: "Sheltered waters and rivers...", trade: "Active trade linking coastal and inland...", society: "Longhouse architecture...", legacy: "Cities of Vancouver and Seattle sit on their land..." },
+      blackfoot: { start: -1500, end: 2024, summary: "People of the northwestern Great Plains...", geography: "Rolling grasslands and foothills...", trade: "Skilled traders and warriors...", society: "Four nations in the Confederacy...", legacy: "Treaty 7, vibrant self-governing nations..." },
+      plains_cree: { start: -1500, end: 2024, summary: "Adapted to bison hunting on horseback...", geography: "The Northern Plains and parkland...", trade: "Central to the fur trade...", society: "Organized into bands led by chiefs...", legacy: "Signatories to multiple treaties, Cree language..." },
+      haudenosaunee: { start: 1142, end: 2024, summary: "One of the world's oldest democracies...", geography: "Eastern Woodlands...", trade: "Controlled key Great Lakes routes...", society: "Matrilineal society, Great Law of Peace...", legacy: "Still a functioning government today..." },
+      algonquin: { start: -2000, end: 2024, summary: "People of the Ottawa River watershed...", geography: "Boreal and mixed forests...", trade: "Controlled the Ottawa River...", society: "Highly mobile with birchbark canoes...", legacy: "Parliament Hill sits on unceded Algonquin land..." },
+      powhatan: { start: -1000, end: 2024, summary: "Alliance on the Atlantic coast...", geography: "Tidewater region of Virginia...", trade: "Traded copper, beads, food...", society: "Led by a paramount chief...", legacy: "Descendant nations survive and are recognized today..." },
+      cherokee: { start: -1000, end: 2024, summary: "One of the largest Indigenous nations...", geography: "Southern Appalachian Mountains...", trade: "Major partners in colonial trade...", society: "Adopted a written constitution early...", legacy: "Cherokee Nation is a major sovereign government..." },
+      muscogee: { start: -1000, end: 2024, summary: "Powerful alliance in the southeast...", geography: "Rivers and forests of the Southeast...", trade: "Major regional traders...", society: "Confederacy of Red and White towns...", legacy: "Supreme Court affirmed reservation land in 2020..." },
+      pueblos: { start: -2000, end: 2024, summary: "Lived in adobe villages for thousands of years...", geography: "Arid plateaus and river valleys...", trade: "Traded turquoise and textiles...", society: "Sovereign communities around plazas...", legacy: "The successful 1680 Pueblo Revolt..." }
+    };
+
+    // ====================================================================
+    // 4. CATEGORIES
+    // ====================================================================
+    const categories = [
+      { id: 'all',           label: '🌍 Show All' },
+      { id: 'ancient',       label: '🏺 Ancient World' },
+      { id: 'arab',          label: '🕌 Islamic Empires' },
+      { id: 'african',       label: '🦁 West African' },
+      { id: 'americas',      label: '🌽 Americas' },
+      { id: 'indigenous_na', label: '🪶 Indigenous N.A.' },
+    ];
+
+    const groups = [
+      { label: "Old World — Ancient", category: "ancient", ids: ["egypt","indus","greece","persia","maurya","han","rome_republic","rome_empire","kush","axum"] },
+      { label: "Arab / Islamic Civilizations", category: "arab", ids: ["umayyad","abbasid"] },
+      { label: "West African Empires", category: "african", ids: ["ghana","mali","songhai","benin"] },
+      { label: "Mesoamerica & the Andes", category: "americas", ids: ["olmec","teotihuacan","maya","aztec","inca"] },
+      { label: "Indigenous Nations of North America", category: "indigenous_na", ids: ["inuit","tlingit","haida","coast_salish","blackfoot","plains_cree","haudenosaunee","algonquin","powhatan","cherokee","muscogee","pueblos"] },
+    ];
+
+    // ====================================================================
+    // 5. STATE
+    // ====================================================================
+    const infoContent = document.getElementById('info-content');
+    let geojsonLayer;
+    let activeFilter = 'all';
+    let focusedId = null; 
+    
+    // Timeline state
+    let isTimelineActive = false;
+    let currentTimelineYear = 0;
+
+    // ====================================================================
+    // 6. UI RENDERING & TIMELINE
+    // ====================================================================
+    const timeToggle = document.getElementById('use-timeline');
+    const timeSlider = document.getElementById('timeline-slider');
+    const yearDisplay = document.getElementById('year-display');
+
+    function formatYear(year) {
+      if (year < 0) return Math.abs(year) + " BCE";
+      if (year === 0) return "1 CE"; // No year 0
+      return year + " CE";
+    }
+
+    timeToggle.addEventListener('change', (e) => {
+      isTimelineActive = e.target.checked;
+      timeSlider.disabled = !isTimelineActive;
+      
+      if (isTimelineActive) {
+        yearDisplay.textContent = "Year: " + formatYear(timeSlider.value);
+        yearDisplay.style.background = "var(--primary)";
+        yearDisplay.style.color = "white";
+        // When using time machine, disable category filters visually
+        activeFilter = 'all';
+        renderDefaultPanel();
+      } else {
+        yearDisplay.textContent = "Year: All";
+        yearDisplay.style.background = "var(--primary-light)";
+        yearDisplay.style.color = "var(--primary-dark)";
+      }
+      applyVisibility();
+    });
+
+    timeSlider.addEventListener('input', (e) => {
+      currentTimelineYear = parseInt(e.target.value);
+      yearDisplay.textContent = "Year: " + formatYear(currentTimelineYear);
+      applyVisibility();
+    });
+
+    function renderDefaultPanel() {
+      let html = `
+        <div id="filters" style="${isTimelineActive ? 'opacity: 0.5; pointer-events: none;' : ''}">
+          ${categories.map(c => `
+            <button class="filter-chip ${c.id===activeFilter?'active':''}"
+                    data-filter="${c.id}">${c.label}</button>
+          `).join('')}
+        </div>
+        ${focusedId ? `
+          <div id="focus-banner" class="visible">
+            🔍 Showing just one civilization. Click here to see them all again!
+          </div>` : ''}
+        <p style="font-size:0.9rem; margin:0 0 1rem; color: var(--text-muted);">
+          Tap a region on the map, pick a civilization below, or use the <strong>Time Machine</strong> at the bottom!
+        </p>
+      `;
+
+      groups.forEach(g => {
+        if (activeFilter !== 'all' && activeFilter !== g.category) return;
+        html += `<div class="group-label">${g.label}</div>`;
+        html += `<div class="civ-list">`;
+        g.ids.forEach(id => {
+          const data = civData[id];
+          if (!data) return;
+          const features = (geojsonLayer && geojsonLayer.toGeoJSON().features) || [];
+          const feat = features.find(f => f.properties.id === id);
+          const name = feat ? feat.properties.name : id;
+          const isActive = id === focusedId ? 'active' : '';
+          html += `<button class="${isActive}" data-civ="${id}" style="--swatch:${civColors[id]}">${name}</button>`;
+        });
+        html += `</div>`;
+      });
+
+      infoContent.innerHTML = html;
+      attachSidebarHandlers();
+    }
+
+    function attachSidebarHandlers() {
+      document.querySelectorAll('.filter-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeFilter = btn.dataset.filter;
+          applyVisibility();
+          renderDefaultPanel();
+        });
+      });
+      document.querySelectorAll('[data-civ]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          showCivilization(btn.dataset.civ, true);
+        });
+      });
+      const banner = document.getElementById('focus-banner');
+      if (banner) banner.addEventListener('click', clearFocus);
+    }
+
+    function clearFocus() {
+      focusedId = null;
+      applyVisibility();
+      renderDefaultPanel();
+    }
+
+    function showCivilization(id, fitBounds) {
+      const data = civData[id];
+      if (!data) return;
+      let layer = null;
+      if (geojsonLayer) {
+        geojsonLayer.eachLayer(l => {
+          if (l.feature.properties.id === id) layer = l;
+        });
+      }
+      if (!layer) return;
+
+      focusedId = id;
+      applyVisibility();
+
+      const props = layer.feature.properties;
+      const html = `
+        <p style="margin:0 0 1rem;">
+          <button class="filter-chip" id="back-btn" style="background:var(--primary); color:white;">⬅️ Back to Map</button>
+        </p>
+        <h3>${props.name}</h3>
+        <span class="era">🗓️ ${props.era}</span>
+        <h4>📖 Summary</h4><p>${data.summary}</p>
+        <h4>🌍 Geography</h4><p>${data.geography}</p>
+        <h4>⚖️ Trade &amp; Economy</h4><p>${data.trade}</p>
+        <h4>👑 Society</h4><p>${data.society}</p>
+        <h4>✨ Legacy</h4><p>${data.legacy}</p>
+      `;
+      infoContent.innerHTML = html;
+      document.getElementById('back-btn').addEventListener('click', () => clearFocus());
+      layer.bringToFront();
+      if (fitBounds) {
+        map.fitBounds(layer.getBounds(), { padding:, maxZoom: 5 });
+      }
+    }
+
+    // ====================================================================
+    // 7. STYLING & VISIBILITY LOGIC (Including Timeline)
+    // ====================================================================
+    function pSBC(p, c0) {
+      let r,g,b,P,f,t,h,i=parseInt,m=Math.round;
+      if(typeof p!="number"||p<-1||p>1||typeof c0!="string"||(c0!='r'&&c0!='#'))return null;
+      const parse=(d)=>{ d=i(d.slice(1),16); return {r:d>>16,g:d>>8&255,b:d&255}; };
+      f=parse(c0); P=p<0; t=P?{r:0,g:0,b:0}:{r:255,g:255,b:255};
+      p=P?p*-1:p; P=1-p;
+      r=m(P*f.r+p*t.r); g=m(P*f.g+p*t.g); b=m(P*f.b+p*t.b);
+      return "#"+(4294967296+r*16777216+g*65536+b*256).toString(16).slice(1);
+    }
+
+    function styleFor(feature) {
+      const id = feature.properties.id;
+      const c = civColors[id] || '#999';
+      const isFocused = (focusedId === id);
+      const fadeOthers = (focusedId !== null && !isFocused);
+      return {
+        fillColor: c,
+        weight: isFocused ? 4 : 2,
+        color: pSBC(isFocused ? -0.5 : -0.2, c),
+        fillOpacity: fadeOthers ? 0.05 : (isFocused ? 0.8 : 0.5),
+        opacity:     fadeOthers ? 0.2  : 1.0
+      };
+    }
+
+    function applyVisibility() {
+      if (!geojsonLayer) return;
+      geojsonLayer.eachLayer(layer => {
+        const id = layer.feature.properties.id;
+        const cat = layer.feature.properties.category;
+        const civ = civData[id];
+
+        // 1. Check Category Filter
+        let inFilter = (activeFilter === 'all' || cat === activeFilter);
+
+        // 2. Check Timeline Filter (if active)
+        if (isTimelineActive && civ) {
+            // Does the civilization exist in the currently selected year?
+            if (currentTimelineYear < civ.start || currentTimelineYear > civ.end) {
+                inFilter = false;
+            }
+        }
+
+        // Apply
+        if (inFilter) {
+          if (!map.hasLayer(layer)) layer.addTo(map);
+        } else {
+          if (map.hasLayer(layer)) map.removeLayer(layer);
+        }
+        layer.setStyle(styleFor(layer.feature));
+      });
+    }
+
+    function highlight(e) {
+      const layer = e.target;
+      const id = layer.feature.properties.id;
+      if (focusedId && focusedId !== id) return; 
+      const c = civColors[id] || '#999';
+      layer.setStyle({ weight: 4, color: pSBC(-0.6, c), fillOpacity: 0.8 });
+      layer.bringToFront();
+    }
+
+    function resetHighlight(e) {
+      if (geojsonLayer) {
+        geojsonLayer.resetStyle(e.target);
+        e.target.setStyle(styleFor(e.target.feature));
+      }
+    }
+
+    function clickFeature(e) {
+      L.DomEvent.stopPropagation(e);
+      showCivilization(e.target.feature.properties.id, false);
+    }
+
+    function onEachFeature(feature, layer) {
+      layer.bindPopup(`<strong>${feature.properties.name}</strong><br>
+                       <span style="font-weight:400; font-size:0.9em">🗓️ ${feature.properties.era}</span>`);
+      layer.on({ mouseover: highlight, mouseout: resetHighlight, click: clickFeature });
+    }
+
+    map.on('click', () => { if (focusedId) clearFocus(); });
+
+    // ====================================================================
+    // 8. LOAD
+    // ====================================================================
+    const GEOJSON_URL = 'https://raw.githubusercontent.com/Maltais239/interactives/main/curriculum_civilizations.geojson';
+
+    fetch(GEOJSON_URL)
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        geojsonLayer = L.geoJson(data, { style: styleFor, onEachFeature: onEachFeature }).addTo(map);
+        renderDefaultPanel();
+      })
+      .catch(err => {
+        console.error('GeoJSON load failed:', err);
+        infoContent.innerHTML = `<p style="color:#b91c1c;"><strong>Could not load map data.</strong></p>`;
+      });
+  </script>
+</body>
+</html>
