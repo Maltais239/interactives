@@ -352,8 +352,11 @@ const RAW = [
   // ── Health & illness ──────────────────────────────────────────────────────
   [35,[['me duele','it hurts / I have a pain in'],['me duele la cabeza','I have a headache'],['me duelen los ojos','my eyes hurt'],['me he roto...','I have broken...'],['la pierna','the leg'],['el dedo','the finger / toe'],['un medicamento','a medicine'],['he cogido un resfriado','I have caught a cold'],['de nuevo','again / back'],['la gripe','the flu'],['me siento','I feel'],['no me siento bien','I don\'t feel well'],['enfermo','ill / sick (masculine)'],['enferma','ill / sick (feminine)'],['mi pie','my foot'],['mi pierna','my leg']],
       {'Illnesses':[['artritis','arthritis'],['tos','cough'],['fiebre','fever']],'Medicine':[['una pastilla','tablet'],['una aspirina','aspirin']],'Parts of the body':[['el pecho','chest'],['una mano','hand'],['la nariz','nose']]}],
-  [36,[],{'Family and friends':[['mi madre','mother'],['mi padre','father'],['mi hermano','brother'],['mi hermana','sister'],['mi hijo','son'],['mi hija','daughter']]}],
-  [36,[],{'Family and friends':[['mi madre','mother'],['mi padre','father'],['mi hermano','brother'],['mi hermana','sister'],['mi hijo','son'],['mi hija','daughter']]}],
+  // ── Shopping & souvenirs ─────────────────────────────────────────────────
+  [36,[['comprar','to buy'],['comprarlo','to buy it'],['caro','expensive (masculine)'],['cara','expensive (feminine)'],['algo','something'],['una postal','a postcard'],['sellos','stamps'],['un recuerdo','a souvenir'],['mi madre','my mother'],['mi mujer','my wife'],['mi padre','my father'],['mis abuelos','my grandparents'],['mi primo','my cousin'],['el dedo del pie','the toe'],['el estómago','the stomach'],['voy a llamar','I\'m going to call'],['la mano','the hand']],
+      {'Family and friends':[['mi madre','mother'],['mi padre','father'],['mi hermano','brother'],['mi hermana','sister'],['mi hijo','son'],['mi hija','daughter'],['mi mujer','wife'],['mis abuelos','grandparents'],['mi primo','cousin']]}],
+  // ── Describing things ────────────────────────────────────────────────────
+  [37,[['de la región','from the region'],['diferente','different'],['más grande','bigger / larger'],['español','Spanish (masculine)'],['española','Spanish (feminine)'],['mexicano','Mexican (masculine)'],['mexicana','Mexican (feminine)']]],
 ];
 
 
@@ -418,6 +421,15 @@ const STRUCT = {
   ],
 };
 
+
+// ── Number groups for sequential drill ───────────────────────────────────────
+const NUM_GROUPS = [
+  {label:'0 – 10',   pairs:[['cero','zero'],['uno','one'],['dos','two'],['tres','three'],['cuatro','four'],['cinco','five'],['seis','six'],['siete','seven'],['ocho','eight'],['nueve','nine'],['diez','ten']]},
+  {label:'11 – 20',  pairs:[['once','eleven'],['doce','twelve'],['trece','thirteen'],['catorce','fourteen'],['quince','fifteen'],['dieciséis','sixteen'],['diecisiete','seventeen'],['dieciocho','eighteen'],['diecinueve','nineteen'],['veinte','twenty']]},
+  {label:'21 – 29',  pairs:[['veintiuno','twenty-one'],['veintidós','twenty-two'],['veintitrés','twenty-three'],['veinticuatro','twenty-four'],['veinticinco','twenty-five'],['veintiséis','twenty-six'],['veintisiete','twenty-seven'],['veintiocho','twenty-eight'],['veintinueve','twenty-nine']]},
+  {label:'30 – 90',  pairs:[['treinta','thirty'],['cuarenta','forty'],['cincuenta','fifty'],['sesenta','sixty'],['setenta','seventy'],['ochenta','eighty'],['noventa','ninety']]},
+  {label:'100 – 1,000,000', pairs:[['cien','one hundred'],['ciento uno','one hundred and one'],['doscientos','two hundred'],['trescientos','three hundred'],['cuatrocientos','four hundred'],['quinientos','five hundred'],['seiscientos','six hundred'],['setecientos','seven hundred'],['novecientos','nine hundred'],['mil','one thousand'],['un millón','one million']]},
+];
 // ── Conjugation groups ────────────────────────────────────────────────────────
 // Format: [groupLabel, [[spanish form, english meaning], ...]]
 const VERBS=[
@@ -523,7 +535,8 @@ const state = {
   rev:{queue:[],idx:0,correct:0,total:0,reveal:false,typed:'',lastResult:'',showPraise:null},
   phraseProgress:[], // SRS progress per phrase, indexed parallel to PHRASES
   phraseRev:{queue:[],idx:0,correct:0,total:0,reveal:false,typed:'',lastResult:'',started:false},
-  verbDrill:{queue:[],idx:0,reveal:false,correct:0,total:0} // simple drill, no SRS
+  verbDrill:{queue:[],idx:0,reveal:false,correct:0,total:0}, // simple drill, no SRS
+  numDrill:{active:false,group:0,idx:0,reveal:false,correct:0,total:0} // sequential number drill
 };
 
 function initPhraseProgress(saved=[]) {
@@ -954,12 +967,67 @@ function renderVerbs() {
     </div>
   </div>`;
 
+  // ── Numbers drill card ───────────────────────────────────────────────────
+  const nd = state.numDrill;
+  const numDrillCard = () => {
+    if(!nd.active) return '';
+    const g = NUM_GROUPS[nd.group];
+    const pair = g.pairs[nd.idx];
+    if(!pair){
+      const pct=nd.total?Math.round(nd.correct/nd.total*100):0;
+      return `<div class="card review-card anim-pop" style="margin-bottom:12px;">
+        <span style="font-size:2.5rem">🔢</span>
+        <div style="font-size:1.4rem;font-weight:900;margin:8px 0;">${esc(g.label)} — done!</div>
+        <div class="score-ring" style="margin:10px auto 16px"><span class="ring-pct">${pct}%</span><span class="ring-label">correct</span></div>
+        <div class="action-row">
+          <button class="btn primary" id="nRepeatBtn">Repeat group</button>
+          ${nd.group < NUM_GROUPS.length-1 ? '<button class="btn" id="nNextGroupBtn">Next group →</button>' : ''}
+          <button class="btn" id="nStopBtn">Stop</button>
+        </div>
+      </div>`;
+    }
+    // Alternate direction: even = ES→EN, odd = EN→ES
+    const dir = nd.idx%2===0;
+    const prompt = dir ? pair[0] : pair[1];
+    const answer = dir ? pair[1] : pair[0];
+    return `<div class="card review-card anim-pop" style="margin-bottom:12px;">
+      <div class="toolbar" style="justify-content:center;margin-bottom:10px;">
+        <span class="pill blue">Numbers · ${esc(g.label)}</span>
+        <span class="pill yellow">${nd.idx+1} / ${g.pairs.length}</span>
+        <span class="pill green">✓ ${nd.correct}</span>
+      </div>
+      <div class="task-hint">${dir?'Spanish → English':'English → Spanish'}</div>
+      <div class="prompt">${esc(prompt)}</div>
+      <div class="review-input"><input id="nAns" placeholder="Type your answer…" autocomplete="off" autocorrect="off" spellcheck="false"/></div>
+      <div class="action-row">
+        <button class="btn primary" id="nCheckBtn">Check ✓</button>
+        <button class="btn" id="nRevealBtn">Show</button>
+        <button class="btn" id="nStopBtn">Stop</button>
+      </div>
+      ${nd.reveal?`<div class="answer-reveal anim-pop"><div class="reveal-label">Answer</div><div class="reveal-text">${esc(answer)}</div></div><div class="action-row"><button class="btn primary" id="nNextBtn">Next →</button></div>`:''}
+    </div>`;
+  };
+
+  const numGroupBtns = NUM_GROUPS.map((g,gi)=>
+    `<button class="btn${nd.active&&nd.group===gi?' primary':''} nGroupBtn" data-gi="${gi}" style="font-size:.85rem;padding:8px 12px;">${esc(g.label)}</button>`
+  ).join('');
+
   d.innerHTML = `
     <div class="toolbar" style="justify-content:space-between;margin-bottom:4px;">
       <h2 style="margin:0;">Conjugation Corner</h2>
       <button class="btn primary" id="vDrillAllBtn">Drill all verbs</button>
     </div>
     <div class="muted small">Full conjugation tables for the verbs in the course. Use the drill buttons to practice forms as flash cards.</div>
+
+    <div class="card" style="margin-top:14px;">
+      <div class="toolbar" style="justify-content:space-between;margin-bottom:10px;">
+        <h3 style="margin:0;">🔢 Numbers — sequential drill</h3>
+      </div>
+      <div class="muted small" style="margin-bottom:10px;">Drill one group at a time. Spanish ↔ English alternates each card.</div>
+      <div class="toolbar" style="gap:6px;flex-wrap:wrap;">${numGroupBtns}</div>
+      ${numDrillCard()}
+    </div>
+
     ${callout}
     <div id="vDrillArea" style="margin-top:12px;">${drillArea()}</div>
     ${tables}`;
@@ -987,13 +1055,38 @@ function renderVerbs() {
   });
   document.getElementById('vRevealBtn')?.addEventListener('click',()=>{ state.verbDrill.total++; state.verbDrill.reveal=true; state.verbDrill.lastResult='Answer shown.'; renderVerbs(); });
   document.getElementById('vNextBtn')?.addEventListener('click',()=>{ state.verbDrill.idx++; state.verbDrill.reveal=false; state.verbDrill.typed=''; state.verbDrill.lastResult=''; renderVerbs(); });
+
+  // ── Number drill events ────────────────────────────────────────────────────
+  const nd2=state.numDrill;
+  const nNext=()=>{ nd2.idx++; nd2.reveal=false; renderVerbs(); };
+  d.querySelectorAll('.nGroupBtn').forEach(b=>b.addEventListener('click',()=>{
+    nd2.group=+b.dataset.gi; nd2.idx=0; nd2.reveal=false; nd2.correct=0; nd2.total=0; nd2.active=true;
+    renderVerbs();
+    requestAnimationFrame(()=>{ const el=document.querySelector('.review-input input'); if(el) el.focus(); });
+  }));
+  const nInp=document.getElementById('nAns');
+  if(nInp){ nInp.focus(); nInp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();document.getElementById('nCheckBtn')?.click();}}); }
+  document.getElementById('nCheckBtn')?.addEventListener('click',()=>{
+    const t=(document.getElementById('nAns')?.value||'').trim();
+    const g=NUM_GROUPS[nd2.group], pair=g.pairs[nd2.idx];
+    const dir=nd2.idx%2===0; const answer=dir?pair[1]:pair[0];
+    nd2.total++;
+    if(norm(t)===norm(answer)){ nd2.correct++; nNext(); }
+    else { nd2.reveal=true; renderVerbs(); }
+  });
+  document.getElementById('nRevealBtn')?.addEventListener('click',()=>{ nd2.total++; nd2.reveal=true; renderVerbs(); });
+  document.getElementById('nNextBtn')?.addEventListener('click',nNext);
+  document.getElementById('nRepeatBtn')?.addEventListener('click',()=>{ nd2.idx=0; nd2.reveal=false; nd2.correct=0; nd2.total=0; renderVerbs(); });
+  document.getElementById('nNextGroupBtn')?.addEventListener('click',()=>{ nd2.group++; nd2.idx=0; nd2.reveal=false; nd2.correct=0; nd2.total=0; renderVerbs(); });
+  document.getElementById('nStopBtn')?.addEventListener('click',()=>{ nd2.active=false; nd2.idx=0; nd2.reveal=false; renderVerbs(); });
 }
 
 // ── Phrases ───────────────────────────────────────────────────────────────────
-function reviewPhrase(idx,ok) {
+function reviewPhrase(idx,rating) {
   const p=state.phraseProgress[idx], now=todayISO(), n={...p,attempts:(p.attempts||0)+1};
-  if(ok){ n.correct=(n.correct||0)+1; n.level=Math.min(6,n.level+2); n.dueAt=addDays(now,INTERVALS[Math.min(6,n.level)]||3); }
-  else  { n.level=Math.max(0,n.level-1); n.dueAt=todayISO(); }
+  if(rating==='got')   { n.correct=(n.correct||0)+1; n.level=Math.min(6,n.level+3); n.dueAt=addDays(now,(INTERVALS[Math.min(6,n.level)]||7)); }
+  if(rating==='almost'){ n.correct=(n.correct||0)+1; n.level=Math.min(6,n.level+1); n.dueAt=addDays(now,INTERVALS[Math.max(1,n.level)]||1); }
+  if(rating==='nope')  { n.level=Math.max(0,n.level-1); n.dueAt=todayISO(); }
   n.mastered=n.level>=6; state.phraseProgress[idx]=n; saveState();
 }
 
@@ -1008,35 +1101,53 @@ function renderPhrases() {
   const pr=state.phraseRev, mastered=state.phraseProgress.filter(p=>p.mastered).length;
   const due=state.phraseProgress.filter(p=>isDue(p)&&!p.mastered).length;
 
-  // ── Phrase review card ─────────────────────────────────────────────────────
+  // ── Phrase review card (reveal-then-self-rate) ───────────────────────────
   const reviewArea = () => {
     if(!pr.started||!pr.queue.length) return '';
     const i=pr.queue[pr.idx];
-    if(i===undefined) return `<div class="card review-card" style="margin-bottom:16px;">
-      <h2>Phrases session complete 🎉</h2>
-      <div class="toolbar" style="justify-content:center;margin-bottom:12px;">
-        <span class="pill green">Reviewed ${pr.total}</span><span class="pill blue">Correct ${pr.correct}</span>
-      </div>
-      <button class="btn primary" id="pRestartBtn">Go again</button></div>`;
+    if(i===undefined){
+      const pct=pr.total?Math.round(pr.correct/pr.total*100):0;
+      return `<div class="card session-complete anim-pop" style="margin-bottom:16px;">
+        <span class="complete-icon">${pct>=80?'🏆':pct>=60?'🎉':'📚'}</span>
+        <div class="complete-title">Phrases done!</div>
+        <div class="score-ring"><span class="ring-pct">${pct}%</span><span class="ring-label">got it</span></div>
+        <div class="toolbar" style="justify-content:center;margin-bottom:16px;">
+          <span class="pill green">✓ ${pr.correct} got it</span>
+          <span class="pill red">✗ ${pr.total-pr.correct} missed</span>
+        </div>
+        <button class="btn primary" id="pRestartBtn">Go again</button></div>`;
+    }
     const dir=pr.idx%2===0?'es-en':'en-es';
     const prompt=dir==='es-en'?PHRASES[i][0]:PHRASES[i][1];
     const answer=dir==='es-en'?PHRASES[i][1]:PHRASES[i][0];
-    const ph=dir==='es-en'?'Type the English translation…':'Type the Spanish translation…';
-    return `<div class="card review-card" style="margin-bottom:16px;">
+    const sp=PHRASES[i][0];
+    // Before reveal: show prompt + optional typing area + Reveal button
+    // After reveal: show answer + 3 self-rate buttons
+    return `<div class="card review-card anim-pop" style="margin-bottom:16px;">
       <div class="toolbar" style="justify-content:center;margin-bottom:12px;">
         <span class="pill blue">${dir==='es-en'?'Spanish → English':'English → Spanish'}</span>
         <span class="pill yellow">Phrase ${pr.idx+1} of ${pr.queue.length}</span>
       </div>
-      <div class="prompt" style="font-size:clamp(1.1rem,2.5vw,1.6rem);">${esc(prompt)}</div>
-      <div class="review-input"><input id="pAns" placeholder="${ph}" value="${esc(pr.typed)}"/></div>
-      <div class="choice-row">
-        <button class="btn primary" id="pCheckBtn">Check</button>
-        <button class="btn" id="pRevealBtn">Show answer</button>
-        <button class="btn" id="pSkipBtn">Skip</button>
-      </div>
-      ${pr.reveal?`<div class="choice-row"><button class="btn primary" id="pNextBtn">Next phrase</button></div>`:''}
-      ${pr.lastResult?`<div class="footer-note">${esc(pr.lastResult)}</div>`:''}
-      ${pr.reveal?`<div class="answer-reveal"><div class="tiny muted">Answer</div><div style="font-size:1.05rem;font-weight:700;margin-top:4px;">${esc(answer)}</div></div>`:''}
+      <div class="prompt" style="font-size:clamp(1rem,2.8vw,1.5rem);margin-bottom:12px;">${esc(prompt)}</div>
+      ${!pr.reveal?`
+        <div class="muted small" style="margin-bottom:10px;font-style:italic;">Think of the ${dir==='es-en'?'English meaning':'Spanish translation'}, then reveal.</div>
+        <div class="speak-row"><button class="speak-btn" id="pSpeakBtn">🔊 Play Spanish</button></div>
+        <div class="action-row" style="margin-top:14px;">
+          <button class="btn primary" id="pRevealBtn">👁 Reveal answer</button>
+          <button class="btn" id="pSkipBtn">Skip</button>
+        </div>
+      `:`
+        <div class="answer-reveal anim-pop">
+          <div class="reveal-label">Answer</div>
+          <div class="reveal-text">${esc(answer)}</div>
+        </div>
+        <div class="muted small" style="margin:12px 0 8px;text-align:center;font-weight:700;">How did you do?</div>
+        <div class="action-row">
+          <button class="btn primary" id="pGotBtn" style="background:var(--green);border-color:var(--gd);border-bottom-color:#337800;">✓ Got it</button>
+          <button class="btn" id="pAlmostBtn" style="background:var(--golds);border-color:#e6b800;border-bottom-color:#c9a000;color:#7a5800;">~ Almost</button>
+          <button class="btn danger" id="pNopeBtn">✗ Not yet</button>
+        </div>
+      `}
     </div>`;
   };
 
@@ -1067,29 +1178,85 @@ function renderPhrases() {
   document.getElementById('pRestartBtn')?.addEventListener('click',()=>{ buildPhraseQueue(); renderPhrases(); });
 
   const nextPhrase=()=>{ pr.idx++; pr.reveal=false; pr.typed=''; pr.lastResult=''; renderPhrases(); };
-  const pInp=document.getElementById('pAns');
-  if(pInp){ pInp.focus(); pInp.addEventListener('input',e=>pr.typed=e.target.value); pInp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();document.getElementById('pCheckBtn')?.click();}}); }
 
-  document.getElementById('pCheckBtn')?.addEventListener('click',()=>{
-    const t=(document.getElementById('pAns')?.value||'').trim(); pr.typed=t; pr.total++;
-    const i=pr.queue[pr.idx]; const dir=pr.idx%2===0?'es-en':'en-es';
-    const answer=dir==='es-en'?PHRASES[i][1]:PHRASES[i][0];
-    const ok=norm(t)===norm(answer);
-    if(ok){ pr.correct++; reviewPhrase(i,true); nextPhrase(); }
-    else { pr.reveal=true; pr.lastResult=t?'Not an exact match — see the answer and continue.':'No answer entered.'; renderPhrases(); }
+  // Speak button
+  const sp=pr.queue[pr.idx]!==undefined?PHRASES[pr.queue[pr.idx]]?.[0]:'';
+  document.getElementById('pSpeakBtn')?.addEventListener('click',()=>{
+    if('speechSynthesis'in window&&sp){window.speechSynthesis.cancel();window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(sp),{lang:'es-ES'}));}
   });
-  document.getElementById('pRevealBtn')?.addEventListener('click',()=>{ const i=pr.queue[pr.idx]; pr.total++; reviewPhrase(i,false); pr.reveal=true; pr.lastResult='Answer shown.'; renderPhrases(); });
-  document.getElementById('pSkipBtn')?.addEventListener('click',()=>{ const i=pr.queue[pr.idx]; pr.total++; reviewPhrase(i,false); nextPhrase(); });
-  document.getElementById('pNextBtn')?.addEventListener('click',nextPhrase);
+
+  // Reveal
+  document.getElementById('pRevealBtn')?.addEventListener('click',()=>{ pr.reveal=true; renderPhrases(); });
+  document.getElementById('pSkipBtn')?.addEventListener('click',()=>{ const i=pr.queue[pr.idx]; pr.total++; reviewPhrase(i,'nope'); nextPhrase(); });
+
+  // Self-rate buttons
+  document.getElementById('pGotBtn')?.addEventListener('click',()=>{
+    const i=pr.queue[pr.idx]; pr.total++; pr.correct++; reviewPhrase(i,'got'); nextPhrase();
+  });
+  document.getElementById('pAlmostBtn')?.addEventListener('click',()=>{
+    const i=pr.queue[pr.idx]; pr.total++; pr.correct++; reviewPhrase(i,'almost'); nextPhrase();
+  });
+  document.getElementById('pNopeBtn')?.addEventListener('click',()=>{
+    const i=pr.queue[pr.idx]; pr.total++; reviewPhrase(i,'nope'); nextPhrase();
+  });
 }
 
 
 // ── Sentence Builder ──────────────────────────────────────────────────────────
 const buildState = {
-  activeSlot: 'q',   // 'q' | 'c' | 'i' | 'e'
-  q: null, c: null, i: null, e: null,
-  neg: false,
+  // Free-build mode
+  activeSlot: 'q', q:null, c:null, i:null, e:null, neg:false,
+  // Challenge mode
+  challengeActive: false,
+  challengeIdx: 0,
+  challengeSelected: [], // indices of chips tapped so far
+  challengeResult: null, // null | 'correct' | 'wrong'
 };
+
+
+// ── Translation challenges (English prompt → build Spanish) ──────────────────
+const CHALLENGES = [
+  {en:'Where can I eat here?',        q:'¿Dónde?', c:'puedo',   i:'comer',    e:'aquí'},
+  {en:'What do you want to drink?',   q:'¿Qué?',   c:'quiere',  i:'beber',    e:null},
+  {en:'When should I go?',            q:'¿Cuándo?',c:'debo',    i:'ir',       e:null},
+  {en:'How can I pay?',               q:'¿Cómo?',  c:'puedo',   i:'pagar',    e:null},
+  {en:'What are you going to order?', q:'¿Qué?',   c:'va a',    i:'pedir',    e:null},
+  {en:'Where am I going to stay?',    q:'¿Dónde?', c:'voy a',   i:'quedarse', e:null},
+  {en:'How much do I have to spend?', q:'¿Cuánto?',c:'debo',    i:'gastar',   e:null},
+  {en:'What do I want to try?',       q:'¿Qué?',   c:'quiero',  i:'probar',   e:'hoy'},
+  {en:'Where can I find it?',         q:'¿Dónde?', c:'puedo',   i:'encontrar',e:'aquí'},
+  {en:"What time are you going to pay?", q:'¿A qué hora?', c:'va a', i:'pagar', e:null},
+  {en:"What can't I do tonight?",     q:'¿Qué?',   c:'puedo',   i:'hacer',    e:'esta noche', neg:true},
+  {en:"Where should I go tomorrow?",  q:'¿Dónde?', c:'debo',    i:'ir',       e:'mañana'},
+  {en:"What do you want to buy?",     q:'¿Qué?',   c:'quiere',  i:'comprar',  e:null},
+  {en:"How can I find the hotel?",    q:'¿Cómo?',  c:'puedo',   i:'encontrar',e:null},
+  {en:"What can I try here?",         q:'¿Qué?',   c:'puedo',   i:'probar',   e:'aquí'},
+];
+
+function buildChallengeTokens(ch) {
+  // Returns the correct ordered chips for a challenge
+  const tokens = [];
+  if(ch.q) tokens.push({sp:ch.q, cat:'q'});
+  if(ch.neg && ch.c) tokens.push({sp:'no', cat:'c'});
+  if(ch.c) tokens.push({sp:ch.c, cat:'c'});
+  if(ch.i) tokens.push({sp:ch.i, cat:'i'});
+  if(ch.e) tokens.push({sp:ch.e, cat:'e'});
+  return tokens;
+}
+
+function shuffleChallengeChips(tokens) {
+  // Add 2 distractors from STRUCT, then shuffle
+  const all = [...tokens];
+  const distractors = [
+    ...STRUCT.questions, ...STRUCT.carriers, ...STRUCT.infinitives
+  ].filter(w => !tokens.find(t=>norm(t.sp)===norm(w.sp)));
+  const picked = shuffle([...distractors]).slice(0,3);
+  picked.forEach(w => {
+    const cat = STRUCT.questions.includes(w)?'q': STRUCT.carriers.includes(w)?'c':'i';
+    all.push({sp:w.sp, cat, distractor:true});
+  });
+  return shuffle(all);
+}
 
 function renderBuild() {
   const d = document.getElementById('buildSection');
@@ -1162,7 +1329,65 @@ function renderBuild() {
 
   const examplesHTML = examples.map(ex=>`<div class="example-sentence"><strong>${esc(ex.sp)}</strong><br><span style="opacity:.7">${esc(ex.en)}</span></div>`).join('');
 
+  // ── Challenge mode rendering ─────────────────────────────────────────────
+  const bs2 = buildState;
+  const ch = CHALLENGES[bs2.challengeIdx % CHALLENGES.length];
+  const correctTokens = buildChallengeTokens(ch);
+  const chips = shuffleChallengeChips(correctTokens);
+  // Rebuild chips deterministically (same seed per challenge)
+  const stableChips = (() => {
+    // Use a fixed per-challenge shuffle so chips don't re-randomise on each render
+    if(!bs2._chips || bs2._chipsFor !== bs2.challengeIdx) {
+      bs2._chips = shuffleChallengeChips(correctTokens);
+      bs2._chipsFor = bs2.challengeIdx;
+    }
+    return bs2._chips;
+  })();
+  const selSps = bs2.challengeSelected.map(i => stableChips[i]?.sp||'');
+  const builtSentence = selSps.length
+    ? (ch.q?'¿':'')+selSps.join(' ')+(ch.q?'?':'.')
+    : '';
+  const correctSentence = (ch.q?'¿':'')+correctTokens.map(t=>t.sp).join(' ')+(ch.q?'?':'.');
+  const isCorrect = norm(builtSentence)===norm(correctSentence);
+
+  const challengeHTML = bs2.challengeActive ? `
+    <div class="card anim-pop" style="margin-bottom:14px;">
+      <div class="toolbar" style="justify-content:space-between;margin-bottom:10px;">
+        <h3 style="margin:0;">🎯 Translation Challenge</h3>
+        <span class="pill yellow">${bs2.challengeIdx+1} / ${CHALLENGES.length}</span>
+      </div>
+      <div style="background:var(--blues);border:2px solid #8dd9f8;border-radius:14px;padding:14px 16px;margin-bottom:14px;font-weight:800;font-size:1.05rem;color:#0880bf;">${esc(ch.en)}</div>
+      <div style="min-height:52px;background:var(--gxs);border:2px solid ${bs2.challengeResult==='correct'?'var(--green)':bs2.challengeResult==='wrong'?'var(--red)':'var(--gs)'};border-radius:14px;padding:12px 16px;margin-bottom:12px;font-weight:900;font-size:1.05rem;display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+        ${builtSentence
+          ? `<span>${esc(builtSentence)}</span>`
+          : `<span style="color:var(--muted);font-weight:700;font-style:italic;">Tap the chips below in order…</span>`}
+      </div>
+      ${bs2.challengeResult==='wrong'?`<div class="feedback-bar wrong-fb anim-pop">✗ Not quite — correct: <strong>${esc(correctSentence)}</strong></div>`:''}
+      ${bs2.challengeResult==='correct'?`<div class="feedback-bar correct-fb anim-pop">✓ ¡Correcto!</div>`:''}
+      <div class="word-chips" style="margin-bottom:12px;">
+        ${stableChips.map((chip,ci)=>{
+          const used=bs2.challengeSelected.includes(ci);
+          return `<button class="word-chip ${chip.cat}${used?' sel':''}" data-ci="${ci}" data-sp="${esc(chip.sp)}">${esc(chip.sp)}</button>`;
+        }).join('')}
+      </div>
+      <div class="action-row">
+        ${!bs2.challengeResult&&selSps.length?`<button class="btn primary" id="cCheckBtn">Check ✓</button>`:''}
+        ${!bs2.challengeResult&&selSps.length?`<button class="btn" id="cUndoBtn">↩ Undo</button>`:''}
+        ${bs2.challengeResult?`<button class="btn primary" id="cNextBtn">Next →</button>`:''}
+        <button class="btn" id="cResetBtn">↺ Reset</button>
+        <button class="btn" id="cExitBtn">Exit</button>
+      </div>
+    </div>
+  ` : `
+    <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,#f0fde4,#e8f7ff);border-color:#b8e6a0;">
+      <h3 style="margin:0 0 6px;">🎯 Translation Challenge</h3>
+      <div class="muted small" style="margin-bottom:12px;">See an English sentence, tap the Spanish chips in the right order to build it. ${CHALLENGES.length} challenges using the Lesson 32 structure.</div>
+      <button class="btn primary" id="cStartBtn">Start challenge →</button>
+    </div>
+  `;
+
   d.innerHTML = `
+    ${challengeHTML}
     <div class="card" style="margin-bottom:14px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
         <h2 style="margin:0;">Sentence Builder 🏗️</h2>
