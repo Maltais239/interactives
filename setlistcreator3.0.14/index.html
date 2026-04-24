@@ -72,20 +72,29 @@
             height: 100dvh; /* dynamic viewport height for mobile browsers */
         }
         
-        /* Lyrics display styling for stage readability */
+        /* Lyrics display styling - tight, readable chord chart format */
         .lyrics-display {
-            font-size: 1.25rem;
-            line-height: 1.7;
+            font-size: 1rem;
+            line-height: 1.45;
             color: #e5e7eb;
-            font-family: ui-sans-serif, system-ui, sans-serif;
-            max-width: 48rem;
+            font-family: 'Courier New', Courier, monospace;
+            max-width: 54rem;
             margin: 0 auto;
             padding-bottom: 60vh;
-            white-space: pre-wrap;
             word-wrap: break-word;
+            text-align: left;
         }
         @media (min-width: 768px) {
-            .lyrics-display { font-size: 1.75rem; line-height: 1.8; }
+            .lyrics-display { font-size: 1.15rem; line-height: 1.5; }
+        }
+        .lyrics-section {
+            margin-bottom: 1.1em;
+            white-space: pre-wrap;
+        }
+        .lyrics-section:last-child { margin-bottom: 0; }
+        .chord-tag {
+            color: #fbbf24;
+            font-weight: bold;
         }
         
         /* Tap target minimum for mobile */
@@ -130,7 +139,8 @@
                 'toggleAutoScroll', 'changeSpeed', 'stopScroll', 'renderLyrics',
                 'submitNewRequest', 'requestBankSong', 'addAudienceRequest',
                 'deleteRequest', 'clearAllRequests', 'saveRequestToSet',
-                'renderBank', 'renderAudienceBankFallback', 'renderIncomingRequests'
+                'renderBank', 'renderAudienceBankFallback', 'renderIncomingRequests',
+                'changeLyricsSize'
             ];
             
             fnNames.forEach(function(name) {
@@ -1438,14 +1448,36 @@
         };
 
         window.renderLyrics = (text) => {
-            // Escape HTML, preserve line breaks, highlight chord brackets
-            const html = text
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/\n/g, "<br>")
-                .replace(/(\[[A-G][b#]?[0-9]*[a-zA-Z0-9#/]*\])/g, '<span class="text-yellow-400 font-bold">$1</span>');
-            // Use outer styling (lyrics-display class) instead of wrapping in a tiny font-mono div
-            document.getElementById('lyrics-content').innerHTML = `<div class="lyrics-display">${html}</div>`;
+            // Normalize: strip trailing whitespace per line, collapse 3+ blank lines to 1
+            const normalized = text.trim()
+                .replace(/[ \t]+$/gm, '')
+                .replace(/\n{3,}/g, '\n\n');
+
+            // Split into sections on double newlines (verses, choruses, etc.)
+            const sections = normalized.split(/\n\n/);
+
+            // Highlight bracket chords [G], [Am7], etc. AND standalone chord lines
+            const highlightChords = (line) => {
+                // Bracket notation: [G], [Am7], [C#m], etc.
+                return line.replace(/(\[[A-G][b#]?[0-9]*[a-zA-Z0-9#/]*\])/g,
+                    '<span class="chord-tag">$1</span>');
+            };
+
+            const html = sections.map(section => {
+                const escaped = section
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+                const highlighted = escaped
+                    .split('\n')
+                    .map(line => highlightChords(line))
+                    .join('\n');
+                return `<div class="lyrics-section">${highlighted}</div>`;
+            }).join('');
+
+            document.getElementById('lyrics-content').innerHTML =
+                `<div class="lyrics-display">${html}</div>`;
+            // Apply user's saved font size preference
+            applyLyricsSize();
         };
 
         window.toggleEditMode = () => {
@@ -1504,6 +1536,19 @@
                     if(container.scrollTop + container.clientHeight >= container.scrollHeight - 5) window.stopScroll();
                 }, scrollDelay);
             }
+        };
+
+        // Font size control for lyrics (persisted in session)
+        let lyricsFontSize = parseFloat(safeStorage.get('lyricsFontSize') || '1');
+        const applyLyricsSize = () => {
+            const el = document.querySelector('.lyrics-display');
+            if (el) el.style.fontSize = lyricsFontSize + 'rem';
+        };
+        window.changeLyricsSize = (dir) => {
+            lyricsFontSize = Math.max(0.7, Math.min(2.2, lyricsFontSize + dir * 0.1));
+            lyricsFontSize = Math.round(lyricsFontSize * 10) / 10;
+            safeStorage.set('lyricsFontSize', lyricsFontSize.toString());
+            applyLyricsSize();
         };
 
         window.changeSpeed = (delta) => {
@@ -2023,7 +2068,7 @@
         </div>
 
         <!-- Toolbar -->
-        <div class="bg-gray-900 p-2 border-b border-gray-800 flex justify-between items-center flex-shrink-0 overflow-x-auto z-10 gap-2">
+        <div class="bg-gray-900 p-2 border-b border-gray-800 flex justify-between items-center flex-shrink-0 z-10 gap-2">
             <div class="flex items-center gap-1 flex-shrink-0">
                 <button onclick="changeSpeed(10)" class="text-sm bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded font-bold w-10 tap-target">-</button>
                 <div class="flex flex-col items-center w-14">
@@ -2031,6 +2076,12 @@
                     <span id="scroll-speed-display" class="font-bold text-indigo-400 text-sm">50%</span>
                 </div>
                 <button onclick="changeSpeed(-10)" class="text-sm bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded font-bold w-10 tap-target">+</button>
+            </div>
+
+            <!-- Font size controls -->
+            <div class="flex items-center gap-1 flex-shrink-0">
+                <button onclick="changeLyricsSize(-1)" class="text-sm bg-gray-700 hover:bg-gray-600 text-white px-2 py-2 rounded font-bold tap-target" title="Smaller text">A-</button>
+                <button onclick="changeLyricsSize(1)" class="text-sm bg-gray-700 hover:bg-gray-600 text-white px-2 py-2 rounded font-bold tap-target" title="Larger text">A+</button>
             </div>
             
             <div class="flex gap-2 flex-shrink-0">
