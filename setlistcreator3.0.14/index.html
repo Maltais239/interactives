@@ -322,6 +322,11 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'setlist-v2-demo';
 
         let app, auth, db;
+        // Auth-ready promise — resolves once the user is signed in (anonymous or custom token)
+        // addAudienceRequest awaits this before any Firestore write, fixing iPhone timing issues
+        let _authReadyResolve;
+        const authReadyPromise = new Promise(resolve => { _authReadyResolve = resolve; });
+        window.authReadyPromise = authReadyPromise;
         try {
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
@@ -1208,7 +1213,10 @@
                 } else {
                     await signInAnonymously(auth);
                 }
+                // Resolve immediately after sign-in completes (before onAuthStateChanged fires)
+                if (_authReadyResolve) { _authReadyResolve(auth.currentUser); _authReadyResolve = null; }
             } catch (error) { 
+                console.error('Auth failed:', error);
                 const statusEl = document.getElementById('firebase-status');
                 if(statusEl) statusEl.innerHTML = `<span class="text-red-400 font-bold">⚠️ Auth Error</span>`;
             }
@@ -1281,6 +1289,8 @@
                 onAuthStateChanged(auth, (user) => {
                     window.currentUser = user;
                     if (user) {
+                        // Safety net: resolve promise in case initAuth path missed it
+                        if (_authReadyResolve) { _authReadyResolve(user); _authReadyResolve = null; }
                         console.log("Connected as", user.uid);
                         const statusEl = document.getElementById('firebase-status');
                         if(statusEl) statusEl.innerHTML = `<span class="text-green-400 animate-pulse">● Online</span>`;
@@ -1582,7 +1592,7 @@
         // ==========================================
         window.addAudienceRequest = async (song, artist, source = 'new', requesterName = '') => {
             if (!db) {
-                showToast("No connection — try again in a moment", true);
+                showToast("Not connected yet — try again in a moment", true);
                 return false;
             }
             const normalizedSong = song.trim(); 
@@ -1597,7 +1607,26 @@
             const COOLDOWN_MS = 15 * 60 * 1000;
             
             if (lastVoted && (Date.now() - parseInt(lastVoted) < COOLDOWN_MS)) {
-                showToast(`You already requested "${normalizedSong}".`, true);
+                showToast(`Already requested "${normalizedSong}" recently!`, true);
+                return false;
+            }
+
+            // Wait for auth to complete — critical on slow mobile connections (iPhone)
+            // Times out after 10s and shows a specific message instead of generic error
+            try {
+                await Promise.race([
+                    authReadyPromise,
+                    new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('auth_timeout')), 10000)
+                    )
+                ]);
+            } catch(authErr) {
+                if (authErr.message === 'auth_timeout') {
+                    showToast("Still connecting to server — please try again", true);
+                } else {
+                    showToast("Connection error — check your signal", true);
+                }
+                console.warn('Auth wait failed:', authErr);
                 return false;
             }
 
@@ -1620,11 +1649,18 @@
                     });
                 }
                 safeStorage.set(storageKey, Date.now().toString());
-                showToast(`Request for "${normalizedSong}" sent!`);
+                showToast(`✅ "${normalizedSong}" requested!`);
                 return true;
             } catch (e) { 
-                console.error("Request error:", e); 
-                showToast("Error sending — check your connection", true); 
+                console.error("Request Firestore error:", e);
+                // Give a specific message for permission errors vs network errors
+                if (e.code === 'permission-denied') {
+                    showToast("Permission error — refresh the page and try again", true);
+                } else if (e.code === 'unavailable' || e.message?.includes('network')) {
+                    showToast("No internet — check your connection", true);
+                } else {
+                    showToast("Request failed — please try again", true);
+                }
                 return false; 
             }
         };
@@ -1829,6 +1865,29 @@
         try { window._drainClickQueue(); console.log('[Setlist 3.0.14] Module loaded OK'); }
         catch(e) { console.error('[Setlist 3.0.14] Drain error:', e); }
 
+        // Audience mode: kick off auth IMMEDIATELY so it's ready before first tap
+        // Band mode auth is handled inside window.onload
+        if (auth && window.location.search.includes('mode=audience')) {
+            initAuth().then(() => {
+                const statusEl = document.getElementById('audience-conn-status');
+                if (statusEl) {
+                    statusEl.textContent = '● Ready to receive requests';
+                    statusEl.classList.remove('text-yellow-400');
+                    statusEl.classList.add('text-green-400');
+                    statusEl.classList.remove('animate-pulse');
+                    setTimeout(() => { if(statusEl) statusEl.style.display = 'none'; }, 3000);
+                }
+            }).catch(e => {
+                console.warn('Early auth failed:', e);
+                const statusEl = document.getElementById('audience-conn-status');
+                if (statusEl) {
+                    statusEl.textContent = '⚠️ Connection issue — requests may not work';
+                    statusEl.classList.remove('text-yellow-400', 'animate-pulse');
+                    statusEl.classList.add('text-red-400');
+                }
+            });
+        }
+
     </script>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen font-sans selection:bg-indigo-500 selection:text-white pb-20">
@@ -1993,6 +2052,7 @@
                 <h1 class="text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 to-pink-500 drop-shadow-sm">Request A Song</h1>
                 <p class="text-indigo-200 text-sm mt-1 font-medium">Tap a song to request it live!</p>
                 <p class="text-green-400 text-xs mt-2 font-bold animate-pulse">💰 Tips Appreciated! 💰</p>
+                <div id="audience-conn-status" class="mt-2 text-xs text-yellow-400 animate-pulse">● Connecting...</div>
             </header>
 
             <!-- Success Message -->
