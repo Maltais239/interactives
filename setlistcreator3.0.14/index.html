@@ -140,7 +140,8 @@
                 'submitNewRequest', 'requestBankSong', 'addAudienceRequest',
                 'deleteRequest', 'clearAllRequests', 'saveRequestToSet',
                 'renderBank', 'renderAudienceBankFallback', 'renderIncomingRequests',
-                'changeLyricsSize', 'setAudienceView', 'toggleArtistGroup', 'renderAudienceByArtist'
+                'changeLyricsSize', 'setAudienceView', 'toggleArtistGroup', 'renderAudienceByArtist',
+                'updateRequestHint'
             ];
             
             fnNames.forEach(function(name) {
@@ -1595,7 +1596,14 @@
                 showToast("Not connected yet — try again in a moment", true);
                 return false;
             }
-            const normalizedSong = song.trim(); 
+
+            const isArtistOnly = !song && !!artist.trim();
+            // For artist-only requests, use a prefixed key so deduplication works
+            // without needing a Firestore composite index
+            const normalizedSong = isArtistOnly
+                ? `[Artist] ${artist.trim()}`
+                : song.trim();
+
             let deviceID = safeStorage.get('deviceID');
             if(!deviceID) {
                 deviceID = safeUUID();
@@ -1607,12 +1615,12 @@
             const COOLDOWN_MS = 15 * 60 * 1000;
             
             if (lastVoted && (Date.now() - parseInt(lastVoted) < COOLDOWN_MS)) {
-                showToast(`Already requested "${normalizedSong}" recently!`, true);
+                const what = isArtistOnly ? `"${artist.trim()}"` : `"${song.trim()}"`;
+                showToast(`Already requested ${what} recently!`, true);
                 return false;
             }
 
-            // Wait for auth to complete — critical on slow mobile connections (iPhone)
-            // Times out after 10s and shows a specific message instead of generic error
+            // Wait for auth before Firestore write
             try {
                 await Promise.race([
                     authReadyPromise,
@@ -1621,12 +1629,9 @@
                     )
                 ]);
             } catch(authErr) {
-                if (authErr.message === 'auth_timeout') {
-                    showToast("Still connecting to server — please try again", true);
-                } else {
-                    showToast("Connection error — check your signal", true);
-                }
-                console.warn('Auth wait failed:', authErr);
+                showToast(authErr.message === 'auth_timeout'
+                    ? "Still connecting — please try again"
+                    : "Connection error — check your signal", true);
                 return false;
             }
 
@@ -1644,18 +1649,19 @@
                         requester: (requesterName || 'Anonymous').trim(),
                         votes: 1,
                         timestamp: Date.now(),
-                        source: source,
+                        source: isArtistOnly ? 'artist_request' : source,
+                        type: isArtistOnly ? 'artist' : 'song',
                         voterID: deviceID
                     });
                 }
                 safeStorage.set(storageKey, Date.now().toString());
-                showToast(`✅ "${normalizedSong}" requested!`);
+                const label = isArtistOnly ? `🎤 ${artist.trim()} requested!` : `✅ "${song.trim()}" requested!`;
+                showToast(label);
                 return true;
             } catch (e) { 
                 console.error("Request Firestore error:", e);
-                // Give a specific message for permission errors vs network errors
                 if (e.code === 'permission-denied') {
-                    showToast("Permission error — refresh the page and try again", true);
+                    showToast("Permission error — refresh and try again", true);
                 } else if (e.code === 'unavailable' || e.message?.includes('network')) {
                     showToast("No internet — check your connection", true);
                 } else {
@@ -1674,24 +1680,51 @@
             const song = songInput.value.trim();
             const artist = artistInput.value.trim();
 
-            if (!song) return showToast("Please enter a song title.", true);
-            
-            // --- Relaxed Validation (keeps spam out, allows legit songs) ---
-            
-            // 1. Length
+            // Must have at least a song OR an artist
+            if (!song && !artist) {
+                return showToast("Enter a song title or an artist name.", true);
+            }
+
+            const combinedText = (song + ' ' + artist + ' ' + name).toLowerCase();
+
+            // --- ARTIST-ONLY REQUEST PATH ---
+            if (!song && artist) {
+                if (artist.length < 2) return showToast("Artist name is too short.", true);
+                if (artist.length > 80) return showToast("Artist name too long.", true);
+
+                // Basic spam checks on artist name
+                if (/(.)\1{4,}/.test(artist)) return showToast("Please check the artist name.", true);
+                const badWords = [" fuck","fuck ","shit ","bitch","asshole","cunt","nigger","faggot"];
+                if (badWords.some(w => combinedText.includes(w))) return showToast("Let's keep it clean, folks.", true);
+
+                const submitBtn = document.getElementById('btn-submit-new');
+                if(submitBtn) { submitBtn.disabled = true; submitBtn.innerText = "Sending..."; }
+
+                const success = await window.addAudienceRequest('', artist, 'artist_request', name);
+                if(submitBtn) { submitBtn.disabled = false; submitBtn.innerText = "Send Request"; }
+
+                if (success) {
+                    songInput.value = '';
+                    artistInput.value = '';
+                    songInput.blur(); artistInput.blur();
+                    const successMsg = document.getElementById('request-success');
+                    if(successMsg) {
+                        successMsg.classList.remove('hidden');
+                        setTimeout(() => successMsg.classList.add('hidden'), 3000);
+                    }
+                }
+                return;
+            }
+
+            // --- SONG REQUEST PATH ---
             if (song.length < 2) return showToast("Song title is too short.", true);
             if (song.length > 80) return showToast("Title too long — please shorten.", true);
             
             const lowerSong = song.toLowerCase();
-            const combinedText = (song + " " + artist + " " + name).toLowerCase();
 
-            // 2. Keysmash (4+ same char in a row — catches "aaaaaa" but allows "Oooh")
             if (/(.)\1{4,}/.test(combinedText)) return showToast("Please double-check spelling.", true);
-
-            // 3. Excessive punctuation
             if (/[?!.]{4,}/.test(combinedText)) return showToast("Too much punctuation.", true);
 
-            // 4. No-Go List
             const blockedPhrases = [
                 "free bird", "freebird", "wonderwall", "stairway to heaven", 
                 "don't stop believin", "sweet caroline", "piano man", 
@@ -1699,63 +1732,43 @@
                 "play something good", "play something upbeat", "play anything", 
                 "play whatever", "more cowbell", "play some skynyrd"
             ];
-            
             if (blockedPhrases.some(b => lowerSong.includes(b))) {
                 return showToast("🚫 That song is on the 'No' list tonight.", true);
             }
-            
-            // 5. Profanity filter (targeted - avoids Scunthorpe problem)
-            const badWords = [" fuck", "fuck ", "shit ", " shit", "bitch", "asshole", "cunt", "whore", "slut", "nigger", "faggot", "you suck", "this sucks", "hate you"]; 
+
+            const badWords = [" fuck","fuck ","shit ","bitch","asshole","cunt","nigger","faggot","you suck","this sucks","hate you"]; 
             if (badWords.some(w => combinedText.includes(w))) return showToast("Let's keep it clean, folks.", true);
             
-            // 6. Keysmash: no vowels in long string (but only check the song title)
             if (song.length > 6 && !/[aeiouy]/i.test(song)) {
                 return showToast("That doesn't look like a real song.", true);
             }
-
-            // 7. Context: short title needs artist
             if (song.length < 4 && !artist) {
                 return showToast("Short title? Please add the Artist.", true);
             }
 
-            // --- iTunes Verification (optional, fail-open) ---
+            // --- iTunes Verification (song requests only, fail-open) ---
             const submitBtn = document.getElementById('btn-submit-new');
             const originalText = submitBtn ? submitBtn.innerText : "Send Request";
-            
-            if(submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.innerText = "Verifying...";
-            }
+            if(submitBtn) { submitBtn.disabled = true; submitBtn.innerText = "Verifying..."; }
 
             try {
                 const term = encodeURIComponent(`${song} ${artist}`);
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000); 
-
                 const res = await fetch(`https://itunes.apple.com/search?term=${term}&entity=song&limit=1`, { signal: controller.signal });
                 clearTimeout(timeoutId);
-
                 if(res.ok) {
                     const data = await res.json();
                     if(data.resultCount === 0) {
-                        if(submitBtn) {
-                            submitBtn.disabled = false;
-                            submitBtn.innerText = originalText;
-                        }
+                        if(submitBtn) { submitBtn.disabled = false; submitBtn.innerText = originalText; }
                         return showToast("🤔 iTunes doesn't know this song. Check spelling!", true);
-                    } else {
-                         console.log("iTunes Found:", data.results[0].trackName, "by", data.results[0].artistName);
                     }
                 }
             } catch(e) {
-                console.warn("iTunes verification skipped (Offline/Timeout):", e);
-                // Fail-open: allow request if iTunes unreachable
+                console.warn("iTunes verification skipped:", e);
             }
             
-            if(submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerText = originalText;
-            }
+            if(submitBtn) { submitBtn.disabled = false; submitBtn.innerText = originalText; }
 
             window.addAudienceRequest(song, artist, 'custom', name).then(success => {
                 if (success) {
@@ -1849,6 +1862,32 @@
                 if (arrow) { arrow.textContent = '›'; arrow.style.transform = 'rotate(90deg)'; }
                 // Scroll the group into view smoothly
                 setTimeout(() => group.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+            }
+        };
+
+        // Dynamic hint updates as user types in the request form
+        window.updateRequestHint = () => {
+            const song = (document.getElementById('audience-new-song')?.value || '').trim();
+            const artist = (document.getElementById('audience-artist')?.value || '').trim();
+            const hint = document.getElementById('request-hint');
+            const btn = document.getElementById('btn-submit-new');
+            if (!hint) return;
+
+            if (!song && artist) {
+                hint.textContent = `🎤 Requesting any song by ${artist}`;
+                hint.classList.remove('hidden');
+                if (btn) btn.textContent = `Request ${artist}`;
+            } else if (song && artist) {
+                hint.textContent = `🎵 Requesting "${song}" by ${artist}`;
+                hint.classList.remove('hidden');
+                if (btn) btn.textContent = 'Send Request';
+            } else if (song) {
+                hint.textContent = `🎵 Requesting "${song}"`;
+                hint.classList.remove('hidden');
+                if (btn) btn.textContent = 'Send Request';
+            } else {
+                hint.classList.add('hidden');
+                if (btn) btn.textContent = 'Send Request';
             }
         };
 
@@ -1953,14 +1992,46 @@
                 list.innerHTML = `<div class="text-center text-gray-500 py-10 italic">No requests yet.</div>`;
             } else {
                 list.innerHTML = requests.map(r => {
-                    const originTag = r.source === 'bank' ? `<span class="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded-full mr-2">Bank</span>` : `<span class="text-xs bg-red-500/20 text-red-300 px-2 py-1 rounded-full mr-2">New</span>`;
-                    const voteBadge = r.votes > 1 ? `<span class="bg-green-600 text-white text-xs px-2 py-1 rounded-full font-bold ml-2">${r.votes} Votes</span>` : '';
-                    const requesterDisplay = r.requester && r.requester !== 'Anonymous' ? `<span class="text-xs text-indigo-300 ml-2 font-normal">(${r.requester})</span>` : '';
-                    
+                    const isArtist = r.type === 'artist' || r.source === 'artist_request' || (r.song && r.song.startsWith('[Artist]'));
+                    // Clean display name: strip the internal [Artist] prefix if present
+                    const displayName = isArtist
+                        ? (r.artist || r.song.replace(/^\[Artist\]\s*/, ''))
+                        : r.song;
+
+                    const originTag = isArtist
+                        ? `<span class="text-xs bg-purple-500/20 text-purple-300 px-2 py-1 rounded-full mr-2">🎤 Artist</span>`
+                        : r.source === 'bank'
+                            ? `<span class="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded-full mr-2">Bank</span>`
+                            : `<span class="text-xs bg-red-500/20 text-red-300 px-2 py-1 rounded-full mr-2">New</span>`;
+
+                    const voteBadge = r.votes > 1
+                        ? `<span class="bg-green-600 text-white text-xs px-2 py-1 rounded-full font-bold ml-2">${r.votes} Votes</span>`
+                        : '';
+                    const requesterDisplay = r.requester && r.requester !== 'Anonymous'
+                        ? `<span class="text-xs text-indigo-300 ml-2 font-normal">(${r.requester})</span>`
+                        : '';
+
+                    const safeDisplay = displayName.replace(/'/g, "\\'");
+
                     return `
-                        <div class="bg-gray-700/50 p-3 rounded-lg flex justify-between items-start border border-gray-600 animate-fade-in">
-                            <div><div class="font-bold text-white flex items-center flex-wrap">${r.song} ${requesterDisplay} ${voteBadge}</div><div class="mt-2 text-xs text-gray-500 flex items-center">${originTag} <span class="text-pink-300 ml-2">${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span></div></div>
-                            <div class="flex flex-col gap-1"><button onclick="window.saveRequestToSet('${r.song.replace(/'/g, "\\'")}', '', '${r.id}')" class="text-xs bg-indigo-600 text-white px-2 py-1 rounded">Save</button><button onclick="window.deleteRequest('${r.id}')" class="text-xs bg-gray-600 hover:bg-red-500 text-white px-2 py-1 rounded">Clear</button></div>
+                        <div class="p-3 rounded-lg flex justify-between items-start border animate-fade-in ${isArtist ? 'bg-purple-900/20 border-purple-700/40' : 'bg-gray-700/50 border-gray-600'}">
+                            <div class="min-w-0 flex-1 mr-2">
+                                <div class="font-bold flex items-center flex-wrap gap-1 ${isArtist ? 'text-purple-200' : 'text-white'}">
+                                    ${isArtist ? '🎤' : '🎵'}
+                                    <span class="truncate">${displayName}</span>
+                                    ${requesterDisplay}
+                                    ${voteBadge}
+                                </div>
+                                <div class="mt-1.5 text-xs text-gray-500 flex items-center flex-wrap gap-1">
+                                    ${originTag}
+                                    <span class="text-pink-300">${new Date(r.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                    ${isArtist ? '<span class="text-gray-600 italic">— any song by this artist</span>' : ''}
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-1 flex-shrink-0">
+                                <button onclick="window.saveRequestToSet('${safeDisplay}', '', '${r.id}')" class="text-xs bg-indigo-600 text-white px-2 py-1 rounded whitespace-nowrap">Save</button>
+                                <button onclick="window.deleteRequest('${r.id}')" class="text-xs bg-gray-600 hover:bg-red-500 text-white px-2 py-1 rounded">Clear</button>
+                            </div>
                         </div>`;
                 }).join('');
             }
@@ -2185,12 +2256,23 @@
 
             <!-- Custom Request Form (BOTTOM) -->
             <div class="glass p-5 rounded-2xl border border-white/10 shadow-xl flex-shrink-0 safe-bottom">
-                <h3 class="font-bold text-white mb-3 text-sm uppercase tracking-wide opacity-80">Can't find it? Request something new:</h3>
+                <h3 class="font-bold text-white mb-1 text-sm uppercase tracking-wide opacity-80">Request Something Specific</h3>
+                <p class="text-gray-500 text-xs mb-3">Enter a song, an artist, or both.</p>
                 <div class="space-y-3">
-                    <input type="text" id="audience-name" placeholder="Your Name (Optional)" autocomplete="name" class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white placeholder-gray-500 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 outline-none transition-all">
-                    <input type="text" id="audience-new-song" placeholder="Song Title" autocomplete="off" class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white placeholder-gray-500 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 outline-none transition-all">
-                    <input type="text" id="audience-artist" placeholder="Artist (Optional)" autocomplete="off" class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white placeholder-gray-500 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 outline-none transition-all">
-                    <button id="btn-submit-new" onclick="submitNewRequest()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3.5 rounded-xl shadow-lg transform active:scale-95 transition-all tap-target">Send Request</button>
+                    <input type="text" id="audience-name" placeholder="Your Name (Optional)" autocomplete="name"
+                           class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white placeholder-gray-500 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 outline-none transition-all">
+                    <input type="text" id="audience-new-song" placeholder="Song Title (optional)"
+                           autocomplete="off" oninput="updateRequestHint()"
+                           class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white placeholder-gray-500 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 outline-none transition-all">
+                    <input type="text" id="audience-artist" placeholder="Artist Name (optional)"
+                           autocomplete="off" oninput="updateRequestHint()"
+                           class="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white placeholder-gray-500 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 outline-none transition-all">
+                    <!-- Dynamic hint -->
+                    <div id="request-hint" class="text-xs text-indigo-400 px-1 hidden"></div>
+                    <button id="btn-submit-new" onclick="submitNewRequest()"
+                            class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-3.5 rounded-xl shadow-lg transform active:scale-95 transition-all tap-target">
+                        Send Request
+                    </button>
                 </div>
             </div>
         </div>
