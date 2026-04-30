@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VOID RUNNER</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: 'Orbitron', monospace;
+  overflow: hidden;
+  cursor: none;
+}
+#wrap {
+  position: relative;
+  border: 1px solid #0ff3;
+  box-shadow: 0 0 60px #0ff2, inset 0 0 60px #0001;
+}
+canvas { display: block; }
+
+/* HUD */
+#hud {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 16px 24px;
+  pointer-events: none;
+  z-index: 10;
+}
+.hud-left, .hud-right { display: flex; flex-direction: column; gap: 8px; }
+.hud-center { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+
+.hud-label {
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: #0ff8;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 600;
+}
+.hud-value {
+  font-size: 26px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 20px #0ff;
+  letter-spacing: 2px;
+}
+.hud-value.red { color: #ff4444; text-shadow: 0 0 20px #f00; }
+.hud-value.gold { color: #ffd700; text-shadow: 0 0 20px #fa0; }
+
+#health-bar-wrap { width: 160px; background: #ffffff15; border: 1px solid #ff4444; height: 8px; border-radius: 4px; overflow: hidden; }
+#health-bar { height: 100%; background: linear-gradient(90deg, #f00, #ff6600); transition: width 0.3s; border-radius: 4px; box-shadow: 0 0 10px #f00; }
+
+#shield-bar-wrap { width: 160px; background: #ffffff15; border: 1px solid #00ccff; height: 6px; border-radius: 3px; overflow: hidden; }
+#shield-bar { height: 100%; background: linear-gradient(90deg, #0ff, #00f); transition: width 0.3s; border-radius: 3px; box-shadow: 0 0 8px #0ff; }
+
+#wave-display {
+  font-size: 13px;
+  letter-spacing: 4px;
+  color: #0ff;
+  text-shadow: 0 0 20px #0ff;
+}
+
+/* Overlay */
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.85);
+  z-index: 20;
+  text-align: center;
+  backdrop-filter: blur(4px);
+}
+#overlay h1 {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(42px, 7vw, 80px);
+  font-weight: 900;
+  color: #0ff;
+  letter-spacing: 8px;
+  text-shadow: 0 0 40px #0ff, 0 0 80px #0ff5;
+  margin-bottom: 6px;
+}
+#overlay .sub {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(14px, 2vw, 20px);
+  color: #fff8;
+  letter-spacing: 6px;
+  margin-bottom: 30px;
+}
+#overlay .desc {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(16px, 2.2vw, 22px);
+  color: #cce;
+  line-height: 1.8;
+  margin-bottom: 30px;
+  max-width: 480px;
+}
+#overlay .desc strong { color: #0ff; }
+#start-prompt {
+  font-family: 'Orbitron', monospace;
+  font-size: clamp(14px, 2vw, 18px);
+  letter-spacing: 4px;
+  color: #000;
+  background: linear-gradient(135deg, #0ff, #007bff);
+  padding: 16px 40px;
+  border-radius: 4px;
+  animation: pulse 1.5s ease-in-out infinite;
+  box-shadow: 0 0 40px #0ff6;
+}
+#stats-box {
+  display: none;
+  margin-bottom: 20px;
+  border: 1px solid #0ff3;
+  padding: 20px 40px;
+  background: #0ff08;
+  border-radius: 4px;
+}
+#stats-box .stat-row { display: flex; justify-content: space-between; gap: 40px; margin: 6px 0; }
+#stats-box .stat-lbl { font-family: 'Rajdhani', sans-serif; color: #0ff8; letter-spacing: 2px; font-size: 14px; }
+#stats-box .stat-val { color: #fff; font-weight: 700; font-size: 18px; }
+
+@keyframes pulse {
+  0%,100% { transform: scale(1); box-shadow: 0 0 40px #0ff6; }
+  50% { transform: scale(1.04); box-shadow: 0 0 70px #0ffb; }
+}
+
+/* Scanlines */
+#scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 4px);
+}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div id="scanlines"></div>
+
+  <div id="hud">
+    <div class="hud-left">
+      <div class="hud-label">SCORE</div>
+      <div class="hud-value" id="score-el">000000</div>
+      <div class="hud-label" style="margin-top:6px">BEST</div>
+      <div class="hud-value gold" id="best-el">000000</div>
+    </div>
+    <div class="hud-center">
+      <div id="wave-display">WAVE 01</div>
+      <div class="hud-label" style="margin-top:8px">HULL INTEGRITY</div>
+      <div id="health-bar-wrap"><div id="health-bar" style="width:100%"></div></div>
+      <div class="hud-label" style="margin-top:6px">SHIELD</div>
+      <div id="shield-bar-wrap"><div id="shield-bar" style="width:0%"></div></div>
+    </div>
+    <div class="hud-right" style="align-items:flex-end">
+      <div class="hud-label">KILLS</div>
+      <div class="hud-value" id="kills-el">000</div>
+      <div class="hud-label" style="margin-top:6px">MULTIPLIER</div>
+      <div class="hud-value red" id="multi-el">x1</div>
+    </div>
+  </div>
+
+  <div id="overlay">
+    <h1>VOID RUNNER</h1>
+    <div class="sub">DEEP SPACE COMBAT</div>
+    <div class="desc" id="desc-text">
+      Move your face to pilot the fighter.<br>
+      <strong>Auto-cannons</strong> fire continuously.<br>
+      Survive the waves. Destroy everything.
+    </div>
+    <div id="stats-box">
+      <div class="stat-row"><span class="stat-lbl">WAVE REACHED</span><span class="stat-val" id="final-wave">—</span></div>
+      <div class="stat-row"><span class="stat-lbl">KILLS</span><span class="stat-val" id="final-kills">—</span></div>
+      <div class="stat-row"><span class="stat-lbl">SCORE</span><span class="stat-val" id="final-score">—</span></div>
+      <div class="stat-row"><span class="stat-lbl">BEST SCORE</span><span class="stat-val" id="final-best">—</span></div>
+    </div>
+    <div id="start-prompt">MOVE TO ENGAGE</div>
+  </div>
+</div>
+
+<script>
+// ── Setup ──────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const scoreEl = document.getElementById('score-el');
+const bestEl  = document.getElementById('best-el');
+const killsEl = document.getElementById('kills-el');
+const multiEl = document.getElementById('multi-el');
+const waveEl  = document.getElementById('wave-display');
+const hpBar   = document.getElementById('health-bar');
+const shBar   = document.getElementById('shield-bar');
+
+let W, H;
+function resize() {
+  W = Math.min(window.innerWidth - 4, 1200);
+  H = Math.min(window.innerHeight - 4, 750);
+  canvas.width = W; canvas.height = H;
+}
+resize();
+window.addEventListener('resize', () => { resize(); });
+
+// Sound removed — face-control friendly, no audio distractions
+function sfxShoot()    {}
+function sfxHit()      {}
+function sfxExplode()  {}
+function sfxPowerup()  {}
+function sfxWave()     {}
+function sfxPlayerHit(){}
+// AC resume stub so existing code doesn't error
+const AC = { state: 'running', resume: ()=>{} };
+
+// ── State ──────────────────────────────────────────────────────────
+let gameState = 'idle'; // idle | playing | over
+let mouse = { x: -999, y: -999 };
+let ship, bullets, enemies, enemyBullets, particles, powerups;
+let score, best=0, kills, wave, frame;
+let hp, maxHp=100, shield, shieldMax=100, shieldRegen=0;
+let multiplier, multiTimer;
+let shootTimer=0, waveTimer=0, waveSpawning=false;
+let waveCount=0, enemiesThisWave=0, enemiesLeft=0;
+let screenShake=0;
+let bgStars=[];
+
+// Background starfield
+for(let i=0;i<300;i++) bgStars.push({ x:Math.random(), y:Math.random(), r:Math.random()*1.6+0.2, speed:0.0003+Math.random()*0.001, bright:Math.random() });
+
+function padScore(n) { return String(Math.floor(n)).padStart(6,'0'); }
+
+// ── Init ───────────────────────────────────────────────────────────
+function initGame() {
+  ship = { x:W/2, y:H*0.75, tx:W/2, ty:H*0.75, w:36, h:44, invince:0, trail:[] };
+  bullets=[]; enemies=[]; enemyBullets=[]; particles=[]; powerups=[];
+  score=0; kills=0; wave=0; frame=0;
+  hp=maxHp; shield=0; shieldRegen=0;
+  multiplier=1; multiTimer=0;
+  shootTimer=0; waveTimer=9999;
+  waveCount=0;
+  updateHUD();
+  startWave();
+}
+
+// ── Wave system ────────────────────────────────────────────────────
+const FORMATIONS = [
+  // V-line
+  (n,w,h) => Array.from({length:n},(_,i)=>({x:W*0.2+i*(W*0.6/(n-1||1)), y:-60-i%3*30})),
+  // Arc
+  (n,w,h) => Array.from({length:n},(_,i)=>{ const a=(i/(n-1||1))*Math.PI; return {x:W*0.1+Math.cos(a)*W*0.4, y:H*0.1-Math.sin(a)*H*0.2}; }),
+  // Grid
+  (n,w,h) => { const cols=Math.ceil(Math.sqrt(n)); return Array.from({length:n},(_,i)=>({x:W*0.15+(i%cols)*(W*0.7/(cols-1||1)), y:-60-Math.floor(i/cols)*60})); },
+  // Two flanks
+  (n,w,h) => Array.from({length:n},(_,i)=>({x:i<n/2?W*0.05+i*(W*0.35/(n/2)):W*0.6+(i-n/2)*(W*0.35/(n/2)), y:-60-Math.random()*60})),
+];
+
+function startWave() {
+  wave++;
+  waveEl.textContent = `WAVE ${String(wave).padStart(2,'0')}`;
+  const count = 5 + wave*3 + (wave>5?wave*2:0);
+  enemiesThisWave = Math.min(count, 40);
+  enemiesLeft = enemiesThisWave;
+  const form = FORMATIONS[Math.floor(Math.random()*FORMATIONS.length)](enemiesThisWave, W, H);
+  const type = wave<=2?'scout': wave<=4?'fighter': wave%5===0?'bomber':'fighter';
+  enemies = form.map((pos,i)=>createEnemy(pos.x,pos.y,type,i));
+  sfxWave();
+}
+
+function createEnemy(x,y,type,idx) {
+  const defs = {
+    scout:  { hp:1, speed:1.2, size:16, color:'#00ffcc', score:100, shoot:false },
+    fighter:{ hp:2, speed:0.9, size:20, color:'#ff6600', score:200, shoot:true, fireRate:180 },
+    bomber: { hp:5, speed:0.6, size:28, color:'#cc00ff', score:500, shoot:true, fireRate:120 },
+  };
+  const d = defs[type];
+  return { x, y, type, hp:d.hp, maxHp:d.hp, speed:d.speed+(wave*0.04), size:d.size, color:d.color, scoreVal:d.score,
+    shoot:d.shoot, fireRate:d.fireRate||999, fireTimer:Math.random()*120,
+    vx:(Math.random()-0.5)*0.5, vy:d.speed+(wave*0.04),
+    pattern:'dive', patternTimer:idx*8, active:false,
+    glow:0, trail:[] };
+}
+
+// ── Shooting ───────────────────────────────────────────────────────
+function fireBullet() {
+  const spread = multiplier>=5 ? 3 : multiplier>=3 ? 2 : 1;
+  for(let i=0;i<spread;i++) {
+    const off = spread===1?0: (i-(spread-1)/2)*14;
+    bullets.push({ x:ship.x+off, y:ship.y-ship.h/2, vy:-14, w:3, h:12, color:'#0ff', dmg:1+(multiplier>=5?1:0) });
+  }
+  sfxShoot();
+}
+
+function fireEnemyBullet(e) {
+  const dx=ship.x-e.x, dy=ship.y-e.y, d=Math.hypot(dx,dy);
+  const spd = 4+wave*0.15;
+  enemyBullets.push({ x:e.x, y:e.y+e.size, vx:(dx/d)*spd, vy:(dy/d)*spd, r:5, color:e.color });
+}
+
+// ── Particles ──────────────────────────────────────────────────────
+function explode(x,y,color,n=20,big=false) {
+  for(let i=0;i<n;i++) {
+    const a=Math.random()*Math.PI*2, spd=(big?3:1.5)+Math.random()*(big?8:5);
+    particles.push({ x,y, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd,
+      r:(big?3:1.5)+Math.random()*(big?6:3), life:1, decay:0.018+Math.random()*0.025,
+      color, glow:big });
+  }
+  if(big) screenShake=14;
+  else screenShake=Math.max(screenShake,4);
+}
+
+function spawnPowerup(x,y) {
+  if(Math.random()>0.25) return;
+  const types=['shield','multi','health'];
+  powerups.push({ x,y, type:types[Math.floor(Math.random()*types.length)], vy:1.2, r:14, pulse:0 });
+}
+
+// ── HUD update ─────────────────────────────────────────────────────
+function updateHUD() {
+  scoreEl.textContent = padScore(score);
+  bestEl.textContent  = padScore(best);
+  killsEl.textContent = String(kills).padStart(3,'0');
+  multiEl.textContent = `x${multiplier}`;
+  multiEl.style.color = multiplier>=5?'#ff0': multiplier>=3?'#fa0':'#f44';
+  multiEl.style.textShadow = multiplier>=5?'0 0 20px #ff0':'0 0 20px #f00';
+  hpBar.style.width = (hp/maxHp*100)+'%';
+  shBar.style.width = (shield/shieldMax*100)+'%';
+}
+
+// ── Draw helpers ───────────────────────────────────────────────────
+function drawBg() {
+  ctx.fillStyle='#030010'; ctx.fillRect(0,0,W,H);
+  // nebula cloud blobs
+  ctx.save();
+  [[W*0.2,H*0.3,'#0ff01a'],[W*0.75,H*0.6,'#f0f01a'],[W*0.5,H*0.8,'#00f01a']].forEach(([nx,ny,nc])=>{
+    const g=ctx.createRadialGradient(nx,ny,20,nx,ny,280);
+    g.addColorStop(0,nc); g.addColorStop(1,'transparent');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  });
+  ctx.restore();
+  bgStars.forEach(s=>{
+    s.y+=s.speed;
+    if(s.y>1) s.y=0;
+    const a=0.3+0.5*s.bright;
+    ctx.beginPath(); ctx.arc(s.x*W,s.y*H,s.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,255,255,${a})`; ctx.fill();
+  });
+}
+
+function drawShip(s) {
+  // Trail
+  s.trail.push({x:s.x,y:s.y});
+  if(s.trail.length>18) s.trail.shift();
+  s.trail.forEach((t,i)=>{
+    const a=i/s.trail.length*0.4;
+    ctx.beginPath(); ctx.arc(t.x,t.y,3*(i/s.trail.length),0,Math.PI*2);
+    ctx.fillStyle=`rgba(0,255,255,${a})`; ctx.fill();
+  });
+
+  ctx.save();
+  ctx.translate(s.x, s.y);
+
+  // Engine glow
+  const eg = ctx.createRadialGradient(0,s.h/2+10,0,0,s.h/2+10,30);
+  eg.addColorStop(0,'rgba(0,200,255,0.8)'); eg.addColorStop(1,'transparent');
+  ctx.fillStyle=eg; ctx.fillRect(-30,s.h/2-5,60,50);
+
+  // Thruster flames
+  const fl = 8+Math.sin(frame*0.4)*4;
+  const fg=ctx.createLinearGradient(0,s.h/2,0,s.h/2+fl*2);
+  fg.addColorStop(0,'#0ff'); fg.addColorStop(0.5,'#00f'); fg.addColorStop(1,'transparent');
+  ctx.fillStyle=fg;
+  [[-10,s.h/2],[0,s.h/2],[10,s.h/2]].forEach(([tx,ty])=>{
+    ctx.beginPath(); ctx.ellipse(tx,ty+fl/2,4,fl,0,0,Math.PI*2); ctx.fill();
+  });
+
+  // Ship body — sleek fighter silhouette
+  if(s.invince>0 && Math.floor(frame/4)%2===0) {
+    ctx.strokeStyle='#0ff'; ctx.lineWidth=14;
+    ctx.globalAlpha=0.2;
+    ctx.beginPath(); ctx.moveTo(0,-s.h/2); ctx.lineTo(s.w/2,s.h/2); ctx.lineTo(-s.w/2,s.h/2); ctx.closePath();
+    ctx.stroke(); ctx.globalAlpha=1;
+  }
+
+  // Main hull
+  const hg=ctx.createLinearGradient(-s.w/2,0,s.w/2,0);
+  hg.addColorStop(0,'#0d2b4d'); hg.addColorStop(0.5,'#1a5276'); hg.addColorStop(1,'#0d2b4d');
+  ctx.beginPath();
+  ctx.moveTo(0,-s.h/2);
+  ctx.lineTo(s.w/2,s.h*0.1);
+  ctx.lineTo(s.w*0.65,s.h/2);
+  ctx.lineTo(s.w*0.2,s.h*0.35);
+  ctx.lineTo(-s.w*0.2,s.h*0.35);
+  ctx.lineTo(-s.w*0.65,s.h/2);
+  ctx.lineTo(-s.w/2,s.h*0.1);
+  ctx.closePath();
+  ctx.fillStyle=hg; ctx.fill();
+  ctx.strokeStyle='#0ff'; ctx.lineWidth=1.5; ctx.stroke();
+
+  // Cockpit
+  ctx.beginPath(); ctx.ellipse(0,-s.h*0.1,8,12,0,0,Math.PI*2);
+  ctx.fillStyle='#00ffff22'; ctx.fill();
+  ctx.strokeStyle='#0ff'; ctx.lineWidth=1; ctx.stroke();
+
+  // Wing accents
+  ctx.strokeStyle='#0ff8'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(s.w*0.15,0); ctx.lineTo(s.w*0.55,s.h*0.4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-s.w*0.15,0); ctx.lineTo(-s.w*0.55,s.h*0.4); ctx.stroke();
+
+  // Shield bubble
+  if(shield>0) {
+    const sa=shield/shieldMax*0.35;
+    ctx.beginPath(); ctx.ellipse(0,0,s.w*1.2,s.h*1.1,0,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(0,200,255,${sa+0.15})`; ctx.lineWidth=2+sa*3;
+    ctx.shadowColor='#0ff'; ctx.shadowBlur=20*sa;
+    ctx.stroke(); ctx.shadowBlur=0;
+  }
+
+  ctx.restore();
+}
+
+function drawEnemy(e) {
+  if(!e.active) return;
+  e.trail.push({x:e.x,y:e.y});
+  if(e.trail.length>10) e.trail.shift();
+  e.trail.forEach((t,i)=>{
+    ctx.beginPath(); ctx.arc(t.x,t.y,e.size*0.3*(i/e.trail.length),0,Math.PI*2);
+    ctx.fillStyle=e.color+'33'; ctx.fill();
+  });
+
+  e.glow = Math.sin(frame*0.1+e.patternTimer)*0.3+0.7;
+  ctx.save(); ctx.translate(e.x,e.y);
+
+  // Glow
+  const gg=ctx.createRadialGradient(0,0,e.size*0.3,0,0,e.size*2);
+  gg.addColorStop(0,e.color+'44'); gg.addColorStop(1,'transparent');
+  ctx.fillStyle=gg; ctx.fillRect(-e.size*2,-e.size*2,e.size*4,e.size*4);
+
+  // Body shapes per type
+  ctx.strokeStyle=e.color; ctx.fillStyle=e.color+'22'; ctx.lineWidth=2;
+  ctx.shadowColor=e.color; ctx.shadowBlur=12*e.glow;
+
+  if(e.type==='scout') {
+    ctx.beginPath(); ctx.moveTo(0,-e.size); ctx.lineTo(e.size*0.7,e.size*0.8); ctx.lineTo(-e.size*0.7,e.size*0.8); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+  } else if(e.type==='fighter') {
+    ctx.beginPath(); ctx.moveTo(0,e.size); ctx.lineTo(e.size*0.9,-e.size*0.5); ctx.lineTo(e.size*0.3,-e.size*0.2); ctx.lineTo(0,-e.size); ctx.lineTo(-e.size*0.3,-e.size*0.2); ctx.lineTo(-e.size*0.9,-e.size*0.5); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+  } else {
+    ctx.beginPath();
+    for(let i=0;i<6;i++){const a=(i/6)*Math.PI*2-Math.PI/6; ctx.lineTo(Math.cos(a)*e.size,Math.sin(a)*e.size);}
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    for(let i=0;i<6;i++){const a=(i/6)*Math.PI*2; ctx.lineTo(Math.cos(a)*e.size*0.5,Math.sin(a)*e.size*0.5);}
+    ctx.closePath(); ctx.stroke();
+  }
+
+  // HP bar
+  if(e.hp<e.maxHp) {
+    ctx.fillStyle='#ff000066'; ctx.fillRect(-e.size,-e.size-10,e.size*2,4);
+    ctx.fillStyle=e.color; ctx.fillRect(-e.size,-e.size-10,e.size*2*(e.hp/e.maxHp),4);
+  }
+
+  ctx.shadowBlur=0; ctx.restore();
+}
+
+function drawBullets() {
+  bullets.forEach(b=>{
+    const bg=ctx.createLinearGradient(b.x,b.y+b.h,b.x,b.y);
+    bg.addColorStop(0,'transparent'); bg.addColorStop(1,'#0ff');
+    ctx.shadowColor='#0ff'; ctx.shadowBlur=10;
+    ctx.fillStyle=bg; ctx.fillRect(b.x-b.w/2,b.y,b.w,b.h);
+  });
+  enemyBullets.forEach(b=>{
+    ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+    ctx.fillStyle=b.color+'aa';
+    ctx.shadowColor=b.color; ctx.shadowBlur=14;
+    ctx.fill();
+  });
+  ctx.shadowBlur=0;
+}
+
+function drawParticles() {
+  particles.forEach(p=>{
+    ctx.globalAlpha=p.life;
+    if(p.glow){ctx.shadowColor=p.color;ctx.shadowBlur=20;}
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r*p.life,0,Math.PI*2);
+    ctx.fillStyle=p.color; ctx.fill();
+    ctx.shadowBlur=0;
+  });
+  ctx.globalAlpha=1;
+}
+
+const POWERUP_ICONS = { shield:'🛡', multi:'⚡', health:'❤' };
+const POWERUP_COLORS= { shield:'#0ff', multi:'#ff0', health:'#f55' };
+function drawPowerups() {
+  powerups.forEach(p=>{
+    p.pulse+=0.08;
+    const a=0.7+0.3*Math.sin(p.pulse);
+    ctx.save(); ctx.translate(p.x,p.y);
+    ctx.beginPath(); ctx.arc(0,0,p.r,0,Math.PI*2);
+    ctx.fillStyle=POWERUP_COLORS[p.type]+'33'; ctx.fill();
+    ctx.strokeStyle=POWERUP_COLORS[p.type]; ctx.lineWidth=2;
+    ctx.globalAlpha=a; ctx.stroke(); ctx.globalAlpha=1;
+    ctx.font=`${p.r*1.2}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(POWERUP_ICONS[p.type],0,1);
+    ctx.restore();
+  });
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+}
+
+// Crosshair cursor
+function drawCursor() {
+  const x=mouse.x, y=mouse.y;
+  ctx.save();
+  ctx.strokeStyle='rgba(0,255,255,0.7)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(x-18,y); ctx.lineTo(x-7,y); ctx.moveTo(x+7,y); ctx.lineTo(x+18,y);
+  ctx.moveTo(x,y-18); ctx.lineTo(x,y-7); ctx.moveTo(x,y+7); ctx.lineTo(x,y+18); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x,y,5,0,Math.PI*2);
+  ctx.strokeStyle='rgba(0,255,255,0.5)'; ctx.stroke();
+  ctx.restore();
+}
+
+// ── Update ─────────────────────────────────────────────────────────
+function update() {
+  frame++;
+  if(screenShake>0) screenShake*=0.85;
+
+  // Ship movement
+  if(mouse.x>0){ship.tx=mouse.x;ship.ty=mouse.y;}
+  ship.x+=(ship.tx-ship.x)*0.13;
+  ship.y+=(ship.ty-ship.y)*0.13;
+  ship.x=Math.max(ship.w,Math.min(W-ship.w,ship.x));
+  ship.y=Math.max(ship.h,Math.min(H-ship.h,ship.y));
+  if(ship.invince>0) ship.invince--;
+
+  // Shield regen
+  if(shieldRegen>0 && shield<shieldMax) { shield=Math.min(shieldMax,shield+0.4); shBar.style.width=(shield/shieldMax*100)+'%'; }
+
+  // Auto-fire
+  shootTimer++;
+  const fireRate = multiplier>=5?8: multiplier>=3?10:13;
+  if(shootTimer>=fireRate){ shootTimer=0; fireBullet(); }
+
+  // Multiplier decay
+  if(multiplier>1){ multiTimer--; if(multiTimer<=0){multiplier=1;multiEl.textContent='x1';} }
+
+  // Move player bullets
+  for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i]; b.y+=b.vy;
+    if(b.y<-20){ bullets.splice(i,1); continue; }
+    // Check enemy hits
+    let hit=false;
+    for(let j=enemies.length-1;j>=0;j--){
+      const e=enemies[j]; if(!e.active) continue;
+      if(Math.hypot(b.x-e.x,b.y-e.y)<e.size+3){
+        e.hp-=b.dmg||1; hit=true;
+        explode(b.x,b.y,e.color,6);
+        if(e.hp<=0){
+          explode(e.x,e.y,e.color,24,true);
+          sfxExplode();
+          score+=e.scoreVal*multiplier;
+          kills++;
+          multiplier=Math.min(10,multiplier+1);
+          multiTimer=300;
+          spawnPowerup(e.x,e.y);
+          enemies.splice(j,1);
+          killsEl.textContent=String(kills).padStart(3,'0');
+          scoreEl.textContent=padScore(score);
+          multiEl.textContent=`x${multiplier}`;
+          if(enemies.length===0){ waveTimer=180; }
+        }
+        break;
+      }
+    }
+    if(hit){ bullets.splice(i,1); }
+  }
+
+  // Activate enemies staggered
+  enemies.forEach((e,i)=>{ if(!e.active && frame>i*6+60) e.active=true; });
+
+  // Move enemies — iterate backwards so we can splice safely
+  for(let i=enemies.length-1;i>=0;i--){
+    const e=enemies[i];
+    if(!e.active) continue;
+    e.patternTimer++;
+    e.x+=e.vx+Math.sin(e.patternTimer*0.025)*1.2;
+    e.y+=e.vy*0.6;
+    if(e.x<e.size||e.x>W-e.size) e.vx*=-1;
+    // Flew off screen — splice so wave-end check works
+    if(e.y>H+e.size*2){ enemies.splice(i,1); if(enemies.length===0) waveTimer=180; continue; }
+    // Shoot
+    if(e.shoot){ e.fireTimer--; if(e.fireTimer<=0){ fireEnemyBullet(e); e.fireTimer=e.fireRate-wave*5; if(e.fireTimer<40)e.fireTimer=40; } }
+    // Collide with ship
+    if(ship.invince===0&&Math.hypot(e.x-ship.x,e.y-ship.y)<e.size+ship.w*0.7){
+      takeDamage(20); ship.invince=90;
+      explode(e.x,e.y,e.color,16,true);
+      enemies.splice(i,1);
+      if(enemies.length===0) waveTimer=180;
+    }
+  }
+
+  // Enemy bullets
+  for(let i=enemyBullets.length-1;i>=0;i--){
+    const b=enemyBullets[i]; b.x+=b.vx; b.y+=b.vy;
+    if(b.x<-20||b.x>W+20||b.y>H+20||b.y<-20){ enemyBullets.splice(i,1); continue; }
+    if(ship.invince===0&&Math.hypot(b.x-ship.x,b.y-ship.y)<b.r+18){
+      takeDamage(8);
+      explode(b.x,b.y,b.color,8);
+      sfxPlayerHit();
+      enemyBullets.splice(i,1);
+    }
+  }
+
+  // Powerups
+  for(let i=powerups.length-1;i>=0;i--){
+    const p=powerups[i]; p.y+=p.vy;
+    if(p.y>H+30){ powerups.splice(i,1); continue; }
+    if(Math.hypot(p.x-ship.x,p.y-ship.y)<p.r+20){
+      sfxPowerup();
+      if(p.type==='shield'){ shield=Math.min(shieldMax,shield+40); shieldRegen=600; }
+      else if(p.type==='multi'){ multiplier=Math.min(10,multiplier+2); multiTimer=400; multiEl.textContent=`x${multiplier}`; }
+      else if(p.type==='health'){ hp=Math.min(maxHp,hp+25); hpBar.style.width=(hp/maxHp*100)+'%'; }
+      explode(p.x,p.y,POWERUP_COLORS[p.type],15);
+      powerups.splice(i,1);
+    }
+  }
+
+  // Particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.08; p.life-=p.decay;
+    if(p.life<=0) particles.splice(i,1);
+  }
+
+  // Next wave — start countdown once all enemies are cleared
+  if(enemies.length===0){ waveTimer--; if(waveTimer<=0){ waveTimer=9999; startWave(); } }
+
+  updateHUD();
+}
+
+function takeDamage(amt) {
+  if(shield>0){ const absorbed=Math.min(shield,amt); shield-=absorbed; amt-=absorbed; shBar.style.width=(shield/shieldMax*100)+'%'; }
+  if(amt>0){ hp-=amt; hpBar.style.width=(hp/maxHp*100)+'%'; sfxHit(); if(hp<=0) endGame(); }
+}
+
+function endGame() {
+  gameState='over';
+  if(score>best) best=score;
+  bestEl.textContent=padScore(best);
+  sfxExplode(); sfxExplode();
+  showOverlay(true);
+}
+
+// ── Draw loop ──────────────────────────────────────────────────────
+function draw() {
+  const sx = screenShake?(Math.random()-0.5)*screenShake:0;
+  const sy = screenShake?(Math.random()-0.5)*screenShake:0;
+  ctx.save(); if(screenShake){ ctx.translate(sx,sy); }
+  drawBg();
+  drawPowerups();
+  enemies.forEach(drawEnemy);
+  drawBullets();
+  drawParticles();
+  drawShip(ship);
+  drawCursor();
+  ctx.restore();
+}
+
+// ── Overlay ────────────────────────────────────────────────────────
+function showOverlay(isOver) {
+  overlay.style.display='flex';
+  overlay.querySelector('h1').textContent = isOver ? 'MISSION FAILED' : 'VOID RUNNER';
+  overlay.querySelector('.sub').textContent = isOver ? 'YOU WERE DESTROYED' : 'DEEP SPACE COMBAT';
+  const statsBox = document.getElementById('stats-box');
+  if(isOver){
+    statsBox.style.display='block';
+    document.getElementById('final-wave').textContent=`WAVE ${wave}`;
+    document.getElementById('final-kills').textContent=kills;
+    document.getElementById('final-score').textContent=padScore(score);
+    document.getElementById('final-best').textContent=padScore(best);
+    document.getElementById('desc-text').style.display='none';
+    document.getElementById('start-prompt').textContent='MOVE TO RETRY';
+  } else {
+    statsBox.style.display='none';
+    document.getElementById('desc-text').style.display='block';
+    document.getElementById('start-prompt').textContent='MOVE TO ENGAGE';
+  }
+}
+
+// ── Main loop ──────────────────────────────────────────────────────
+function loop() {
+  if(gameState==='playing'){ update(); draw(); }
+  else { drawBg(); drawParticles(); drawCursor(); }
+  requestAnimationFrame(loop);
+}
+
+// ── Input ──────────────────────────────────────────────────────────
+const wrap = document.getElementById('wrap');
+let moved=false;
+function onMove(cx,cy){
+  const rect=canvas.getBoundingClientRect();
+  mouse.x=cx-rect.left; mouse.y=cy-rect.top;
+  if(AC.state==='suspended') AC.resume();
+  if(gameState!=='playing' && !moved){
+    moved=true;
+    setTimeout(()=>{
+      overlay.style.display='none';
+      gameState='playing';
+      initGame();
+    },200);
+  }
+}
+wrap.addEventListener('mousemove',e=>onMove(e.clientX,e.clientY));
+wrap.addEventListener('touchmove',e=>{e.preventDefault();const t=e.touches[0];onMove(t.clientX,t.clientY);},{passive:false});
+
+// ── Start ──────────────────────────────────────────────────────────
+showOverlay(false);
+// minimal pre-init
+ship={x:W/2,y:H*0.75,tx:W/2,ty:H*0.75,w:36,h:44,invince:0,trail:[]};
+particles=[];
+loop();
+</script>
+</body>
+</html>
