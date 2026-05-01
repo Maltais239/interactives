@@ -1,0 +1,404 @@
+
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pratique PAT Sciences</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&amp;family=Baloo+2:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+  <style>
+html, body { height: 100%; margin: 0; }
+* { font-family: 'Nunito', sans-serif; }
+h1, h2, h3, .bubbly { font-family: 'Baloo 2', cursive; }
+.cat-card { transition: transform 0.2s, box-shadow 0.2s; }
+.cat-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.12); }
+.option-btn { transition: all 0.15s; }
+.option-btn:hover:not(.selected):not(.correct-answer):not(.wrong-answer) { transform: scale(1.01); }
+.option-btn.selected { border-color: #7c3aed; background: #ede9fe; }
+.option-btn.correct-answer { border-color: #22c55e; background: #dcfce7; }
+.option-btn.wrong-answer { border-color: #ef4444; background: #fee2e2; }
+.fade-in { animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+.progress-ring { transition: stroke-dashoffset 0.4s ease; }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50">
+  <div id="app" class="h-full w-full overflow-auto">
+   <!-- HOME SCREEN -->
+   <div id="home-screen" class="min-h-full w-full flex flex-col items-center px-4 py-8">
+    <div class="text-center mb-8 fade-in">
+     <h1 id="main-title" class="text-4xl md:text-5xl font-extrabold text-purple-600 mb-2">🔬 Pratique PAT Sciences</h1>
+     <p id="subtitle" class="text-lg text-purple-400 font-semibold">Révision du curriculum albertain</p>
+     <p class="text-sm text-gray-400 mt-2">Choisissez une catégorie pour commencer!</p>
+    </div>
+    <div id="cat-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 max-w-6xl w-full"></div>
+   </div><!-- QUIZ SCREEN -->
+   <div id="quiz-screen" class="min-h-full w-full flex flex-col items-center px-4 py-6" style="display:none;">
+    <div class="max-w-3xl w-full">
+     <button id="back-btn" class="flex items-center gap-2 text-purple-500 font-bold mb-4 hover:text-purple-700 transition bubbly text-lg"> <i data-lucide="arrow-left" style="width:20px;height:20px;"></i> Retour aux catégories </button>
+     <div class="bg-white/80 rounded-3xl shadow-lg p-6 md:p-8 border border-purple-100">
+      <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+       <h2 id="quiz-title" class="text-2xl md:text-3xl font-extrabold bubbly"></h2>
+       <div id="score-badge" class="hidden bg-purple-100 text-purple-700 font-bold px-4 py-2 rounded-full text-sm bubbly"></div>
+      </div>
+      <div id="questions-container"></div>
+      <div class="flex justify-center gap-4 mt-8 flex-wrap">
+       <button id="check-btn" class="bg-gradient-to-r from-purple-400 to-pink-400 text-white font-bold px-8 py-3 rounded-full shadow-md hover:shadow-lg hover:scale-105 transition bubbly text-lg"> ✅ Vérifier mes réponses </button> <button id="reset-btn" class="hidden bg-gradient-to-r from-blue-300 to-cyan-300 text-white font-bold px-8 py-3 rounded-full shadow-md hover:shadow-lg hover:scale-105 transition bubbly text-lg"> 🔄 Réessayer </button>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+  <script>
+const categories = [
+  { id:"earth", name:"Systèmes terrestres", emoji:"🌍", color:"from-emerald-200 to-teal-200", border:"border-emerald-300", text:"text-emerald-700" },
+  { id:"space", name:"Espace", emoji:"🚀", color:"from-indigo-200 to-blue-200", border:"border-indigo-300", text:"text-indigo-700" },
+  { id:"cs", name:"Informatique", emoji:"💻", color:"from-cyan-200 to-sky-200", border:"border-cyan-300", text:"text-cyan-700" },
+  { id:"living", name:"Systèmes vivants", emoji:"🌱", color:"from-lime-200 to-green-200", border:"border-lime-300", text:"text-green-700" },
+  { id:"energy", name:"Énergie", emoji:"⚡", color:"from-yellow-200 to-amber-200", border:"border-yellow-300", text:"text-amber-700" },
+  { id:"matter", name:"Matière", emoji:"🧪", color:"from-pink-200 to-rose-200", border:"border-pink-300", text:"text-rose-700" },
+  { id:"method", name:"Méthode scientifique", emoji:"🔍", color:"from-violet-200 to-purple-200", border:"border-violet-300", text:"text-purple-700" }
+];
+
+const allQuestions = {
+  matter: [
+    { q:"Que se passe-t-il aux particules quand la matière est chauffée?", opts:["Elles se déplacent lentement et l'espace reste inchangé","Elles se déplacent rapidement et l'espace entre elles augmente","Elles se déplacent très lentement et disparaissent lentement","Elles s'arrêtent complètement et deviennent un gaz"], ans:1 },
+    { q:"Quand une substance refroidit, comment les forces d'attraction changent?", opts:["Les forces augmentent et les particules se rapprochent","Les forces s'affaiblissent et l'espace augmente entre elles","Les forces disparaissent et la matière se vaporise","Les forces restent identiques peu importe la température"], ans:0 },
+    { q:"Qu'est-ce qu'un changement d'état?", opts:["Une transition de solide à liquide à gaz ou inversement","Quand une substance change seulement de couleur","Quand une substance change de texture ou de densité","Quand une substance devient plus chaude sans changer"], ans:0 },
+    { q:"Pendant un changement d'état, quelle propriété reste constante?", opts:["La masse de la substance ne change jamais","Le volume du matériau reste toujours identique","La couleur de la substance ne varie jamais","La forme du conteneur reste exactement pareille"], ans:0 },
+    { q:"Comment fonctionne un thermomètre à liquide?", opts:["Le liquide se dilate ou se contracte avec la température","Le liquide change simplement de couleur en fonction du froid","Le liquide produit une lumière basée sur la chaleur","Le liquide crée des bulles pour indiquer la température"], ans:0 },
+    { q:"À quel degré Celsius gèle l'eau?", opts:["À 0°C selon l'échelle internationale standard","À 32°C sur les vieilles mesures de température","À -40°C quand l'eau gèle très profondément","À 100°C quand l'eau change d'état"], ans:0 },
+    { q:"À quel degré Celsius bout l'eau au niveau de la mer?", opts:["À 0°C dans les conditions normales","À 50°C quand elle commence à bouillir lentement","À 100°C au niveau de la mer standard","À 200°C dans un conteneur hermétique fermé"], ans:2 },
+    { q:"L'eau a une anomalie spéciale. Qu'est-ce que cela veut dire?", opts:["En gelant, la glace occupe plus d'espace que l'eau","L'eau bout à une température très basse toujours","L'eau change de couleur quand elle gèle","L'eau devient toujours plus dense en gelant"], ans:0 },
+    { q:"Pourquoi la glace flotte-t-elle sur l'eau?", opts:["La glace est moins dense que l'eau liquide","La glace est toujours légère peu importe la taille","La glace repousse l'eau avec une force spéciale","La glace est plus chaude que l'eau dessous"], ans:0 },
+    { q:"Comment la glace de surface protège la vie sous l'eau?", opts:["Elle agit comme couverture isolante et empêche la congélation","Elle absorbe toute la chaleur du Soleil complètement","Elle produit de l'oxygène pour les poissons","Elle repousse les prédateurs de la surface"], ans:0 },
+    { q:"Pourquoi les routes ont-elles des joints d'expansion?", opts:["Pour permettre la dilatation et contraction avec la température","Pour permettre à l'eau de s'écouler sans geler","Pour rendre les routes plus jolies esthétiquement","Pour faciliter le nettoyage des routes régulièrement"], ans:0 },
+    { q:"Quand les particules ralentissent en refroidissant, l'espace entre elles?", opts:["Diminue parce que les particules se rapprochent davantage","Augmente parce que les particules se déplacent moins","Reste exactement le même peu importe la température","Devient aléatoire et complètement imprévisible"], ans:0 },
+    { q:"Lors du chauffage, comment les forces d'attraction changent?", opts:["S'affaiblissent car les particules rapides réduisent les attractions","Augmentent considérablement et les particules restent ensemble","Changent de direction et poussent les particules vers le bas","Disparaissent complètement et ne reviennent jamais"], ans:0 },
+    { q:"L'échelle Celsius utilise quels points de référence?", opts:["Les points de congélation et d'ébullition de l'eau","Le point d'ébullition du lait et du mercure","Le point de fusion de l'or et du fer","La température du corps humain et ambiante"], ans:0 },
+    { q:"Comment définit-on la densité d'une substance?", opts:["La masse divisée par le volume de la substance","La vitesse à laquelle un objet tombe dans l'eau","La résistance d'une substance à être comprimée","L'attraction entre les particules de matière"], ans:0 },
+    { q:"Pourquoi les métaux deviennent cassants très froid?", opts:["Les particules se déplacent lentement et les forces augmentent","Les particules se dilatent uniformément sans aucun risque","Les particules perdent toute résistance et s'effondrent","Les particules changent seulement de couleur graduellement"], ans:0 },
+    { q:"Quand un solide est chauffé, que se passe-t-il généralement?", opts:["Il se dilate car les particules bougent plus vite","Il rétrécit et devient plus compact en général","Il fond immédiatement et devient liquide","Il disparaît complètement dans l'air environnant"], ans:0 },
+    { q:"Quand on refroidit un objet métallique, sa taille?", opts:["Diminue car les particules se rapprochent davantage","Augmente car les particules ont plus d'espace","Reste exactement la même peu importe la température","Augmente puis diminue alternativement constamment"], ans:0 },
+    { q:"Si la glace était plus dense que l'eau, les lacs?", opts:["Gèleraient complètement du fond tuant la vie aquatique","Auraient plus d'espace pour les poissons","Ne gèleraient jamais peu importe la température","Seraient plus chauds en hiver toujours"], ans:0 },
+    { q:"Comment les ingénieurs appliquent la dilatation thermique?", opts:["Conçoivent des joints pour gérer les changements de taille","Ignorent complètement ce phénomène naturel","Utilisent seulement des matériaux qui ne changent jamais","Construisent tous les bâtiments exactement pareils"], ans:0 }
+  ],
+  energy: [
+    { q:"Lequel des énergies peut être utilisé AVANT transformation?", opts:["Le gaz naturel liquéfié","Le bois brûlé pour la chaleur","L'énergie géothermale traitée","Le charbon transformé en poudre"], ans:1 },
+    { q:"Comment différencie-t-on une ressource énergétique?", opts:["Par la région où elle existe","Par sa capacité à produire de l'énergie immédiate","Par sa couleur ou apparence","Par le coût du marché"], ans:1 },
+    { q:"Lequel NE devrait PAS influencer le choix énergétique?", opts:["L'impact environnemental global","L'accessibilité et la disponibilité","Les impacts sociaux et économiques","Le prénom du directeur de l'usine"], ans:3 },
+    { q:"Que signifie la gestion responsable des ressources?", opts:["Minimiser les dégâts et restaurer les zones","Extraire autant que possible","Arrêter toute exploitation complètement","Réduire seulement les prix"], ans:0 },
+    { q:"Laquelle peut servir avant ET après transformation?", opts:["Le biocarburant uniquement comme carburant","Le vent pour naviguer ou produire l'électricité","L'uranium seulement sous forme nucléaire","L'hydrogène produit par l'électricité"], ans:1 },
+    { q:"Quelle affirmation sur l'énergie éolienne est correcte?", opts:["Elle ne fonctionne que pour la navigation","Elle peut propulser une voile ou produire l'électricité","Elle ne produit jamais de l'électricité du tout","Elle est identique au vent naturel toujours"], ans:1 },
+    { q:"Lequel NE s'applique généralement PAS aux individus?", opts:["Le transport personnel quotidien","L'illumination des maisons résidentielles","La transformation industrielle du pétrole brut","Le chauffage des bâtiments domestiques"], ans:2 },
+    { q:"Quelle est la première étape logique de design?", opts:["Acheter tous les composants disponibles","Identifier le problème et les besoins","Copier un design existant entièrement","Supposer que cela fonctionnera"], ans:1 },
+    { q:"Pourquoi les énergies renouvelables sont-elles importantes?", opts:["Elles coûtent moins cher immédiatement","Elles ne s'épuisent pas contrairement aux combustibles fossiles","Elles fonctionnent parfaitement la nuit","Elles n'ont aucun impact environnemental"], ans:1 },
+    { q:"Le biocarburant transformé peut être utilisé pour?", opts:["Naviguer directement sans traitement","Alimenter les moteurs ou chauffer les bâtiments","Produire uniquement de la chaleur en fumant","Créer de l'électricité dans les centrales spéciales"], ans:1 },
+    { q:"Laquelle est toujours traitée avant son utilisation?", opts:["Le vent naturel qui fait tourner les voiles","L'électricité des panneaux solaires bruts","Le gaz naturel qui doit être raffiné","L'eau qui s'écoule des rivières naturellement"], ans:2 },
+    { q:"Comment le changement climatique affecte le choix?", opts:["Il n'a aucune relation avec les énergies","Les énergies propres réduisent les gaz à effet de serre","Il rend toutes les énergies fossiles moins accessibles","Le changement crée plus de ressources énergétiques"], ans:1 },
+    { q:"Quel est un défi majeur de la gestion responsable?", opts:["Utiliser le moins de ressources humaines possible","Équilibrer les besoins énergétiques avec la protection","Éviter d'employer des travailleurs qualifiés","Interdire complètement toute extraction"], ans:1 },
+    { q:"L'énergie géothermale est classée comme?", opts:["Une ressource non renouvelable comme le pétrole","Une ressource renouvelable utilisant la chaleur terrestre","Une ressource qui épuise l'environnement rapidement","Une source d'énergie seulement certains jours"], ans:1 },
+    { q:"Un avantage de l'énergie nucléaire est?", opts:["Aucun déchet n'est jamais produit","Elle produit beaucoup d'énergie avec peu d'espace","Elle est moins chère que toutes autres sources","Elle crée directement de l'air pur"], ans:1 },
+    { q:"Quel est un impact de la combustion des combustibles?", opts:["Elle purifie complètement l'air ambiant","Elle augmente les gaz à effet de serre","Elle crée uniquement de l'eau et de l'oxygène","Elle refroidit naturellement la Terre"], ans:1 },
+    { q:"Les panneaux solaires convertissent?", opts:["La chaleur ambiante en électricité directement","L'électricité en panneaux fonctionnels","L'énergie rayonnante du Soleil en électricité","La pluie en électricité statique"], ans:2 },
+    { q:"Une région près de rivières puissantes bénéficierait de?", opts:["L'énergie géothermale profonde souterraine","L'énergie hydraulique du mouvement de l'eau","L'énergie provenant de réactions nucléaires","L'énergie tirée de la biomasse côtière"], ans:1 },
+    { q:"L'énergie marémotrice utilise?", opts:["Les mouvements cycliques des marées océaniques","Le vent côtier sans restrictions constantes","La température de l'océan profond","La pression de l'eau souterraine"], ans:0 },
+    { q:"Un défi significant pour les énergies renouvelables?", opts:["Elles produisent trop d'énergie toujours","Leur variabilité selon les conditions météorologiques","Elles coûtent absolument rien à maintenir","Elles n'existent que dans les zones équatoriales"], ans:1 }
+  ],
+  earth: [
+    { q:"La latitude affecte le climat car?", opts:["Elle détermine la hauteur exacte d'un lieu","Elle influence le rayonnement solaire reçu","Elle est directement responsable du sol","Elle n'affecte pas les conditions climatiques"], ans:1 },
+    { q:"Laquelle pourrait aider à réduire le changement climatique?", opts:["Augmenter la consommation d'énergie fossile","Réduire les déchets et utiliser responsablement","Ignorer toutes les recommandations environnementales","Construire plus de bâtiments artificiels"], ans:1 },
+    { q:"Les changements naturels au cours de l'histoire ont causés par?", opts:["Les véhicules à moteur principalement","Les éruptions volcaniques et variations solaires","Seulement l'agriculture humaine ancienne","L'électricité utilisée par les humains"], ans:1 },
+    { q:"Comment les humains contribuent au changement climatique?", opts:["En créant des zones urbaines seulement","Par la libération de gaz à effet de serre","En construisant les routes principalement","En coupant les cheveux régulièrement"], ans:1 },
+    { q:"Quel impact le changement climatique a sur l'agriculture?", opts:["Augmente les rendements dans toutes les zones","Modifie les périodes de croissance des cultures","Crée plus de terre fertile partout","Élimine complètement le besoin d'irrigation"], ans:1 },
+    { q:"Comment affecte-t-il les communautés du Nord du Canada?", opts:["Il améliore les conditions de chasse et pêche","L'augmentation des niveaux marins et l'accès réduit","Il crée un climat stable et prévisible","Il produit uniquement des conditions meilleures"], ans:1 },
+    { q:"Laquelle implique un changement climatique global?", opts:["Les dinosaures ont volontairement quitté","Un changement provoqué par des impacts ou éruptions","Les dinosaures existent toujours en Australie","Il n'y a aucune théorie scientifique valide"], ans:1 },
+    { q:"Comment les scientifiques identifient le changement climatique?", opts:["Par des observations occasionnelles du ciel","Par des mesures de température et événements extrêmes","Par des suppositions sans données actuelles","Ils ne peuvent pas l'identifier actuellement"], ans:1 },
+    { q:"Pourquoi les scientifiques et les Gardiens travaillent ensemble?", opts:["Les scientifiques ont tous les connaissances","Deux perspectives enrichissent la compréhension","C'est juste un exercice académique général","Seuls les scientifiques peuvent contribuer"], ans:1 },
+    { q:"Quel processus cause des changements climatiques globaux?", opts:["L'utilisation des voitures électriques","Les éruptions volcaniques massives","Les maisons solaires modernes","La plantation d'arbres fruitiers"], ans:1 },
+    { q:"Comment l'effet de serre affecte la température terrestre?", opts:["Il refroidit toujours la planète","Les gaz retiennent la chaleur du Soleil","Il crée uniquement du vent local","Il n'a aucun effet réel"], ans:1 },
+    { q:"Que se passe-t-il quand les nuages reflètent la lumière?", opts:["La Terre se réchauffe immédiatement","Cela peut réduire le rayonnement solaire","Les nuages créent simplement de l'eau","Cela crée de la neige artificielle"], ans:1 },
+    { q:"Comment le permafrost répond au réchauffement climatique?", opts:["Il gèle plus profondément toujours","Il commence à fondre et libère des gaz","Il devient plus dur progressivement","Il n'est pas affecté du tout"], ans:1 },
+    { q:"Lequel est un exemple d'événement météorologique extrême?", opts:["Les typhons tropicaux du sud-est asiatique","Les tornades, blizzards, et pluies torrentielles","Les moussons du sud-est asiatique","Les tremblements de terre violents"], ans:1 },
+    { q:"Les événements météorologiques extrêmes mondiaux incluent?", opts:["Juste la pluie légère uniquement","Les vagues de chaleur et les hurricanes","Le vent constant et doux partout","Uniquement la neige légère seulement"], ans:1 },
+    { q:"Laquelle aide à prédire les événements extrêmes?", opts:["Les simples thermomètres traditionnels","Les radars, satellites météorologiques, et modélisation","Un simple télescope d'astronomie","Aucune technologie ne peut le faire"], ans:1 },
+    { q:"Pourquoi les niveaux des océans augmentent-ils?", opts:["Aucune augmentation ne se produit","La fonte de la glace polaire et l'expansion thermique","L'évaporation augmente la surface de l'océan","Les poissons se reproduisent plus vite"], ans:1 },
+    { q:"Pourquoi les carottes de glace sont précieuses?", opts:["C'est joli à regarder naturellement","Elles contiennent des couches enregistrant l'histoire climatique","C'est utile pour la construction moderne","Elles n'ont aucune valeur scientifique"], ans:1 },
+    { q:"Comment l'énergie propre aide le changement climatique?", opts:["Elle n'a aucun impact réel ou significatif","En réduisant la production de gaz à effet de serre","En augmentant la pollution de l'environnement","En utilisant plus de combustibles fossiles"], ans:1 },
+    { q:"Qu'est-ce que la proximité à un grand plan d'eau?", opts:["Elle n'a aucun effet sur le climat","Elle modère les températures et l'humidité","Elle crée des déserts immédiats","Elle élève toujours la température locale"], ans:1 }
+  ],
+  living: [
+    { q:"Qu'inclut le terme 'biote' dans les écosystèmes?", opts:["L'eau et le sol non-vivants","Les êtres vivants comme les plantes et animaux","L'air et la lumière du Soleil","Uniquement les prédateurs au sommet"], ans:1 },
+    { q:"Laquelle est un composant abiotique d'un écosystème?", opts:["Une population de cerfs dans le territoire","Les bactéries du sol vivantes","L'énergie du Soleil, l'eau, et le sol","Les arbres et la mousse vivante"], ans:2 },
+    { q:"Comment les composants biotiques et abiotiques interagissent?", opts:["Aucune interaction ne se produit jamais","Seulement indirectement par l'eau disponible","Ils s'influencent mutuellement en permanence","Seulement les êtres vivants interagissent ensemble"], ans:2 },
+    { q:"Qu'est-ce qui définit un écosystème?", opts:["Un seul type de plante spécialisée","L'ensemble des organismes et de l'environnement","Un groupe d'animaux similaires","Un laboratoire scientifique", "L'ensemble des organismes vivants et de l'environnement physique"], ans:4 },
+    { q:"Lequel agit comme puits de carbone majeur?", opts:["Seulement les zones urbaines modernes","Les marécages, les océans, et les forêts","Seulement les zones désertiques arides","Aucun écosystème ne stocke du carbone"], ans:1 },
+    { q:"Qu'est-ce que la photosynthèse exactement?", opts:["C'est quand les animaux mangent de la nourriture","Le processus convertissant la lumière en oxygène","C'est l'respiration des plantes seulement","La reproduction végétale asexuée"], ans:1 },
+    { q:"Lequel est un énoncé CORRECT sur la photosynthèse?", opts:["Les animaux la font aussi certainement","Elle ne nécessite aucune lumière du tout","Elle produit l'oxygène et le sucre","Elle crée seulement du dioxyde de carbone"], ans:2 },
+    { q:"De combien de façons les humains dépendent des plantes?", opts:["D'aucune façon réelle","Pour la nourriture seulement dans le monde","Pour l'oxygène, nourriture, vêtements, médicaments","Seulement pour la décoration extérieure"], ans:2 },
+    { q:"Lequel est sacrée pour les Premières Nations?", opts:["Les roses cultivées commercialement","Les marguerites sauvages généralement","La sauge, le cèdre, le tabac, et le foin","Seulement le maïs cultivé"], ans:2 },
+    { q:"Que signifie l'offrande de tabac dans les traditions?", opts:["C'est simplement un cadeau commercial","Un manque de respect complètement","L'équilibre, l'harmonie, et le respect de la terre","Rien de particulier culturellement"], ans:2 },
+    { q:"Quel est le rôle crucial des décomposeurs?", opts:["Ils n'ont aucun rôle important du tout","Ils mangent tous les herbivores du monde","Ils retournent les nutriments essentiels au sol","Ils créent uniquement de la pollution"], ans:2 },
+    { q:"Lequel est un exemple de composant biotique?", opts:["La roche de base du terrain","L'air de l'atmosphère","Un insecte qui vit sous une pierre","La température de l'eau"], ans:2 },
+    { q:"Comment l'altitude affecte les écosystèmes montagnes?", opts:["Aucun effet sur les plantes ou les animaux","Elle change la température et les plantes","Elle crée seulement du vent","Elle augmente la beauté"], ans:1 },
+    { q:"Quel écosystème terrestre a les changements saisonniers?", opts:["L'écosystème tropical humide","L'écosystème arctique avec hivers extrêmes","L'écosystème du désert","L'écosystème côtier stable"], ans:1 },
+    { q:"Comment les forêts matures combattent le changement?", opts:["Elles créent plus de dioxyde de carbone","Elles absorbent le CO2 de l'atmosphère","Elles créent seulement de l'oxygène","Elles ne font rien pour le climat"], ans:1 },
+    { q:"Lequel est un écosystème aquatique d'eau douce?", opts:["L'océan Atlantique immense","Les rivières, les lacs, et les milieux humides","La Mer Morte salée","L'océan Pacifique très grand"], ans:1 },
+    { q:"Comment les organismes sont organisés dans une chaîne?", opts:["Aléatoirement sans ordre particulier","Producteurs, consommateurs, consommateurs, décomposeurs","Uniquement les carnivores au top","Aucun ordre ne s'applique"], ans:1 },
+    { q:"Pourquoi la biodiversité est importante pour un écosystème?", opts:["Elle n'a aucune importance réelle","Elle crée l'équilibre et la résilience","Elle crée le chaos et l'imprévisibilité","Elle rend les écosystèmes inutiles"], ans:1 },
+    { q:"Qu'est-ce qu'un producteur primaire dans une chaîne?", opts:["Les carnivores qui mangent les herbivores","Les plantes qui produisent la nourriture","Les décomposeurs qui cassent la matière","Les herbivores qui mangent les plantes"], ans:1 },
+    { q:"Laquelle est une relation écologique classique?", opts:["Deux plantes se combattant pour l'eau","Un renard prédateur chassant un lapin proie","Deux herbivores ignomant complètement les uns les autres","Aucune relation n'existe dans la nature"], ans:1 }
+  ],
+  space: [
+    { q:"Le système solaire comprend tout SAUF?", opts:["Le Soleil au centre","Les astéroïdes dans l'orbite","Les autres galaxies lointaines","Les planètes multiples"], ans:2 },
+    { q:"Qu'est-ce que les corps célestes?", opts:["Seulement les phénomènes météorologiques","Les étoiles près de nous seulement","Les corps naturels au-delà de l'atmosphère","Seulement les planètes terrestres"], ans:2 },
+    { q:"Comment varient les corps célestes?", opts:["Ils sont tous pareils exactement","Seulement la température qui varie","La taille, la forme, la composition","Tous sont ronds toujours"], ans:2 },
+    { q:"Qu'est-ce que la ceinture d'astéroïdes?", opts:["Un anneau autour d'une planète","Un type de planète spécifique","Une collection d'astéroïdes dans le système solaire","Le chemin d'une lune"], ans:2 },
+    { q:"Pourquoi Pluton n'est plus classifié comme planète?", opts:["Elle a rétréci progressivement","C'était une erreur scientifique majeure","De nouvelles informations ont changé la classification","Elle s'éloigne continuellement"], ans:2 },
+    { q:"Quelle technologie explore le système solaire?", opts:["Seulement les jumelles traditionnelles","Seulement les bougies et la lumière","Les télescopes, satellites, sondes, rovers","Seulement les miroirs simples"], ans:2 },
+    { q:"Qu'est-ce qu'un satellite artificiel?", opts:["Un corps céleste naturel","Quelque chose qui existe complètement seul","Un objet humain en orbite autour","Une étoile lointaine très éloignée"], ans:2 },
+    { q:"La Station spatiale internationale est?", opts:["Une planète du système solaire","Un laboratoire de recherche en orbite","Une lune naturelle en rotation","Une comète gelée lointaine"], ans:1 },
+    { q:"Qu'est-ce qu'une orbite exactement?", opts:["Seulement une forme géométrique","Un type de fusée propulsée","Le chemin récurrent d'un objet autour d'un autre","Seulement la rotation saisonnière"], ans:2 },
+    { q:"Quel satellite albertain a été lancé?", opts:["AlbertaSat dans l'espace","SpaceX Alberta originelle","Ex-Alta 1 en orbite terrestre basse","North Star canadienne"], ans:2 },
+    { q:"Combien de planètes existent dans le système?", opts:["7 planètes actuellement","8 planètes officielles","9 planètes connues","10 planètes théoriques"], ans:1 },
+    { q:"Laquelle est une planète gazeuse?", opts:["Mercure rocheuse","Venus rocheuse interne","Jupiter gazeuse colossale","Mars rocheuse extérieure"], ans:2 },
+    { q:"Qu'est-ce qu'une comète?", opts:["Une petite planète solide","Un corps avec une queue de gaz","Un satellite artificiel","Un astéroïde de roche"], ans:1 },
+    { q:"Le Soleil est classifié comme?", opts:["Une planète rocheuse","Un satellite gravitationnel","Une étoile massive","Un astéroïde géant"], ans:2 },
+    { q:"Quel est le plus grand objet du système?", opts:["Jupiter colossale","La Terre moyenne","Saturne spectaculaire","Le Soleil complètement"], ans:3 },
+    { q:"Un satellite naturel est?", opts:["Lancé par les humains actuellement","Une lune orbitant une planète","Un astéroïde détaché","Un vaisseau spatial robotique"], ans:1 },
+    { q:"Qu'est-ce qu'un télescope spatial?", opts:["Un télescope posé sur la Terre","Un instrument en orbite autour","Un outil pour l'oeil nu","Une fusée spatiale propulsée"], ans:1 },
+    { q:"Comment les sondes envoient l'information?", opts:["Par signaux radio directs","Par fibre optique terrestre","Par voix amplifiée","Elles ne peuvent jamais"], ans:0 },
+    { q:"Quel est le corps céleste le plus proche?", opts:["Mercure relativement proche","Vénus atmosphérique","La Lune naturelle satellite","Mars extérieure lointaine"], ans:2 },
+    { q:"Pourquoi étudions-nous le système solaire?", opts:["Pour nous ennuyer complètement","Pour comprendre l'univers et notre place","Juste pour observer les fusées","Aucune raison valide réelle"], ans:1 }
+  ],
+  cs: [
+    { q:"Qu'est-ce que l'abstraction en informatique?", opts:["Rendre plus compliqué toujours","Ajouter tous les détails possibles","Simplifier en gardant l'essentiel","Changer les couleurs principalement"], ans:2 },
+    { q:"Lequel est un exemple d'abstraction?", opts:["Montrer tous les détails techniquement","Les contrôles simples des appareils","Écrire beaucoup de code complexe","Rien de particulier vraiment"], ans:1 },
+    { q:"Qu'est-ce que l'information?", opts:["Des données aléatoires complètement","Seulement des nombres numériques","Les données organisées pour l'utilité","Seulement du texte écrit"], ans:2 },
+    { q:"Quelle structure code répète les instructions?", opts:["Une séquence linéaire","Une condition logique","Une boucle itérative","Une fonction nommée"], ans:2 },
+    { q:"Qu'est-ce qu'une séquence en programmation?", opts:["Des instructions aléatoires","Des instructions qui sautent","Des ordres exécutés l'un après l'autre","Des ordres jamais exécutés"], ans:2 },
+    { q:"Que fait une déclaration si-alors-sinon?", opts:["Se répète toujours infiniment","Exécute des actions selon les conditions","Arrête le programme automatiquement","Enregistre les données seulement"], ans:1 },
+    { q:"Lequel résout un besoin sociétal?", opts:["Un robot jouet amusant","Les modèles météorologiques avancés","Une calculatrice cassée inutile","Un motif aléatoire sans sens"], ans:1 },
+    { q:"Les impacts de la technologie peuvent être?", opts:["Seulement positifs toujours","Seulement négatifs jamais","Personnels, sociaux, environnementaux","Aucun impact réel jamais"], ans:2 },
+    { q:"Quel est un impact non intentionnel possible?", opts:["Aider les gens directement","Créer des appareils médicaux","Réduire la communication en face à face","Meilleur transport public"], ans:2 },
+    { q:"Pourquoi planifier le design et le codage?", opts:["Ce n'est jamais important","Pour résoudre efficacement les besoins","Pour ralentir tout le processus","Juste pour s'amuser complètement"], ans:1 },
+    { q:"Une boucle en programmation est pour?", opts:["Rien de particulier","Sauter certaines étapes rapidement","Répéter une action plusieurs fois","Terminer le programme entièrement"], ans:2 },
+    { q:"Une condition permet de?", opts:["Toujours faire la même chose","Prendre des décisions basées sur les conditions","Rien de particulier vraiment","Crée une erreur sûrement"], ans:1 },
+    { q:"Qu'est-ce qu'un algorithme?", opts:["Une erreur de code grave","Un ensemble d'étapes pour résoudre un problème","Un type de langage spécifique","Rien d'important réellement"], ans:1 },
+    { q:"Lequel est un impact positif de la technologie?", opts:["Isoler complètement les gens","Communication instantanée globale","Perte d'emplois nécessairement","Pollution accrue partout"], ans:1 },
+    { q:"Lequel est un impact environnemental négatif?", opts:["Aucun impact négatif jamais","Consommation excessive d'énergie","Amélioration totale de l'environnement","Création de nouvelles ressources"], ans:1 },
+    { q:"Comment la technologie aide les personnes handicapées?", opts:["Elle ne le fait jamais","Appareils adaptatifs et technologies spécialisées","Juste pour loisirs occasionnels","C'est extrêmement compliqué"], ans:1 },
+    { q:"Qu'est-ce que le code informatique?", opts:["Une erreur système majeure","Des instructions que les ordinateurs comprennent","Une langue étrangère seulement","Rien d'important réellement"], ans:1 },
+    { q:"Lequel est un langage de programmation?", opts:["Français parlé couramment","Espagnol également parlé","Python langage de code","Anglais seulement parlé"], ans:2 },
+    { q:"Quel est le but du design en informatique?", opts:["Aucun but particulier","Créer une solution efficace et utilisable","Juste ajouter des couleurs","Faire intentionnellement des erreurs"], ans:1 },
+    { q:"Comment test-on un programme?", opts:["On ne le teste jamais","Vérifier s'il fonctionne correctement","L'ignorer complètement toujours","Le cacher intentionnellement"], ans:1 }
+  ],
+  method: [
+    { q:"Qu'est-ce qu'une explication scientifique?", opts:["Une histoire fictive imaginée","Une explication basée sur l'enquête et les preuves","Une simple suppostion sans données","Ce que la majorité croit seulement"], ans:1 },
+    { q:"Pour être acceptable en science, une explication?", opts:["Doit être très compliquée","Doit être testable et réfutable","Doit être acceptée par l'établissement","Doit être basée sur les convictions"], ans:1 },
+    { q:"Qu'est-ce qu'une hypothèse en recherche?", opts:["Un fait qui a été prouvé","Une explication proposée basée sur les connaissances préalables","Une observation sans plan","La conclusion finale de l'enquête"], ans:1 },
+    { q:"Sur quoi les hypothèses solides sont basées?", opts:["Les souhaits et les espoirs","Les connaissances et observations précédentes","Les suppositions aléatoires seulement","Ce qu'on voit à la télévision"], ans:1 },
+    { q:"Qu'est-ce que la preuve scientifique?", opts:["Le sentiment d'un chercheur","Les données soutenant ou contredisant","L'avis de n'importe qui sans rigueur","Une suppostion non testée jamais"], ans:1 },
+    { q:"Laquelle explique les phases de la Lune?", opts:["C'est juste de la magie","Les positions relatives de la Terre et de la Lune","C'est impossible d'expliquer","La Lune change de forme"], ans:1 },
+    { q:"Pourquoi l'exactitude et la précision sont essentielles?", opts:["Pour le plaisir uniquement","Pour produire des preuves fiables et reproductibles","Pour plus de temps d'expérience","C'est complètement inutile"], ans:1 },
+    { q:"Comment partagent-ils leur savoir naturel?", opts:["Seulement par les livres publiés","Par les traditions orales et les pratiques","Seulement par l'informatique","Ils ne partagent jamais leur savoir"], ans:1 },
+    { q:"Comment validez les preuves fiables?", opts:["Un chercheur affirme qu'elle est vraie","Par l'exactitude et l'examen par d'autres scientifiques","Par le vote simple de la majorité","Sans aucune vérification nécessaire"], ans:1 },
+    { q:"Que font les scientifiques avec les preuves opposées?", opts:["Ils ignorent les preuves complètement","Ils enquêtent et refont l'explication","Ils ne changent jamais leurs idées","Ils attendent 100 ans avant d'agir"], ans:1 },
+    { q:"Qu'est-ce qu'une variable en contexte?", opts:["Une opinion qui change constamment","Quelque chose qui reste toujours constant","Quelque chose qui peut changer et est mesuré","Quelque chose sans importance"], ans:2 },
+    { q:"Quel est le rôle du groupe de contrôle?", opts:["Le groupe qui reçoit le traitement","Le groupe de référence sans traitement","Le groupe qui dirige l'expérience","Aucun rôle particulier vraiment"], ans:1 },
+    { q:"Comment documentez les observations?", opts:["Aucune documentation n'est nécessaire","Par des notes précises, diagrammes, tableaux","Seulement par des photos seulement","Mentalement sans rien écrire"], ans:1 },
+    { q:"Quel est le rôle du scepticisme en science?", opts:["Rejeter complètement toutes les idées","Questionner les affirmations avec des preuves","Rien de particulier vraiment","N'avoir aucune importance réelle"], ans:1 },
+    { q:"Comment la science corrige ses erreurs?", opts:["La science n'admet jamais les erreurs","Par la collecte continue de preuves","Avec un seul étude contradictoire","Extrêmement lentement jamais"], ans:1 },
+    { q:"Laquelle est une explication historiquement incorrecte?", opts:["La Terre est sphérique","Le Soleil tourne autour de la Terre","Différentes portions détectent goûts","Différentes portions d'ont été corrigées"], ans:3 },
+    { q:"Qu'implique une enquête scientifique?", opts:["Une question aléatoire sans plan","Un processus structuré pour répondre","Rien de particulier vraiment","Une histoire d'horreur complète"], ans:1 },
+    { q:"Pourquoi répètent les expériences plusieurs fois?", opts:["Parce que c'est ennuyeux","Pour confirmer la fiabilité des résultats","Sans raison particulière","C'est interdit en science"], ans:1 },
+    { q:"Comment communique-t-on les résultats?", opts:["Jamais; on garde secret","Via les graphiques précis, tableaux, rapports","Seulement en personne verbalement","C'est classé et confidentiel"], ans:1 },
+    { q:"Qu'est-ce qu'une théorie scientifique?", opts:["Une supposé imaginaire","Une explication largement testée et soutenue","Un mensonge des scientifiques","Une opinion personnelle seulement"], ans:1 }
+  ]
+};
+
+let currentCategory = null;
+let userAnswers = {};
+let checked = false;
+
+// Build category cards
+const grid = document.getElementById('cat-grid');
+categories.forEach((cat, i) => {
+  const count = allQuestions[cat.id].length;
+  const card = document.createElement('button');
+  card.className = `cat-card bg-gradient-to-br ${cat.color} ${cat.border} border-2 rounded-3xl p-6 text-left fade-in`;
+  card.style.animationDelay = `${i * 0.05}s`;
+  card.innerHTML = `
+    <div class="text-4xl mb-3">${cat.emoji}</div>
+    <h3 class="bubbly text-xl font-extrabold ${cat.text}">${cat.name}</h3>
+    <p class="text-sm ${cat.text} opacity-70 mt-1">${count} questions</p>
+    <div class="mt-3 flex items-center gap-1 text-xs font-bold ${cat.text} opacity-50">
+      <span>APPUYEZ POUR COMMENCER</span> <i data-lucide="chevron-right" style="width:14px;height:14px;"></i>
+    </div>
+  `;
+  card.setAttribute('aria-label', `Commencer le quiz ${cat.name} avec ${count} questions`);
+  card.onclick = () => openCategory(cat.id);
+  grid.appendChild(card);
+});
+
+function openCategory(catId) {
+  currentCategory = catId;
+  userAnswers = {};
+  checked = false;
+  const cat = categories.find(c => c.id === catId);
+  const qs = allQuestions[catId];
+
+  document.getElementById('home-screen').style.display = 'none';
+  document.getElementById('quiz-screen').style.display = 'flex';
+  document.getElementById('quiz-title').textContent = `${cat.emoji} ${cat.name}`;
+  document.getElementById('quiz-title').className = `text-2xl md:text-3xl font-extrabold bubbly ${cat.text}`;
+  document.getElementById('score-badge').classList.add('hidden');
+  document.getElementById('check-btn').style.display = '';
+  document.getElementById('reset-btn').classList.add('hidden');
+
+  const container = document.getElementById('questions-container');
+  container.innerHTML = '';
+  qs.forEach((question, qi) => {
+    const div = document.createElement('div');
+    div.className = 'mb-6 fade-in';
+    div.style.animationDelay = `${qi * 0.03}s`;
+    div.innerHTML = `
+      <p class="font-bold text-gray-700 mb-3 text-base"><span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-purple-200 text-purple-700 font-extrabold text-sm mr-2 bubbly">${qi+1}</span>${question.q}</p>
+      <div class="grid gap-2" id="opts-${qi}">
+        ${question.opts.map((opt, oi) => `
+          <button class="option-btn w-full text-left px-4 py-3 rounded-2xl border-2 border-gray-200 bg-white hover:bg-purple-50 font-semibold text-gray-600 text-sm" data-qi="${qi}" data-oi="${oi}">${String.fromCharCode(65+oi)}. ${opt}</button>
+        `).join('')}
+      </div>
+      <p class="feedback-text text-sm font-bold mt-2 hidden"></p>
+    `;
+    container.appendChild(div);
+  });
+
+  // Option click handlers
+  container.querySelectorAll('.option-btn').forEach(btn => {
+    btn.onclick = () => {
+      if (checked) return;
+      const qi = parseInt(btn.dataset.qi);
+      const oi = parseInt(btn.dataset.oi);
+      userAnswers[qi] = oi;
+      document.querySelectorAll(`#opts-${qi} .option-btn`).forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    };
+  });
+
+  window.scrollTo(0, 0);
+  lucide.createIcons();
+}
+
+document.getElementById('back-btn').onclick = () => {
+  document.getElementById('quiz-screen').style.display = 'none';
+  document.getElementById('home-screen').style.display = 'flex';
+};
+
+document.getElementById('check-btn').onclick = () => {
+  if (checked) return;
+  checked = true;
+  const qs = allQuestions[currentCategory];
+  let score = 0;
+
+  qs.forEach((question, qi) => {
+    const optsDiv = document.getElementById(`opts-${qi}`);
+    const buttons = optsDiv.querySelectorAll('.option-btn');
+    const userAns = userAnswers[qi];
+    const correctAns = question.ans;
+
+    buttons.forEach((btn, oi) => {
+      btn.style.pointerEvents = 'none';
+      if (oi === correctAns) {
+        btn.classList.add('correct-answer');
+        btn.classList.remove('selected');
+      } else if (oi === userAns && userAns !== correctAns) {
+        btn.classList.add('wrong-answer');
+        btn.classList.remove('selected');
+      }
+    });
+
+    if (userAns === correctAns) score++;
+
+    const fb = optsDiv.parentElement.querySelector('.feedback-text');
+    if (userAns === undefined) {
+      fb.textContent = '⚠️ Non répondu';
+      fb.className = 'feedback-text text-sm font-bold mt-2 text-amber-500';
+    } else if (userAns === correctAns) {
+      fb.textContent = '✅ Correct!';
+      fb.className = 'feedback-text text-sm font-bold mt-2 text-green-600';
+    } else {
+      fb.textContent = `❌ Bonne réponse: ${String.fromCharCode(65 + correctAns)}. ${question.opts[correctAns]}`;
+      fb.className = 'feedback-text text-sm font-bold mt-2 text-red-500';
+    }
+  });
+
+  const badge = document.getElementById('score-badge');
+  badge.textContent = `${score} / ${qs.length} (${Math.round(score/qs.length*100)}%)`;
+  badge.classList.remove('hidden');
+  document.getElementById('check-btn').style.display = 'none';
+  document.getElementById('reset-btn').classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+document.getElementById('reset-btn').onclick = () => openCategory(currentCategory);
+
+// Element SDK
+const defaultConfig = {
+  main_title: "🔬 Pratique PAT Sciences",
+  subtitle: "Révision du curriculum albertain",
+  background_color: "#fdf2f8",
+  surface_color: "#ffffff",
+  text_color: "#581c87",
+  primary_action_color: "#a855f7",
+  secondary_action_color: "#7dd3fc",
+  font_family: "Nunito",
+  font_size: 16
+};
+
+function applyConfig(config) {
+  const t = (k) => config[k] || defaultConfig[k];
+  document.getElementById('main-title').textContent = t('main_title');
+  document.getElementById('subtitle').textContent = t('subtitle');
+  document.body.style.fontFamily = `${t('font_family')}, Nunito, sans-serif`;
+  document.querySelectorAll('.bubbly, h1, h2, h3').forEach(el => {
+    el.style.fontFamily = `'Baloo 2', ${t('font_family')}, cursive`;
+  });
+  const fs = t('font_size');
+  document.body.style.fontSize = fs + 'px';
+}
+
+if (window.elementSdk) {
+  window.elementSdk.init({
+    defaultConfig,
+    onConfigChange: async (config) => applyConfig(config),
+    mapToCapabilities: (config) => {
+      const c = (key) => ({
+        get: () => config[key] || defaultConfig[key],
+        set: (v) => { config[key] = v; window.elementSdk.setConfig({ [key]: v }); }
+      });
+      return {
+        recolorables: [c('background_color'), c('surface_color'), c('text_color'), c('primary_action_color'), c('secondary_action_color')],
+        borderables: [],
+        fontEditable: c('font_family'),
+        fontSizeable: { get: () => config.font_size || defaultConfig.font_size, set: (v) => { config.font_size = v; window.elementSdk.setConfig({ font_size: v }); } }
+      };
+    },
+    mapToEditPanelValues: (config) => new Map([
+      ["main_title", config.main_title || defaultConfig.main_title],
+      ["subtitle", config.subtitle || defaultConfig.subtitle]
+    ])
+  });
+}
+
+lucide.createIcons();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9f4fa6c821245768',t:'MTc3NzY0NzU4MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
+
+
