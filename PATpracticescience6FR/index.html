@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Science PAT Practice</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    html, body { height: 100%; margin: 0; }
+    * { font-family: 'Nunito', sans-serif; }
+    h1, h2, h3, .bubbly { font-family: 'Fredoka', sans-serif; letter-spacing: -0.01em; }
+
+    .bg-mesh {
+      background-image:
+        radial-gradient(at 20% 10%, rgba(167, 139, 250, 0.18) 0px, transparent 50%),
+        radial-gradient(at 80% 0%, rgba(252, 165, 165, 0.18) 0px, transparent 50%),
+        radial-gradient(at 0% 90%, rgba(125, 211, 252, 0.20) 0px, transparent 50%),
+        radial-gradient(at 90% 80%, rgba(134, 239, 172, 0.18) 0px, transparent 50%);
+    }
+
+    .cat-card {
+      transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .cat-card::before {
+      content: "";
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.45), rgba(255,255,255,0));
+      opacity: 0; transition: opacity 0.25s ease;
+      pointer-events: none;
+    }
+    .cat-card:hover { transform: translateY(-6px) scale(1.02); box-shadow: 0 20px 40px -12px rgba(0,0,0,0.18); }
+    .cat-card:hover::before { opacity: 1; }
+    .cat-card:active { transform: translateY(-2px) scale(1.00); }
+
+    .cat-emoji {
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      display: inline-block;
+    }
+    .cat-card:hover .cat-emoji { transform: scale(1.2) rotate(-8deg); }
+
+    .option-btn { transition: all 0.18s ease; }
+    .option-btn:hover:not(.selected):not(.correct-answer):not(.wrong-answer):not(:disabled) {
+      transform: translateX(4px);
+      border-color: #c4b5fd;
+      background: #faf5ff;
+    }
+    .option-btn.selected {
+      border-color: #8b5cf6;
+      background: linear-gradient(135deg, #ede9fe, #f3e8ff);
+      box-shadow: 0 4px 12px -2px rgba(139, 92, 246, 0.25);
+    }
+    .option-btn.correct-answer {
+      border-color: #22c55e;
+      background: linear-gradient(135deg, #dcfce7, #d1fae5);
+      box-shadow: 0 4px 12px -2px rgba(34, 197, 94, 0.25);
+    }
+    .option-btn.wrong-answer {
+      border-color: #ef4444;
+      background: linear-gradient(135deg, #fee2e2, #fecaca);
+    }
+    .option-letter {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: white;
+      border: 2px solid currentColor;
+      font-weight: 800;
+      font-size: 0.75rem;
+      flex-shrink: 0;
+    }
+    .option-btn.correct-answer .option-letter { background: #22c55e; color: white; border-color: #22c55e; }
+    .option-btn.wrong-answer .option-letter { background: #ef4444; color: white; border-color: #ef4444; }
+    .option-btn.selected .option-letter { background: #8b5cf6; color: white; border-color: #8b5cf6; }
+
+    .fade-in { animation: fadeIn 0.4s ease both; }
+    .pop-in { animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes popIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+
+    .progress-bar-fill { transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+    .question-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px; height: 32px;
+      padding: 0 8px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #c4b5fd, #ddd6fe);
+      color: #5b21b6;
+      font-weight: 800;
+      font-size: 0.85rem;
+      margin-right: 10px;
+      box-shadow: 0 2px 4px rgba(139, 92, 246, 0.15);
+    }
+
+    .score-circle {
+      background: conic-gradient(var(--score-color, #8b5cf6) calc(var(--score-pct, 0) * 1%), #e9d5ff 0);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .score-inner {
+      background: white;
+      border-radius: 50%;
+      width: calc(100% - 16px);
+      height: calc(100% - 16px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .feedback-text { animation: fadeIn 0.3s ease both; }
+
+    .nav-btn {
+      transition: all 0.2s ease;
+    }
+    .nav-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px -4px rgba(0,0,0,0.15);
+    }
+    .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .badge-streak {
+      animation: bounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes bounce {
+      0% { transform: scale(0); }
+      60% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 10px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #ddd6fe; border-radius: 5px; }
+    ::-webkit-scrollbar-thumb:hover { background: #c4b5fd; }
+
+    @media (max-width: 640px) {
+      .question-num { min-width: 28px; height: 28px; font-size: 0.75rem; }
+    }
+  </style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+</head>
+<body class="h-full bg-mesh bg-gradient-to-br from-violet-50 via-pink-50 to-sky-50">
+  <div id="app" class="h-full w-full overflow-auto">
+
+    <!-- HOME SCREEN -->
+    <div id="home-screen" class="min-h-full w-full flex flex-col items-center px-4 py-10">
+      <div class="text-center mb-10 fade-in max-w-2xl">
+        <div class="inline-block mb-3 px-4 py-1.5 bg-white/70 backdrop-blur rounded-full text-purple-600 text-xs font-bold tracking-wider uppercase shadow-sm">
+          Grade 6 • Alberta Curriculum
+        </div>
+        <h1 id="main-title" class="text-4xl md:text-6xl font-extrabold mb-3 bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 bg-clip-text text-transparent">
+          🔬 Science PAT Practice
+        </h1>
+        <p id="subtitle" class="text-lg md:text-xl text-purple-500 font-semibold">Get ready for your Provincial Achievement Test!</p>
+        <p class="text-sm text-gray-500 mt-3">Pick a topic below to start practicing 👇</p>
+      </div>
+      <div id="cat-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 max-w-7xl w-full"></div>
+
+      <div class="mt-12 text-center text-xs text-gray-400">
+        <p>💡 Tip: Each quiz gives you instant feedback so you can learn from your mistakes</p>
+      </div>
+    </div>
+
+    <!-- QUIZ SCREEN -->
+    <div id="quiz-screen" class="min-h-full w-full flex flex-col items-center px-4 py-6" style="display:none;">
+      <div class="max-w-3xl w-full">
+        <button id="back-btn" class="flex items-center gap-2 text-purple-500 font-bold mb-4 hover:text-purple-700 transition bubbly text-base">
+          <i data-lucide="arrow-left" style="width:18px;height:18px;"></i> Back to topics
+        </button>
+
+        <div class="bg-white/85 backdrop-blur rounded-3xl shadow-xl p-6 md:p-8 border border-white">
+          <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <h2 id="quiz-title" class="text-2xl md:text-3xl font-extrabold bubbly"></h2>
+            <div id="score-badge" class="hidden bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold px-5 py-2 rounded-full text-sm bubbly shadow-md badge-streak"></div>
+          </div>
+
+          <!-- Progress bar -->
+          <div id="progress-section" class="mb-6">
+            <div class="flex justify-between items-center mb-2 text-xs font-bold text-purple-500">
+              <span id="progress-text">Answered: 0</span>
+              <span id="progress-total"></span>
+            </div>
+            <div class="h-2.5 bg-purple-100 rounded-full overflow-hidden">
+              <div id="progress-bar" class="progress-bar-fill h-full bg-gradient-to-r from-purple-400 to-pink-400 rounded-full" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <div id="questions-container"></div>
+
+          <div class="flex justify-center gap-4 mt-8 flex-wrap">
+            <button id="check-btn" class="nav-btn bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold px-8 py-3.5 rounded-full shadow-lg bubbly text-lg flex items-center gap-2">
+              <i data-lucide="check-circle-2" style="width:20px;height:20px;"></i> Check my answers
+            </button>
+            <button id="reset-btn" class="hidden nav-btn bg-gradient-to-r from-sky-400 to-cyan-400 text-white font-bold px-8 py-3.5 rounded-full shadow-lg bubbly text-lg flex items-center gap-2">
+              <i data-lucide="refresh-cw" style="width:20px;height:20px;"></i> Try again
+            </button>
+            <button id="home-btn" class="hidden nav-btn bg-white border-2 border-purple-300 text-purple-600 font-bold px-8 py-3.5 rounded-full shadow-md bubbly text-lg flex items-center gap-2">
+              <i data-lucide="home" style="width:20px;height:20px;"></i> All topics
+            </button>
+          </div>
+
+          <!-- Results celebration -->
+          <div id="results-celebration" class="hidden mt-8 text-center"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============== CATEGORIES ==============
+    const categories = [
+      { id:"matter", name:"Matter & Particles", desc:"Particle model, phase changes", emoji:"🧪", color:"from-pink-200 via-rose-200 to-pink-300", border:"border-pink-300", text:"text-rose-700", accent:"#e11d48" },
+      { id:"forces", name:"Forces & Interactions", desc:"Newton's Third Law, elasticity", emoji:"💪", color:"from-orange-200 via-amber-200 to-yellow-200", border:"border-orange-300", text:"text-orange-700", accent:"#ea580c" },
+      { id:"energy", name:"Energy Resources", desc:"Renewable vs. fossil fuels", emoji:"⚡", color:"from-yellow-200 via-amber-200 to-orange-200", border:"border-yellow-300", text:"text-amber-700", accent:"#d97706" },
+      { id:"earth", name:"Climate & Earth Systems", desc:"Climate change, weather", emoji:"🌍", color:"from-emerald-200 via-teal-200 to-green-200", border:"border-emerald-300", text:"text-emerald-700", accent:"#059669" },
+      { id:"living", name:"Ecosystems", desc:"Plants, animals, photosynthesis", emoji:"🌱", color:"from-lime-200 via-green-200 to-emerald-200", border:"border-lime-300", text:"text-green-700", accent:"#16a34a" },
+      { id:"space", name:"Space & Solar System", desc:"Planets, satellites, exploration", emoji:"🚀", color:"from-indigo-200 via-blue-200 to-violet-200", border:"border-indigo-300", text:"text-indigo-700", accent:"#4f46e5" },
+      { id:"cs", name:"Computer Science", desc:"Coding, abstraction, impacts", emoji:"💻", color:"from-cyan-200 via-sky-200 to-blue-200", border:"border-cyan-300", text:"text-cyan-700", accent:"#0891b2" },
+      { id:"method", name:"Scientific Method", desc:"Hypotheses, evidence, inquiry", emoji:"🔍", color:"from-violet-200 via-purple-200 to-fuchsia-200", border:"border-violet-300", text:"text-purple-700", accent:"#7c3aed" }
+    ];
+
+    // ============== QUESTIONS ==============
+    // Format: { q: question, opts: [option array], ans: index of correct answer }
+    const allQuestions = {
+      matter: [
+        { q:"According to the particle model of matter, what happens when matter is heated?", opts:["Particles move faster and the space between them increases","Particles slow down and stop completely","Particles disappear into the air","Particles change colour but stay in the same position"], ans:0 },
+        { q:"As a substance cools down, what happens to the attractive forces between its particles?", opts:["The forces weaken and particles move apart","The forces become stronger and particles move closer together","The forces disappear completely","The forces stay exactly the same"], ans:1 },
+        { q:"What is a phase change?", opts:["A change from one state of matter to another","A change in colour only","A change in chemical composition","A change in the type of atoms"], ans:0 },
+        { q:"During a phase change, which property of matter ALWAYS stays the same?", opts:["The volume","The mass","The shape","The temperature"], ans:1 },
+        { q:"How does a liquid thermometer measure temperature?", opts:["The liquid changes colour with temperature","The liquid expands or contracts as temperature changes","The liquid produces light based on heat","The liquid creates bubbles when warm"], ans:1 },
+        { q:"At what temperature does pure water freeze on the Celsius scale?", opts:["0°C","32°C","-40°C","100°C"], ans:0 },
+        { q:"At what temperature does pure water boil at sea level?", opts:["0°C","50°C","100°C","212°C"], ans:2 },
+        { q:"Water has an unusual property compared to most substances. What is it?", opts:["Water expands when it freezes, taking up more space as ice","Water boils at a very low temperature","Water always becomes denser when it freezes","Water never changes state"], ans:0 },
+        { q:"Why does ice float on liquid water?", opts:["Because ice is less dense than liquid water","Because ice is always lighter no matter what","Because ice repels water","Because ice is warmer than the water below"], ans:0 },
+        { q:"How does a frozen surface on a lake protect aquatic life below?", opts:["It acts as an insulating sheet that keeps the water below from freezing","It absorbs all the Sun's heat","It produces oxygen for the fish","It keeps predators away from the surface"], ans:0 },
+        { q:"Why do bridges and roads have expansion joints?", opts:["To allow materials to expand and contract with temperature changes","To let water drain through them","To make the road look more decorative","To make cleaning easier"], ans:0 },
+        { q:"When particles slow down due to cooling, the space between them...", opts:["Decreases because particles move closer together","Increases because particles move less","Stays exactly the same","Becomes random and unpredictable"], ans:0 },
+        { q:"Which two reference points define the Celsius scale?", opts:["The freezing point and boiling point of water","The boiling point of milk and mercury","The melting point of gold and iron","Body temperature and room temperature"], ans:0 },
+        { q:"What is density?", opts:["The mass of a substance divided by its volume","How fast an object falls in water","How hard a substance is to compress","The attraction between particles"], ans:0 },
+        { q:"When a solid metal object is heated, what generally happens to its size?", opts:["It expands because particles move faster and need more space","It shrinks and becomes more compact","It melts immediately into a liquid","It stays exactly the same size"], ans:0 },
+        { q:"If ice were DENSER than liquid water, what would happen to lakes in winter?", opts:["They would freeze from the bottom up, harming aquatic life","They would have more space for fish","They would never freeze","They would become warmer in winter"], ans:0 },
+        { q:"How do engineers apply knowledge of thermal expansion?", opts:["By designing joints and gaps that allow materials to change size","By ignoring this natural phenomenon","By using only materials that never change","By building everything exactly the same way"], ans:0 },
+        { q:"On the Celsius scale, the melting point of ice is the same temperature as the...", opts:["Freezing point of water","Boiling point of water","Body temperature of humans","Room temperature on a hot day"], ans:0 },
+        { q:"Which statement best describes the particle model?", opts:["All matter is made of tiny particles that are always moving","All matter is solid and unmoving","All particles are visible to the naked eye","All particles are exactly the same size"], ans:0 },
+        { q:"A controlled experiment showing that mass stays the same after melting demonstrates which idea?", opts:["Mass is conserved during a phase change","Volume is always conserved","Temperature never changes","Particles are destroyed when heated"], ans:0 }
+      ],
+      forces: [
+        { q:"What are internal forces in an object?", opts:["Forces that act inside the object, like tension and compression","Forces that act on the object from outside","Forces that only act on liquids","Forces that don't really exist"], ans:0 },
+        { q:"Which of the following is an example of an EXTERNAL force?", opts:["Tension inside a steel beam","Friction between a box and the floor","Compression inside a column","Torsion within a metal rod"], ans:1 },
+        { q:"What does friction do?", opts:["It speeds up moving objects","It opposes the movement of objects in contact","It makes objects float","It only acts on water"], ans:1 },
+        { q:"What is tension?", opts:["A pushing force inside a wall","A force exerted by pulling on a rope or string","A twisting force on a door handle","A bending force on a tree branch"], ans:1 },
+        { q:"What does a compression force do to an object?", opts:["It twists the object","It stretches the object","It squeezes or squashes the object","It bends the object sideways"], ans:2 },
+        { q:"What is shear force?", opts:["A force that pulls an object straight","A force that pushes parts of an object in opposite directions","A force that twists an object","A force from gravity only"], ans:1 },
+        { q:"What is torsion?", opts:["A force that compresses an object","A force that twists an object","A force that lifts an object","A force from electricity"], ans:1 },
+        { q:"Which property leads to PERMANENT changes in an object's shape?", opts:["Plasticity","Elasticity","Density","Tension"], ans:0 },
+        { q:"Which property allows TEMPORARY changes in shape, returning to original form?", opts:["Plasticity","Elasticity","Friction","Torsion"], ans:1 },
+        { q:"Bending a paper clip so it stays bent is an example of what property?", opts:["Elasticity","Plasticity","Compression","Shear"], ans:1 },
+        { q:"Stretching a rubber band that snaps back into shape is an example of what?", opts:["Elasticity","Plasticity","Friction","Tension only"], ans:0 },
+        { q:"According to Newton's Third Law, for every action force, there is...", opts:["A larger reaction force in the same direction","An equal and opposite reaction force","No reaction force at all","A smaller reaction force in any direction"], ans:1 },
+        { q:"When you push on a wall, what happens?", opts:["The wall pushes back on you with equal force","The wall absorbs all the force","The wall does nothing","Only your hand experiences a force"], ans:0 },
+        { q:"What is an applied force?", opts:["A force exerted on an object by a person or another object","A force that only exists in space","A force from inside the object","A magnetic force only"], ans:0 },
+        { q:"An elastic or spring force is exerted when...", opts:["A spring is stretched or compressed and contacts an object","An object is just sitting still","Two surfaces rub together","An object is heated"], ans:0 },
+        { q:"What can external forces cause inside an object?", opts:["Internal forces such as tension or compression","Nothing at all","Only colour changes","Only temperature changes"], ans:0 },
+        { q:"Which is a force that bends or breaks an object by pushing its parts in opposite directions?", opts:["Compression","Tension","Shear","Friction"], ans:2 },
+        { q:"In an interaction between two objects, the action and reaction forces are...", opts:["Equal in size and opposite in direction","Always in the same direction","Different in size","Only on one object"], ans:0 },
+        { q:"Which change in an object's shape is REVERSIBLE?", opts:["A plastic change","An elastic change","A permanent change","No change is reversible"], ans:1 },
+        { q:"How can you SAFELY experiment with forces?", opts:["By using materials and tools properly and with adult guidance when needed","By skipping safety steps to save time","By using forces on people","By avoiding all force experiments"], ans:0 }
+      ],
+      energy: [
+        { q:"Which energy resource can be used BEFORE processing?", opts:["Refined gasoline","Wood burned for heat","Processed nuclear fuel","Electricity from a power plant"], ans:1 },
+        { q:"Which factor influences the selection of an energy resource?", opts:["Availability and accessibility","The colour of the resource","The favourite resource of the user","Whether it sounds nice"], ans:0 },
+        { q:"Which of the following should NOT influence energy choices?", opts:["Environmental impacts","Economic impacts","Societal impacts","The first name of the factory manager"], ans:3 },
+        { q:"What does responsible management of energy resources include?", opts:["Minimal disruption to nature and restoration of extraction areas","Extracting as much as possible quickly","Stopping all extraction completely","Only reducing prices"], ans:0 },
+        { q:"Which energy resource can be used BOTH before AND after processing?", opts:["Wind (sailing a boat or generating electricity)","Uranium (nuclear only)","Refined gasoline only","Hydrogen produced by electrolysis only"], ans:0 },
+        { q:"Wind energy can be used BEFORE processing in what way?", opts:["To generate electricity in a power plant","To sail a boat","To heat water through pipes","To make solar panels work"], ans:1 },
+        { q:"Which is an everyday use of energy resources by individuals?", opts:["Operating an oil refinery","Heating a home","Building hydroelectric dams","Running a nuclear plant"], ans:1 },
+        { q:"What is a smart first step when designing a device to use an energy resource?", opts:["Buy all materials immediately","Identify the problem and what is needed to solve it","Copy an existing design exactly","Just hope it works"], ans:1 },
+        { q:"Why are renewable energy resources important?", opts:["They cost less than everything else","They do not run out like fossil fuels","They work better at night","They have zero environmental impact"], ans:1 },
+        { q:"After processing, biofuel can be used to...", opts:["Sail directly without any treatment","Power vehicles or heat buildings","Only smoke for fragrance","Only run nuclear reactors"], ans:1 },
+        { q:"Which resource MUST be processed before it can be used as electricity?", opts:["Wind that fills a sailboat","Sunlight just falling on you","Coal at a power plant","River water flowing naturally"], ans:2 },
+        { q:"How does climate change influence our energy choices?", opts:["It has no relation to energy choices","Clean energy reduces greenhouse gas emissions","It makes all fossil fuels less accessible","It creates more energy resources"], ans:1 },
+        { q:"What is a major challenge of responsible resource management?", opts:["Using as few workers as possible","Balancing energy needs with protecting the environment","Avoiding skilled workers","Banning all extraction"], ans:1 },
+        { q:"Geothermal energy is classified as...", opts:["A non-renewable resource like petroleum","A renewable resource using Earth's internal heat","A resource that depletes the environment quickly","An energy source that only works on certain days"], ans:1 },
+        { q:"What is one advantage of nuclear energy?", opts:["It produces zero waste","It produces a lot of energy from a small amount of fuel","It is the cheapest source of all","It directly creates clean air"], ans:1 },
+        { q:"What is one impact of burning fossil fuels?", opts:["It purifies the surrounding air","It increases greenhouse gases in the atmosphere","It only produces water and oxygen","It cools the Earth naturally"], ans:1 },
+        { q:"What do solar panels convert?", opts:["Surrounding heat directly into electricity","Wind into electricity","The Sun's radiant energy into electricity","Rainwater into static electricity"], ans:2 },
+        { q:"A region with powerful, fast-flowing rivers would benefit most from...", opts:["Geothermal energy from deep underground","Hydroelectric energy from moving water","Energy from nuclear reactions","Biomass from coastal areas"], ans:1 },
+        { q:"Tidal energy uses...", opts:["The cyclic motion of ocean tides","Coastal wind only","Deep ocean temperature","Underground water pressure"], ans:0 },
+        { q:"What is one challenge for renewable energy?", opts:["It always produces too much energy","It can be variable depending on weather conditions","It costs absolutely nothing to maintain","It only exists in tropical zones"], ans:1 }
+      ],
+      earth: [
+        { q:"How does latitude affect the climate of a place?", opts:["It determines the exact height of a location","It affects how much solar radiation that area receives","It is responsible for the type of soil","It has no effect on climate"], ans:1 },
+        { q:"Which personal action could help reduce climate change?", opts:["Increasing fossil fuel consumption","Reducing waste and using clean energy responsibly","Ignoring all environmental advice","Building more parking lots"], ans:1 },
+        { q:"Natural climate changes throughout Earth's history have been caused by...", opts:["Cars and trucks driving","Volcanic eruptions and changes in the Sun's output","Only ancient farming","Electricity used by humans long ago"], ans:1 },
+        { q:"How do humans contribute to climate change today?", opts:["Only by building cities","By releasing greenhouse gases into the atmosphere","Only by building roads","By cutting their hair regularly"], ans:1 },
+        { q:"How can climate change affect agriculture?", opts:["It increases yields everywhere","It can change crop production, harvesting periods, and pest patterns","It creates more fertile land everywhere","It eliminates the need for irrigation"], ans:1 },
+        { q:"How is climate change affecting many Northern, Inuit, and coastal communities in Canada?", opts:["It improves all hunting and fishing conditions","Rising sea levels and changing access to traditional hunting and fishing","It creates a perfectly stable climate","It only produces better conditions"], ans:1 },
+        { q:"Which is a leading scientific theory about dinosaur extinction?", opts:["The dinosaurs voluntarily migrated away","A catastrophic meteor impact, volcanic activity, or worldwide climate change","Dinosaurs still exist in remote areas","There is no scientific theory about it"], ans:1 },
+        { q:"How do scientists identify long-term climate change?", opts:["By occasional sky observations","By measuring temperature, precipitation, and tracking extreme weather events over time","By guessing without data","They cannot identify it"], ans:1 },
+        { q:"Why do scientists collaborate with Elders and traditional Knowledge Keepers?", opts:["Scientists already have all the knowledge they need","Both perspectives provide a deeper understanding of the environment","It is just a school exercise","Only scientists can contribute useful information"], ans:1 },
+        { q:"Which natural process can cause global climate changes?", opts:["Using electric cars","Massive volcanic eruptions","Building modern solar homes","Planting fruit trees"], ans:1 },
+        { q:"How does the greenhouse effect affect Earth's temperature?", opts:["It always cools the planet","Greenhouse gases trap heat from the Sun, warming the Earth","It only creates local wind","It has no real effect"], ans:1 },
+        { q:"What happens when clouds reflect sunlight back into space?", opts:["The Earth warms up immediately","It can reduce the amount of solar energy reaching the surface","Clouds simply create rainwater","It creates artificial snow"], ans:1 },
+        { q:"How does permafrost respond to a warming climate?", opts:["It freezes more deeply than ever","It begins to melt and can release stored greenhouse gases","It becomes harder over time","It is not affected at all"], ans:1 },
+        { q:"Which is an example of an extreme weather event in Canada?", opts:["Tropical typhoons","Tornadoes, blizzards, and torrential rain","Southeast Asian monsoons","Volcanic eruptions"], ans:1 },
+        { q:"Which technology helps scientists predict extreme weather events?", opts:["Simple traditional thermometers only","Radars, weather satellites, and computer modelling","Telescopes for stars","No technology can predict weather"], ans:1 },
+        { q:"Why are global ocean levels rising?", opts:["No rise is actually happening","Melting polar ice and thermal expansion of warming water","Increased evaporation from the surface","Fish reproducing more quickly"], ans:1 },
+        { q:"Why are ice cores so valuable to climate scientists?", opts:["They look beautiful","They contain layers that record climate history from different time periods","They are useful for modern construction","They have no scientific value"], ans:1 },
+        { q:"How does clean energy help address climate change?", opts:["It has no real impact","By reducing the production of greenhouse gases","By increasing pollution","By using more fossil fuels"], ans:1 },
+        { q:"How does proximity to a large body of water affect local climate?", opts:["It has no effect on climate","It moderates temperatures and influences humidity","It instantly creates a desert","It always raises the local temperature"], ans:1 },
+        { q:"Which factor does NOT affect a region's local climate?", opts:["Latitude","Elevation","Proximity to water","The first letter of the city's name"], ans:3 }
+      ],
+      living: [
+        { q:"What does the term 'biotic' refer to in an ecosystem?", opts:["The non-living parts like water and rocks","The living things like plants, animals, and microorganisms","Only the air and sunlight","Only the top predators"], ans:1 },
+        { q:"Which of the following is an ABIOTIC component of an ecosystem?", opts:["A population of deer","Soil bacteria","Sunlight, water, and soil","Trees and moss"], ans:2 },
+        { q:"How do biotic and abiotic components of an ecosystem interact?", opts:["They never interact","Only indirectly through available water","They influence each other directly and indirectly","Only living things interact with each other"], ans:2 },
+        { q:"What best defines an ecosystem?", opts:["A single type of plant","All the living organisms together with their physical environment","A group of similar animals","A scientific laboratory"], ans:1 },
+        { q:"Which ecosystems act as major carbon sinks (storing greenhouse gases)?", opts:["Only modern urban areas","Wetlands, oceans, forests, and grasslands","Only dry desert areas","No ecosystem stores carbon"], ans:1 },
+        { q:"What is photosynthesis?", opts:["When animals eat food","The process plants use to convert light, water, and CO₂ into food and oxygen","Plant breathing only","Plant reproduction"], ans:1 },
+        { q:"Which statement about photosynthesis is CORRECT?", opts:["Animals do photosynthesis too","It does not need any light","It produces oxygen and glucose (sugar)","It only creates carbon dioxide"], ans:2 },
+        { q:"In how many ways do humans depend on plants?", opts:["In no real way","Only for food","For oxygen, food, clothing, paper, medicine, and more","Only for outdoor decoration"], ans:2 },
+        { q:"Which plants are considered sacred to many First Nations and Métis?", opts:["Commercially grown roses","Wild daisies","Sage, cedar, tobacco, and sweetgrass","Only corn"], ans:2 },
+        { q:"What does the offering of tobacco signify in Indigenous traditions?", opts:["A simple commercial gift","Disrespect","Balance, harmony, and respect for the land","Nothing culturally important"], ans:2 },
+        { q:"What is the crucial role of decomposers in an ecosystem?", opts:["They have no important role","They eat all the herbivores","They return essential nutrients to the soil","They create only pollution"], ans:2 },
+        { q:"Which is an example of a biotic component?", opts:["A rock on the ground","Air in the atmosphere","An insect living under a rock","The temperature of the water"], ans:2 },
+        { q:"How does altitude affect mountain ecosystems?", opts:["It has no effect on plants or animals","It changes the temperature and the types of plants and animals that can live there","It only creates wind","It only affects the view"], ans:1 },
+        { q:"Which terrestrial ecosystem has extreme seasonal changes with very cold winters?", opts:["A tropical rainforest","An arctic ecosystem","A hot desert","A stable coastal ecosystem"], ans:1 },
+        { q:"How do mature forests help fight climate change?", opts:["By creating more carbon dioxide","By absorbing CO₂ from the atmosphere","By creating only oxygen and nothing else","By doing nothing for the climate"], ans:1 },
+        { q:"Which is a freshwater aquatic ecosystem?", opts:["The Atlantic Ocean","Rivers, lakes, and wetlands","The Dead Sea","The Pacific Ocean"], ans:1 },
+        { q:"How are organisms organized in a typical food chain?", opts:["Randomly with no order","Producers, then consumers, then decomposers","Only carnivores at the top","No order applies"], ans:1 },
+        { q:"Why is biodiversity important to an ecosystem?", opts:["It has no importance","It creates balance and resilience to changes","It creates chaos and unpredictability","It makes ecosystems useless"], ans:1 },
+        { q:"What is a primary producer in a food chain?", opts:["A carnivore that eats herbivores","A plant that produces its own food through photosynthesis","A decomposer breaking down matter","A herbivore eating plants"], ans:1 },
+        { q:"What gas do plants need from animals to perform photosynthesis?", opts:["Oxygen","Carbon dioxide","Nitrogen","Hydrogen"], ans:1 }
+      ],
+      space: [
+        { q:"The solar system includes all of the following EXCEPT...", opts:["The Sun at the centre","Asteroids in orbit","Other distant galaxies","Multiple planets"], ans:2 },
+        { q:"What are celestial bodies?", opts:["Only weather phenomena","Only nearby stars","Natural bodies located beyond Earth's atmosphere","Only rocky planets"], ans:2 },
+        { q:"In what ways do celestial bodies vary?", opts:["They are all exactly the same","Only their temperature varies","Their size, shape, surface, and atmosphere all vary","They are all perfectly round"], ans:2 },
+        { q:"What is the asteroid belt?", opts:["A ring around a planet","A type of planet","A collection of asteroids found within the solar system","The path of a moon"], ans:2 },
+        { q:"Why is Pluto no longer classified as a planet?", opts:["It shrank","It was a major scientific error","New information led to it being reclassified as a dwarf planet","It moved away from the Sun"], ans:2 },
+        { q:"Which technologies are used to explore the solar system?", opts:["Only ordinary binoculars","Only candles and lamps","Telescopes, satellites, probes, and rovers","Only simple mirrors"], ans:2 },
+        { q:"What is an artificial satellite?", opts:["A natural celestial body","Something that exists by itself","An object made by humans that orbits a larger object","A distant star"], ans:2 },
+        { q:"What is the International Space Station?", opts:["A planet in our solar system","A research facility that orbits Earth","A natural moon","A frozen comet"], ans:1 },
+        { q:"What is an orbit?", opts:["Just a geometric shape","A type of rocket","The recurring path of an object around another object in space","Only seasonal rotation"], ans:2 },
+        { q:"Which Alberta-built satellite was launched from the International Space Station in 2017?", opts:["AlbertaSat-A","SpaceX Alberta","Ex-Alta 1","North Star One"], ans:2 },
+        { q:"How many planets are officially in our solar system?", opts:["7","8","9","10"], ans:1 },
+        { q:"Which of the following is a gas giant planet?", opts:["Mercury","Venus","Jupiter","Mars"], ans:2 },
+        { q:"What is a comet?", opts:["A small solid planet","A celestial body that develops a tail of gas and dust as it nears the Sun","An artificial satellite","A small rocky asteroid"], ans:1 },
+        { q:"The Sun is classified as...", opts:["A rocky planet","A gravitational satellite","A star","A giant asteroid"], ans:2 },
+        { q:"What is the largest object in our solar system?", opts:["Jupiter","Earth","Saturn","The Sun"], ans:3 },
+        { q:"What is a natural satellite?", opts:["Something launched by humans","A celestial body, like a moon, that orbits a planet","A loose asteroid","A robotic spacecraft"], ans:1 },
+        { q:"What is a space telescope?", opts:["A telescope on Earth","An instrument placed in orbit to observe space","A tool for the naked eye","A propelled rocket"], ans:1 },
+        { q:"How do space probes send information back to Earth?", opts:["Through radio signals","By Earth-based fibre optic cable","By amplified voice","They cannot send information"], ans:0 },
+        { q:"What is the closest natural celestial body to Earth?", opts:["Mercury","Venus","The Moon","Mars"], ans:2 },
+        { q:"Why do humans study the solar system?", opts:["Just to be bored","To understand the universe and our place in it","Just to watch rockets","There is no good reason"], ans:1 }
+      ],
+      cs: [
+        { q:"What is abstraction in computer science?", opts:["Making things more complicated","Adding all possible details","Simplifying by keeping the important parts and removing unnecessary details","Just changing colours"], ans:2 },
+        { q:"Which is a real-world example of abstraction?", opts:["Showing every technical detail","Simple controls on appliances like a power button","Writing very complex code","Nothing in particular"], ans:1 },
+        { q:"What is information?", opts:["Completely random data","Only numbers","Data that has been organized to be useful","Only written text"], ans:2 },
+        { q:"Which code structure repeats a set of instructions?", opts:["A linear sequence","A conditional","A loop","A simple variable"], ans:2 },
+        { q:"What is a sequence in programming?", opts:["Random instructions","Instructions that skip around","An ordered set of instructions executed one after another","Instructions that never run"], ans:2 },
+        { q:"What does an if-then-else statement do?", opts:["Repeats forever","Executes different actions depending on conditions","Stops the program automatically","Saves data only"], ans:1 },
+        { q:"Which is an example of using a computational artifact to address a societal need?", opts:["A toy that does nothing useful","Weather modelling apps that warn of severe storms","A broken calculator","A random pattern with no meaning"], ans:1 },
+        { q:"Impacts of technology can be...", opts:["Always positive","Always negative","Personal, social, environmental, and economic","Never real"], ans:2 },
+        { q:"Which is a possible UNINTENDED impact of technology?", opts:["Helping people directly","Creating medical devices","Reducing face-to-face communication","Improving public transit"], ans:2 },
+        { q:"Why is it important to plan design and coding?", opts:["It is never important","To efficiently solve real needs and problems","To slow down the process","Just for fun"], ans:1 },
+        { q:"A loop in programming is used to...", opts:["Do nothing in particular","Skip certain steps","Repeat an action multiple times","End the program completely"], ans:2 },
+        { q:"A conditional in code allows you to...", opts:["Always do exactly the same thing","Make decisions based on different situations","Do nothing useful","Cause an error"], ans:1 },
+        { q:"What is an algorithm?", opts:["A serious code error","A set of step-by-step instructions to solve a problem","A specific type of language","Nothing important"], ans:1 },
+        { q:"Which is a POSITIVE impact of technology?", opts:["Isolating people completely","Instant global communication","Job losses everywhere","Increased pollution"], ans:1 },
+        { q:"Which is a NEGATIVE environmental impact of technology?", opts:["No negative impact ever","Excessive energy consumption and electronic waste","Total improvement of the environment","Creation of new resources"], ans:1 },
+        { q:"How can technology help people with disabilities?", opts:["It cannot","Through adaptive devices and specialized software","Just for occasional hobbies","It is too complicated to help"], ans:1 },
+        { q:"What is computer code?", opts:["A major system error","Instructions written in a language that computers understand","Only a foreign spoken language","Nothing important"], ans:1 },
+        { q:"Which of the following is a programming language?", opts:["Spoken French","Spoken Spanish","Python","Spoken English"], ans:2 },
+        { q:"What is the goal of design in computer science?", opts:["No particular goal","To create an effective and usable solution","Just to add nice colours","To intentionally cause errors"], ans:1 },
+        { q:"How do you test a computer program?", opts:["You never test it","You check whether it works correctly and fix any bugs","Ignore it completely","Hide it intentionally"], ans:1 }
+      ],
+      method: [
+        { q:"What is a scientific explanation?", opts:["An imaginary story","An explanation based on investigation and evidence","A simple guess without data","Whatever the majority believes"], ans:1 },
+        { q:"To be acceptable in science, an explanation must be...", opts:["Very complicated","Testable (falsifiable) by investigation","Accepted by leadership","Based on personal beliefs"], ans:1 },
+        { q:"What is a hypothesis in research?", opts:["A proven fact","A proposed explanation developed before an investigation, based on prior knowledge","An observation with no plan","The final conclusion of an inquiry"], ans:1 },
+        { q:"Strong hypotheses are based on...", opts:["Wishes and hopes","Prior knowledge and observations","Random guessing only","What is shown on TV"], ans:1 },
+        { q:"What is scientific evidence?", opts:["A researcher's personal feeling","Data that supports or contradicts a hypothesis","Anyone's untested opinion","An untested guess"], ans:1 },
+        { q:"Which can be explained scientifically?", opts:["Nothing at all","The phases of the Moon, based on the positions of Earth, Moon, and Sun","Only magic","Only ancient mysteries"], ans:1 },
+        { q:"Why are accuracy and precision essential in experiments?", opts:["Just for fun","To produce trustworthy and reproducible evidence","To use up more time","They are completely useless"], ans:1 },
+        { q:"How do First Nations, Métis, and Inuit share explanations of natural phenomena?", opts:["Only through published books","Through oral traditions, stories, visual forms, and written texts","Only through computer science","They never share knowledge"], ans:1 },
+        { q:"How do scientists validate that evidence is reliable?", opts:["One scientist simply says it is true","Through accuracy, repeated investigation, and review by other scientists","By a simple majority vote","Without any verification"], ans:1 },
+        { q:"What do scientists do when they encounter conflicting evidence?", opts:["They ignore the evidence completely","They investigate further and may refine the explanation","They never change their ideas","They wait 100 years before acting"], ans:1 },
+        { q:"What is a variable in an experiment?", opts:["An opinion that constantly changes","Something that always stays constant","Something that can change and be measured","Something with no importance"], ans:2 },
+        { q:"What is the role of a control group?", opts:["The group that gets the experimental treatment","The reference group used for comparison without the treatment","The group that runs the experiment","No real role"], ans:1 },
+        { q:"How should you document scientific observations?", opts:["No documentation is needed","With precise notes, diagrams, charts, and tables","Only by taking photos and nothing else","Mentally without writing anything"], ans:1 },
+        { q:"What is the role of skepticism in science?", opts:["To reject every idea completely","To question claims and ask for evidence","No particular role","No importance at all"], ans:1 },
+        { q:"How does science correct its mistakes over time?", opts:["Science never admits mistakes","Through ongoing collection of new evidence and reinvestigation","With one single conflicting study","Extremely slowly, never really"], ans:1 },
+        { q:"Which is a historically incorrect explanation that was later refined?", opts:["The Earth is roughly spherical","The Sun revolves around the Earth","Plants need sunlight","Water is made of molecules"], ans:1 },
+        { q:"What does a scientific inquiry typically involve?", opts:["A random question with no plan","A structured process for answering a question with evidence","Nothing in particular","A horror story"], ans:1 },
+        { q:"Why do scientists repeat experiments multiple times?", opts:["Because it is boring","To confirm the reliability of the results","For no particular reason","Repeating is forbidden in science"], ans:1 },
+        { q:"How are scientific results typically communicated?", opts:["Never; they are kept secret","Through accurate graphs, tables, reports, and presentations","Only verbally in person","They are classified information"], ans:1 },
+        { q:"What is a scientific theory?", opts:["An imaginary guess","A well-tested explanation supported by a large body of evidence","A lie made up by scientists","A personal opinion"], ans:1 }
+      ]
+    };
+
+    // ============== STATE ==============
+    let currentCategory = null;
+    let userAnswers = {};
+    let checked = false;
+
+    // ============== BUILD CATEGORY CARDS ==============
+    const grid = document.getElementById('cat-grid');
+    categories.forEach((cat, i) => {
+      const count = allQuestions[cat.id].length;
+      const card = document.createElement('button');
+      card.className = `cat-card bg-gradient-to-br ${cat.color} ${cat.border} border-2 rounded-3xl p-6 text-left fade-in shadow-md`;
+      card.style.animationDelay = `${i * 0.06}s`;
+      card.innerHTML = `
+        <div class="flex items-start justify-between mb-3">
+          <div class="text-5xl cat-emoji">${cat.emoji}</div>
+          <div class="bg-white/60 backdrop-blur px-2.5 py-1 rounded-full text-xs font-extrabold ${cat.text}">
+            ${count} Q
+          </div>
+        </div>
+        <h3 class="bubbly text-xl font-bold ${cat.text} leading-tight">${cat.name}</h3>
+        <p class="text-sm ${cat.text} opacity-75 mt-1.5 font-medium">${cat.desc}</p>
+        <div class="mt-4 flex items-center gap-1.5 text-xs font-extrabold ${cat.text} opacity-80 bubbly">
+          <span>START</span>
+          <i data-lucide="arrow-right" style="width:14px;height:14px;"></i>
+        </div>
+      `;
+      card.setAttribute('aria-label', `Start ${cat.name} quiz with ${count} questions`);
+      card.onclick = () => openCategory(cat.id);
+      grid.appendChild(card);
+    });
+
+    // ============== OPEN CATEGORY ==============
+    function openCategory(catId) {
+      currentCategory = catId;
+      userAnswers = {};
+      checked = false;
+      const cat = categories.find(c => c.id === catId);
+      const qs = allQuestions[catId];
+
+      document.getElementById('home-screen').style.display = 'none';
+      document.getElementById('quiz-screen').style.display = 'flex';
+      const titleEl = document.getElementById('quiz-title');
+      titleEl.textContent = `${cat.emoji} ${cat.name}`;
+      titleEl.className = `text-2xl md:text-3xl font-extrabold bubbly ${cat.text}`;
+
+      document.getElementById('score-badge').classList.add('hidden');
+      document.getElementById('check-btn').style.display = '';
+      document.getElementById('reset-btn').classList.add('hidden');
+      document.getElementById('home-btn').classList.add('hidden');
+      document.getElementById('results-celebration').classList.add('hidden');
+      document.getElementById('progress-section').style.display = '';
+
+      document.getElementById('progress-total').textContent = `Total: ${qs.length} questions`;
+      updateProgress();
+
+      const container = document.getElementById('questions-container');
+      container.innerHTML = '';
+      qs.forEach((question, qi) => {
+        const div = document.createElement('div');
+        div.className = 'mb-7 fade-in';
+        div.style.animationDelay = `${qi * 0.025}s`;
+        div.innerHTML = `
+          <p class="font-bold text-gray-700 mb-3 text-base flex items-start">
+            <span class="question-num bubbly">${qi+1}</span>
+            <span class="flex-1 pt-1">${question.q}</span>
+          </p>
+          <div class="grid gap-2.5" id="opts-${qi}">
+            ${question.opts.map((opt, oi) => `
+              <button class="option-btn w-full text-left px-4 py-3 rounded-2xl border-2 border-gray-200 bg-white font-semibold text-gray-700 text-sm flex items-start gap-3" data-qi="${qi}" data-oi="${oi}">
+                <span class="option-letter mt-0.5" style="color: ${cat.accent};">${String.fromCharCode(65+oi)}</span>
+                <span class="flex-1">${opt}</span>
+              </button>
+            `).join('')}
+          </div>
+          <p class="feedback-text text-sm font-bold mt-2 hidden"></p>
+        `;
+        container.appendChild(div);
+      });
+
+      // Option click handlers
+      container.querySelectorAll('.option-btn').forEach(btn => {
+        btn.onclick = () => {
+          if (checked) return;
+          const qi = parseInt(btn.dataset.qi);
+          const oi = parseInt(btn.dataset.oi);
+          userAnswers[qi] = oi;
+          document.querySelectorAll(`#opts-${qi} .option-btn`).forEach(b => b.classList.remove('selected'));
+          btn.classList.add('selected');
+          updateProgress();
+        };
+      });
+
+      window.scrollTo(0, 0);
+      lucide.createIcons();
+    }
+
+    // ============== UPDATE PROGRESS ==============
+    function updateProgress() {
+      const qs = allQuestions[currentCategory];
+      const answered = Object.keys(userAnswers).length;
+      const pct = (answered / qs.length) * 100;
+      document.getElementById('progress-bar').style.width = pct + '%';
+      document.getElementById('progress-text').textContent = `Answered: ${answered}`;
+    }
+
+    // ============== BUTTON HANDLERS ==============
+    document.getElementById('back-btn').onclick = () => {
+      document.getElementById('quiz-screen').style.display = 'none';
+      document.getElementById('home-screen').style.display = 'flex';
+    };
+
+    document.getElementById('home-btn').onclick = () => {
+      document.getElementById('quiz-screen').style.display = 'none';
+      document.getElementById('home-screen').style.display = 'flex';
+    };
+
+    document.getElementById('check-btn').onclick = () => {
+      if (checked) return;
+      checked = true;
+      const qs = allQuestions[currentCategory];
+      const cat = categories.find(c => c.id === currentCategory);
+      let score = 0;
+
+      qs.forEach((question, qi) => {
+        const optsDiv = document.getElementById(`opts-${qi}`);
+        const buttons = optsDiv.querySelectorAll('.option-btn');
+        const userAns = userAnswers[qi];
+        const correctAns = question.ans;
+
+        buttons.forEach((btn, oi) => {
+          btn.disabled = true;
+          btn.style.cursor = 'default';
+          if (oi === correctAns) {
+            btn.classList.add('correct-answer');
+            btn.classList.remove('selected');
+          } else if (oi === userAns && userAns !== correctAns) {
+            btn.classList.add('wrong-answer');
+            btn.classList.remove('selected');
+          }
+        });
+
+        if (userAns === correctAns) score++;
+
+        const fb = optsDiv.parentElement.querySelector('.feedback-text');
+        fb.classList.remove('hidden');
+        if (userAns === undefined) {
+          fb.textContent = '⚠️ Not answered. The correct answer is highlighted in green.';
+          fb.className = 'feedback-text text-sm font-bold mt-3 text-amber-600';
+        } else if (userAns === correctAns) {
+          fb.textContent = '✅ Correct! Nice work.';
+          fb.className = 'feedback-text text-sm font-bold mt-3 text-green-600';
+        } else {
+          fb.textContent = `❌ Not quite. The correct answer is ${String.fromCharCode(65 + correctAns)}.`;
+          fb.className = 'feedback-text text-sm font-bold mt-3 text-red-500';
+        }
+      });
+
+      // Score display
+      const pct = Math.round(score/qs.length*100);
+      const badge = document.getElementById('score-badge');
+      badge.textContent = `🏆 ${score} / ${qs.length}  •  ${pct}%`;
+      badge.classList.remove('hidden');
+
+      // Results celebration
+      const celebration = document.getElementById('results-celebration');
+      let message = '';
+      let emoji = '';
+      let colour = '#8b5cf6';
+      if (pct >= 90) { message = 'Amazing! You really know your stuff!'; emoji = '🎉🌟'; colour = '#16a34a'; }
+      else if (pct >= 75) { message = 'Great job! You\'re well prepared.'; emoji = '🎯'; colour = '#22c55e'; }
+      else if (pct >= 60) { message = 'Good effort! A bit more practice and you\'ll ace it.'; emoji = '💪'; colour = '#f59e0b'; }
+      else if (pct >= 40) { message = 'Keep practicing - you\'re building knowledge!'; emoji = '📚'; colour = '#f97316'; }
+      else { message = 'Don\'t give up! Review the answers and try again.'; emoji = '🌱'; colour = '#ef4444'; }
+
+      celebration.innerHTML = `
+        <div class="pop-in">
+          <div class="inline-block">
+            <div class="score-circle w-32 h-32 mx-auto" style="--score-pct: ${pct}; --score-color: ${colour};">
+              <div class="score-inner">
+                <div class="text-3xl font-extrabold bubbly" style="color: ${colour};">${pct}%</div>
+                <div class="text-xs font-bold text-gray-500">${score}/${qs.length}</div>
+              </div>
+            </div>
+          </div>
+          <div class="mt-4 text-2xl">${emoji}</div>
+          <p class="bubbly text-xl font-bold mt-2" style="color: ${colour};">${message}</p>
+        </div>
+      `;
+      celebration.classList.remove('hidden');
+
+      document.getElementById('check-btn').style.display = 'none';
+      document.getElementById('reset-btn').classList.remove('hidden');
+      document.getElementById('home-btn').classList.remove('hidden');
+      document.getElementById('progress-section').style.display = 'none';
+
+      lucide.createIcons();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    document.getElementById('reset-btn').onclick = () => openCategory(currentCategory);
+
+    // ============== ELEMENT SDK ==============
+    const defaultConfig = {
+      main_title: "🔬 Science PAT Practice",
+      subtitle: "Get ready for your Provincial Achievement Test!",
+      background_color: "#faf5ff",
+      surface_color: "#ffffff",
+      text_color: "#581c87",
+      primary_action_color: "#a855f7",
+      secondary_action_color: "#7dd3fc",
+      font_family: "Nunito",
+      font_size: 16
+    };
+
+    function applyConfig(config) {
+      const t = (k) => config[k] || defaultConfig[k];
+      document.getElementById('main-title').textContent = t('main_title');
+      document.getElementById('subtitle').textContent = t('subtitle');
+      document.body.style.fontFamily = `${t('font_family')}, Nunito, sans-serif`;
+      document.querySelectorAll('.bubbly, h1, h2, h3').forEach(el => {
+        el.style.fontFamily = `'Fredoka', ${t('font_family')}, sans-serif`;
+      });
+      const fs = t('font_size');
+      document.body.style.fontSize = fs + 'px';
+    }
+
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange: async (config) => applyConfig(config),
+        mapToCapabilities: (config) => {
+          const c = (key) => ({
+            get: () => config[key] || defaultConfig[key],
+            set: (v) => { config[key] = v; window.elementSdk.setConfig({ [key]: v }); }
+          });
+          return {
+            recolorables: [c('background_color'), c('surface_color'), c('text_color'), c('primary_action_color'), c('secondary_action_color')],
+            borderables: [],
+            fontEditable: c('font_family'),
+            fontSizeable: { get: () => config.font_size || defaultConfig.font_size, set: (v) => { config.font_size = v; window.elementSdk.setConfig({ font_size: v }); } }
+          };
+        },
+        mapToEditPanelValues: (config) => new Map([
+          ["main_title", config.main_title || defaultConfig.main_title],
+          ["subtitle", config.subtitle || defaultConfig.subtitle]
+        ])
+      });
+    }
+
+    lucide.createIcons();
+  </script>
+</body>
+</html>
