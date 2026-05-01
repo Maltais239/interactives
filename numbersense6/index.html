@@ -1,0 +1,1830 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Number Sense</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&amp;family=Nunito:wght@400;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Nunito', sans-serif; }
+    h1, h2, h3, .game-title { font-family: 'Fredoka', sans-serif; }
+
+    @keyframes bounce-in {
+      0% { transform: scale(0); opacity: 0; }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    @keyframes spin-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.5); }
+      50% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.8); }
+    }
+
+    @keyframes confetti-fall {
+      0% { transform: translateY(-100%) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
+
+    @keyframes star-burst {
+      0% { transform: scale(0) rotate(0deg); opacity: 1; }
+      100% { transform: scale(2) rotate(180deg); opacity: 0; }
+    }
+
+    .bounce-in { animation: bounce-in 0.5s ease-out; }
+    .shake { animation: shake 0.5s ease-in-out; }
+    .float { animation: float 2s ease-in-out infinite; }
+    .spin-slow { animation: spin-slow 8s linear infinite; }
+    .pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+
+    .confetti {
+      position: fixed;
+      width: 10px;
+      height: 10px;
+      animation: confetti-fall 3s linear forwards;
+    }
+
+    .star-burst {
+      position: absolute;
+      font-size: 2rem;
+      animation: star-burst 0.8s ease-out forwards;
+    }
+
+    .category-btn {
+      transition: all 0.3s ease;
+    }
+
+    .category-btn:hover {
+      transform: translateY(-3px);
+    }
+
+    .answer-btn {
+      transition: all 0.2s ease;
+    }
+
+    .answer-btn:hover:not(:disabled) {
+      transform: scale(1.02);
+    }
+
+    .correct-answer {
+      background: linear-gradient(135deg, #10b981, #059669) !important;
+      color: white !important;
+    }
+
+    .wrong-answer {
+      background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+      color: white !important;
+    }
+
+    .mini-game-target {
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    .mini-game-target:hover {
+      transform: scale(1.1);
+    }
+
+    .progress-bar {
+      transition: width 0.5s ease;
+    }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full overflow-auto">
+  <div id="app" class="min-h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-4"><!-- Welcome Screen -->
+   <div id="welcome-screen" class="max-w-2xl mx-auto">
+    <div class="bg-white/95 backdrop-blur rounded-3xl shadow-2xl p-8 text-center bounce-in">
+     <div class="text-6xl mb-4">
+      🎮
+     </div>
+     <h1 id="main-title" class="game-title text-4xl font-bold text-indigo-600 mb-2">Number Sense</h1>
+     <p id="welcome-text" class="text-gray-600 mb-6">Welcome to the review game!</p>
+     <div class="mb-6"><label class="block text-left text-gray-700 font-semibold mb-2">Your name:</label> <input type="text" id="player-name-input" placeholder="Enter your name..." class="w-full px-4 py-3 border-2 border-indigo-200 rounded-xl focus:border-indigo-500 focus:outline-none text-lg">
+     </div><button id="start-btn" onclick="startGame()" class="w-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold py-4 px-8 rounded-xl text-xl hover:from-indigo-600 hover:to-purple-600 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"> Start! 🚀 </button>
+     <div id="leaderboard" class="mt-8 hidden">
+      <h3 class="text-lg font-bold text-gray-700 mb-3">🏆 Leaderboard</h3>
+      <div id="leaderboard-list" class="space-y-2"></div>
+     </div>
+    </div>
+   </div><!-- Main Game Screen -->
+   <div id="game-screen" class="hidden max-w-4xl mx-auto"><!-- Header -->
+    <div class="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-4 mb-4">
+     <div class="flex justify-between items-center flex-wrap gap-2">
+      <div class="flex items-center gap-3"><span class="text-2xl">👋</span> <span id="greeting" class="text-xl font-bold text-indigo-600">Hi!</span>
+      </div>
+      <div class="flex items-center gap-4">
+       <div class="bg-yellow-100 px-4 py-2 rounded-full"><span class="text-yellow-600 font-bold">⭐ Session: <span id="session-points">0</span></span>
+       </div>
+       <div class="bg-purple-100 px-4 py-2 rounded-full"><span class="text-purple-600 font-bold">💫 Total: <span id="cumulative-points">0</span></span>
+       </div>
+       <div class="bg-indigo-100 px-4 py-2 rounded-full"><span class="text-indigo-600 font-bold">❓ Question: <span id="question-num">0</span></span>
+       </div>
+      </div>
+     </div>
+     <div class="mt-3 bg-gray-200 rounded-full h-3 overflow-hidden hidden">
+      <div id="progress-bar" class="progress-bar bg-gradient-to-r from-indigo-500 to-purple-500 h-full" style="width: 0%"></div>
+     </div>
+    </div><!-- Category Selection -->
+    <div id="category-screen" class="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-6">
+     <h2 class="game-title text-2xl font-bold text-center text-gray-800 mb-6">Choose a category! 📚</h2>
+     <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="category-grid"><!-- Categories will be inserted here -->
+     </div>
+    </div><!-- Question Screen -->
+    <div id="question-screen" class="hidden bg-white/95 backdrop-blur rounded-2xl shadow-xl p-6">
+     <div class="flex justify-between items-center mb-4"><button onclick="returnToCategories()" class="bg-red-100 hover:bg-red-200 text-red-700 font-semibold py-2 px-4 rounded-lg transition-all text-sm">✕ Quit</button>
+      <div class="text-center flex-1"><span id="category-badge" class="inline-block bg-indigo-100 text-indigo-700 px-4 py-1 rounded-full text-sm font-semibold"></span>
+      </div>
+      <div class="w-16"></div>
+     </div>
+     <h2 id="question-text" class="game-title text-xl md:text-2xl font-bold text-center text-gray-800 mb-6 min-h-[80px] flex items-center justify-center"></h2><button id="hint-btn" onclick="showHint()" class="mb-4 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 font-semibold py-2 px-4 rounded-lg transition-all text-sm"> 💡 Need a hint? </button>
+     <div id="hint-box" class="hidden mb-4 bg-blue-50 border-2 border-blue-200 p-4 rounded-lg text-blue-700">
+      <p id="hint-text" class="text-sm"></p>
+     </div>
+     <div id="answers-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3"><!-- Answers will be inserted here -->
+     </div>
+     <div id="feedback" class="hidden mt-4 text-center">
+      <p id="feedback-text" class="text-xl font-bold"></p><button id="next-btn" onclick="nextQuestion()" class="mt-4 bg-indigo-500 text-white font-bold py-3 px-8 rounded-xl hover:bg-indigo-600 transition-all"> Continue ➡️ </button>
+     </div>
+    </div><!-- Mini Game Screen -->
+    <div id="mini-game-screen" class="hidden bg-white/95 backdrop-blur rounded-2xl shadow-xl p-6">
+     <h2 class="game-title text-2xl font-bold text-center text-gray-800 mb-2">🎯 Bonus Game!</h2>
+     <p id="mini-game-instruction" class="text-center text-gray-600 mb-4"></p>
+     <div id="mini-game-area" class="min-h-[300px] relative bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl flex items-center justify-center"><!-- Mini game content here -->
+     </div>
+     <div id="mini-game-result" class="hidden mt-4 text-center">
+      <p id="mini-game-score" class="text-xl font-bold text-indigo-600"></p><button onclick="continueMiniGame()" class="mt-3 bg-indigo-500 text-white font-bold py-3 px-8 rounded-xl hover:bg-indigo-600 transition-all"> Continue ➡️ </button>
+     </div>
+    </div>
+   </div><!-- Game Over Screen -->
+   <div id="gameover-screen" class="hidden max-w-2xl mx-auto">
+    <div class="bg-white/95 backdrop-blur rounded-3xl shadow-2xl p-8 text-center bounce-in">
+     <div class="text-6xl mb-4">
+      🎉
+     </div>
+     <h1 class="game-title text-3xl font-bold text-indigo-600 mb-2">Game Over!</h1>
+     <p id="final-score" class="text-2xl text-gray-700 mb-4"></p>
+     <p id="final-message" class="text-lg text-gray-600 mb-6"></p>
+     <div class="grid grid-cols-2 gap-4 mb-6">
+      <div class="bg-green-100 p-4 rounded-xl">
+       <div class="text-3xl mb-1">
+        ✅
+       </div>
+       <div class="text-green-700 font-bold" id="correct-count">
+        0
+       </div>
+       <div class="text-green-600 text-sm">
+        Correct Answers
+       </div>
+      </div>
+      <div class="bg-red-100 p-4 rounded-xl">
+       <div class="text-3xl mb-1">
+        ❌
+       </div>
+       <div class="text-red-700 font-bold" id="wrong-count">
+        0
+       </div>
+       <div class="text-red-600 text-sm">
+        Mistakes
+       </div>
+      </div>
+     </div>
+     <div class="bg-gray-100 p-4 rounded-xl mb-6">
+      <div class="text-gray-700 text-sm mb-2">
+       📊 Session Statistics
+      </div>
+      <div class="flex justify-between text-gray-600"><span>Ratio: <strong id="accuracy-ratio">0%</strong></span> <span>Accuracy: <strong id="accuracy">0%</strong></span>
+      </div>
+     </div><button onclick="playAgain()" class="w-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold py-4 px-8 rounded-xl text-xl hover:from-indigo-600 hover:to-purple-600 transition-all transform hover:scale-105"> Play Again! 🔄 </button>
+    </div>
+   </div>
+  </div>
+  <script>
+    // Configuration
+    const defaultConfig = {
+      game_title: "Number Sense",
+      welcome_message: "Welcome to the review game!"
+    };
+
+    // Game State
+    let playerName = "";
+    let cumulativePoints = 0; // Total points across all sessions
+    let currentSessionPoints = 0; // Points in current game session
+    let questionNum = 0;
+    let correctAnswers = 0;
+    let wrongAnswers = 0;
+    let currentCategory = null;
+    let allPlayerData = [];
+    let currentPlayerRecord = null;
+    let currentQuestionData = null;
+    let hintShown = false;
+
+    // Categories with questions
+    const categories = [
+      { id: "integers", name: "Integer Addition", emoji: "➕", color: "from-blue-400 to-blue-600" },
+      { id: "comparing", name: "Comparing & Ordering", emoji: "↔️", color: "from-green-400 to-green-600" },
+      { id: "situations", name: "Integer Word Problems", emoji: "🌡️", color: "from-cyan-400 to-cyan-600" },
+      { id: "factortree", name: "Factor Trees", emoji: "🌳", color: "from-emerald-400 to-emerald-600" },
+      { id: "exponents", name: "Exponents", emoji: "²", color: "from-purple-400 to-purple-600" },
+      { id: "probability", name: "Probability", emoji: "🎲", color: "from-pink-400 to-pink-600" },
+      { id: "simplify", name: "Simplifying Fractions", emoji: "✂️", color: "from-orange-400 to-orange-600" },
+      { id: "sharing", name: "Equal Sharing", emoji: "🍕", color: "from-red-400 to-red-600" },
+      { id: "convert", name: "Fractions-Decimals-%", emoji: "🔄", color: "from-teal-400 to-teal-600" },
+      { id: "percentdiv", name: "% by Long Division", emoji: "➗", color: "from-amber-400 to-amber-600" },
+      { id: "ratios", name: "Equivalent Ratios", emoji: "⚖️", color: "from-indigo-400 to-indigo-600" },
+      { id: "addsubfrac", name: "Add/Sub Fractions", emoji: "🧮", color: "from-rose-400 to-rose-600" },
+      { id: "multfrac", name: "Multiply Fractions", emoji: "✖️", color: "from-violet-400 to-violet-600" },
+      { id: "addsubdec", name: "Add/Sub Decimals", emoji: "🔢", color: "from-lime-400 to-lime-600" },
+      { id: "multdec", name: "Multiply Decimals by Whole Nums", emoji: "✖️", color: "from-sky-400 to-sky-600" },
+      { id: "divdec", name: "Divide Decimals by Whole Nums", emoji: "➗", color: "from-fuchsia-400 to-fuchsia-600" },
+      { id: "repdec", name: "Representing Decimals", emoji: "📊", color: "from-cyan-400 to-cyan-600" },
+      { id: "longdiv", name: "Long Division", emoji: "🔢", color: "from-slate-400 to-slate-600" },
+      { id: "multmulti", name: "Multi-digit Multiplication", emoji: "✖️", color: "from-orange-400 to-orange-600" },
+      { id: "percentof", name: "Find % of a Number", emoji: "%", color: "from-teal-400 to-teal-600" },
+      { id: "compdec", name: "Compare/Order/Round Decimals", emoji: "🔢", color: "from-indigo-400 to-indigo-600" },
+      { id: "bedmas", name: "Order of Operations", emoji: "🧮", color: "from-blue-500 to-cyan-500" },
+      { id: "algebra", name: "Algebraic Equations", emoji: "x", color: "from-purple-500 to-pink-500" },
+      { id: "coordinates", name: "Cartesian Plane", emoji: "📍", color: "from-green-500 to-teal-500" },
+      { id: "transformations", name: "Transformations", emoji: "🔄", color: "from-orange-500 to-red-500" },
+      { id: "area", name: "Area: Triangles & Parallelograms", emoji: "📐", color: "from-indigo-500 to-blue-500" },
+      { id: "volume", name: "Volume of Prisms", emoji: "🧊", color: "from-cyan-500 to-blue-500" },
+      { id: "unitrate", name: "Unit Rates", emoji: "🏷️", color: "from-rose-500 to-orange-500" },
+      { id: "frequency", name: "Relative Frequency", emoji: "📊", color: "from-violet-500 to-purple-500" }
+    ];
+
+    // Question generators for each category
+    function generateQuestion(categoryId) {
+      switch(categoryId) {
+        case "integers": return generateIntegerAddition();
+        case "comparing": return generateComparing();
+        case "situations": return generateSituations();
+        case "factortree": return generateFactorTree();
+        case "exponents": return generateExponents();
+        case "probability": return generateProbability();
+        case "simplify": return generateSimplify();
+        case "sharing": return generateSharing();
+        case "convert": return generateConvert();
+        case "percentdiv": return generatePercentDiv();
+        case "ratios": return generateRatios();
+        case "addsubfrac": return generateAddSubFrac();
+        case "multfrac": return generateMultFrac();
+        case "addsubdec": return generateAddSubDec();
+        case "multdec": return generateMultDec();
+        case "divdec": return generateDivDec();
+        case "repdec": return generateRepDec();
+        case "longdiv": return generateLongDiv();
+        case "multmulti": return generateMultMulti();
+        case "percentof": return generatePercentOf();
+        case "compdec": return generateCompareOrderRoundDec();
+        case "bedmas": return generateBedmas();
+        case "algebra": return generateAlgebra();
+        case "coordinates": return generateCoordinates();
+        case "transformations": return generateTransformations();
+        case "area": return generateArea();
+        case "volume": return generateVolume();
+        case "unitrate": return generateUnitRate();
+        case "frequency": return generateFrequency();
+      }
+    }
+
+    function getHint(categoryId, questionText) {
+      const hints = {
+        "integers": {
+          strategy: "💡 Use a number line! Start at the first number, then move right to add (or left to subtract).",
+          example: "Similar example: (-3) + 7 = ?\nOn a line: start at -3, then move up 7 → you land on 4"
+        },
+        "comparing": {
+          strategy: "💡 Compare digit by digit, starting from the far left. If one number is larger, use >. If they are equal, use =.",
+          example: "Similar example: 2.8 vs 2.08\nCompare: 2 = 2 ✓, then 8 > 0 ✓, so 2.8 > 2.08"
+        },
+        "situations": {
+          strategy: "💡 Read the problem twice. What numbers do you have? Is it increasing or decreasing? Draw a quick diagram or number line.",
+          example: "Similar example: A diver is at -20m. They swim up 30m. What is their depth?\nSwim up = add → (-20) + 30 = 10m"
+        },
+        "factortree": {
+          strategy: "💡 Divide the number by the smallest prime numbers (2, 3, 5, 7...) until you can't anymore. Count how many times each prime appears (that's the exponent).",
+          example: "Similar example: 18\n18 ÷ 2 = 9 → 9 ÷ 3 = 3 → 3 ÷ 3 = 1\nResult: 2 × 3²"
+        },
+        "exponents": {
+          strategy: "💡 The exponent tells you how many times to multiply the base by itself.",
+          example: "Similar example: 5² = ?\nThis means: 5 × 5 = 25"
+        },
+        "probability": {
+          strategy: "💡 Probability = (what you want) ÷ (total possibilities). Count carefully!",
+          example: "Similar example: 2 red candies, 6 blue. Probability of drawing blue?\nAnswer: 6 ÷ (2+6) = 6/8 = 3/4"
+        },
+        "simplify": {
+          strategy: "💡 Find the greatest number that divides BOTH the top and bottom. Divide them both by that number.",
+          example: "Similar example: Simplify 8/12\n8 and 12 are divisible by 4 → 8÷4=2, 12÷4=3 → Answer: 2/3"
+        },
+        "sharing": {
+          strategy: "💡 If you share items among people, the number of items goes on top, the number of people on the bottom.",
+          example: "Similar example: 5 pies shared among 8 people\nEach gets: 5/8 of a pie"
+        },
+        "convert": {
+          strategy: "💡 Fraction → Decimal: divide top by bottom. Decimal → %: multiply by 100. % → Decimal: divide by 100.",
+          example: "Similar example: 3/4 = ?\n3 ÷ 4 = 0.75 = 75%"
+        },
+        "percentdiv": {
+          strategy: "💡 Divide the numerator by the denominator using long division. Then multiply by 100.",
+          example: "Similar example: 5/8 = ?\n5 ÷ 8 = 0.625 → 0.625 × 100 = 62.5%"
+        },
+        "ratios": {
+          strategy: "💡 If you multiply (or divide) BOTH numbers in a ratio by the same number, you get an equivalent ratio.",
+          example: "Similar example: Find a ratio equivalent to 3:5\n3×2 : 5×2 = 6:10 ✓ or 3×3 : 5×3 = 9:15 ✓"
+        },
+        "addsubfrac": {
+          strategy: "💡 Denominators MUST be the same! If they aren't, find a common denominator first.",
+          example: "Similar example: 2/3 + 1/6 = ?\nMake them the same: 4/6 + 1/6 = 5/6"
+        },
+        "multfrac": {
+          strategy: "💡 Multiply the top by the top, and the bottom by the bottom.",
+          example: "Similar example: 3/4 × 8 = ?\n(3×8)/(4×1) = 24/4 = 6"
+        },
+        "addsubdec": {
+          strategy: "💡 Line up the decimal points vertically! Then add or subtract like normal.",
+          example: "Similar example: 3.2 + 1.7 = ?\n  3.2\n+ 1.7\n-----\n  4.9"
+        },
+        "multdec": {
+          strategy: "💡 Multiply as if the decimals weren't there. Then place the decimal based on the total number of decimal places.",
+          example: "Similar example: 3.5 × 2 = ?\n35 × 2 = 70, then 1 decimal place → 7.0"
+        },
+        "divdec": {
+          strategy: "💡 Use long division. Move the decimal point straight up from the dividend into your answer.",
+          example: "Similar example: 8.4 ÷ 3 = ?\n3 goes into 8.4 how many times? 2.8 times"
+        },
+        "repdec": {
+          strategy: "💡 Break it down into parts. Read each digit with its place value (tenths, hundredths, thousandths).",
+          example: "Similar example: 0.527 = ?\n= 0.5 + 0.02 + 0.007 = five hundred twenty-seven thousandths"
+        },
+        "longdiv": {
+          strategy: "💡 Steps: Divide, Multiply, Subtract, Bring down. Repeat until finished!",
+          example: "Similar example: 56 ÷ 4 = ?\nDivide 5÷4=1 remainder 1 → Bring down 6 → 16÷4=4 → Answer: 14"
+        },
+        "multmulti": {
+          strategy: "💡 Multiply by the ones first, then by the tens. Add the results together.",
+          example: "Similar example: 15 × 12 = ?\n15×2=30 + 15×10=150 → 30+150=180"
+        },
+        "percentof": {
+          strategy: "💡 'Of' means multiply. Convert the % to a decimal first.",
+          example: "Similar example: 25% of 80 = ?\n25% = 0.25 → 0.25 × 80 = 20"
+        },
+        "compdec": {
+          strategy: "💡 Compare: check digit by digit. Round: if the next digit is 5 or more, round up!",
+          example: "Similar example: Round 2.56 to the nearest tenth?\nThe hundredths digit is 6 (≥5), so round up → 2.6"
+        },
+        "bedmas": {
+          strategy: "💡 Remember the order: Parentheses, Exponents, Divide/Multiply (left to right), Add/Subtract (left to right).",
+          example: "Example: 2³ + 4 × 2\n= 8 + 8\n= 16"
+        },
+        "algebra": {
+          strategy: "💡 The goal is to isolate the variable (x). Do the opposite operation to both sides of the equation.",
+          example: "Example: 2x + 3 = 11\nSubtract 3: 2x = 8\nDivide by 2: x = 4"
+        },
+        "coordinates": {
+          strategy: "💡 The x-axis is horizontal (left/right) and the y-axis is vertical (up/down). (x, y).",
+          example: "Example: (3, 5) means 3 units right, 5 units up."
+        },
+        "transformations": {
+          strategy: "💡 Translation = slide. Reflection = flip. Rotation = turn. Pay attention to coordinates (x,y)!",
+          example: "Example: (2,3) translated 1 unit right (+1 to x) → (3,3)"
+        },
+        "area": {
+          strategy: "💡 Parallelogram = base × height. Triangle = (base × height) ÷ 2.",
+          example: "Example: Triangle with base 4, height 5\n(4 × 5) ÷ 2 = 20 ÷ 2 = 10"
+        },
+        "volume": {
+          strategy: "💡 Volume of a rectangular prism = length × width × height (or base area × height).",
+          example: "Example: Prism 2×3×4 = 24 cubic units"
+        },
+        "unitrate": {
+          strategy: "💡 Divide the total amount by the quantity to find how much ONE item costs or represents.",
+          example: "Example: $10 for 5 pens\n10 ÷ 5 = $2 per pen"
+        },
+        "frequency": {
+          strategy: "💡 Relative frequency = (number of successes) ÷ (total number of trials).",
+          example: "Example: 15 heads out of 50 flips = 15/50 (or 30%)"
+        }
+      };
+      const hint = hints[categoryId] || { strategy: "💡 You can do it! Think carefully!", example: "" };
+      return hint;
+    }
+
+    function showHint() {
+      if(!currentQuestionData) return;
+
+      hintShown = true;
+      const hintBox = document.getElementById('hint-box');
+      const hintText = document.getElementById('hint-text');
+      const hintBtn = document.getElementById('hint-btn');
+
+      const hint = getHint(currentCategory.id, currentQuestionData.question);
+      hintText.innerHTML = `<strong>${hint.strategy}</strong><br><br><em style="font-style: italic; color: #1e40af;">${hint.example}</em>`;
+      hintBox.classList.remove('hidden');
+      hintBtn.disabled = true;
+      hintBtn.className = 'mb-4 bg-gray-100 text-gray-400 font-semibold py-2 px-4 rounded-lg text-sm cursor-not-allowed';
+    }
+
+    // FIXED: Dedupe wrong answers so the player never sees two identical
+    // buttons (could happen when correct = 0, since -correct = 0 too).
+    function generateIntegerAddition() {
+      const a = Math.floor(Math.random() * 41) - 20;
+      const b = Math.floor(Math.random() * 41) - 20;
+      const correct = a + b;
+
+      const wrongs = new Set();
+      let safety = 0;
+      while (wrongs.size < 3 && safety < 50) {
+        const offset = Math.floor(Math.random() * 11) - 5; // -5..5
+        if (offset !== 0) {
+          wrongs.add(correct + offset);
+        }
+        safety++;
+      }
+
+      return {
+        question: `Calculate: (${a}) + (${b}) = ?`,
+        correct: correct.toString(),
+        wrong: Array.from(wrongs).map(w => w.toString())
+      };
+    }
+
+    // FIXED: ensure 4 distinct random numbers (avoid "-3 < -3 < ...")
+    // and make sure the 3 wrong-order options are distinct from each other
+    // and from the correct order.
+    function generateComparing() {
+      const uniqueNums = [];
+      let safety = 0;
+      while (uniqueNums.length < 4 && safety < 100) {
+        const candidate = Math.floor(Math.random() * 41) - 20;
+        if (!uniqueNums.includes(candidate)) {
+          uniqueNums.push(candidate);
+        }
+        safety++;
+      }
+      const sorted = [...uniqueNums].sort((a, b) => a - b);
+      const type = Math.random() < 0.5 ? "ascending" : "descending";
+      const sep = type === "ascending" ? " < " : " > ";
+      const correct = type === "ascending"
+        ? sorted.join(sep)
+        : [...sorted].reverse().join(sep);
+
+      const wrongs = new Set();
+      let attempts = 0;
+      while (wrongs.size < 3 && attempts < 50) {
+        const candidate = [...uniqueNums].sort(() => Math.random() - 0.5).join(sep);
+        if (candidate !== correct) {
+          wrongs.add(candidate);
+        }
+        attempts++;
+      }
+
+      return {
+        question: `Place in ${type} order: ${uniqueNums.join(", ")}`,
+        correct: correct,
+        wrong: Array.from(wrongs).slice(0, 3)
+      };
+    }
+
+    function generateSituations() {
+      const situations = [
+        { text: "The temperature was -5°C. It increased by 8°C. What is the new temperature?", answer: 3, unit: "°C" },
+        { text: "A submarine is at -120m. It ascends 45m. What is its depth?", answer: -75, unit: "m" },
+        { text: "You have $15 and owe $23. What is your balance?", answer: -8, unit: "$" },
+        { text: "The elevator is at level -3. It goes up 7 floors. What level is it on?", answer: 4, unit: "" },
+        { text: "The temperature was 12°C. It dropped by 18°C. What is the temperature?", answer: -6, unit: "°C" },
+        { text: "A diver is at -30m. They descend another 15m. What is their depth?", answer: -45, unit: "m" },
+        { text: "You have -$50 in your account. You receive $75. What is your balance?", answer: 25, unit: "$" },
+        { text: "The thermometer shows -8°C in the morning. By noon, it is 15°C warmer. What is the temperature?", answer: 7, unit: "°C" }
+      ];
+      const s = situations[Math.floor(Math.random() * situations.length)];
+      // Formatting unit properly (e.g. $15 instead of 15$)
+      const formatCurrency = (val, unit) => unit === "$" ? `${unit}${val}` : `${val}${unit}`;
+      const correct = formatCurrency(s.answer, s.unit);
+
+      // Build wrong answers and dedupe against the correct one.
+      const wrongValues = [s.answer + 5, s.answer - 5, -s.answer, s.answer + 10, s.answer - 10];
+      const wrongs = [];
+      for (const v of wrongValues) {
+        const formatted = formatCurrency(v, s.unit);
+        if (formatted !== correct && !wrongs.includes(formatted)) {
+          wrongs.push(formatted);
+        }
+        if (wrongs.length === 3) break;
+      }
+
+      return {
+        question: s.text,
+        correct: correct,
+        wrong: wrongs
+      };
+    }
+
+    function generateFactorTree() {
+      const composites = [
+        { num: 12, primes: "2² × 3" },
+        { num: 18, primes: "2 × 3²" },
+        { num: 24, primes: "2³ × 3" },
+        { num: 36, primes: "2² × 3²" },
+        { num: 48, primes: "2⁴ × 3" },
+        { num: 60, primes: "2² × 3 × 5" },
+        { num: 72, primes: "2³ × 3²" },
+        { num: 90, primes: "2 × 3² × 5" },
+        { num: 100, primes: "2² × 5²" },
+        { num: 120, primes: "2³ × 3 × 5" },
+        { num: 45, primes: "3² × 5" },
+        { num: 50, primes: "2 × 5²" },
+        { num: 80, primes: "2⁴ × 5" },
+        { num: 96, primes: "2⁵ × 3" },
+        { num: 150, primes: "2 × 3 × 5²" }
+      ];
+
+      const c = composites[Math.floor(Math.random() * composites.length)];
+
+      const wrongAnswers = composites
+        .filter(x => x.num !== c.num)
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 3)
+        .map(x => x.primes);
+
+      return {
+        question: `Find the prime factors of ${c.num} (use exponents if needed):`,
+        correct: c.primes,
+        wrong: wrongAnswers
+      };
+    }
+
+    // FIXED: previously had `const bases =;` and `const exps =;` (syntax error
+    // that broke the entire <script> block). Also expanded the wrong-answer
+    // pool so we always get at least 3 distinct distractors.
+    function generateExponents() {
+      const bases = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+      const exps = [2, 3];
+      const base = bases[Math.floor(Math.random() * bases.length)];
+      const exp = exps[Math.floor(Math.random() * exps.length)];
+      const correct = Math.pow(base, exp);
+
+      const superscripts = { 2: "²", 3: "³", 4: "⁴" };
+
+      // Plenty of plausible distractors so we always have 3 unique wrongs.
+      const wrongCandidates = new Set();
+      wrongCandidates.add(base * exp);          // multiplied instead of powered
+      wrongCandidates.add(base + exp);          // added instead of powered
+      wrongCandidates.add(Math.pow(base, exp - 1));
+      wrongCandidates.add(Math.pow(base, exp + 1));
+      wrongCandidates.add(base + base);
+      wrongCandidates.add(exp * exp);
+      wrongCandidates.add(correct + 1);
+      wrongCandidates.add(correct - 1);
+
+      wrongCandidates.delete(correct);
+
+      const wrongAnswers = Array.from(wrongCandidates)
+        .filter(n => n > 0)
+        .slice(0, 3)
+        .map(w => w.toString());
+
+      return {
+        question: `Calculate: ${base}${superscripts[exp]} = ?`,
+        correct: correct.toString(),
+        wrong: wrongAnswers
+      };
+    }
+
+    function generateProbability() {
+      const scenarios = [
+        {
+          text: "A bag has 3 red marbles and 5 blue marbles. What is the probability of drawing a red marble?",
+          correct: "3/8",
+          wrong: ["5/8", "3/5", "1/3"]
+        },
+        {
+          text: "You roll a standard die. What is the probability of getting an even number?",
+          correct: "1/2",
+          wrong: ["1/3", "1/6", "2/3"]
+        },
+        {
+          text: "In a deck of 52 cards, what is the probability of drawing an ace?",
+          correct: "4/52 or 1/13",
+          wrong: ["1/52", "4/13", "1/4"]
+        },
+        {
+          text: "A bag contains 4 red candies, 2 green, and 4 yellow. Probability of drawing green?",
+          correct: "2/10 or 1/5",
+          wrong: ["4/10", "2/6", "1/2"]
+        },
+        {
+          text: "You draw a card from a standard deck. What is the probability it is a heart?",
+          correct: "13/52 or 1/4",
+          wrong: ["1/13", "4/52", "1/2"]
+        },
+        {
+          text: "A spinner has 8 equal sections: 3 blue, 2 red, 3 green. Probability of spinning red?",
+          correct: "2/8 or 1/4",
+          wrong: ["3/8", "2/3", "1/2"]
+        }
+      ];
+
+      const s = scenarios[Math.floor(Math.random() * scenarios.length)];
+      return {
+        question: s.text,
+        correct: s.correct,
+        wrong: s.wrong
+      };
+    }
+
+    function generateSimplify() {
+      const fractions = [
+        { original: "4/8", simplified: "1/2" },
+        { original: "6/9", simplified: "2/3" },
+        { original: "10/15", simplified: "2/3" },
+        { original: "12/16", simplified: "3/4" },
+        { original: "15/20", simplified: "3/4" },
+        { original: "8/12", simplified: "2/3" },
+        { original: "6/18", simplified: "1/3" },
+        { original: "14/21", simplified: "2/3" },
+        { original: "9/12", simplified: "3/4" },
+        { original: "20/25", simplified: "4/5" },
+        { original: "18/24", simplified: "3/4" },
+        { original: "15/45", simplified: "1/3" }
+      ];
+
+      const f = fractions[Math.floor(Math.random() * fractions.length)];
+      const allSimplified = fractions.map(x => x.simplified);
+      const wrongOptions = [...new Set(allSimplified.filter(s => s !== f.simplified))].slice(0, 3);
+
+      return {
+        question: `Simplify the fraction: ${f.original}`,
+        correct: f.simplified,
+        wrong: wrongOptions
+      };
+    }
+
+    function generateSharing() {
+      const scenarios = [
+        { text: "You share 3 pizzas among 4 people. How much pizza does each person get?", answer: "3/4" },
+        { text: "5 friends share 2 cakes equally. What fraction does each friend get?", answer: "2/5" },
+        { text: "You divide 1 pie among 6 people. How much does everyone get?", answer: "1/6" },
+        { text: "4 children share 3 chocolate bars. How much for each child?", answer: "3/4" },
+        { text: "8 people share 5 pizzas. What is the share for each person?", answer: "5/8" },
+        { text: "3 friends share 2 sandwiches. How much does each get?", answer: "2/3" },
+        { text: "6 students share 4 apples. What fraction for each student?", answer: "4/6 or 2/3" },
+        { text: "You share 1 pizza among 8 people. What is each person's share?", answer: "1/8" }
+      ];
+
+      const s = scenarios[Math.floor(Math.random() * scenarios.length)];
+      const wrongFracs = ["1/2", "1/4", "2/4", "3/5", "1/3", "2/8", "4/5", "5/6"]
+        .filter(f => f !== s.answer && !s.answer.includes(f))
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 3);
+
+      return {
+        question: s.text,
+        correct: s.answer,
+        wrong: wrongFracs
+      };
+    }
+
+    function generateConvert() {
+      const conversions = [
+        { fraction: "1/2", decimal: "0.5", percent: "50%" },
+        { fraction: "1/4", decimal: "0.25", percent: "25%" },
+        { fraction: "3/4", decimal: "0.75", percent: "75%" },
+        { fraction: "1/5", decimal: "0.2", percent: "20%" },
+        { fraction: "2/5", decimal: "0.4", percent: "40%" },
+        { fraction: "1/10", decimal: "0.1", percent: "10%" },
+        { fraction: "3/10", decimal: "0.3", percent: "30%" },
+        { fraction: "4/5", decimal: "0.8", percent: "80%" }
+      ];
+
+      const c = conversions[Math.floor(Math.random() * conversions.length)];
+      const type = Math.floor(Math.random() * 3);
+
+      let question, correct, wrongPool;
+
+      if(type === 0) {
+        question = `Convert ${c.fraction} to a percentage:`;
+        correct = c.percent;
+        wrongPool = conversions.map(x => x.percent).filter(p => p !== correct);
+      } else if(type === 1) {
+        question = `Convert ${c.decimal} to a fraction:`;
+        correct = c.fraction;
+        wrongPool = conversions.map(x => x.fraction).filter(f => f !== correct);
+      } else {
+        question = `Convert ${c.percent} to a decimal:`;
+        correct = c.decimal;
+        wrongPool = conversions.map(x => x.decimal).filter(d => d !== correct);
+      }
+
+      return {
+        question: question,
+        correct: correct,
+        wrong: wrongPool.sort(() => Math.random() - 0.5).slice(0, 3)
+      };
+    }
+
+    function generatePercentDiv() {
+      const problems = [
+        { fraction: "3/8", steps: "3 ÷ 8 = 0.375", percent: "37.5%" },
+        { fraction: "5/8", steps: "5 ÷ 8 = 0.625", percent: "62.5%" },
+        { fraction: "7/8", steps: "7 ÷ 8 = 0.875", percent: "87.5%" },
+        { fraction: "1/8", steps: "1 ÷ 8 = 0.125", percent: "12.5%" },
+        { fraction: "2/5", steps: "2 ÷ 5 = 0.4", percent: "40%" },
+        { fraction: "3/5", steps: "3 ÷ 5 = 0.6", percent: "60%" },
+        { fraction: "1/3", steps: "1 ÷ 3 = 0.333...", percent: "33.3%" },
+        { fraction: "2/3", steps: "2 ÷ 3 = 0.666...", percent: "66.7%" },
+        { fraction: "5/6", steps: "5 ÷ 6 = 0.833...", percent: "83.3%" },
+        { fraction: "1/6", steps: "1 ÷ 6 = 0.166...", percent: "16.7%" }
+      ];
+
+      const p = problems[Math.floor(Math.random() * problems.length)];
+      const wrongPercents = problems.map(x => x.percent).filter(per => per !== p.percent);
+
+      return {
+        question: `Using long division (numerator ÷ denominator), find the percentage of ${p.fraction}:`,
+        correct: p.percent,
+        wrong: wrongPercents.sort(() => Math.random() - 0.5).slice(0, 3)
+      };
+    }
+
+    function generateRatios() {
+      const ratios = [
+        { base: "2:3", equivalents: ["4:6", "6:9", "8:12", "10:15"] },
+        { base: "1:4", equivalents: ["2:8", "3:12", "4:16", "5:20"] },
+        { base: "3:5", equivalents: ["6:10", "9:15", "12:20", "15:25"] },
+        { base: "2:5", equivalents: ["4:10", "6:15", "8:20", "10:25"] },
+        { base: "4:7", equivalents: ["8:14", "12:21", "16:28", "20:35"] }
+      ];
+
+      const r = ratios[Math.floor(Math.random() * ratios.length)];
+      const correct = r.equivalents[Math.floor(Math.random() * r.equivalents.length)];
+
+      const allWrong = [];
+      ratios.forEach(ratio => {
+        if(ratio.base !== r.base) {
+          allWrong.push(...ratio.equivalents);
+        }
+      });
+      allWrong.push("5:7", "3:8", "7:9", "2:9", "4:11");
+
+      return {
+        question: `Find an equivalent ratio to ${r.base}:`,
+        correct: correct,
+        wrong: allWrong.sort(() => Math.random() - 0.5).slice(0, 3)
+      };
+    }
+
+    function generateAddSubFrac() {
+      const problems = [
+        { q: "1/2 + 1/4", a: "3/4" },
+        { q: "2/3 + 1/6", a: "5/6" },
+        { q: "1/3 + 1/4", a: "7/12" },
+        { q: "3/4 - 1/2", a: "1/4" },
+        { q: "5/6 - 1/3", a: "1/2" },
+        { q: "2/3 - 1/4", a: "5/12" },
+        { q: "1/2 + 1/3", a: "5/6" },
+        { q: "3/4 + 1/6", a: "11/12" },
+        { q: "7/8 - 1/4", a: "5/8" },
+        { q: "2/5 + 1/10", a: "1/2" }
+      ];
+
+      const p = problems[Math.floor(Math.random() * problems.length)];
+      const wrongAnswers = ["2/4", "3/5", "4/7", "2/6", "5/7", "3/8", "4/9", "6/11", "7/10", "8/15"]
+        .filter(w => w !== p.a)
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 3);
+
+      return {
+        question: `Calculate: ${p.q} = ?`,
+        correct: p.a,
+        wrong: wrongAnswers
+      };
+    }
+
+    function generateMultFrac() {
+      const problems = [
+        { q: "1/2 × 6", a: "3" },
+        { q: "1/3 × 9", a: "3" },
+        { q: "2/3 × 6", a: "4" },
+        { q: "3/4 × 8", a: "6" },
+        { q: "1/4 × 12", a: "3" },
+        { q: "2/5 × 10", a: "4" },
+        { q: "3/5 × 15", a: "9" },
+        { q: "1/6 × 18", a: "3" },
+        { q: "5/6 × 12", a: "10" },
+        { q: "4/5 × 20", a: "16" }
+      ];
+
+      const p = problems[Math.floor(Math.random() * problems.length)];
+      const correctNum = parseInt(p.a);
+
+      return {
+        question: `Calculate: ${p.q} = ?`,
+        correct: p.a,
+        wrong: [(correctNum + 2).toString(), (correctNum - 1).toString(), (correctNum + 3).toString()]
+      };
+    }
+
+    function generateAddSubDec() {
+      const problems = [
+        { q: "2.5 + 1.3", a: "3.8" },
+        { q: "4.7 + 2.1", a: "6.8" },
+        { q: "5.6 + 3.2", a: "8.8" },
+        { q: "1.8 + 2.4", a: "4.2" },
+        { q: "6.3 + 1.5", a: "7.8" },
+        { q: "7.5 - 2.3", a: "5.2" },
+        { q: "9.4 - 3.1", a: "6.3" },
+        { q: "8.7 - 4.2", a: "4.5" },
+        { q: "6.8 - 2.5", a: "4.3" },
+        { q: "10.2 - 5.1", a: "5.1" }
+      ];
+
+      const p = problems[Math.floor(Math.random() * problems.length)];
+      const wrongOptions = [...new Set(problems.map(pr => pr.a))].filter(a => a !== p.a);
+
+      return {
+        question: `Calculate: ${p.q} = ?`,
+        correct: p.a,
+        wrong: wrongOptions.sort(() => Math.random() - 0.5).slice(0, 3)
+      };
+    }
+
+    function generateMultDec() {
+      const problems = [
+        { q: "2.5 × 3", a: "7.5" },
+        { q: "1.2 × 4", a: "4.8" },
+        { q: "3.6 × 2", a: "7.2" },
+        { q: "0.5 × 6", a: "3" },
+        { q: "2.1 × 5", a: "10.5" },
+        { q: "4.5 × 2", a: "9" },
+        { q: "1.8 × 3", a: "5.4" },
+        { q: "2.2 × 4", a: "8.8" },
+        { q: "3.3 × 3", a: "9.9" },
+        { q: "0.7 × 5", a: "3.5" }
+      ];
+
+      const p = problems[Math.floor(Math.random() * problems.length)];
+      const wrongOptions = [...new Set(problems.map(pr => pr.a))].filter(a => a !== p.a);
+
+      return {
+        question: `Calculate: ${p.q} = ?`,
+        correct: p.a,
+        wrong: wrongOptions.sort(() => Math.random() - 0.5).slice(0, 3)
+      };
+    }
+
+    function generateDivDec() {
+      const problems = [
+        { q: "6.4 ÷ 2", a: "3.2" },
+        { q: "9.6 ÷ 3", a: "3.2" },
+        { q: "7.5 ÷ 5", a: "1.5" },
+        { q: "8.4 ÷ 4", a: "2.1" },
+        { q: "10.5 ÷ 5", a: "2.1" },
+        { q: "4.8 ÷ 2", a: "2.4" },
+        { q: "12.6 ÷ 6", a: "2.1" },
+        { q: "5.6 ÷ 4", a: "1.4" },
+        { q: "3.6 ÷ 3", a: "1.2" },
+        { q: "14.4 ÷ 6", a: "2.4" }
+      ];
+
+      const p = problems[Math.floor(Math.random() * problems.length)];
+      // Dedupe: several problems share the same answer (e.g. 3.2 appears twice).
+      const wrongOptions = [...new Set(problems.map(pr => pr.a))].filter(a => a !== p.a);
+
+      return {
+        question: `Calculate: ${p.q} = ?`,
+        correct: p.a,
+        wrong: wrongOptions.sort(() => Math.random() - 0.5).slice(0, 3)
+      };
+    }
+
+    function generateRepDec() {
+      const representations = [
+        { decimal: "0.348", decomposed: "0.3 + 0.04 + 0.008", grid: "348 squares out of 1000", written: "three hundred forty-eight thousandths", answer: "0.348" },
+        { decimal: "0.517", decomposed: "0.5 + 0.01 + 0.007", grid: "517 squares out of 1000", written: "five hundred seventeen thousandths", answer: "0.517" },
+        { decimal: "0.863", decomposed: "0.8 + 0.06 + 0.003", grid: "863 squares out of 1000", written: "eight hundred sixty-three thousandths", answer: "0.863" },
+        { decimal: "0.604", decomposed: "0.6 + 0.00 + 0.004", grid: "604 squares out of 1000", written: "six hundred four thousandths", answer: "0.604" },
+        { decimal: "0.729", decomposed: "0.7 + 0.02 + 0.009", grid: "729 squares out of 1000", written: "seven hundred twenty-nine thousandths", answer: "0.729" },
+        { decimal: "0.156", decomposed: "0.1 + 0.05 + 0.006", grid: "156 squares out of 1000", written: "one hundred fifty-six thousandths", answer: "0.156" },
+        { decimal: "0.482", decomposed: "0.4 + 0.08 + 0.002", grid: "482 squares out of 1000", written: "four hundred eighty-two thousandths", answer: "0.482" },
+        { decimal: "0.935", decomposed: "0.9 + 0.03 + 0.005", grid: "935 squares out of 1000", written: "nine hundred thirty-five thousandths", answer: "0.935" },
+        { decimal: "0.271", decomposed: "0.2 + 0.07 + 0.001", grid: "271 squares out of 1000", written: "two hundred seventy-one thousandths", answer: "0.271" },
+        { decimal: "0.641", decomposed: "0.6 + 0.04 + 0.001", grid: "641 squares out of 1000", written: "six hundred forty-one thousandths", answer: "0.641" },
+        { decimal: "2.548", decomposed: "2 + 0.5 + 0.04 + 0.008", grid: "2 wholes and 548 squares out of 1000", written: "two and five hundred forty-eight thousandths", answer: "2.548" },
+        { decimal: "5.316", decomposed: "5 + 0.3 + 0.01 + 0.006", grid: "5 wholes and 316 squares out of 1000", written: "five and three hundred sixteen thousandths", answer: "5.316" },
+        { decimal: "7.829", decomposed: "7 + 0.8 + 0.02 + 0.009", grid: "7 wholes and 829 squares out of 1000", written: "seven and eight hundred twenty-nine thousandths", answer: "7.829" },
+        { decimal: "3.402", decomposed: "3 + 0.4 + 0.00 + 0.002", grid: "3 wholes and 402 squares out of 1000", written: "three and four hundred two thousandths", answer: "3.402" },
+        { decimal: "6.175", decomposed: "6 + 0.1 + 0.07 + 0.005", grid: "6 wholes and 175 squares out of 1000", written: "six and one hundred seventy-five thousandths", answer: "6.175" },
+        { decimal: "1.764", decomposed: "1 + 0.7 + 0.06 + 0.004", grid: "1 whole and 764 squares out of 1000", written: "one and seven hundred sixty-four thousandths", answer: "1.764" },
+        { decimal: "8.591", decomposed: "8 + 0.5 + 0.09 + 0.001", grid: "8 wholes and 591 squares out of 1000", written: "eight and five hundred ninety-one thousandths", answer: "8.591" },
+        { decimal: "4.237", decomposed: "4 + 0.2 + 0.03 + 0.007", grid: "4 wholes and 237 squares out of 1000", written: "four and two hundred thirty-seven thousandths", answer: "4.237" },
+        { decimal: "9.456", decomposed: "9 + 0.4 + 0.05 + 0.006", grid: "9 wholes and 456 squares out of 1000", written: "nine and four hundred fifty-six thousandths", answer: "9.456" },
+        { decimal: "2.683", decomposed: "2 + 0.6 + 0.08 + 0.003", grid: "2 wholes and 683 squares out of 1000", written: "two and six hundred eighty-three thousandths", answer: "2.683" },
+        { decimal: "0.108", decomposed: "0.1 + 0.00 + 0.008", grid: "108 squares out of 1000", written: "one hundred eight thousandths", answer: "0.108" },
+        { decimal: "0.905", decomposed: "0.9 + 0.00 + 0.005", grid: "905 squares out of 1000", written: "nine hundred five thousandths", answer: "0.905" },
+        { decimal: "0.062", decomposed: "0.0 + 0.06 + 0.002", grid: "62 squares out of 1000", written: "sixty-two thousandths", answer: "0.062" },
+        { decimal: "0.413", decomposed: "0.4 + 0.01 + 0.003", grid: "413 squares out of 1000", written: "four hundred thirteen thousandths", answer: "0.413" },
+        { decimal: "0.754", decomposed: "0.7 + 0.05 + 0.004", grid: "754 squares out of 1000", written: "seven hundred fifty-four thousandths", answer: "0.754" },
+        { decimal: "3.087", decomposed: "3 + 0.0 + 0.08 + 0.007", grid: "3 wholes and 87 squares out of 1000", written: "three and eighty-seven thousandths", answer: "3.087" },
+        { decimal: "5.602", decomposed: "5 + 0.6 + 0.00 + 0.002", grid: "5 wholes and 602 squares out of 1000", written: "five and six hundred two thousandths", answer: "5.602" },
+        { decimal: "7.231", decomposed: "7 + 0.2 + 0.03 + 0.001", grid: "7 wholes and 231 squares out of 1000", written: "seven and two hundred thirty-one thousandths", answer: "7.231" },
+        { decimal: "1.948", decomposed: "1 + 0.9 + 0.04 + 0.008", grid: "1 whole and 948 squares out of 1000", written: "one and nine hundred forty-eight thousandths", answer: "1.948" },
+        { decimal: "4.015", decomposed: "4 + 0.0 + 0.01 + 0.005", grid: "4 wholes and 15 squares out of 1000", written: "four and fifteen thousandths", answer: "4.015" },
+        { decimal: "6.394", decomposed: "6 + 0.3 + 0.09 + 0.004", grid: "6 wholes and 394 squares out of 1000", written: "six and three hundred ninety-four thousandths", answer: "6.394" },
+        { decimal: "0.520", decomposed: "0.5 + 0.02 + 0.000", grid: "520 squares out of 1000", written: "five hundred twenty thousandths", answer: "0.520" },
+        { decimal: "0.008", decomposed: "0.0 + 0.00 + 0.008", grid: "8 squares out of 1000", written: "eight thousandths", answer: "0.008" },
+        { decimal: "9.701", decomposed: "9 + 0.7 + 0.00 + 0.001", grid: "9 wholes and 701 squares out of 1000", written: "nine and seven hundred one thousandths", answer: "9.701" },
+        { decimal: "2.009", decomposed: "2 + 0.0 + 0.00 + 0.009", grid: "2 wholes and 9 squares out of 1000", written: "two and nine thousandths", answer: "2.009" }
+      ];
+
+      const rep = representations[Math.floor(Math.random() * representations.length)];
+      const type = Math.floor(Math.random() * 4);
+
+      let question, correct, wrongPool;
+
+      if(type === 0) {
+        // Decomposed to decimal
+        question = `What decimal represents: ${rep.decomposed}?`;
+        correct = rep.answer;
+        wrongPool = representations.map(r => r.answer).filter(a => a !== correct);
+      } else if(type === 1) {
+        // Grid to decimal
+        question = `If the grid represents ${rep.grid}, what is the decimal?`;
+        correct = rep.answer;
+        wrongPool = representations.map(r => r.answer).filter(a => a !== correct);
+      } else if(type === 2) {
+        // Decimal to decomposed
+        question = `Decompose ${rep.decimal}:`;
+        correct = rep.decomposed;
+        wrongPool = representations.map(r => r.decomposed).filter(d => d !== correct);
+      } else {
+        // Written form to decimal
+        question = `What decimal matches: ${rep.written}?`;
+        correct = rep.answer;
+        wrongPool = representations.map(r => r.answer).filter(a => a !== correct);
+      }
+
+      return {
+        question: question,
+        correct: correct,
+        wrong: wrongPool.sort(() => Math.random() - 0.5).slice(0, 3)
+      };
+    }
+
+    function generateLongDiv() {
+      const problems = [
+        { q: "45 ÷ 3", a: "15" },
+        { q: "56 ÷ 4", a: "14" },
+        { q: "72 ÷ 6", a: "12" },
+        { q: "84 ÷ 7", a: "12" },
+        { q: "96 ÷ 8", a: "12" },
+        { q: "63 ÷ 9", a: "7" },
+        { q: "88 ÷ 8", a: "11" },
+        { q: "99 ÷ 9", a: "11" },
+        { q: "144 ÷ 12", a: "12" },
+        { q: "135 ÷ 15", a: "9" },
+        { q: "156 ÷ 12", a: "13" },
+        { q: "182 ÷ 14", a: "13" },
+        { q: "240 ÷ 16", a: "15" },
+        { q: "312 ÷ 24", a: "13" },
+        { q: "456 ÷ 24", a: "19" }
+      ];
+
+      const p = problems[Math.floor(Math.random() * problems.length)];
+      const wrongOptions = [...new Set(problems.map(pr => pr.a))].filter(a => a !== p.a);
+
+      return {
+        question: `Divide using long division: ${p.q} = ?`,
+        correct: p.a,
+        wrong: wrongOptions.sort(() => Math.random() - 0.5).slice(0, 3)
+      };
+    }
+
+    function generateMultMulti() {
+      const problems = [
+        { q: "12 × 14", a: "168" },
+        { q: "15 × 16", a: "240" },
+        { q: "18 × 12", a: "216" },
+        { q: "21 × 13", a: "273" },
+        { q: "25 × 14", a: "350" },
+        { q: "32 × 15", a: "480" },
+        { q: "24 × 23", a: "552" },
+        { q: "31 × 22", a: "682" },
+        { q: "42 × 21", a: "882" },
+        { q: "35 × 24", a: "840" },
+        { q: "28 × 125", a: "3500" },
+        { q: "45 × 123", a: "5535" },
+        { q: "32 × 145", a: "4640" },
+        { q: "56 × 112", a: "6272" },
+        { q: "73 × 124", a: "9052" }
+      ];
+
+      const p = problems[Math.floor(Math.random() * problems.length)];
+      const wrongOptions = [...new Set(problems.map(pr => pr.a))].filter(a => a !== p.a);
+
+      return {
+        question: `Multiply: ${p.q} = ?`,
+        correct: p.a,
+        wrong: wrongOptions.sort(() => Math.random() - 0.5).slice(0, 3)
+      };
+    }
+
+    function generatePercentOf() {
+      const problems = [
+        { q: "20% of 50", a: "10" },
+        { q: "25% of 80", a: "20" },
+        { q: "50% of 120", a: "60" },
+        { q: "10% of 200", a: "20" },
+        { q: "75% of 40", a: "30" },
+        { q: "30% of 100", a: "30" },
+        { q: "15% of 60", a: "9" },
+        { q: "40% of 150", a: "60" },
+        { q: "5% of 200", a: "10" },
+        { q: "60% of 90", a: "54" },
+        { q: "12% of 50", a: "6" },
+        { q: "35% of 80", a: "28" },
+        { q: "45% of 200", a: "90" },
+        { q: "88% of 100", a: "88" },
+        { q: "70% of 140", a: "98" }
+      ];
+
+      const p = problems[Math.floor(Math.random() * problems.length)];
+      const wrongOptions = [...new Set(problems.map(pr => pr.a))].filter(a => a !== p.a);
+
+      return {
+        question: `Calculate: ${p.q} = ?`,
+        correct: p.a,
+        wrong: wrongOptions.sort(() => Math.random() - 0.5).slice(0, 3)
+      };
+    }
+
+    // FIXED: order branch no longer mutates p.nums (was using .reverse() on
+    // shared data) and now produces 3 unique wrong answers like other categories.
+    function generateCompareOrderRoundDec() {
+      const types = ["compare", "order", "round"];
+      const type = types[Math.floor(Math.random() * types.length)];
+
+      if(type === "compare") {
+        const comparisons = [
+          { q: "3.5 ___ 3.05", correct: ">", wrong: ["<", "="] },
+          { q: "2.7 ___ 2.70", correct: "=", wrong: ["<", ">"] },
+          { q: "4.2 ___ 4.20", correct: "=", wrong: ["<", ">"] },
+          { q: "5.6 ___ 5.06", correct: ">", wrong: ["<", "="] },
+          { q: "1.3 ___ 1.30", correct: "=", wrong: ["<", ">"] },
+          { q: "8.4 ___ 8.14", correct: ">", wrong: ["<", "="] },
+          { q: "2.05 ___ 2.5", correct: "<", wrong: [">", "="] },
+          { q: "7.8 ___ 7.08", correct: ">", wrong: ["<", "="] },
+          { q: "3.45 ___ 3.54", correct: "<", wrong: [">", "="] },
+          { q: "6.2 ___ 6.02", correct: ">", wrong: ["<", "="] }
+        ];
+
+        const c = comparisons[Math.floor(Math.random() * comparisons.length)];
+        return {
+          question: `Fill in the blank: ${c.q}`,
+          correct: c.correct,
+          wrong: c.wrong
+        };
+      } else if(type === "order") {
+        const orderProblems = [
+          { nums: [3.5, 2.8, 3.05, 2.9], order: "2.8 < 2.9 < 3.05 < 3.5" },
+          { nums: [1.2, 1.02, 1.22, 1.1], order: "1.02 < 1.1 < 1.2 < 1.22" },
+          { nums: [4.5, 4.05, 4.55, 4.15], order: "4.05 < 4.15 < 4.5 < 4.55" },
+          { nums: [2.3, 2.03, 2.33, 2.13], order: "2.03 < 2.13 < 2.3 < 2.33" },
+          { nums: [5.6, 5.06, 5.16, 5.61], order: "5.06 < 5.16 < 5.6 < 5.61" },
+          { nums: [0.8, 0.08, 0.88, 0.18], order: "0.08 < 0.18 < 0.8 < 0.88" },
+          { nums: [7.2, 7.02, 7.22, 7.12], order: "7.02 < 7.12 < 7.2 < 7.22" },
+          { nums: [9.5, 9.05, 9.55, 9.15], order: "9.05 < 9.15 < 9.5 < 9.55" }
+        ];
+
+        const p = orderProblems[Math.floor(Math.random() * orderProblems.length)];
+        // Display order in the question (random shuffle of the same numbers).
+        const display = [...p.nums].sort(() => Math.random() - 0.5);
+
+        // Build 3 unique wrong orderings. Start with the descending order
+        // (a classic distractor) and then add random permutations.
+        const reversed = [...p.nums].sort((a, b) => b - a).join(" < ");
+        const wrongs = new Set();
+        if (reversed !== p.order) wrongs.add(reversed);
+
+        let attempts = 0;
+        while (wrongs.size < 3 && attempts < 50) {
+          const candidate = [...p.nums].sort(() => Math.random() - 0.5).join(" < ");
+          if (candidate !== p.order) {
+            wrongs.add(candidate);
+          }
+          attempts++;
+        }
+
+        return {
+          question: `Place in ascending order: ${display.join(", ")}`,
+          correct: p.order,
+          wrong: Array.from(wrongs).slice(0, 3)
+        };
+      } else {
+        // Round to nearest tenth
+        const roundProblems = [
+          { q: "3.47 rounded to the nearest tenth", a: "3.5" },
+          { q: "2.83 rounded to the nearest tenth", a: "2.8" },
+          { q: "5.15 rounded to the nearest tenth", a: "5.2" },
+          { q: "4.24 rounded to the nearest tenth", a: "4.2" },
+          { q: "1.96 rounded to the nearest tenth", a: "2.0" },
+          { q: "7.45 rounded to the nearest tenth", a: "7.5" },
+          { q: "6.12 rounded to the nearest tenth", a: "6.1" },
+          { q: "8.67 rounded to the nearest tenth", a: "8.7" },
+          { q: "2.54 rounded to the nearest tenth", a: "2.5" },
+          { q: "9.88 rounded to the nearest tenth", a: "9.9" }
+        ];
+
+        const p = roundProblems[Math.floor(Math.random() * roundProblems.length)];
+        const wrongOptions = roundProblems.map(pr => pr.a).filter(a => a !== p.a);
+
+        return {
+          question: `${p.q} = ?`,
+          correct: p.a,
+          wrong: wrongOptions.sort(() => Math.random() - 0.5).slice(0, 3)
+        };
+      }
+    }
+
+    function generateBedmas() {
+      const problems = [
+        { q: "3² + 4 × 2", a: "17" },
+        { q: "2³ - 10 ÷ 2", a: "3" },
+        { q: "(5 + 3) × 2", a: "16" },
+        { q: "4² - (3 × 2)", a: "10" },
+        { q: "10 + 2³ × 2", a: "26" },
+        { q: "20 ÷ 5 + 4²", a: "20" },
+        { q: "(10 - 2) ÷ 2³", a: "1" },
+        { q: "5 × 2² - 10", a: "10" }
+      ];
+      const p = problems[Math.floor(Math.random() * problems.length)];
+      const correctNum = parseInt(p.a);
+      return {
+        question: `Calculate: ${p.q} = ?`,
+        correct: p.a,
+        wrong: [(correctNum + 2).toString(), (correctNum - 2).toString(), (correctNum + 4).toString(), (correctNum * 2).toString()].filter(x => x !== p.a).slice(0, 3)
+      };
+    }
+
+    function generateAlgebra() {
+      const problems = [
+        { q: "2x = 10", a: "5" },
+        { q: "x + 7 = 15", a: "8" },
+        { q: "3x - 2 = 7", a: "3" },
+        { q: "x / 2 = 6", a: "12" },
+        { q: "4x + 1 = 17", a: "4" },
+        { q: "x - 5 = 12", a: "17" },
+        { q: "5x = 35", a: "7" },
+        { q: "2x + 5 = 15", a: "5" }
+      ];
+      const p = problems[Math.floor(Math.random() * problems.length)];
+      const correctNum = parseInt(p.a);
+      // Build deduped wrong answers.
+      const candidates = [correctNum + 1, correctNum - 2, correctNum + 3, correctNum * 2, correctNum - 1];
+      const seen = new Set([correctNum]);
+      const wrongs = [];
+      for (const v of candidates) {
+        if (!seen.has(v)) {
+          seen.add(v);
+          wrongs.push(`x = ${v}`);
+        }
+        if (wrongs.length === 3) break;
+      }
+      return {
+        question: `Find the value of x : ${p.q}`,
+        correct: `x = ${p.a}`,
+        wrong: wrongs
+      };
+    }
+
+    function generateCoordinates() {
+      const questions = [
+        { q: "Which axis is the horizontal line?", a: "x-axis", w: ["y-axis", "Origin", "Equator"] },
+        { q: "What are the coordinates of the origin?", a: "(0, 0)", w: ["(1, 1)", "(0, 1)", "(1, 0)"] },
+        { q: "The first number in (3, 5) represents...", a: "The x-coordinate", w: ["The y-coordinate", "The height", "The origin"] },
+        { q: "If you move 4 units right from (0,0), you are at...", a: "(4, 0)", w: ["(0, 4)", "(4, 4)", "(-4, 0)"] },
+        { q: "The point (0, 7) is located on the...", a: "y-axis", w: ["x-axis", "Origin", "Right quadrant"] }
+      ];
+      const p = questions[Math.floor(Math.random() * questions.length)];
+      return {
+        question: p.q,
+        correct: p.a,
+        wrong: p.w
+      };
+    }
+
+    function generateTransformations() {
+      const questions = [
+        { q: "Translate the point (2, 3) 2 units to the right.", a: "(4, 3)", w: ["(2, 5)", "(0, 3)", "(4, 5)"] },
+        { q: "Translate the point (1, 1) 3 units up.", a: "(1, 4)", w: ["(4, 1)", "(1, -2)", "(-2, 1)"] },
+        { q: "A shape slid to another location without turning. This is a...", a: "Translation", w: ["Rotation", "Reflection", "Tessellation"] },
+        { q: "A shape is flipped like in a mirror. This is a...", a: "Reflection", w: ["Translation", "Rotation", "Dilation"] },
+        { q: "If you reflect the point (3, 2) across the y-axis, you get...", a: "(-3, 2)", w: ["(3, -2)", "(-3, -2)", "(2, 3)"] }
+      ];
+      const p = questions[Math.floor(Math.random() * questions.length)];
+      return {
+        question: p.q,
+        correct: p.a,
+        wrong: p.w
+      };
+    }
+
+    function generateArea() {
+      const questions = [
+        { q: "Find the area of a triangle: base = 4 cm, height = 5 cm.", a: "10 cm²", w: ["20 cm²", "9 cm²", "18 cm²"] },
+        { q: "Find the area of a parallelogram: base = 6 m, height = 3 m.", a: "18 m²", w: ["9 m²", "12 m²", "24 m²"] },
+        { q: "Find the area of a triangle: base = 8 mm, height = 4 mm.", a: "16 mm²", w: ["32 mm²", "12 mm²", "24 mm²"] },
+        { q: "Find the area of a parallelogram: base = 10 cm, height = 7 cm.", a: "70 cm²", w: ["35 cm²", "17 cm²", "140 cm²"] }
+      ];
+      const p = questions[Math.floor(Math.random() * questions.length)];
+      return {
+        question: p.q,
+        correct: p.a,
+        wrong: p.w
+      };
+    }
+
+    function generateVolume() {
+      const questions = [
+        { q: "Find the volume of a prism: 2 cm × 3 cm × 4 cm.", a: "24 cm³", w: ["9 cm³", "14 cm³", "48 cm³"] },
+        { q: "Find the volume of a prism: base area of 15 m², height of 4 m.", a: "60 m³", w: ["19 m³", "30 m³", "120 m³"] },
+        { q: "If a cube has sides of 3 cm, what is its volume?", a: "27 cm³", w: ["9 cm³", "18 cm³", "81 cm³"] },
+        { q: "Find the volume of a prism: 5 m × 2 m × 10 m.", a: "100 m³", w: ["50 m³", "17 m³", "20 m³"] }
+      ];
+      const p = questions[Math.floor(Math.random() * questions.length)];
+      return {
+        question: p.q,
+        correct: p.a,
+        wrong: p.w
+      };
+    }
+
+    function generateUnitRate() {
+      const questions = [
+        { q: "If 4 pens cost $8, what is the price for 1 pen?", a: "$2", w: ["$4", "$1", "$3"] },
+        { q: "If a car travels 150 km in 3 hours, what is its speed (km/h)?", a: "50 km/h", w: ["100 km/h", "30 km/h", "45 km/h"] },
+        { q: "If 5 apples cost $2.50, how much does 1 apple cost?", a: "$0.50", w: ["$0.25", "$1.00", "$0.75"] },
+        { q: "If you earn $60 for 4 hours of work, what is your hourly rate?", a: "$15/h", w: ["$10/h", "$20/h", "$12/h"] }
+      ];
+      const p = questions[Math.floor(Math.random() * questions.length)];
+      return {
+        question: p.q,
+        correct: p.a,
+        wrong: p.w
+      };
+    }
+
+    function generateFrequency() {
+      const questions = [
+        { q: "You flip a coin 50 times and get Heads 20 times. What is the relative frequency of getting Heads?", a: "20/50 or 40%", w: ["30/50 or 60%", "20/100 or 20%", "1/2 or 50%"] },
+        { q: "Out of 10 games played, you win 7. What is your relative frequency of winning?", a: "7/10 or 70%", w: ["3/10 or 30%", "7/100 or 7%", "1/7 or 14%"] },
+        { q: "If theoretical probability is 50%, but relative frequency is 40% after 10 trials. What does the law of large numbers say?", a: "More trials will bring the frequency closer to 50%", w: ["The coin is rigged", "The theoretical probability is wrong", "You should stop playing"] }
+      ];
+      const p = questions[Math.floor(Math.random() * questions.length)];
+      return {
+        question: p.q,
+        correct: p.a,
+        wrong: p.w
+      };
+    }
+
+    const miniGames = [
+      {
+        name: "Catch the stars!",
+        instruction: "Click on all the stars before they disappear!",
+        play: playStarCatch
+      },
+      {
+        name: "Flash memory!",
+        instruction: "Memorize the sequence and repeat it!",
+        play: playMemoryFlash
+      },
+      {
+        name: "Target practice!",
+        instruction: "Click on the targets as they appear!",
+        play: playTargetShoot
+      }
+    ];
+
+    let miniGameScore = 0;
+    let miniGameActive = false;
+
+    function playStarCatch() {
+      const area = document.getElementById('mini-game-area');
+      area.innerHTML = '';
+      miniGameScore = 0;
+      miniGameActive = true;
+      let starsLeft = 8;
+
+      const scoreDisplay = document.createElement('div');
+      scoreDisplay.className = 'absolute top-2 right-2 bg-yellow-400 px-3 py-1 rounded-full font-bold';
+      scoreDisplay.id = 'mini-score';
+      scoreDisplay.textContent = '⭐ 0';
+      area.appendChild(scoreDisplay);
+
+      function spawnStar() {
+        if(!miniGameActive || starsLeft <= 0) return;
+
+        const star = document.createElement('div');
+        star.className = 'absolute text-4xl cursor-pointer float';
+        star.textContent = '⭐';
+        star.style.left = Math.random() * 80 + 5 + '%';
+        star.style.top = Math.random() * 70 + 10 + '%';
+
+        star.onclick = () => {
+          if(!miniGameActive) return;
+          miniGameScore += 10;
+          document.getElementById('mini-score').textContent = '⭐ ' + miniGameScore;
+          star.textContent = '✨';
+          setTimeout(() => star.remove(), 200);
+        };
+
+        area.appendChild(star);
+        starsLeft--;
+
+        setTimeout(() => {
+          if(star.parentNode) star.remove();
+        }, 2000);
+
+        if(starsLeft > 0) {
+          setTimeout(spawnStar, 400);
+        } else {
+          setTimeout(endMiniGame, 2500);
+        }
+      }
+
+      setTimeout(spawnStar, 500);
+    }
+
+    function playMemoryFlash() {
+      const area = document.getElementById('mini-game-area');
+      area.innerHTML = '';
+      miniGameScore = 0;
+      miniGameActive = true;
+
+      const colors = ['🔴', '🔵', '🟢', '🟡'];
+      const sequence = [];
+      for(let i = 0; i < 4; i++) {
+        sequence.push(colors[Math.floor(Math.random() * colors.length)]);
+      }
+
+      const display = document.createElement('div');
+      display.className = 'text-6xl text-center mb-4';
+      display.id = 'sequence-display';
+      area.appendChild(display);
+
+      const buttons = document.createElement('div');
+      buttons.className = 'flex gap-4 justify-center mt-4 hidden';
+      buttons.id = 'color-buttons';
+
+      let playerSequence = [];
+
+      colors.forEach(color => {
+        const btn = document.createElement('button');
+        btn.className = 'text-4xl p-4 bg-white rounded-xl shadow-lg hover:scale-110 transition-transform';
+        btn.textContent = color;
+        btn.onclick = () => {
+          if(!miniGameActive) return;
+          playerSequence.push(color);
+
+          if(playerSequence[playerSequence.length - 1] === sequence[playerSequence.length - 1]) {
+            miniGameScore += 25;
+            if(playerSequence.length === sequence.length) {
+              endMiniGame();
+            }
+          } else {
+            miniGameScore = Math.max(0, miniGameScore - 10);
+            endMiniGame();
+          }
+        };
+        buttons.appendChild(btn);
+      });
+
+      area.appendChild(buttons);
+
+      // Show sequence
+      let i = 0;
+      const showNext = () => {
+        if(i < sequence.length) {
+          display.textContent = sequence[i];
+          i++;
+          setTimeout(() => {
+            display.textContent = '❓';
+            setTimeout(showNext, 300);
+          }, 700);
+        } else {
+          display.textContent = 'Your turn!';
+          buttons.classList.remove('hidden');
+        }
+      };
+
+      setTimeout(showNext, 500);
+    }
+
+    function playTargetShoot() {
+      const area = document.getElementById('mini-game-area');
+      area.innerHTML = '';
+      miniGameScore = 0;
+      miniGameActive = true;
+      let targetsLeft = 6;
+
+      const scoreDisplay = document.createElement('div');
+      scoreDisplay.className = 'absolute top-2 right-2 bg-red-400 text-white px-3 py-1 rounded-full font-bold';
+      scoreDisplay.id = 'mini-score';
+      scoreDisplay.textContent = '🎯 0';
+      area.appendChild(scoreDisplay);
+
+      function spawnTarget() {
+        if(!miniGameActive || targetsLeft <= 0) return;
+
+        const target = document.createElement('div');
+        target.className = 'absolute text-5xl cursor-pointer mini-game-target';
+        target.textContent = '🎯';
+        target.style.left = Math.random() * 80 + 5 + '%';
+        target.style.top = Math.random() * 70 + 10 + '%';
+
+        target.onclick = () => {
+          if(!miniGameActive) return;
+          miniGameScore += 15;
+          document.getElementById('mini-score').textContent = '🎯 ' + miniGameScore;
+          target.textContent = '💥';
+          setTimeout(() => target.remove(), 150);
+        };
+
+        area.appendChild(target);
+        targetsLeft--;
+
+        setTimeout(() => {
+          if(target.parentNode) target.remove();
+        }, 1500);
+
+        if(targetsLeft > 0) {
+          setTimeout(spawnTarget, 500);
+        } else {
+          setTimeout(endMiniGame, 2000);
+        }
+      }
+
+      setTimeout(spawnTarget, 500);
+    }
+
+    function endMiniGame() {
+      miniGameActive = false;
+      currentSessionPoints += miniGameScore;
+      cumulativePoints += miniGameScore;
+      document.getElementById('session-points').textContent = currentSessionPoints;
+      document.getElementById('cumulative-points').textContent = cumulativePoints;
+
+      document.getElementById('mini-game-result').classList.remove('hidden');
+      document.getElementById('mini-game-score').textContent = `You won ${miniGameScore} bonus points! 🎉`;
+    }
+
+    function continueMiniGame() {
+      document.getElementById('mini-game-screen').classList.add('hidden');
+      document.getElementById('category-screen').classList.remove('hidden');
+    }
+
+    // Shuffle array helper
+    function shuffleArray(array) {
+      const shuffled = [...array];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    }
+
+    // Game Functions
+    function showCategories() {
+      const grid = document.getElementById('category-grid');
+      grid.innerHTML = '';
+
+      categories.forEach(cat => {
+        const btn = document.createElement('button');
+        btn.className = `category-btn bg-gradient-to-br ${cat.color} text-white p-4 rounded-xl shadow-lg font-semibold text-sm hover:shadow-xl`;
+        btn.innerHTML = `<span class="text-2xl block mb-1">${cat.emoji}</span>${cat.name}`;
+        btn.onclick = () => selectCategory(cat);
+        grid.appendChild(btn);
+      });
+    }
+
+    function selectCategory(category) {
+      currentCategory = category;
+      showQuestion();
+    }
+
+    function returnToCategories() {
+      document.getElementById('question-screen').classList.add('hidden');
+      document.getElementById('category-screen').classList.remove('hidden');
+    }
+
+    function showQuestion() {
+      document.getElementById('category-screen').classList.add('hidden');
+      document.getElementById('question-screen').classList.remove('hidden');
+      document.getElementById('feedback').classList.add('hidden');
+      document.getElementById('hint-box').classList.add('hidden');
+
+      hintShown = false;
+      const hintBtn = document.getElementById('hint-btn');
+      hintBtn.disabled = false;
+      hintBtn.className = 'mb-4 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 font-semibold py-2 px-4 rounded-lg transition-all text-sm';
+
+      const q = generateQuestion(currentCategory.id);
+      currentQuestionData = q;
+      document.getElementById('category-badge').textContent = currentCategory.emoji + ' ' + currentCategory.name;
+      document.getElementById('question-text').textContent = q.question;
+
+      const answersGrid = document.getElementById('answers-grid');
+      answersGrid.innerHTML = '';
+
+      // Combine correct and wrong answers, then shuffle.
+      // Also dedupe defensively in case any wrong answer happens to equal the correct one.
+      const seen = new Set([q.correct]);
+      const allAnswers = [{ text: q.correct, isCorrect: true }];
+      for (const w of q.wrong.slice(0, 3)) {
+        if (!seen.has(w)) {
+          seen.add(w);
+          allAnswers.push({ text: w, isCorrect: false });
+        }
+      }
+      const shuffledAnswers = shuffleArray(allAnswers);
+
+      shuffledAnswers.forEach(answer => {
+        const btn = document.createElement('button');
+        btn.className = 'answer-btn bg-white border-2 border-gray-200 p-4 rounded-xl text-lg font-semibold text-gray-700 hover:border-indigo-400 hover:bg-indigo-50';
+        btn.textContent = answer.text;
+        btn.onclick = () => checkAnswer(btn, answer.isCorrect, q.correct);
+        answersGrid.appendChild(btn);
+      });
+    }
+
+    function checkAnswer(btn, isCorrect, correctAnswer) {
+      const buttons = document.querySelectorAll('.answer-btn');
+      buttons.forEach(b => b.disabled = true);
+
+      if(isCorrect) {
+        btn.classList.add('correct-answer');
+        currentSessionPoints += 10;
+        cumulativePoints += 10;
+        correctAnswers++;
+        document.getElementById('feedback-text').innerHTML = '✅ Excellent! +10 points';
+        document.getElementById('feedback-text').className = 'text-xl font-bold text-green-600';
+        createConfetti();
+      } else {
+        btn.classList.add('wrong-answer');
+        wrongAnswers++;
+        // Find and highlight correct answer
+        buttons.forEach(b => {
+          if(b.textContent === correctAnswer) {
+            b.classList.add('correct-answer');
+          }
+        });
+        document.getElementById('feedback-text').innerHTML = `❌ The correct answer was: ${correctAnswer}`;
+        document.getElementById('feedback-text').className = 'text-xl font-bold text-red-600';
+      }
+
+      document.getElementById('session-points').textContent = currentSessionPoints;
+      document.getElementById('cumulative-points').textContent = cumulativePoints;
+      document.getElementById('feedback').classList.remove('hidden');
+    }
+
+    function nextQuestion() {
+      questionNum++;
+      document.getElementById('question-num').textContent = questionNum;
+
+      // Every 3 questions, show a mini game
+      if(questionNum % 3 === 0) {
+        showMiniGame();
+      } else {
+        // Stay in the same category - show next question
+        showQuestion();
+      }
+    }
+
+    function showMiniGame() {
+      document.getElementById('question-screen').classList.add('hidden');
+      document.getElementById('mini-game-screen').classList.remove('hidden');
+      document.getElementById('mini-game-result').classList.add('hidden');
+
+      const game = miniGames[Math.floor(Math.random() * miniGames.length)];
+      document.getElementById('mini-game-instruction').textContent = game.instruction;
+      game.play();
+    }
+
+    function createConfetti() {
+      const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96e6a1', '#dda0dd', '#f9d56e'];
+      for(let i = 0; i < 20; i++) {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti';
+        confetti.style.left = Math.random() * 100 + '%';
+        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.animationDelay = Math.random() * 0.5 + 's';
+        document.body.appendChild(confetti);
+        setTimeout(() => confetti.remove(), 3000);
+      }
+    }
+
+    async function endGame() {
+      document.getElementById('game-screen').classList.add('hidden');
+      document.getElementById('gameover-screen').classList.remove('hidden');
+
+      const totalQuestions = correctAnswers + wrongAnswers;
+      const accuracy = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+
+      document.getElementById('final-score').textContent = `Points this session: ${currentSessionPoints} | Total: ${cumulativePoints} points`;
+      document.getElementById('correct-count').textContent = correctAnswers;
+      document.getElementById('wrong-count').textContent = wrongAnswers;
+      document.getElementById('accuracy-ratio').textContent = `${correctAnswers}/${totalQuestions}`;
+      document.getElementById('accuracy').textContent = `${accuracy}%`;
+
+      let message = "";
+      if(accuracy >= 90) message = "Incredible! You're a math genius! 🏆";
+      else if(accuracy >= 70) message = "Excellent work! Keep it up! 🌟";
+      else if(accuracy >= 50) message = "Well played! You're improving! 💪";
+      else message = "Keep practicing, you'll get there! 📚";
+
+      document.getElementById('final-message').textContent = message;
+
+      // Save score - update cumulative points
+      if(window.dataSdk && playerName) {
+        if(currentPlayerRecord) {
+          const newBest = Math.max(currentPlayerRecord.best_game_score || 0, currentSessionPoints);
+          const result = await window.dataSdk.update({
+            ...currentPlayerRecord,
+            cumulative_points: cumulativePoints,
+            games_played: (currentPlayerRecord.games_played || 0) + 1,
+            best_game_score: newBest,
+            last_played: new Date().toISOString()
+          });
+          if(!result.isOk) {
+            console.error('Failed to update score');
+          }
+        } else if(allPlayerData.length < 999) {
+          const result = await window.dataSdk.create({
+            player_name: playerName,
+            cumulative_points: cumulativePoints,
+            games_played: 1,
+            best_game_score: currentSessionPoints,
+            last_played: new Date().toISOString()
+          });
+          if(!result.isOk) {
+            console.error('Failed to save score');
+          }
+        }
+      }
+
+      createConfetti();
+    }
+
+    function playAgain() {
+      currentSessionPoints = 0;
+      questionNum = 0;
+      correctAnswers = 0;
+      wrongAnswers = 0;
+
+      document.getElementById('session-points').textContent = '0';
+      document.getElementById('cumulative-points').textContent = cumulativePoints;
+      document.getElementById('question-num').textContent = '0';
+      document.getElementById('progress-bar').style.width = '0%';
+
+      document.getElementById('gameover-screen').classList.add('hidden');
+      document.getElementById('game-screen').classList.remove('hidden');
+      document.getElementById('question-screen').classList.add('hidden');
+      document.getElementById('category-screen').classList.remove('hidden');
+    }
+
+    function startGame() {
+      const nameInput = document.getElementById('player-name-input');
+      playerName = nameInput.value.trim();
+
+      if(!playerName) {
+        nameInput.style.borderColor = '#ef4444';
+        nameInput.placeholder = "Please enter your name!";
+        return;
+      }
+
+      // Find existing player record
+      currentPlayerRecord = allPlayerData.find(p => p.player_name.toLowerCase() === playerName.toLowerCase());
+
+      // Load cumulative points from saved record if exists
+      if(currentPlayerRecord) {
+        cumulativePoints = currentPlayerRecord.cumulative_points || 0;
+      }
+
+      currentSessionPoints = 0; // Reset session points
+      questionNum = 0;
+      correctAnswers = 0;
+      wrongAnswers = 0;
+
+      document.getElementById('greeting').textContent = `Hi ${playerName}! 👋`;
+      document.getElementById('welcome-screen').classList.add('hidden');
+      document.getElementById('game-screen').classList.remove('hidden');
+      document.getElementById('session-points').textContent = '0';
+      document.getElementById('cumulative-points').textContent = cumulativePoints;
+
+      showCategories();
+    }
+
+    function updateLeaderboard() {
+      const list = document.getElementById('leaderboard-list');
+      const leaderboard = document.getElementById('leaderboard');
+
+      if(allPlayerData.length === 0) {
+        leaderboard.classList.add('hidden');
+        return;
+      }
+
+      leaderboard.classList.remove('hidden');
+      list.innerHTML = '';
+
+      const sorted = [...allPlayerData].sort((a, b) => (b.cumulative_points || 0) - (a.cumulative_points || 0)).slice(0, 5);
+
+      sorted.forEach((player, index) => {
+        const div = document.createElement('div');
+        div.className = 'flex justify-between items-center bg-indigo-50 px-4 py-2 rounded-lg';
+        const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+        div.innerHTML = `
+          <span class="font-semibold">${medals[index]} ${player.player_name}</span>
+          <span class="text-indigo-600 font-bold">${player.cumulative_points || 0} pts</span>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    // Data handler
+    const dataHandler = {
+      onDataChanged(data) {
+        allPlayerData = data;
+        updateLeaderboard();
+
+        // Update current player record if exists
+        if(playerName) {
+          currentPlayerRecord = data.find(p => p.player_name.toLowerCase() === playerName.toLowerCase());
+        }
+      }
+    };
+
+    // Element SDK
+    function onConfigChange(config) {
+      const title = document.getElementById('main-title');
+      const welcome = document.getElementById('welcome-text');
+
+      if(title) title.textContent = config.game_title || defaultConfig.game_title;
+      if(welcome) welcome.textContent = config.welcome_message || defaultConfig.welcome_message;
+    }
+
+    // Initialize
+    async function init() {
+      // Init Element SDK
+      if(window.elementSdk) {
+        window.elementSdk.init({
+          defaultConfig,
+          onConfigChange,
+          mapToCapabilities: (config) => ({
+            recolorables: [],
+            borderables: [],
+            fontEditable: undefined,
+            fontSizeable: undefined
+          }),
+          mapToEditPanelValues: (config) => new Map([
+            ["game_title", config.game_title || defaultConfig.game_title],
+            ["welcome_message", config.welcome_message || defaultConfig.welcome_message]
+          ])
+        });
+      }
+
+      // Init Data SDK
+      if(window.dataSdk) {
+        const result = await window.dataSdk.init(dataHandler);
+        if(!result.isOk) {
+          console.error('Failed to initialize data SDK');
+        }
+      }
+
+      // Apply initial config
+      onConfigChange(window.elementSdk?.config || defaultConfig);
+    }
+
+    init();
+  </script>
+</body>
+</html>
