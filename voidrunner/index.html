@@ -243,7 +243,7 @@ function initGame() {
   bullets=[]; enemies=[]; enemyBullets=[]; particles=[]; powerups=[];
   score=0; kills=0; wave=0; frame=0;
   hp=maxHp; shield=0; shieldRegen=0;
-  multiplier=1; multiTimer=0;
+  multiplier=1; multiTimer=0; bananaTimer=0;
   shootTimer=0; waveTimer=9999;
   waveCount=0;
   updateHUD();
@@ -316,9 +316,11 @@ function explode(x,y,color,n=20,big=false) {
   else screenShake=Math.max(screenShake,4);
 }
 
+let bananaTimer=0; // frames remaining of banana mode
+
 function spawnPowerup(x,y) {
   if(Math.random()>0.25) return;
-  const types=['shield','multi','health'];
+  const types=['shield','multi','health','shield','banana']; // banana is rarer
   powerups.push({ x,y, type:types[Math.floor(Math.random()*types.length)], vy:1.2, r:14, pulse:0 });
 }
 
@@ -414,13 +416,16 @@ function drawShip(s) {
   ctx.beginPath(); ctx.moveTo(s.w*0.15,0); ctx.lineTo(s.w*0.55,s.h*0.4); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(-s.w*0.15,0); ctx.lineTo(-s.w*0.55,s.h*0.4); ctx.stroke();
 
-  // Shield bubble
-  if(shield>0) {
-    const sa=shield/shieldMax*0.35;
-    ctx.beginPath(); ctx.ellipse(0,0,s.w*1.2,s.h*1.1,0,0,Math.PI*2);
-    ctx.strokeStyle=`rgba(0,200,255,${sa+0.15})`; ctx.lineWidth=2+sa*3;
-    ctx.shadowColor='#0ff'; ctx.shadowBlur=20*sa;
-    ctx.stroke(); ctx.shadowBlur=0;
+  // Shield bubble — yellow & wild during banana mode, cyan normally
+  if(shield>0 || bananaTimer>0){
+    const isBanana = bananaTimer>0;
+    const sa = isBanana ? 0.6+0.4*Math.sin(frame*0.3) : shield/shieldMax*0.35;
+    const col = isBanana ? '#ffe135' : '#00ccff';
+    ctx.beginPath(); ctx.ellipse(0,0,s.w*1.3,s.h*1.2,0,0,Math.PI*2);
+    ctx.strokeStyle=col; ctx.lineWidth=isBanana?4:2;
+    ctx.globalAlpha=sa+0.15;
+    ctx.shadowColor=col; ctx.shadowBlur=isBanana?40:20;
+    ctx.stroke(); ctx.shadowBlur=0; ctx.globalAlpha=1;
   }
 
   ctx.restore();
@@ -498,8 +503,8 @@ function drawParticles() {
   ctx.globalAlpha=1;
 }
 
-const POWERUP_ICONS = { shield:'🛡', multi:'⚡', health:'❤' };
-const POWERUP_COLORS= { shield:'#0ff', multi:'#ff0', health:'#f55' };
+const POWERUP_ICONS  = { shield:'🛡', multi:'⚡', health:'❤', banana:'🍌' };
+const POWERUP_COLORS = { shield:'#0ff', multi:'#ff0', health:'#f55', banana:'#ffe135' };
 function drawPowerups() {
   powerups.forEach(p=>{
     p.pulse+=0.08;
@@ -541,8 +546,20 @@ function update() {
   ship.y=Math.max(ship.h,Math.min(H-ship.h,ship.y));
   if(ship.invince>0) ship.invince--;
 
-  // Shield regen
-  if(shieldRegen>0 && shield<shieldMax) { shield=Math.min(shieldMax,shield+0.4); shBar.style.width=(shield/shieldMax*100)+'%'; }
+  // Banana mode countdown — shield drains fast while active
+  if(bananaTimer>0){
+    bananaTimer--;
+    shield=Math.max(0, shield-1.2);
+    shBar.style.width=(shield/shieldMax*100)+'%';
+    if(bananaTimer===0){ ship.invince=0; } // end invincibility with banana
+  }
+
+  // Shield passive drain (shield always drains slowly when not regenning)
+  if(shieldRegen<=0 && shield>0 && bananaTimer===0){
+    shield=Math.max(0, shield-0.15);
+    shBar.style.width=(shield/shieldMax*100)+'%';
+  }
+  if(shieldRegen>0) shieldRegen--;
 
   // Auto-fire
   shootTimer++;
@@ -599,11 +616,24 @@ function update() {
     // Shoot
     if(e.shoot){ e.fireTimer--; if(e.fireTimer<=0){ fireEnemyBullet(e); e.fireTimer=e.fireRate-wave*5; if(e.fireTimer<40)e.fireTimer=40; } }
     // Collide with ship
-    if(ship.invince===0&&Math.hypot(e.x-ship.x,e.y-ship.y)<e.size+ship.w*0.7){
-      takeDamage(20); ship.invince=90;
-      explode(e.x,e.y,e.color,16,true);
-      enemies.splice(i,1);
-      if(enemies.length===0) waveTimer=180;
+    // Collide with ship
+    if(Math.hypot(e.x-ship.x,e.y-ship.y)<e.size+ship.w*0.7){
+      if(bananaTimer>0){
+        // BANANA MODE — wreck them!
+        explode(e.x,e.y,e.color,28,true);
+        explode(e.x,e.y,'#ffe135',12);
+        score+=e.scoreVal*multiplier*2;
+        kills++;
+        enemies.splice(i,1);
+        if(enemies.length===0) waveTimer=180;
+        killsEl.textContent=String(kills).padStart(3,'0');
+        scoreEl.textContent=padScore(score);
+      } else if(ship.invince===0){
+        takeDamage(20); ship.invince=90;
+        explode(e.x,e.y,e.color,16,true);
+        enemies.splice(i,1);
+        if(enemies.length===0) waveTimer=180;
+      }
     }
   }
 
@@ -611,7 +641,7 @@ function update() {
   for(let i=enemyBullets.length-1;i>=0;i--){
     const b=enemyBullets[i]; b.x+=b.vx; b.y+=b.vy;
     if(b.x<-20||b.x>W+20||b.y>H+20||b.y<-20){ enemyBullets.splice(i,1); continue; }
-    if(ship.invince===0&&Math.hypot(b.x-ship.x,b.y-ship.y)<b.r+18){
+    if(ship.invince===0&&bananaTimer===0&&Math.hypot(b.x-ship.x,b.y-ship.y)<b.r+18){
       takeDamage(8);
       explode(b.x,b.y,b.color,8);
       sfxPlayerHit();
@@ -625,9 +655,15 @@ function update() {
     if(p.y>H+30){ powerups.splice(i,1); continue; }
     if(Math.hypot(p.x-ship.x,p.y-ship.y)<p.r+20){
       sfxPowerup();
-      if(p.type==='shield'){ shield=Math.min(shieldMax,shield+40); shieldRegen=600; }
+      if(p.type==='shield'){ shield=Math.min(shieldMax,shield+40); shieldRegen=300; }
       else if(p.type==='multi'){ multiplier=Math.min(10,multiplier+2); multiTimer=400; multiEl.textContent=`x${multiplier}`; }
       else if(p.type==='health'){ hp=Math.min(maxHp,hp+25); hpBar.style.width=(hp/maxHp*100)+'%'; }
+      else if(p.type==='banana'){
+        shield=shieldMax; // full shield
+        bananaTimer=420;  // ~7 seconds of chaos
+        ship.invince=420;
+        shieldRegen=0;
+      }
       explode(p.x,p.y,POWERUP_COLORS[p.type],15);
       powerups.splice(i,1);
     }
