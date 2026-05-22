@@ -253,6 +253,16 @@ body{margin:0;font-family:'Nunito',ui-sans-serif,system-ui,sans-serif;background
 .neg-toggle.on{background:var(--reds);border-color:var(--red);color:#aa0000}
 .example-sentence{padding:12px 16px;border-radius:14px;background:var(--gxs);border:2px solid var(--gs);margin-top:10px;font-size:.92rem;font-weight:700;color:var(--text);line-height:1.5}
 .example-sentence strong{color:var(--gd)}
+/* Translation Challenge filter chips */
+.topic-chip-row{display:flex;flex-wrap:wrap;gap:6px}
+.topic-chip{display:inline-flex;align-items:center;gap:5px;padding:6px 10px 6px 8px;border:2px solid #d8d5e0;background:#fff;border-radius:999px;font-family:inherit;font-weight:800;font-size:.78rem;cursor:pointer;color:var(--text);transition:all .12s;line-height:1.2}
+.topic-chip:hover{border-color:#a78bfa;background:#f8f5ff}
+.topic-chip.active{border-color:#7030c8;background:#7030c8;color:#fff}
+.topic-chip .topic-chip-count{font-size:.66rem;font-weight:900;background:rgba(0,0,0,.08);border-radius:999px;padding:1px 7px;letter-spacing:.5px}
+.topic-chip.active .topic-chip-count{background:rgba(255,255,255,.25);color:#fff}
+.lvl-chip{display:inline-flex;align-items:center;padding:6px 12px;border:2px solid #d8d5e0;background:#fff;border-radius:999px;font-family:inherit;font-weight:800;font-size:.78rem;cursor:pointer;color:var(--text);transition:all .12s}
+.lvl-chip:hover{border-color:#a78bfa;background:#f8f5ff}
+.lvl-chip.active{border-color:#7030c8;background:#7030c8;color:#fff}
 
 </style>
 </head>
@@ -1407,35 +1417,162 @@ const buildState = {
 };
 
 
-// ── Translation challenges (English prompt → build Spanish) ──────────────────
+// ── Translation Challenges (English → build Spanish) ─────────────────────────
+// Schema: {en, tokens, topic, lvl}
+//   tokens : [[spanish, category], ...]   chip text + role for colouring
+//   topic  : one of TOPIC_META keys below — used for filtering & distractor pool
+//   lvl    : 1 ★ easy, 2 ★★ medium, 3 ★★★ harder
+// Categories: q=question, c=conjugated verb, i=infinitive / past-participle,
+//             n=noun, e=time/place extra, neg=negation, x=connector / filler
+const TOPIC_META = {
+  q:      {label:'Questions',     icon:'❓', desc:'Lesson 32 Structure 1'},
+  food:   {label:'Restaurant',    icon:'🍽️', desc:'Ordering, food, drinks'},
+  hotel:  {label:'Hotel',         icon:'🏨', desc:'Rooms, requests'},
+  dir:    {label:'Directions',    icon:'🗺️', desc:'Finding places'},
+  shop:   {label:'Shopping',      icon:'🛍️', desc:'Buying, colours, sizes'},
+  time:   {label:'Time',          icon:'🕐', desc:'Hours, schedules'},
+  travel: {label:'Travel',        icon:'✈️', desc:'Tickets, rental, transport'},
+  health: {label:'Health',        icon:'💊', desc:'Pain, illness'},
+  hay:    {label:'There is/are',  icon:'📍', desc:'Hay structures (L38–41)'},
+  past:   {label:'Past tense',    icon:'⏪', desc:'Perfect tense (L42–45)'},
+  neg:    {label:'Negatives',     icon:'🚫', desc:'Saying "not"'},
+  greet:  {label:'Greetings',     icon:'👋', desc:'Hello, intros'},
+};
+
 const CHALLENGES = [
-  {en:'Where can I eat here?',           q:'¿Dónde?',     c:'puedo',  i:'comer',    e:'aquí'},
-  {en:'What do you want to drink?',      q:'¿Qué?',       c:'quiere', i:'beber'},
-  {en:'When should I go?',               q:'¿Cuándo?',    c:'debo',   i:'ir'},
-  {en:'How can I pay?',                  q:'¿Cómo?',      c:'puedo',  i:'pagar'},
-  {en:'What are you going to order?',    q:'¿Qué?',       c:'va a',   i:'pedir'},
-  {en:'Where am I going to stay?',       q:'¿Dónde?',     c:'voy a',  i:'quedarme'},
-  {en:'How much do I have to spend?',    q:'¿Cuánto?',    c:'debo',   i:'gastar'},
-  {en:'What do I want to try today?',    q:'¿Qué?',       c:'quiero', i:'probar',   e:'hoy'},
-  {en:'Where can I find it?',            q:'¿Dónde?',     c:'puedo',  i:'encontrar',e:'aquí'},
-  {en:'What time are you going to pay?', q:'¿A qué hora?',c:'va a',   i:'pagar'},
-  {en:"What can't I do tonight?",        q:'¿Qué?',       c:'puedo',  i:'hacer',    e:'esta noche', neg:true},
-  {en:'Where should I go tomorrow?',     q:'¿Dónde?',     c:'debo',   i:'ir',       e:'mañana'},
-  {en:'What do you want to buy?',        q:'¿Qué?',       c:'quiere', i:'comprar'},
-  {en:'How can I find the hotel?',       q:'¿Cómo?',      c:'puedo',  i:'encontrar',e:'al hotel'},
-  {en:'What can I try here?',            q:'¿Qué?',       c:'puedo',  i:'probar',   e:'aquí'},
-  {en:'When do you want to eat?',        q:'¿Cuándo?',    c:'quiere', i:'comer'},
-  {en:'How can I get there?',            q:'¿Cómo?',      c:'puedo',  i:'llegar'},
-  {en:'How much is it going to cost?',   q:'¿Cuánto?',    c:'va a',   i:'costar'},
-  {en:'What do I want to see?',          q:'¿Qué?',       c:'quiero', i:'ver'},
-  {en:"I don't want to pay now.",        c:'quiero',      i:'pagar',  e:'ahora',    neg:true},
-  {en:'When can I leave?',               q:'¿Cuándo?',    c:'puedo',  i:'salir'},
-  {en:'What time should I return?',      q:'¿A qué hora?',c:'debo',   i:'volver'},
+  // ─── Questions: Structure 1 (Lesson 32) ───────────────────────────────────
+  {en:'Where can I eat?',                  tokens:[['¿Dónde?','q'],['puedo','c'],['comer','i']], topic:'q', lvl:1},
+  {en:'What do you want to drink?',        tokens:[['¿Qué?','q'],['quiere','c'],['beber','i']], topic:'q', lvl:1},
+  {en:'When should I go?',                 tokens:[['¿Cuándo?','q'],['debo','c'],['ir','i']], topic:'q', lvl:1},
+  {en:'How can I pay?',                    tokens:[['¿Cómo?','q'],['puedo','c'],['pagar','i']], topic:'q', lvl:1},
+  {en:'What are you going to order?',      tokens:[['¿Qué?','q'],['va a','c'],['pedir','i']], topic:'q', lvl:1},
+  {en:'Where am I going to stay?',         tokens:[['¿Dónde?','q'],['voy a','c'],['quedarme','i']], topic:'q', lvl:2},
+  {en:'How much do I have to spend?',      tokens:[['¿Cuánto?','q'],['debo','c'],['gastar','i']], topic:'q', lvl:2},
+  {en:'What time are you going to pay?',   tokens:[['¿A qué hora?','q'],['va a','c'],['pagar','i']], topic:'q', lvl:2},
+  {en:'Where should I go tomorrow?',       tokens:[['¿Dónde?','q'],['debo','c'],['ir','i'],['mañana','e']], topic:'q', lvl:2},
+  {en:'What can I try here?',              tokens:[['¿Qué?','q'],['puedo','c'],['probar','i'],['aquí','e']], topic:'q', lvl:2},
+  {en:'How much is it going to cost?',     tokens:[['¿Cuánto?','q'],['va a','c'],['costar','i']], topic:'q', lvl:2},
+  {en:'When can I leave?',                 tokens:[['¿Cuándo?','q'],['puedo','c'],['salir','i']], topic:'q', lvl:2},
+
+  // ─── Restaurant / food ────────────────────────────────────────────────────
+  {en:'I want a coffee.',                  tokens:[['quiero','c'],['un café','n']], topic:'food', lvl:1},
+  {en:'I want water.',                     tokens:[['quiero','c'],['agua','n']], topic:'food', lvl:1},
+  {en:'The bill, please.',                 tokens:[['la cuenta','n'],['por favor','x']], topic:'food', lvl:1},
+  {en:'A table for two, please.',          tokens:[['una mesa','n'],['para dos personas','e'],['por favor','x']], topic:'food', lvl:2},
+  {en:'I want to eat chicken.',            tokens:[['quiero','c'],['comer','i'],['pollo','n']], topic:'food', lvl:1},
+  {en:'I want to drink wine.',             tokens:[['quiero','c'],['beber','i'],['vino','n']], topic:'food', lvl:1},
+  {en:'A bottle of red wine, please.',     tokens:[['una botella','n'],['de vino tinto','n'],['por favor','x']], topic:'food', lvl:2},
+  {en:'A glass of water, please.',         tokens:[['un vaso','n'],['de agua','n'],['por favor','x']], topic:'food', lvl:2},
+  {en:'I want to try the paella.',         tokens:[['quiero','c'],['probar','i'],['la paella','n']], topic:'food', lvl:2},
+  {en:'Can I see the menu?',               tokens:[['¿puedo?','c'],['ver','i'],['la carta','n']], topic:'food', lvl:2},
+  {en:'Can I order now?',                  tokens:[['¿puedo?','c'],['pedir','i'],['ahora','e']], topic:'food', lvl:2},
+  {en:'The food is delicious.',            tokens:[['la comida','n'],['es','c'],['deliciosa','x']], topic:'food', lvl:2},
+  {en:'I want another glass of wine.',     tokens:[['quiero','c'],['otra copa','n'],['de vino','n']], topic:'food', lvl:2},
+  {en:'For me, the chicken, please.',      tokens:[['para mí','x'],['el pollo','n'],['por favor','x']], topic:'food', lvl:2},
+  {en:'One more, please.',                 tokens:[['uno más','x'],['por favor','x']], topic:'food', lvl:1},
+  {en:'Breakfast is at eight.',            tokens:[['el desayuno','n'],['es','c'],['a las ocho','e']], topic:'food', lvl:2},
+  {en:'I want the same thing.',            tokens:[['quiero','c'],['la misma cosa','n']], topic:'food', lvl:2},
+
+  // ─── Hotel ────────────────────────────────────────────────────────────────
+  {en:'I want a room.',                    tokens:[['quiero','c'],['una habitación','n']], topic:'hotel', lvl:1},
+  {en:'I want a room with a balcony.',     tokens:[['quiero','c'],['una habitación','n'],['con balcón','e']], topic:'hotel', lvl:2},
+  {en:'A room for two people, please.',    tokens:[['una habitación','n'],['para dos personas','e'],['por favor','x']], topic:'hotel', lvl:2},
+  {en:'How much is it per night?',         tokens:[['¿Cuánto?','q'],['es','c'],['por noche','e']], topic:'hotel', lvl:2},
+  {en:'How much is it per person?',        tokens:[['¿Cuánto?','q'],['es','c'],['por persona','e']], topic:'hotel', lvl:2},
+  {en:'The television doesn\'t work.',     tokens:[['el televisor','n'],['no funciona','c']], topic:'hotel', lvl:2},
+  {en:'The shower doesn\'t work.',         tokens:[['la ducha','n'],['no funciona','c']], topic:'hotel', lvl:2},
+  {en:'I want the key to my room.',        tokens:[['quiero','c'],['la llave','n'],['de mi habitación','e']], topic:'hotel', lvl:3},
+  {en:'There is a problem in the room.',   tokens:[['hay','c'],['un problema','n'],['en la habitación','e']], topic:'hotel', lvl:2},
+  {en:'Do you have a map of the city?',    tokens:[['¿tiene?','c'],['un mapa','n'],['de la ciudad','e']], topic:'hotel', lvl:3},
+
+  // ─── Directions ───────────────────────────────────────────────────────────
+  {en:'Where is the bathroom?',            tokens:[['¿Dónde?','q'],['está','c'],['el baño','n']], topic:'dir', lvl:1},
+  {en:'Where is the bank?',                tokens:[['¿Dónde?','q'],['está','c'],['el banco','n']], topic:'dir', lvl:1},
+  {en:'Where is the train station?',       tokens:[['¿Dónde?','q'],['está','c'],['la estación de tren','n']], topic:'dir', lvl:2},
+  {en:'How do I get to the hotel?',        tokens:[['¿Cómo?','q'],['llego','c'],['al hotel','e']], topic:'dir', lvl:2},
+  {en:'How do I get to the beach?',        tokens:[['¿Cómo?','q'],['llego','c'],['a la playa','e']], topic:'dir', lvl:2},
+  {en:'Go straight ahead.',                tokens:[['vaya','c'],['todo recto','e']], topic:'dir', lvl:1},
+  {en:'Turn right.',                       tokens:[['gire','c'],['a la derecha','e']], topic:'dir', lvl:1},
+  {en:'Turn left.',                        tokens:[['gire','c'],['a la izquierda','e']], topic:'dir', lvl:1},
+  {en:'It\'s far from here.',              tokens:[['está','c'],['lejos','e'],['de aquí','e']], topic:'dir', lvl:2},
+  {en:'It\'s near here.',                  tokens:[['está','c'],['cerca','e'],['de aquí','e']], topic:'dir', lvl:2},
+
+  // ─── Shopping ─────────────────────────────────────────────────────────────
+  {en:'How much is it?',                   tokens:[['¿Cuánto?','q'],['es','c']], topic:'shop', lvl:1},
+  {en:'I want it in red.',                 tokens:[['lo quiero','c'],['en rojo','e']], topic:'shop', lvl:1},
+  {en:'I prefer it in blue.',              tokens:[['lo prefiero','c'],['en azul','e']], topic:'shop', lvl:1},
+  {en:'It\'s too expensive.',              tokens:[['es','c'],['demasiado','e'],['caro','x']], topic:'shop', lvl:2},
+  {en:'I want a bigger one.',              tokens:[['quiero','c'],['uno','x'],['más grande','x']], topic:'shop', lvl:2},
+  {en:'I want to buy a postcard.',         tokens:[['quiero','c'],['comprar','i'],['una postal','n']], topic:'shop', lvl:2},
+  {en:'I want to buy a souvenir.',         tokens:[['quiero','c'],['comprar','i'],['un recuerdo','n']], topic:'shop', lvl:2},
+  {en:'A souvenir for my mother.',         tokens:[['un recuerdo','n'],['para mi madre','e']], topic:'shop', lvl:2},
+
+  // ─── Time ─────────────────────────────────────────────────────────────────
+  {en:'What time is it?',                  tokens:[['¿Qué?','q'],['hora','n'],['es','c']], topic:'time', lvl:2},
+  {en:'It\'s one o\'clock.',               tokens:[['es','c'],['la una','e']], topic:'time', lvl:1},
+  {en:'It\'s eight o\'clock.',             tokens:[['son','c'],['las ocho','e']], topic:'time', lvl:1},
+  {en:'It\'s half past three.',            tokens:[['son','c'],['las tres','e'],['y media','e']], topic:'time', lvl:3},
+  {en:'It\'s quarter to eight.',           tokens:[['son','c'],['las ocho','e'],['menos cuarto','e']], topic:'time', lvl:3},
+  {en:'At what time is breakfast?',        tokens:[['¿A qué hora?','q'],['es','c'],['el desayuno','n']], topic:'time', lvl:2},
+  {en:'At what time is dinner?',           tokens:[['¿A qué hora?','q'],['es','c'],['la cena','n']], topic:'time', lvl:2},
+  {en:'I want to eat tonight.',            tokens:[['quiero','c'],['comer','i'],['esta noche','e']], topic:'time', lvl:2},
+
+  // ─── Travel ───────────────────────────────────────────────────────────────
+  {en:'I want to rent a car.',             tokens:[['quiero','c'],['alquilar','i'],['un coche','n']], topic:'travel', lvl:2},
+  {en:'I want to rent a car for a week.',  tokens:[['quiero','c'],['alquilar','i'],['un coche','n'],['por una semana','e']], topic:'travel', lvl:3},
+  {en:'I want a one-way ticket.',          tokens:[['quiero','c'],['un billete de ida','n']], topic:'travel', lvl:2},
+  {en:'I want a return ticket.',           tokens:[['quiero','c'],['un billete de ida y vuelta','n']], topic:'travel', lvl:3},
+  {en:'I\'m going to Madrid.',             tokens:[['voy','c'],['a Madrid','e']], topic:'travel', lvl:1},
+  {en:'I\'m going to the beach tomorrow.', tokens:[['voy','c'],['a la playa','e'],['mañana','e']], topic:'travel', lvl:2},
+
+  // ─── Health ───────────────────────────────────────────────────────────────
+  {en:'I have a headache.',                tokens:[['me duele','c'],['la cabeza','n']], topic:'health', lvl:2},
+  {en:'My foot hurts.',                    tokens:[['me duele','c'],['el pie','n']], topic:'health', lvl:2},
+  {en:'I have caught a cold.',             tokens:[['he cogido','c'],['un resfriado','n']], topic:'health', lvl:3},
+  {en:'I don\'t feel well.',               tokens:[['no me siento','c'],['bien','e']], topic:'health', lvl:2},
+  {en:'I want a medicine.',                tokens:[['quiero','c'],['un medicamento','n']], topic:'health', lvl:2},
+
+  // ─── Hay (there is/are) ───────────────────────────────────────────────────
+  {en:'There is a good restaurant here.',  tokens:[['hay','c'],['un buen restaurante','n'],['aquí','e']], topic:'hay', lvl:2},
+  {en:'Is there a pharmacy nearby?',       tokens:[['¿hay?','c'],['una farmacia','n'],['cerca','e']], topic:'hay', lvl:2},
+  {en:'There is a supermarket near here.', tokens:[['hay','c'],['un supermercado','n'],['cerca de aquí','e']], topic:'hay', lvl:2},
+  {en:'There are too many people here.',   tokens:[['hay','c'],['demasiadas personas','n'],['aquí','e']], topic:'hay', lvl:3},
+  {en:'There is a lot of noise.',          tokens:[['hay','c'],['mucho ruido','n']], topic:'hay', lvl:2},
+  {en:'No problem.',                       tokens:[['no hay','c'],['problema','n']], topic:'hay', lvl:1},
+
+  // ─── Past tense ───────────────────────────────────────────────────────────
+  {en:'I have eaten.',                     tokens:[['he','c'],['comido','i']], topic:'past', lvl:1},
+  {en:'I have reserved a table.',          tokens:[['he','c'],['reservado','i'],['una mesa','n']], topic:'past', lvl:2},
+  {en:'Have you reserved a table?',        tokens:[['¿has?','c'],['reservado','i'],['una mesa','n']], topic:'past', lvl:2},
+  {en:'Have you ordered wine?',            tokens:[['¿has?','c'],['pedido','i'],['vino','n']], topic:'past', lvl:2},
+  {en:'María has finished everything.',    tokens:[['María','x'],['ha','c'],['terminado','i'],['todo','x']], topic:'past', lvl:3},
+  {en:'We have waited a long time.',       tokens:[['hemos','c'],['esperado','i'],['mucho tiempo','e']], topic:'past', lvl:3},
+  {en:'They have seen the cathedral.',     tokens:[['han','c'],['visto','i'],['la catedral','n']], topic:'past', lvl:3},
+  {en:'I have brought my passport.',       tokens:[['he','c'],['traído','i'],['mi pasaporte','n']], topic:'past', lvl:3},
+  {en:'I have written everything.',        tokens:[['he','c'],['escrito','i'],['todo','x']], topic:'past', lvl:2},
+  {en:'He has returned to Barcelona.',     tokens:[['ha','c'],['vuelto','i'],['a Barcelona','e']], topic:'past', lvl:3},
+
+  // ─── Negatives ────────────────────────────────────────────────────────────
+  {en:"I don't want to pay now.",          tokens:[['no quiero','c'],['pagar','i'],['ahora','e']], topic:'neg', lvl:2},
+  {en:"I don't have time.",                tokens:[['no tengo','c'],['tiempo','n']], topic:'neg', lvl:1},
+  {en:"He hasn't eaten yet.",              tokens:[['no ha','c'],['comido','i'],['todavía','e']], topic:'neg', lvl:3},
+  {en:"We haven't seen the movie.",        tokens:[['no hemos','c'],['visto','i'],['la película','n']], topic:'neg', lvl:3},
+  {en:"I'm not from Spain.",               tokens:[['no soy','c'],['de España','e']], topic:'neg', lvl:1},
+
+  // ─── Greetings ────────────────────────────────────────────────────────────
+  {en:'Hello, good morning!',              tokens:[['hola','x'],['buenos días','x']], topic:'greet', lvl:1},
+  {en:'Good night, see you tomorrow.',     tokens:[['buenas noches','x'],['hasta mañana','x']], topic:'greet', lvl:1},
+  {en:"My name is Maria, and you?",        tokens:[['me llamo','c'],['María','x'],['¿y tú?','q']], topic:'greet', lvl:2},
+  {en:"I'm from Canada.",                  tokens:[['soy','c'],['de Canadá','e']], topic:'greet', lvl:1},
+  {en:"Where are you from?",               tokens:[['¿de dónde?','q'],['eres','c']], topic:'greet', lvl:2},
+  {en:"Pleased to meet you.",              tokens:[['encantado','x'],['de conocerte','x']], topic:'greet', lvl:2},
 ];
 
+// Convert legacy {q,c,i,e,neg} shape to token array (only used if any old data slips in).
+// New CHALLENGES use the .tokens field directly.
 function buildChallengeTokens(ch) {
-  // Returns the correct ordered chips for a challenge.
-  // Structure: [question] + [no] + carrier + infinitive + [extra]
+  if(ch.tokens) return ch.tokens.map(([sp,cat]) => ({sp, cat}));
+  // legacy fallback
   const tokens = [];
   if(ch.q)               tokens.push({sp:ch.q, cat:'q'});
   if(ch.neg && ch.c)     tokens.push({sp:'no', cat:'neg'});
@@ -1445,23 +1582,50 @@ function buildChallengeTokens(ch) {
   return tokens;
 }
 
-function shuffleChallengeChips(tokens) {
-  // Build pool of distractors tagged by which category they came from (fixes old object-identity bug).
+// "Almost right" distractors: pull from OTHER prompts' tokens, biased to same category and topic.
+function shuffleChallengeChips(tokens, currentTopic) {
   const correctSet = new Set(tokens.map(t=>norm(t.sp)));
-  const pool = [
-    ...STRUCT.questions.map(w=>({sp:w.sp, cat:'q'})),
-    ...STRUCT.carriers.map(w=>({sp:w.sp, cat:'c'})),
-    ...STRUCT.infinitives.map(w=>({sp:w.sp, cat:'i'})),
-  ].filter(w => !correctSet.has(norm(w.sp)));
-  const picked = shuffle([...pool]).slice(0,3).map(w=>({...w, distractor:true}));
-  return shuffle([...tokens, ...picked]);
+  const usedCats   = new Set(tokens.map(t=>t.cat));
+  // Build pool of all tokens from all challenges (deduped)
+  const seen = new Set();
+  const pool = [];
+  for(const ch of CHALLENGES){
+    if(!ch.tokens) continue;
+    for(const [sp,cat] of ch.tokens){
+      const key = norm(sp)+'|'+cat;
+      if(seen.has(key) || correctSet.has(norm(sp))) continue;
+      seen.add(key);
+      pool.push({sp, cat, fromTopic: ch.topic});
+    }
+  }
+  // Prefer distractors that match a category present in the answer AND the current topic
+  const sameTopicSameCat = pool.filter(p=>usedCats.has(p.cat) && p.fromTopic===currentTopic);
+  const sameCat          = pool.filter(p=>usedCats.has(p.cat) && p.fromTopic!==currentTopic);
+  const otherCat         = pool.filter(p=>!usedCats.has(p.cat));
+  // Pick ~3 distractors, prioritising same-topic/same-category for "almost right" feel
+  const picks = [];
+  const tryFrom = (arr, n) => { for(const p of shuffle([...arr])){ if(picks.length>=n) break; picks.push(p); } };
+  tryFrom(sameTopicSameCat, 2);
+  tryFrom(sameCat, 3);
+  tryFrom(otherCat, 3);
+  return shuffle([...tokens, ...picks.slice(0,3).map(p=>({sp:p.sp, cat:p.cat, distractor:true}))]);
 }
 
 // ── Challenge session control ────────────────────────────────────────────────
-function startChallengeSession() {
+function startChallengeSession(filter={topic:null, lvl:null}) {
   const bs = buildState;
   bs.challengeActive  = true;
-  bs.challengeOrder   = shuffle(CHALLENGES.map((_,i)=>i));
+  bs.challengeFilter  = filter;
+  // Filter CHALLENGES by topic/level if requested
+  const indices = CHALLENGES
+    .map((_,i)=>i)
+    .filter(i => {
+      const c = CHALLENGES[i];
+      if(filter.topic && c.topic !== filter.topic) return false;
+      if(filter.lvl && c.lvl !== filter.lvl) return false;
+      return true;
+    });
+  bs.challengeOrder   = shuffle(indices);
   bs.challengePos     = 0;
   bs.challengeCorrect = 0;
   bs.challengeTotal   = 0;
@@ -1473,7 +1637,7 @@ function loadChallenge() {
   const ch = CHALLENGES[bs.challengeOrder[bs.challengePos]];
   if(!ch){ bs.challengeTokens=[]; bs.challengeBank=[]; return; }
   bs.challengeTokens   = buildChallengeTokens(ch);
-  bs.challengeBank     = shuffleChallengeChips(bs.challengeTokens);
+  bs.challengeBank     = shuffleChallengeChips(bs.challengeTokens, ch.topic);
   bs.challengeSelected = [];
   bs.challengeResult   = null;
 }
@@ -1673,9 +1837,9 @@ function renderBuild() {
 
   // ── Translation Challenge mode ─────────────────────────────────────────────
   const bsC = buildState;
-  const chipCatColors = {q:'#6d28d9',c:'#1d4ed8',i:'#166534',e:'#92400e',neg:'#aa0000'};
-  const chipCatBg     = {q:'#f5f0ff',c:'#eff6ff',i:'#f0fdf4',e:'#fffbeb',neg:'#ffe8e8'};
-  const chipCatBorder = {q:'#c4b5fd',c:'#93c5fd',i:'#86efac',e:'#fcd34d',neg:'#ff4b4b'};
+  const chipCatColors = {q:'#6d28d9',c:'#1d4ed8',i:'#166534',e:'#92400e',neg:'#aa0000',n:'#475569',x:'#64748b'};
+  const chipCatBg     = {q:'#f5f0ff',c:'#eff6ff',i:'#f0fdf4',e:'#fffbeb',neg:'#ffe8e8',n:'#f1f5f9',x:'#f8fafc'};
+  const chipCatBorder = {q:'#c4b5fd',c:'#93c5fd',i:'#86efac',e:'#fcd34d',neg:'#ff4b4b',n:'#94a3b8',x:'#cbd5e1'};
   const renderChallengeChip = (t, attrs='', extraStyle='') =>
     `<button class="word-chip" ${attrs}
        style="border-color:${chipCatBorder[t.cat]};background:${chipCatBg[t.cat]};color:${chipCatColors[t.cat]};${extraStyle}">${esc(t.sp)}</button>`;
@@ -1688,33 +1852,96 @@ function renderBuild() {
   if(!bsC.challengeActive){
     const starred = state.challengeProgress.filter(p=>(p?.correct||0)>=3).length;
     const touched = state.challengeProgress.filter(p=>(p?.attempts||0)>0).length;
-    const promptList = CHALLENGES.map((c,i)=>{
-      const p = state.challengeProgress[i] || {correct:0,attempts:0};
-      const stars = Math.min(3, p.correct||0);
-      const starHTML = '⭐'.repeat(stars) + '☆'.repeat(3-stars);
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:8px;background:${stars>=3?'var(--gxs)':'transparent'};font-size:.85rem;gap:10px;">
-        <span style="flex:1;${stars>=3?'color:var(--gd);font-weight:800;':''}">${esc(c.en)}</span>
-        <span style="font-size:.75rem;letter-spacing:1px;white-space:nowrap;">${starHTML}</span>
-      </div>`;
-    }).join('');
+    // Per-topic and per-level stats
+    const topicStats = {};
+    Object.keys(TOPIC_META).forEach(k => topicStats[k] = {total:0, starred:0, attempted:0});
+    CHALLENGES.forEach((c,i) => {
+      const p = state.challengeProgress[i] || {correct:0, attempts:0};
+      if(!topicStats[c.topic]) topicStats[c.topic] = {total:0, starred:0, attempted:0};
+      topicStats[c.topic].total++;
+      if((p.correct||0) >= 3) topicStats[c.topic].starred++;
+      if((p.attempts||0) > 0) topicStats[c.topic].attempted++;
+    });
+
+    const selTopic = bsC._filterTopic || null;
+    const selLvl   = bsC._filterLvl   || null;
+
+    // Topic filter chips
+    const topicChips = `
+      <button class="topic-chip${!selTopic?' active':''}" data-topic="">
+        <span>🌐</span><span>All topics</span>
+        <span class="topic-chip-count">${CHALLENGES.length}</span>
+      </button>
+      ${Object.entries(TOPIC_META).map(([k,m]) => {
+        const ts = topicStats[k] || {total:0, starred:0};
+        if(ts.total === 0) return '';
+        return `<button class="topic-chip${selTopic===k?' active':''}" data-topic="${k}" title="${esc(m.desc)}">
+          <span>${m.icon}</span><span>${esc(m.label)}</span>
+          <span class="topic-chip-count">${ts.starred}/${ts.total}</span>
+        </button>`;
+      }).join('')}`;
+
+    // Difficulty filter
+    const lvlChips = `
+      <button class="lvl-chip${!selLvl?' active':''}" data-lvl="">All levels</button>
+      <button class="lvl-chip${selLvl===1?' active':''}" data-lvl="1">★ Easy</button>
+      <button class="lvl-chip${selLvl===2?' active':''}" data-lvl="2">★★ Medium</button>
+      <button class="lvl-chip${selLvl===3?' active':''}" data-lvl="3">★★★ Hard</button>
+    `;
+
+    // Filtered prompt count for "Start" button
+    const filteredCount = CHALLENGES.filter(c =>
+      (!selTopic || c.topic === selTopic) && (!selLvl || c.lvl === selLvl)
+    ).length;
+
+    // Prompt list (filtered by current selection)
+    const promptList = CHALLENGES
+      .map((c,i) => ({c, i}))
+      .filter(({c}) => (!selTopic || c.topic === selTopic) && (!selLvl || c.lvl === selLvl))
+      .map(({c,i}) => {
+        const p = state.challengeProgress[i] || {correct:0, attempts:0};
+        const stars = Math.min(3, p.correct||0);
+        const starHTML = '⭐'.repeat(stars) + '<span style="opacity:.3">' + '☆'.repeat(3-stars) + '</span>';
+        const lvlHTML = '★'.repeat(c.lvl) + '<span style="opacity:.3">' + '★'.repeat(3-c.lvl) + '</span>';
+        const meta = TOPIC_META[c.topic] || {icon:'•'};
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:8px;background:${stars>=3?'var(--gxs)':'transparent'};font-size:.85rem;gap:10px;">
+          <span style="flex:1;${stars>=3?'color:var(--gd);font-weight:800;':''}">${meta.icon} ${esc(c.en)}</span>
+          <span style="font-size:.7rem;color:var(--muted);letter-spacing:.5px;">${lvlHTML}</span>
+          <span style="font-size:.75rem;letter-spacing:1px;white-space:nowrap;">${starHTML}</span>
+        </div>`;
+      }).join('');
+
     challengeHTML = `
     <div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,#f3e8ff,#fce7f3);border-color:#c4b5fd;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
         <div style="flex:1;min-width:200px;">
           <h3 style="margin:0 0 6px;">🎯 Translation Challenge</h3>
-          <div class="muted small">Read the English prompt, tap chips to build the Spanish sentence. Get 3 correct on a prompt to earn a ⭐.</div>
+          <div class="muted small">Read the English prompt, tap chips to build the Spanish sentence. Earn a ⭐ for each prompt you nail 3 times.</div>
         </div>
         <div style="text-align:right;">
           <div style="font-size:1.5rem;font-weight:900;color:#7030c8;line-height:1;">⭐ ${starred}/${CHALLENGES.length}</div>
-          <div class="muted tiny" style="font-weight:700;">prompts mastered</div>
+          <div class="muted tiny" style="font-weight:700;">total mastered</div>
         </div>
       </div>
-      <div class="action-row" style="margin:12px 0 4px;">
-        <button class="btn primary" id="chStartBtn">Start challenge →</button>
+
+      <div style="margin-bottom:10px;">
+        <div class="muted tiny" style="font-weight:900;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Topic</div>
+        <div class="topic-chip-row">${topicChips}</div>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <div class="muted tiny" style="font-weight:900;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Difficulty</div>
+        <div class="topic-chip-row">${lvlChips}</div>
+      </div>
+
+      <div class="action-row" style="margin:4px 0;">
+        <button class="btn primary" id="chStartBtn" ${filteredCount===0?'disabled style="opacity:.5"':''}>
+          ${filteredCount > 0 ? `Start (${filteredCount} prompt${filteredCount===1?'':'s'}) →` : 'No prompts match'}
+        </button>
         <button class="btn" id="chTogglePromptsBtn">${bsC._showPrompts?'▲ Hide prompts':'▼ Show prompts'}</button>
         ${starred>0 ? `<button class="btn" id="chResetStarsBtn" title="Reset challenge stars">↺ Reset stars</button>` : ''}
       </div>
-      ${bsC._showPrompts ? `<div style="margin-top:10px;padding:10px;background:rgba(255,255,255,.55);border-radius:12px;max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;">${promptList}</div>` : ''}
+      ${bsC._showPrompts ? `<div style="margin-top:10px;padding:10px;background:rgba(255,255,255,.55);border-radius:12px;max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;">${promptList || '<div class="muted small" style="text-align:center;padding:14px;">No prompts match the current filters.</div>'}</div>` : ''}
     </div>`;
   } else if(chDone){
     const pct = bsC.challengeTotal ? Math.round(bsC.challengeCorrect/bsC.challengeTotal*100) : 0;
@@ -1762,6 +1989,7 @@ function renderBuild() {
 
     const actionHTML = isGraded
       ? `<div class="action-row" style="margin-top:14px;">
+           <button class="speak-btn" id="chListenBtn" style="padding:9px 18px;">🔊 Listen</button>
            <button class="btn primary" id="chNextBtn">${bsC.challengePos+1<chTotal?'Next →':'Finish'}</button>
          </div>`
       : `<div class="action-row" style="margin-top:14px;">
@@ -1844,41 +2072,8 @@ function renderBuild() {
   `;
 
   // When challenge is active, hide other cards to keep the learner focused.
-  const otherCards = bsC.challengeActive ? '' : `
-    ${genHTML}
-    <div class="card" style="margin-bottom:14px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-        <h2 style="margin:0;">Sentence Builder 🏗️</h2>
-        <span class="pill purple">Lesson 32 · Structure 1</span>
-      </div>
-      <div class="muted small" style="margin-bottom:16px;">Tap a slot to select it, then tap a word from the bank below to fill it. Build: <strong>Question + Carrier + Infinitive</strong> (+ optional extra). 🎲 <strong>Shuffle</strong> picks a verified example from the curated library.</div>
-
-      <div class="builder-sentence" id="builderSentence">
-        ${sentence
-          ? `<span style="font-size:1.3rem;font-weight:900;color:var(--text)">${esc(sentence)}</span>
-             <span style="font-size:.9rem;font-weight:700;color:var(--muted);flex-basis:100%;text-align:center">${esc(translation)}</span>`
-          : `<span class="bs-placeholder">Your sentence will appear here…</span>`}
-      </div>
-
-      <div class="builder-slots">${slotHTML}</div>
-
-      <div class="builder-controls">
-        <button class="neg-toggle${bs.neg?' on':''}" id="negToggle">${bs.neg?'✗ Negative ON':'± Make negative'}</button>
-        ${sentence?`<button class="speak-btn" id="bSpeakBtn" style="font-size:.85rem;padding:7px 16px;">🔊 Speak</button>`:''}
-        <button class="btn" id="shuffleBtn">🎲 Shuffle</button>
-        <button class="btn" id="clearAllBtn">🗑 Clear all</button>
-      </div>
-    </div>
-
-    <div class="card" style="margin-bottom:14px;">
-      <h3>Word bank</h3>
-      ${bankHTML}
-    </div>
-
-    <div class="card">
-      <h3>Example sentences for inspiration</h3>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">${examplesHTML}</div>
-    </div>`;
+  // (Sentence Builder UI removed — focused on Translation Challenge + Read & Listen now.)
+  const otherCards = bsC.challengeActive ? '' : `${genHTML}`;
 
   d.innerHTML = `${challengeHTML}${otherCards}`;
 
@@ -1945,9 +2140,31 @@ function renderBuild() {
   });
 
   // ── Translation Challenge events ──────────────────────────────────────────
-  d.querySelector('#chStartBtn')?.addEventListener('click', () => { startChallengeSession(); renderBuild(); });
+  d.querySelector('#chStartBtn')?.addEventListener('click', () => {
+    startChallengeSession({topic: bsC._filterTopic||null, lvl: bsC._filterLvl||null});
+    renderBuild();
+  });
   d.querySelector('#chExitBtn')?.addEventListener('click', () => { bsC.challengeActive = false; renderBuild(); });
-  d.querySelector('#chAgainBtn')?.addEventListener('click', () => { startChallengeSession(); renderBuild(); });
+  d.querySelector('#chAgainBtn')?.addEventListener('click', () => {
+    // Re-run with the same filter that was used for this session
+    startChallengeSession(bsC.challengeFilter || {topic:null, lvl:null});
+    renderBuild();
+  });
+
+  // Topic filter chips
+  d.querySelectorAll('[data-topic]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      bsC._filterTopic = btn.dataset.topic || null;
+      renderBuild();
+    });
+  });
+  // Difficulty filter chips
+  d.querySelectorAll('[data-lvl]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      bsC._filterLvl = btn.dataset.lvl ? +btn.dataset.lvl : null;
+      renderBuild();
+    });
+  });
   d.querySelector('#chTogglePromptsBtn')?.addEventListener('click', () => {
     bsC._showPrompts = !bsC._showPrompts;
     renderBuild();
@@ -1991,18 +2208,24 @@ function renderBuild() {
     renderBuild();
   });
 
+  // Shared helper — speaks the current challenge's correct sentence.
+  const speakChallenge = () => {
+    if(!('speechSynthesis' in window) || !bsC.challengeTokens?.length) return;
+    const text = bsC.challengeTokens.map(t=>t.sp).join(' ');
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'es-ES';
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+  };
+
   d.querySelector('#chCheckBtn')?.addEventListener('click', () => {
     checkChallenge();
     renderBuild();
-    // On correct, speak the sentence for reinforcement (no auto-advance — user taps Next)
-    if(bsC.challengeResult === 'correct' && 'speechSynthesis' in window){
-      const text = bsC.challengeTokens.map(t=>t.sp).join(' ');
-      const u = new SpeechSynthesisUtterance(text.replace(/[¿?]/g,'') + (text.includes('¿')?'?':''));
-      u.lang = 'es-ES';
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
-    }
+    // Speak the correct sentence on EVERY grade — reinforces right answers, models wrong ones.
+    speakChallenge();
   });
+
+  d.querySelector('#chListenBtn')?.addEventListener('click', speakChallenge);
 
   d.querySelector('#chSkipBtn')?.addEventListener('click', () => {
     bsC.challengeTotal++;
