@@ -1,1027 +1,1104 @@
-import React, { useState, useEffect, useRef } from 'react';
-
-// --- SOUND SYNTHESIZER UTILITIES ---
-class SoundSynth {
-  constructor() {
-    this.ctx = null;
-  }
-
-  init() {
-    if (!this.ctx) {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pattern Quest – Grade 3 Magic Meadow</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --emerald-50:#ecfdf5; --emerald-100:#d1fae5; --emerald-200:#a7f3d0;
+      --emerald-500:#10b981; --emerald-600:#059669; --emerald-700:#047857;
+      --teal-50:#f0fdfa; --teal-100:#ccfbf1; --teal-200:#99f6e4;
+      --teal-400:#2dd4bf; --teal-500:#14b8a6; --teal-700:#0f766e;
+      --sky-50:#f0f9ff; --sky-100:#e0f2fe;
+      --amber-50:#fffbeb; --amber-100:#fef3c7; --amber-200:#fde68a;
+      --amber-500:#f59e0b; --amber-700:#b45309; --amber-800:#92400e; --amber-900:#78350f;
+      --indigo-200:#c7d2fe; --indigo-500:#6366f1; --indigo-700:#4338ca;
+      --indigo-800:#3730a3; --indigo-900:#312e81;
+      --rose-50:#fff1f2; --rose-100:#ffe4e6; --rose-500:#f43f5e; --rose-600:#e11d48; --rose-700:#be123c;
+      --slate-50:#f8fafc; --slate-100:#f1f5f9; --slate-200:#e2e8f0;
+      --slate-300:#cbd5e1; --slate-400:#94a3b8; --slate-500:#64748b;
+      --slate-600:#475569; --slate-700:#334155; --slate-800:#1e293b;
     }
-  }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: linear-gradient(to bottom, #ecfdf5, #f0fdfa, #f0f9ff);
+      min-height: 100vh;
+      color: var(--slate-800);
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .app { display: flex; flex-direction: column; min-height: 100vh; }
 
-  playClick() {
-    this.init();
-    if (!this.ctx) return;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(400, this.ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.12);
-  }
+    /* ── Header ── */
+    header {
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--teal-100);
+      padding: 12px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 20;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon {
+      background: var(--emerald-500); color: white; padding: 8px;
+      border-radius: 12px; box-shadow: 0 4px 10px rgba(16,185,129,0.35);
+      transform: rotate(3deg); line-height: 0;
+    }
+    .logo-title {
+      font-family: 'Fredoka One', cursive; font-size: 1.4rem;
+      background: linear-gradient(to right, #059669, #0f766e);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .logo-sub { font-size: 0.7rem; color: var(--emerald-600); font-weight: 700; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    #level-badge {
+      background: var(--teal-50); border: 1px solid var(--teal-200);
+      padding: 6px 14px; border-radius: 999px;
+      font-size: 0.75rem; font-weight: 800; color: var(--teal-700);
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .stars-badge {
+      background: var(--amber-50); border: 1px solid var(--amber-200);
+      padding: 6px 14px; border-radius: 999px;
+      display: flex; align-items: center; gap: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      animation: bounce 1.2s infinite;
+    }
+    #stars-display { font-weight: 900; font-size: 1.1rem; color: var(--amber-800); }
 
-  playCorrect() {
-    this.init();
-    if (!this.ctx) return;
-    const now = this.ctx.currentTime;
-    const notes = [523.25, 659.25, 783.99, 1046.50];
-    notes.forEach((freq, idx) => {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, now + idx * 0.08);
-      gain.gain.setValueAtTime(0.08, now + idx * 0.08);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.25);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start(now + idx * 0.08);
-      osc.stop(now + idx * 0.08 + 0.3);
+    /* ── Main ── */
+    main {
+      max-width: 860px; width: 100%;
+      margin: 0 auto; padding: 24px 16px;
+      flex-grow: 1; display: flex; flex-direction: column; justify-content: center;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: white; border-radius: 28px; padding: 28px 28px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+      border: 1px solid var(--teal-100);
+      position: relative; overflow: hidden;
+    }
+    @media (max-width: 500px) { .card { padding: 20px 16px; } }
+
+    /* ── Buttons ── */
+    .btn {
+      font-family: 'Nunito', sans-serif; font-weight: 800;
+      cursor: pointer; border: none; border-radius: 14px;
+      transition: all 0.15s ease;
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn:active { transform: scale(0.95); }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--emerald-500), var(--teal-500));
+      color: white; padding: 14px 30px; font-size: 1.05rem;
+      box-shadow: 0 5px 18px rgba(16,185,129,0.35);
+      border-bottom: 4px solid var(--emerald-700) !important;
+    }
+    .btn-primary:hover { transform: scale(1.03); }
+    .btn-secondary {
+      background: var(--slate-100); color: var(--slate-600);
+      padding: 12px 22px; font-size: 0.95rem;
+    }
+    .btn-secondary:hover { background: var(--slate-200); }
+    .btn-speaker {
+      background: white; border: 1px solid var(--emerald-200) !important;
+      color: var(--emerald-600); padding: 8px; border-radius: 999px;
+      cursor: pointer; transition: all 0.2s; line-height: 0; font-size: 0;
+    }
+    .btn-speaker:hover { background: var(--emerald-50); }
+    .btn-speaker.speaking { background: var(--emerald-500); color: white; border-color: var(--emerald-600) !important; }
+
+    /* ── Animations ── */
+    @keyframes bounce {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.55} }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)} }
+    @keyframes popIn { 0%{transform:scale(0.8);opacity:0}70%{transform:scale(1.05)}100%{transform:scale(1);opacity:1} }
+    .anim-bounce { animation: bounce 1.2s infinite; }
+    .anim-pulse  { animation: pulse 1.5s infinite; }
+    .anim-fade   { animation: fadeIn 0.35s ease forwards; }
+    .anim-pop    { animation: popIn 0.3s ease forwards; }
+
+    /* ── Mascot ── */
+    .pip-svg { width:100%; height:100%; filter:drop-shadow(0 4px 8px rgba(0,0,0,0.12)); }
+    .pip-label {
+      font-weight:800; color:var(--emerald-700); background:var(--emerald-50);
+      padding:4px 12px; border-radius:999px; font-size:0.7rem;
+      margin-top:8px; border:1px solid var(--emerald-100);
+    }
+
+    /* ── Home Screen ── */
+    .blob {
+      position:absolute; border-radius:50%; filter:blur(45px); opacity:0.55; pointer-events:none;
+    }
+    .blob-tl { top:-50px;left:-50px;width:200px;height:200px;background:var(--emerald-100); }
+    .blob-br { bottom:-60px;right:-60px;width:240px;height:240px;background:var(--teal-100); }
+    .home-inner {
+      position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;text-align:center;
+    }
+    .home-title {
+      font-family:'Fredoka One',cursive;
+      font-size:clamp(2rem,6vw,3.5rem);color:var(--slate-800);margin-bottom:8px;
+    }
+    .home-sub {
+      color:var(--teal-700);font-size:clamp(0.95rem,2.5vw,1.15rem);
+      font-weight:600;margin-bottom:32px;max-width:420px;
+    }
+    .curriculum-grid {
+      display:grid;grid-template-columns:1fr 1fr;gap:10px;
+      max-width:420px;width:100%;margin-top:32px;
+      padding-top:24px;border-top:1px solid var(--slate-100);
+    }
+    .ci { display:flex;align-items:center;gap:8px;font-size:0.75rem;color:var(--slate-500); }
+    .ci-icon { padding:4px 6px;border-radius:6px;font-size:0.85rem; }
+
+    /* ── Level Intro ── */
+    .intro-row {
+      display:flex;flex-direction:column;gap:20px;align-items:flex-start;
+    }
+    @media(min-width:560px){ .intro-row{flex-direction:row;align-items:flex-start;} }
+    .pip-col { display:flex;flex-direction:column;align-items:center;flex-shrink:0; }
+    .speech-bubble {
+      flex-grow:1;background:rgba(236,253,245,0.65);
+      border:2px solid var(--emerald-100);padding:22px;border-radius:20px;
+    }
+    .bubble-header {
+      display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;
+    }
+    .level-tag {
+      font-size:0.65rem;font-weight:900;text-transform:uppercase;
+      letter-spacing:0.1em;color:var(--emerald-600);
+    }
+    .bubble-title { font-family:'Fredoka One',cursive;font-size:1.5rem;color:var(--slate-800);margin-bottom:6px; }
+    .bubble-text  { color:var(--slate-600);font-size:0.97rem;line-height:1.65; }
+    .card-footer  { display:flex;justify-content:flex-end;margin-top:24px; }
+    .card-actions {
+      display:flex;justify-content:space-between;align-items:center;
+      margin-top:24px;padding-top:16px;border-top:1px solid var(--teal-50);gap:12px;
+    }
+
+    /* ── Tutorial ── */
+    .tut-header {
+      display:flex;align-items:flex-start;justify-content:space-between;
+      margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--teal-100);gap:12px;
+    }
+    .tut-tag {
+      background:var(--teal-50);color:var(--teal-700);border:1px solid var(--teal-200);
+      font-weight:700;padding:4px 14px;border-radius:999px;font-size:0.75rem;
+    }
+    .tut-title { font-family:'Fredoka One',cursive;font-size:1.55rem;color:var(--slate-800);margin-top:8px; }
+    .tut-body {
+      background:rgba(240,253,250,0.5);border:1px solid rgba(204,251,241,0.7);
+      padding:20px;border-radius:18px;color:var(--slate-700);
+      font-size:1rem;line-height:1.65;margin-bottom:20px;
+    }
+    .example-box { background:var(--amber-50);border:1px solid var(--amber-100);border-radius:18px;padding:20px; }
+    .example-label {
+      font-weight:900;color:var(--amber-800);font-size:0.7rem;
+      text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;
+    }
+    .example-text { color:var(--amber-900);font-weight:700;font-size:0.95rem; }
+
+    /* ── Prompt Bar ── */
+    .prompt-bar {
+      display:flex;align-items:flex-start;gap:14px;
+      background:rgba(236,253,245,0.5);border:1px solid var(--emerald-100);
+      border-radius:18px;padding:14px;margin-bottom:22px;
+    }
+    .prompt-pip { width:48px;height:48px;flex-shrink:0; }
+    .prompt-content { flex-grow:1; }
+    .prompt-top {
+      display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;
+    }
+    .prompt-label {
+      font-size:0.65rem;font-weight:900;text-transform:uppercase;
+      letter-spacing:0.1em;color:var(--emerald-600);
+    }
+    .prompt-text { font-weight:800;font-size:0.97rem;color:var(--slate-800); }
+
+    /* ── Level 1: Stones ── */
+    .hint-bar {
+      background:var(--teal-50);border:1px solid var(--teal-100);
+      border-radius:12px;padding:10px 16px;text-align:center;
+      font-size:0.78rem;font-weight:700;color:#0f766e;margin-bottom:16px;
+    }
+    .stones-area {
+      display:flex;flex-wrap:wrap;justify-content:center;gap:14px;
+      padding:28px 16px;background:var(--sky-50);border-radius:28px;border:1px solid var(--sky-100);
+    }
+    .stone-btn {
+      width:76px;height:90px;border-radius:18px;
+      border:1px solid var(--slate-200) !important;border-bottom:7px solid var(--slate-200) !important;
+      font-family:'Nunito',sans-serif;font-weight:900;
+      display:flex;flex-direction:column;align-items:center;justify-content:space-between;
+      padding:10px;cursor:pointer;transition:all 0.2s;background:white;
+      box-shadow:0 2px 8px rgba(0,0,0,0.06);
+    }
+    .stone-btn:hover:not([disabled]) { background:var(--teal-50);transform:scale(1.04); }
+    .stone-btn[disabled] { cursor:default; }
+    .stone-ord {
+      font-size:0.62rem;text-transform:uppercase;color:var(--slate-400);
+      background:var(--slate-100);padding:2px 6px;border-radius:4px;font-weight:800;
+    }
+    .stone-num { font-size:1.55rem;color:var(--slate-800); }
+    .stone-dot { width:13px;height:13px;border-radius:50%;border:1px solid var(--slate-200);background:white; }
+    .stone-correct {
+      background:var(--emerald-500) !important;border-color:var(--emerald-600) !important;
+      transform:scale(1.07) !important;
+      box-shadow:0 0 0 4px rgba(16,185,129,0.22) !important;
+    }
+    .stone-correct .stone-ord { background:rgba(255,255,255,0.2);color:white; }
+    .stone-correct .stone-num { color:white; }
+    .stone-correct .stone-dot { background:rgba(255,255,255,0.35);border-color:white; }
+    .stone-wrong {
+      background:var(--rose-500) !important;border-color:var(--rose-600) !important;
+      box-shadow:0 0 0 4px rgba(244,63,94,0.22) !important;
+    }
+    .stone-wrong .stone-ord { background:rgba(255,255,255,0.2);color:white; }
+    .stone-wrong .stone-num { color:white; }
+    .stone-wrong .stone-dot { background:rgba(255,255,255,0.35);border-color:white; }
+    .stone-dim { opacity:0.38; }
+
+    /* ── Level 2: Sorting ── */
+    .sort-cols {
+      display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:8px;
+    }
+    @media(min-width:540px){ .sort-cols{grid-template-columns:1fr 1fr;} }
+    .sort-zone {
+      border-radius:22px;padding:16px;display:flex;flex-direction:column;min-height:140px;
+    }
+    .sz-finite  { background:rgba(255,251,235,0.75);border:2px solid var(--amber-200); }
+    .sz-infinite{ background:rgba(238,242,255,0.75);border:2px solid var(--indigo-200); }
+    .sz-title {
+      font-family:'Fredoka One',cursive;font-size:1rem;
+      display:flex;align-items:center;gap:8px;
+      padding-bottom:10px;margin-bottom:10px;
+    }
+    .sz-finite  .sz-title  { color:var(--amber-800);border-bottom:1px solid var(--amber-200); }
+    .sz-infinite .sz-title { color:var(--indigo-800);border-bottom:1px solid var(--indigo-200); }
+    .sz-hint { font-size:0.72rem;font-weight:600;margin-bottom:10px; }
+    .sz-finite  .sz-hint  { color:var(--amber-700); }
+    .sz-infinite .sz-hint { color:var(--indigo-800); }
+    .sorted-card {
+      background:white;border-radius:12px;padding:10px 14px;
+      font-size:0.82rem;font-weight:800;
+      display:flex;justify-content:space-between;align-items:center;
+      margin-bottom:8px;animation:popIn 0.28s ease;
+    }
+    .sz-finite  .sorted-card { border:1px solid var(--amber-300);color:var(--amber-900); }
+    .sz-infinite .sorted-card{ border:1px solid var(--indigo-200);color:var(--indigo-900); }
+    .sorted-check { color:var(--emerald-600);font-weight:900; }
+    .unsorted-section {
+      margin-top:22px;padding-top:22px;border-top:1px solid var(--slate-100);
+    }
+    .unsorted-label {
+      font-weight:800;color:var(--slate-700);text-align:center;
+      margin-bottom:14px;font-size:0.88rem;
+    }
+    .unsorted-grid { display:grid;grid-template-columns:1fr;gap:12px; }
+    @media(min-width:480px){ .unsorted-grid{grid-template-columns:1fr 1fr;} }
+    .unsorted-card {
+      background:var(--slate-50);border:1px solid var(--slate-200);
+      border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px;
+    }
+    .unsorted-seq {
+      font-weight:900;color:var(--slate-800);text-align:center;
+      background:white;border:1px solid var(--slate-100);border-radius:12px;
+      padding:10px;font-size:0.86rem;
+    }
+    .unsorted-btns { display:grid;grid-template-columns:1fr 1fr;gap:8px; }
+    .btn-fin,.btn-inf {
+      font-family:'Nunito',sans-serif;font-weight:800;font-size:0.75rem;
+      padding:8px 4px;border-radius:12px;border:none;cursor:pointer;transition:all 0.15s;color:white;
+    }
+    .btn-fin { background:var(--amber-500);border-bottom:3px solid var(--amber-700); }
+    .btn-fin:hover { background:#d97706; }
+    .btn-fin:active { transform:scale(0.95); }
+    .btn-inf { background:var(--indigo-500);border-bottom:3px solid var(--indigo-700); }
+    .btn-inf:hover { background:#4f46e5; }
+    .btn-inf:active { transform:scale(0.95); }
+    .sort-feedback {
+      margin-top:12px;background:var(--emerald-50);color:#065f46;
+      border:1px solid var(--emerald-100);border-radius:12px;
+      padding:10px 16px;text-align:center;font-weight:700;
+      font-size:0.88rem;animation:pulse 1.5s infinite;
+    }
+    .sort-complete-box {
+      margin-top:24px;text-align:center;
+      background:rgba(16,185,129,0.07);border:1px solid var(--emerald-300);
+      border-radius:28px;padding:28px;animation:popIn 0.3s ease;
+    }
+    .sort-complete-title {
+      font-family:'Fredoka One',cursive;font-size:1.6rem;color:#065f46;margin-bottom:8px;
+    }
+
+    /* ── Level 3: Grid ── */
+    .seq-strip {
+      display:flex;flex-wrap:wrap;justify-content:center;gap:10px;
+      padding:26px 16px;background:var(--amber-50);
+      border-radius:28px;border:1px solid var(--amber-200);margin-bottom:22px;
+    }
+    .seq-tile {
+      width:58px;height:58px;border-radius:14px;
+      display:flex;align-items:center;justify-content:center;
+      font-weight:900;font-size:1.2rem;
+    }
+    .seq-filled {
+      background:white;border:1px solid var(--slate-200);
+      border-bottom:4px solid var(--slate-300);color:var(--slate-800);
+      box-shadow:0 2px 6px rgba(0,0,0,0.06);
+    }
+    .seq-blank {
+      border:4px dashed var(--amber-400);background:white;
+      color:var(--amber-500);transition:all 0.3s;
+    }
+    .seq-blank.correct { background:var(--emerald-100);border-color:var(--emerald-500);color:#065f46; }
+    .seq-blank.wrong   { background:var(--rose-100);border-color:var(--rose-500);color:var(--rose-700);animation:pulse 0.5s; }
+    .opts-label {
+      font-size:0.7rem;font-weight:900;text-transform:uppercase;
+      letter-spacing:0.08em;color:var(--slate-500);text-align:center;margin-bottom:12px;
+    }
+    .opts-grid {
+      display:grid;grid-template-columns:1fr 1fr;gap:10px;
+      max-width:360px;margin:0 auto;
+    }
+    .opt-btn {
+      padding:16px;border-radius:18px;
+      font-family:'Nunito',sans-serif;font-weight:900;font-size:1.1rem;
+      cursor:pointer;transition:all 0.15s;
+      border:1px solid var(--slate-200) !important;border-bottom:4px solid var(--slate-200) !important;
+      background:white;color:var(--slate-800);
+    }
+    .opt-btn:hover:not([disabled]) { background:var(--emerald-50); }
+    .opt-btn.correct { background:var(--emerald-500) !important;color:white;border-color:var(--emerald-700) !important;transform:scale(1.04); }
+    .opt-btn.wrong   { background:var(--rose-500)    !important;color:white;border-color:var(--rose-700) !important; }
+    .opt-btn.dim     { opacity:0.35;pointer-events:none; }
+    .opt-btn[disabled]{ pointer-events:none; }
+
+    /* ── Level 4: Change ── */
+    .seq-display {
+      background:#1e1b4b;color:white;border-radius:28px;
+      padding:28px 24px;text-align:center;margin-bottom:22px;
+      box-shadow:0 10px 36px rgba(30,27,75,0.3);position:relative;overflow:hidden;
+    }
+    .seq-display::before {
+      content:'';position:absolute;top:-20px;right:-20px;
+      width:80px;height:80px;background:rgba(255,255,255,0.04);border-radius:50%;
+    }
+    .sdl { font-size:0.65rem;font-weight:900;text-transform:uppercase;letter-spacing:0.15em;color:#a5b4fc;margin-bottom:10px; }
+    .sdt { font-family:'Fredoka One',cursive;font-size:clamp(1.2rem,4vw,2rem);color:#fcd34d;letter-spacing:0.04em; }
+    .rules-grid { display:grid;grid-template-columns:1fr;gap:10px;max-width:420px;margin:0 auto; }
+    @media(min-width:460px){ .rules-grid{grid-template-columns:1fr 1fr;} }
+    .rule-btn {
+      padding:14px 16px;border-radius:18px;
+      font-family:'Nunito',sans-serif;font-weight:800;font-size:0.92rem;
+      cursor:pointer;transition:all 0.15s;
+      border:1px solid var(--slate-200) !important;border-bottom:4px solid var(--slate-200) !important;
+      background:white;color:var(--slate-800);
+      text-align:left;display:flex;align-items:center;gap:10px;
+    }
+    .rule-btn:hover:not([disabled]) { background:#eef2ff; }
+    .rule-btn.correct { background:var(--emerald-500) !important;color:white;border-color:var(--emerald-700) !important; }
+    .rule-btn.wrong   { background:var(--rose-500)    !important;color:white;border-color:var(--rose-700)    !important; }
+    .rule-btn.dim     { opacity:0.35;pointer-events:none; }
+    .rule-btn[disabled]{ pointer-events:none; }
+
+    /* ── Explanation ── */
+    .expl-box {
+      margin-top:22px;padding:20px;border-radius:20px;border:2px solid;animation:fadeIn 0.3s ease;
+    }
+    .expl-box.correct { background:var(--emerald-50);border-color:var(--emerald-200);color:#065f46; }
+    .expl-box.wrong   { background:var(--rose-50)   ;border-color:var(--rose-200)   ;color:#9f1239; }
+    .expl-inner { display:flex;align-items:flex-start;gap:12px; }
+    .expl-emoji { font-size:1.4rem;flex-shrink:0; }
+    .expl-title { font-weight:900;font-size:0.92rem;margin-bottom:4px; }
+    .expl-text  { font-size:0.86rem;line-height:1.55;font-weight:600; }
+    .expl-foot  { display:flex;justify-content:flex-end;margin-top:14px; }
+    .btn-next {
+      background:var(--slate-800);color:white;
+      padding:10px 24px;border-radius:12px;
+      font-family:'Nunito',sans-serif;font-weight:800;font-size:0.88rem;
+      cursor:pointer;border:none;transition:all 0.15s;
+    }
+    .btn-next:hover { background:var(--slate-700); }
+    .btn-next:active { transform:scale(0.95); }
+
+    /* ── Progress ── */
+    .progress-row {
+      display:flex;justify-content:space-between;align-items:center;
+      margin-top:26px;padding-top:14px;border-top:1px solid var(--slate-100);
+      font-size:0.74rem;color:var(--slate-400);font-weight:700;
+    }
+    .progress-dots { display:flex;gap:8px; }
+    .pdot {
+      width:11px;height:11px;border-radius:50%;background:var(--slate-200);transition:all 0.3s;
+    }
+    .pdot.done    { background:var(--emerald-500); }
+    .pdot.current { background:var(--teal-400);box-shadow:0 0 0 3px rgba(45,212,191,0.22);transform:scale(1.25); }
+
+    /* ── Level Clear ── */
+    .lc-content {
+      display:flex;flex-direction:column;align-items:center;text-align:center;padding:20px 0;
+    }
+    .trophy {
+      width:88px;height:88px;background:var(--amber-100);border-radius:50%;
+      display:flex;align-items:center;justify-content:center;font-size:2.4rem;
+      margin-bottom:18px;box-shadow:0 4px 14px rgba(0,0,0,0.08);
+      animation:bounce 1.2s infinite;
+    }
+    .lc-title { font-family:'Fredoka One',cursive;font-size:2.1rem;color:var(--slate-800);margin-bottom:4px; }
+    .lc-sub   { color:var(--emerald-700);font-weight:800;font-size:1rem;margin-bottom:26px; }
+    .stars-recap {
+      background:var(--emerald-50);border:1px solid var(--emerald-100);
+      border-radius:20px;padding:22px;max-width:310px;width:100%;margin-bottom:22px;
+    }
+    .sr-label {
+      font-size:0.7rem;font-weight:900;text-transform:uppercase;
+      letter-spacing:0.1em;color:var(--emerald-600);margin-bottom:10px;
+    }
+    .sr-count {
+      display:flex;align-items:center;justify-content:center;gap:10px;
+      font-family:'Fredoka One',cursive;font-size:1.8rem;color:var(--slate-800);
+    }
+    .pip-quote {
+      color:var(--slate-500);font-style:italic;max-width:400px;
+      font-size:0.87rem;margin-bottom:26px;line-height:1.6;
+    }
+
+    /* ── Game Complete ── */
+    .gc-content { display:flex;flex-direction:column;align-items:center;text-align:center; }
+    .gc-title { font-family:'Fredoka One',cursive;font-size:clamp(1.9rem,5vw,2.8rem);color:var(--slate-800);margin-bottom:6px; }
+    .gc-sub   { color:var(--emerald-700);font-weight:700;font-size:1rem;margin-bottom:26px;max-width:380px; }
+    .final-box {
+      background:var(--amber-50);border:1px solid var(--amber-200);
+      border-radius:28px;padding:26px;max-width:310px;width:100%;
+      box-shadow:inset 0 2px 8px rgba(0,0,0,0.04);margin-bottom:28px;
+    }
+    .fb-label {
+      font-size:0.7rem;font-weight:900;text-transform:uppercase;
+      letter-spacing:0.1em;color:var(--amber-700);margin-bottom:10px;
+    }
+    .fb-count {
+      display:flex;align-items:center;justify-content:center;gap:10px;
+      font-family:'Fredoka One',cursive;font-size:1.9rem;color:var(--slate-800);
+    }
+    .gc-btns { display:flex;gap:14px;flex-wrap:wrap;justify-content:center; }
+
+    /* ── Footer ── */
+    footer {
+      background:var(--slate-50);border-top:1px solid var(--slate-100);
+      padding:16px;text-align:center;font-size:0.72rem;color:var(--slate-400);line-height:1.8;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-title">Pattern Quest</div>
+        <div class="logo-sub">Grade 3 Magic Meadow</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div id="level-badge" style="display:none"></div>
+      <div class="stars-badge">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.787 1.4 8.168L12 18.896l-7.334 3.857 1.4-8.168L.133 9.21l8.2-1.192z"/></svg>
+        <span id="stars-display">0</span>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content"></main>
+
+  <footer>
+    <p>© 2026 Grade 3 Pattern Quest &mdash; Crafted using Alberta Curriculum Standards.</p>
+    <p>Built with high-contrast accessibility standards and voiceover synthesis. No ads or paywalls.</p>
+  </footer>
+</div>
+
+<script>
+// =============================================
+// SOUND SYNTH
+// =============================================
+class SoundSynth {
+  constructor(){ this.ctx=null; }
+  init(){ if(!this.ctx) this.ctx=new(window.AudioContext||window.webkitAudioContext)(); }
+  playClick(){
+    this.init(); if(!this.ctx) return;
+    const o=this.ctx.createOscillator(), g=this.ctx.createGain();
+    o.type='sine';
+    o.frequency.setValueAtTime(400,this.ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(800,this.ctx.currentTime+0.1);
+    g.gain.setValueAtTime(0.1,this.ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01,this.ctx.currentTime+0.1);
+    o.connect(g); g.connect(this.ctx.destination);
+    o.start(); o.stop(this.ctx.currentTime+0.12);
+  }
+  playCorrect(){
+    this.init(); if(!this.ctx) return;
+    const now=this.ctx.currentTime;
+    [523.25,659.25,783.99,1046.50].forEach((f,i)=>{
+      const o=this.ctx.createOscillator(), g=this.ctx.createGain();
+      o.type='triangle';
+      o.frequency.setValueAtTime(f,now+i*0.08);
+      g.gain.setValueAtTime(0.08,now+i*0.08);
+      g.gain.exponentialRampToValueAtTime(0.001,now+i*0.08+0.25);
+      o.connect(g); g.connect(this.ctx.destination);
+      o.start(now+i*0.08); o.stop(now+i*0.08+0.3);
     });
   }
-
-  playIncorrect() {
-    this.init();
-    if (!this.ctx) return;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(220, this.ctx.currentTime);
-    osc.frequency.linearRampToValueAtTime(110, this.ctx.currentTime + 0.35);
-    gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.35);
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.36);
+  playIncorrect(){
+    this.init(); if(!this.ctx) return;
+    const o=this.ctx.createOscillator(), g=this.ctx.createGain();
+    o.type='sawtooth';
+    o.frequency.setValueAtTime(220,this.ctx.currentTime);
+    o.frequency.linearRampToValueAtTime(110,this.ctx.currentTime+0.35);
+    g.gain.setValueAtTime(0.12,this.ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01,this.ctx.currentTime+0.35);
+    o.connect(g); g.connect(this.ctx.destination);
+    o.start(); o.stop(this.ctx.currentTime+0.36);
   }
-
-  playWin() {
-    this.init();
-    if (!this.ctx) return;
-    const now = this.ctx.currentTime;
-    const notes = [523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50];
-    notes.forEach((freq, idx) => {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, now + idx * 0.1);
-      gain.gain.setValueAtTime(0.1, now + idx * 0.1);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.1 + 0.35);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start(now + idx * 0.1);
-      osc.stop(now + idx * 0.1 + 0.4);
+  playWin(){
+    this.init(); if(!this.ctx) return;
+    const now=this.ctx.currentTime;
+    [523.25,587.33,659.25,698.46,783.99,880,987.77,1046.50].forEach((f,i)=>{
+      const o=this.ctx.createOscillator(), g=this.ctx.createGain();
+      o.type='sine';
+      o.frequency.setValueAtTime(f,now+i*0.1);
+      g.gain.setValueAtTime(0.1,now+i*0.1);
+      g.gain.exponentialRampToValueAtTime(0.01,now+i*0.1+0.35);
+      o.connect(g); g.connect(this.ctx.destination);
+      o.start(now+i*0.1); o.stop(now+i*0.1+0.4);
     });
   }
 }
-
 const sound = new SoundSynth();
 
-// --- LEVEL DATA DEFINITION ---
+// =============================================
+// LEVEL DATA
+// =============================================
 const LEVELS = [
   {
-    id: 1,
-    title: "Stepping Stones",
-    shortDesc: "Odd, Even & Ordinal Positions",
-    pipIntro: "Welcome! The Magic Meadow is losing its light. Help me restore it! Can you find the correct stepping stones using their Ordinal Positions? Let's count who is 1st, 2nd, 3rd, and beyond!",
-    tutorial: {
-      title: "How to Play Stepping Stones",
-      text: "A sequence is a neat row of numbers. We use Ordinal Numbers to describe where a number sits! '1st' means the very first number, '2nd' is the second, '3rd' is the third, '4th' is the fourth, and '5th' is the fifth. We use them to find our place in the pattern!",
-      example: "In the sequence [2, 4, 6, 8]: The 1st number is 2, the 2nd is 4, the 3rd is 6, and the 4th is 8!"
+    id:1, title:"Stepping Stones", shortDesc:"Odd, Even & Ordinal Positions",
+    pipIntro:"Welcome! The Magic Meadow is losing its light. Help me restore it! Can you find the correct stepping stones using their Ordinal Positions? Let's count who is 1st, 2nd, 3rd, and beyond!",
+    tutorial:{
+      title:"How to Play Stepping Stones",
+      text:"A sequence is a neat row of numbers. We use Ordinal Numbers to describe where a number sits! '1st' means the very first number, '2nd' is the second, '3rd' is the third, '4th' is the fourth, and '5th' is the fifth. We use them to find our place in the pattern!",
+      example:"In the sequence [2, 4, 6, 8]: The 1st number is 2, the 2nd is 4, the 3rd is 6, and the 4th is 8!"
     },
-    questions: [
-      {
-        instruction: "Tap the 3rd stepping stone in this sequence of Odd numbers!",
-        // FIX: was empty — odd numbers 1–9
-        sequence: [1, 3, 5, 7, 9],
-        targetIndex: 2, // 5
-        explanation: "Excellent! The 3rd stone is 5. We count: 1st is 1, 2nd is 3, and the 3rd is 5."
-      },
-      {
-        instruction: "Tap the 5th stepping stone in this sequence of Even numbers!",
-        // FIX: was empty — even numbers 2–10
-        sequence: [2, 4, 6, 8, 10],
-        targetIndex: 4, // 10
-        explanation: "Correct! The 5th stone is 10. We count: 1st (2), 2nd (4), 3rd (6), 4th (8), and 5th (10)!"
-      },
-      {
-        instruction: "Tap the 2nd stepping stone in this Counting-by-10s sequence!",
-        // FIX: was empty — count by 10s
-        sequence: [10, 20, 30, 40, 50],
-        targetIndex: 1, // 20
-        explanation: "Great job! The 2nd stone is 20. Count with me: 1st is 10, 2nd is 20!"
-      },
-      {
-        instruction: "Tap the 1st stepping stone in this Counting-by-5s sequence!",
-        // FIX: was empty — count by 5s
-        sequence: [5, 10, 15, 20, 25],
-        targetIndex: 0, // 5
-        explanation: "Super! The 1st stone is 5. It is at the very beginning of our sequence!"
-      },
-      {
-        instruction: "Tap the 4th stepping stone in this Counting-by-100s sequence!",
-        // FIX: was empty — count by 100s
-        sequence: [100, 200, 300, 400, 500],
-        targetIndex: 3, // 400
-        explanation: "Awesome! The 4th stone is 400. Let's count them: 1st (100), 2nd (200), 3rd (300), 4th (400)!"
-      }
+    questions:[
+      {instruction:"Tap the 3rd stepping stone in this sequence of Odd numbers!",       sequence:[1,3,5,7,9],      targetIndex:2, explanation:"Excellent! The 3rd stone is 5. We count: 1st is 1, 2nd is 3, and the 3rd is 5."},
+      {instruction:"Tap the 5th stepping stone in this sequence of Even numbers!",      sequence:[2,4,6,8,10],     targetIndex:4, explanation:"Correct! The 5th stone is 10. We count: 1st (2), 2nd (4), 3rd (6), 4th (8), and 5th (10)!"},
+      {instruction:"Tap the 2nd stepping stone in this Counting-by-10s sequence!",      sequence:[10,20,30,40,50], targetIndex:1, explanation:"Great job! The 2nd stone is 20. Count with me: 1st is 10, 2nd is 20!"},
+      {instruction:"Tap the 1st stepping stone in this Counting-by-5s sequence!",       sequence:[5,10,15,20,25],  targetIndex:0, explanation:"Super! The 1st stone is 5. It is at the very beginning of our sequence!"},
+      {instruction:"Tap the 4th stepping stone in this Counting-by-100s sequence!",     sequence:[100,200,300,400,500], targetIndex:3, explanation:"Awesome! The 4th stone is 400. Let's count: 1st (100), 2nd (200), 3rd (300), 4th (400)!"}
     ]
   },
   {
-    id: 2,
-    title: "The Portal Sorting",
-    shortDesc: "Finite vs. Infinite Sequences",
-    pipIntro: "Amazing! Now we have to clean up the Portals. Some pattern lines stop and have an end (Finite). Others go on forever and never stop (Infinite)!",
-    tutorial: {
-      title: "Finite vs. Infinite Sequences",
-      text: "Finite sequences have a definite end. For example, counting down from 5 to 1: 5, 4, 3, 2, 1 - it stops! Infinite sequences never end, like the natural numbers [1, 2, 3, 4, ...] which go on forever! Look for the three dots (...) at the end of infinite sequences.",
-      // FIX: was missing the finite example sequence before "is Finite"
-      example: "[5, 4, 3, 2, 1] is Finite (ends). [5, 10, 15, 20, ...] is Infinite (goes forever)."
+    id:2, title:"The Portal Sorting", shortDesc:"Finite vs. Infinite Sequences",
+    pipIntro:"Amazing! Now we have to clean up the Portals. Some pattern lines stop and have an end (Finite). Others go on forever and never stop (Infinite)!",
+    tutorial:{
+      title:"Finite vs. Infinite Sequences",
+      text:"Finite sequences have a definite end. For example, counting down from 5 to 1: 5, 4, 3, 2, 1 — it stops! Infinite sequences never end, like the natural numbers [1, 2, 3, 4, ...] which go on forever! Look for the three dots (...) at the end of infinite sequences.",
+      example:"[5, 4, 3, 2, 1] is Finite (ends). [5, 10, 15, 20, ...] is Infinite (goes forever)."
     },
-    sortingItems: [
-      { id: "s1", sequenceText: "10, 9, 8, 7, 6, 5 (Countdown to takeoff!)", type: "finite", reason: "This sequence ends at 5." },
-      { id: "s2", sequenceText: "2, 4, 6, 8, 10, ... (Counting even numbers)", type: "infinite", reason: "The '...' means even numbers go on forever!" },
-      { id: "s3", sequenceText: "5, 4, 3, 2, 1, 0 (Blastoff!)", type: "finite", reason: "It stops when we hit 0!" },
-      { id: "s4", sequenceText: "3, 6, 9, 12, 15, ... (Skip-counting by 3)", type: "infinite", reason: "The numbers go on without stopping." },
-      { id: "s5", sequenceText: "Days of the week left: 3, 2, 1, Done!", type: "finite", reason: "It has a set limit of days." },
-      { id: "s6", sequenceText: "100, 200, 300, 400, ... (Counting to infinity!)", type: "infinite", reason: "It can go on as high as you can count!" }
+    sortingItems:[
+      {id:"s1", sequenceText:"10, 9, 8, 7, 6, 5 (Countdown to takeoff!)", type:"finite"},
+      {id:"s2", sequenceText:"2, 4, 6, 8, 10, ... (Counting even numbers)", type:"infinite"},
+      {id:"s3", sequenceText:"5, 4, 3, 2, 1, 0 (Blastoff!)", type:"finite"},
+      {id:"s4", sequenceText:"3, 6, 9, 12, 15, ... (Skip-counting by 3)", type:"infinite"},
+      {id:"s5", sequenceText:"Days of the week left: 3, 2, 1, Done!", type:"finite"},
+      {id:"s6", sequenceText:"100, 200, 300, 400, ... (Counting to infinity!)", type:"infinite"}
     ]
   },
   {
-    id: 3,
-    title: "The Secret Grid",
-    shortDesc: "Multiplication Tables & Missing Terms",
-    pipIntro: "You are a pattern master! Now let's explore patterns hidden in multiplication grids. We can find missing terms by skip-counting or multiplying!",
-    tutorial: {
-      title: "Multiplication Skip-Counting",
-      text: "Rows and columns on multiplication tables are just fun skip-counting patterns! You can figure out missing numbers by multiplying or finding what we count by.",
-      example: "In a '3s' column: 3, 6, 9, [?], 15. The missing number is 12 because 3 x 4 = 12!"
+    id:3, title:"The Secret Grid", shortDesc:"Multiplication Tables & Missing Terms",
+    pipIntro:"You are a pattern master! Now let's explore patterns hidden in multiplication grids. We can find missing terms by skip-counting or multiplying!",
+    tutorial:{
+      title:"Multiplication Skip-Counting",
+      text:"Rows and columns on multiplication tables are just fun skip-counting patterns! You can figure out missing numbers by multiplying or finding what we count by.",
+      example:"In a '3s' column: 3, 6, 9, [?], 15. The missing number is 12 because 3 × 4 = 12!"
     },
-    questions: [
-      {
-        instruction: "Find the missing number in this column of the 3s multiplication table!",
-        sequence: [3, 6, 9, null, 15],
-        // FIX: was empty — plausible wrong answers around 12
-        options: [9, 11, 12, 14],
-        correctAnswer: 12,
-        explanation: "Terrific! 12 is the 4th term (3 x 4 = 12). The sequence counts up by 3s!"
-      },
-      {
-        instruction: "Find the missing number in this section of the 5s multiplication table!",
-        sequence: [15, 20, 25, 30, null],
-        // FIX: was empty — plausible wrong answers around 35
-        options: [32, 33, 35, 40],
-        correctAnswer: 35,
-        explanation: "Correct! We are skip-counting by 5s. 30 + 5 is 35 (or 5 x 7 = 35)!"
-      },
-      {
-        instruction: "Find the missing number in this row of the 4s multiplication table!",
-        sequence: [8, 12, 16, null, 24],
-        // FIX: was empty — plausible wrong answers around 20
-        options: [18, 19, 20, 22],
-        correctAnswer: 20,
-        explanation: "Perfect! 20 is the missing term. 4 x 5 = 20."
-      }
+    questions:[
+      {instruction:"Find the missing number in this column of the 3s multiplication table!", sequence:[3,6,9,null,15], options:[9,11,12,14], correctAnswer:12, explanation:"Terrific! 12 is the 4th term (3 × 4 = 12). The sequence counts up by 3s!"},
+      {instruction:"Find the missing number in this section of the 5s multiplication table!", sequence:[15,20,25,30,null], options:[32,33,35,40], correctAnswer:35, explanation:"Correct! We are skip-counting by 5s. 30 + 5 is 35 (or 5 × 7 = 35)!"},
+      {instruction:"Find the missing number in this row of the 4s multiplication table!", sequence:[8,12,16,null,24], options:[18,19,20,22], correctAnswer:20, explanation:"Perfect! 20 is the missing term. 4 × 5 = 20."}
     ]
   },
   {
-    id: 4,
-    title: "The Change Chamber",
-    shortDesc: "Operation Rules & Term Changes",
-    pipIntro: "Final level! Let's decode the secret change from term to term. Is the pattern using Addition, Subtraction, Multiplication, or Division?",
-    tutorial: {
-      title: "What is the Magic Rule?",
-      text: "Every sequence progresses according to a rule. We can describe how we get from one number to the next using math operations like (+), (-), (x), or (÷)!",
-      example: "From 2 to 4 to 8: the rule is 'Multiply by 2' (x2). From 10 to 8 to 6: the rule is 'Subtract 2' (-2)."
+    id:4, title:"The Change Chamber", shortDesc:"Operation Rules & Term Changes",
+    pipIntro:"Final level! Let's decode the secret change from term to term. Is the pattern using Addition, Subtraction, Multiplication, or Division?",
+    tutorial:{
+      title:"What is the Magic Rule?",
+      text:"Every sequence progresses according to a rule. We can describe how we get from one number to the next using math operations like (+), (−), (×), or (÷)!",
+      example:"From 2 to 4 to 8: the rule is 'Multiply by 2' (×2). From 10 to 8 to 6: the rule is 'Subtract 2' (−2)."
     },
-    questions: [
-      {
-        sequenceText: "4 ➔ 8 ➔ 12 ➔ 16 ➔ 20",
-        instruction: "What is the math rule to get from term to term?",
-        options: ["Add 4 (+4)", "Subtract 4 (-4)", "Multiply by 2 (x2)", "Divide by 2 (÷2)"],
-        correctIndex: 0,
-        explanation: "Fantastic! Each step adds 4. (4 + 4 = 8, 8 + 4 = 12)."
-      },
-      {
-        sequenceText: "30 ➔ 25 ➔ 20 ➔ 15 ➔ 10",
-        instruction: "What is the math rule to get from term to term?",
-        options: ["Add 5 (+5)", "Subtract 5 (-5)", "Multiply by 5 (x5)", "Divide by 5 (÷5)"],
-        correctIndex: 1,
-        explanation: "Yes! The sequence is counting backwards by 5, which is subtracting 5 (-5)."
-      },
-      {
-        sequenceText: "3 ➔ 6 ➔ 12 ➔ 24 ➔ 48",
-        instruction: "What is the math rule to get from term to term?",
-        options: ["Add 3 (+3)", "Subtract 3 (-3)", "Multiply by 2 (x2)", "Multiply by 3 (x3)"],
-        correctIndex: 2,
-        explanation: "Brilliant! Each term is doubled: 3 x 2 = 6, 6 x 2 = 12, 12 x 2 = 24. So the rule is Multiply by 2!"
-      },
-      {
-        sequenceText: "40 ➔ 20 ➔ 10 ➔ 5",
-        instruction: "What is the math rule to get from term to term?",
-        options: ["Subtract 20 (-20)", "Divide by 2 (÷2)", "Add 10 (+10)", "Divide by 10 (÷10)"],
-        correctIndex: 1,
-        explanation: "Wow, master status! 40 cut in half is 20, 20 cut in half is 10. That's dividing by 2 (÷2)!"
-      }
+    questions:[
+      {sequenceText:"4 ➔ 8 ➔ 12 ➔ 16 ➔ 20", instruction:"What is the math rule to get from term to term?", options:["Add 4 (+4)","Subtract 4 (−4)","Multiply by 2 (×2)","Divide by 2 (÷2)"], correctIndex:0, explanation:"Fantastic! Each step adds 4. (4 + 4 = 8, 8 + 4 = 12)."},
+      {sequenceText:"30 ➔ 25 ➔ 20 ➔ 15 ➔ 10", instruction:"What is the math rule to get from term to term?", options:["Add 5 (+5)","Subtract 5 (−5)","Multiply by 5 (×5)","Divide by 5 (÷5)"], correctIndex:1, explanation:"Yes! The sequence is counting backwards by 5, which is subtracting 5 (−5)."},
+      {sequenceText:"3 ➔ 6 ➔ 12 ➔ 24 ➔ 48", instruction:"What is the math rule to get from term to term?", options:["Add 3 (+3)","Subtract 3 (−3)","Multiply by 2 (×2)","Multiply by 3 (×3)"], correctIndex:2, explanation:"Brilliant! Each term is doubled: 3×2=6, 6×2=12, 12×2=24. The rule is Multiply by 2!"},
+      {sequenceText:"40 ➔ 20 ➔ 10 ➔ 5", instruction:"What is the math rule to get from term to term?", options:["Subtract 20 (−20)","Divide by 2 (÷2)","Add 10 (+10)","Divide by 10 (÷10)"], correctIndex:1, explanation:"Wow, master status! 40 cut in half is 20, 20 cut in half is 10. That's dividing by 2 (÷2)!"}
     ]
   }
 ];
 
-export default function App() {
-  const [screen, setScreen] = useState('home');
-  const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
-  const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
-  const [stars, setStars] = useState(0);
+// =============================================
+// STATE
+// =============================================
+const S = {
+  screen:'home',
+  levelIdx:0, questionIdx:0, stars:0,
+  stoneIdx:null, gridAns:null, changeAns:null,
+  ansCorrect:null, showExpl:false,
+  sorted:{}, sortFeedback:'', sortDone:false,
+  speaking:false
+};
 
-  const [selectedStoneIdx, setSelectedStoneIdx] = useState(null);
-  const [gridAnswerSelected, setGridAnswerSelected] = useState(null);
-  const [changeAnswerSelected, setChangeAnswerSelected] = useState(null);
-  const [isAnswerCorrect, setIsAnswerCorrect] = useState(null);
-  const [showExplanation, setShowExplanation] = useState(false);
-
-  const [sortedItems, setSortedItems] = useState({});
-  const [sortingFeedback, setSortingFeedback] = useState("");
-  const [sortingComplete, setSortingComplete] = useState(false);
-
-  const [isSpeaking, setIsSpeaking] = useState(false);
-
-  const currentLevel = LEVELS[currentLevelIdx];
-  const currentQuestion = currentLevel?.questions?.[currentQuestionIdx];
-
-  const speakText = (text) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.95;
-      utterance.pitch = 1.15;
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-
-  const stopSpeaking = () => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
-    }
-  };
-
-  const triggerTactileTap = () => {
-    sound.playClick();
-  };
-
-  const handleNavigate = (nextScreen) => {
-    stopSpeaking();
-    sound.playClick();
-    setScreen(nextScreen);
-    if (nextScreen === 'levelIntro') {
-      setTimeout(() => speakText(LEVELS[currentLevelIdx].pipIntro), 400);
-    } else if (nextScreen === 'tutorial') {
-      setTimeout(() => speakText(LEVELS[currentLevelIdx].tutorial.text), 400);
-    }
-  };
-
-  const handleStartGame = () => {
-    setStars(0);
-    setCurrentLevelIdx(0);
-    setCurrentQuestionIdx(0);
-    resetLevelStates();
-    handleNavigate('levelIntro');
-  };
-
-  const resetLevelStates = () => {
-    setSelectedStoneIdx(null);
-    setGridAnswerSelected(null);
-    setChangeAnswerSelected(null);
-    setIsAnswerCorrect(null);
-    setShowExplanation(false);
-    setSortedItems({});
-    setSortingFeedback("");
-    setSortingComplete(false);
-  };
-
-  const handleSelectStone = (idx) => {
-    if (showExplanation) return;
-    triggerTactileTap();
-    setSelectedStoneIdx(idx);
-    const isCorrect = idx === currentQuestion.targetIndex;
-    setIsAnswerCorrect(isCorrect);
-    setShowExplanation(true);
-    if (isCorrect) {
-      sound.playCorrect();
-      setStars(prev => prev + 1);
-    } else {
-      sound.playIncorrect();
-    }
-  };
-
-  const handleSelectGridAnswer = (ans) => {
-    if (showExplanation) return;
-    triggerTactileTap();
-    setGridAnswerSelected(ans);
-    const isCorrect = ans === currentQuestion.correctAnswer;
-    setIsAnswerCorrect(isCorrect);
-    setShowExplanation(true);
-    if (isCorrect) {
-      sound.playCorrect();
-      setStars(prev => prev + 1);
-    } else {
-      sound.playIncorrect();
-    }
-  };
-
-  const handleSelectChangeAnswer = (idx) => {
-    if (showExplanation) return;
-    triggerTactileTap();
-    setChangeAnswerSelected(idx);
-    const isCorrect = idx === currentQuestion.correctIndex;
-    setIsAnswerCorrect(isCorrect);
-    setShowExplanation(true);
-    if (isCorrect) {
-      sound.playCorrect();
-      setStars(prev => prev + 1);
-    } else {
-      sound.playIncorrect();
-    }
-  };
-
-  const handleSortItem = (itemId, targetCategory) => {
-    sound.playClick();
-    const updated = { ...sortedItems, [itemId]: targetCategory };
-    setSortedItems(updated);
-    const item = currentLevel.sortingItems.find(i => i.id === itemId);
-    if (item.type === targetCategory) {
-      setSortingFeedback(`Awesome! Correctly sorted.`);
-      sound.playCorrect();
-    } else {
-      setSortingFeedback(`Oops! Try sorting that one again.`);
-      sound.playIncorrect();
-      setTimeout(() => {
-        setSortedItems(prev => {
-          const reset = { ...prev };
-          delete reset[itemId];
-          return reset;
-        });
-        setSortingFeedback("");
-      }, 1500);
-    }
-  };
-
-  useEffect(() => {
-    if (screen === 'play' && currentLevel?.id === 2) {
-      const items = currentLevel.sortingItems;
-      const allCorrect = items.every(item => sortedItems[item.id] === item.type);
-      if (allCorrect && items.length > 0) {
-        setSortingComplete(true);
-        sound.playWin();
-        setStars(prev => prev + 3);
-      }
-    }
-  }, [sortedItems, screen, currentLevelIdx]);
-
-  const handleNextAction = () => {
-    stopSpeaking();
-    sound.playClick();
-    if (currentLevel.questions && currentQuestionIdx < currentLevel.questions.length - 1) {
-      setCurrentQuestionIdx(prev => prev + 1);
-      setSelectedStoneIdx(null);
-      setGridAnswerSelected(null);
-      setChangeAnswerSelected(null);
-      setIsAnswerCorrect(null);
-      setShowExplanation(false);
-    } else {
-      sound.playWin();
-      setScreen('levelClear');
-    }
-  };
-
-  const handleNextLevel = () => {
-    stopSpeaking();
-    sound.playClick();
-    if (currentLevelIdx < LEVELS.length - 1) {
-      setCurrentLevelIdx(prev => prev + 1);
-      setCurrentQuestionIdx(0);
-      resetLevelStates();
-      setScreen('levelIntro');
-    } else {
-      setScreen('gameComplete');
-    }
-  };
-
-  // Pip SVG mascot — shared component to reduce repetition
-  const PipMascot = ({ size = "w-full h-full", crowned = false, pulsing = false }) => (
-    <svg viewBox="0 0 120 120" className={`${size} drop-shadow-lg`}>
-      <circle cx="60" cy="65" r="45" fill="#10B981" />
-      <circle cx="60" cy="65" r="40" fill="#34D399" />
-      <ellipse cx="25" cy="50" rx="15" ry="25" fill="#93C5FD" opacity="0.8" transform="rotate(-20 25 50)"/>
-      <ellipse cx="95" cy="50" rx="15" ry="25" fill="#93C5FD" opacity="0.8" transform="rotate(20 95 50)"/>
-      {crowned && (
-        <path d="M 40 25 L 45 35 L 60 20 L 75 35 L 80 25 L 85 40 L 35 40 Z" fill="#F59E0B" stroke="#D97706" strokeWidth="2" />
-      )}
-      {!crowned && (
-        <>
-          <path d="M 60 25 Q 60 15 68 12" stroke="#F59E0B" strokeWidth="4" strokeLinecap="round" fill="none" />
-          <circle cx="68" cy="12" r="6" fill="#F59E0B" />
-        </>
-      )}
-      <circle cx="48" cy="55" r="6" fill="#1E293B" />
-      <circle cx="48" cy="53" r="2" fill="white" />
-      <circle cx="72" cy="55" r="6" fill="#1E293B" />
-      <circle cx="72" cy="53" r="2" fill="white" />
-      <circle cx="42" cy="64" r="4" fill="#F43F5E" opacity="0.6" />
-      <circle cx="78" cy="64" r="4" fill="#F43F5E" opacity="0.6" />
-      <path d="M 52 68 Q 60 76 68 68" stroke="#1E293B" strokeWidth="4" strokeLinecap="round" fill="none" />
-    </svg>
-  );
-
-  const SpeakerIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-    </svg>
-  );
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-teal-50 to-sky-100 font-sans text-gray-800 flex flex-col justify-between select-none">
-
-      {/* --- HEADER --- */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-teal-100 py-3 px-4 md:px-8 flex items-center justify-between sticky top-0 z-20 shadow-sm">
-        <div className="flex items-center gap-2">
-          <div className="bg-emerald-500 text-white p-2 rounded-xl shadow-md transform rotate-3">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-700 bg-clip-text text-transparent">
-              Pattern Quest
-            </h1>
-            <p className="text-xs text-emerald-600 font-medium hidden sm:block">Grade 3 Magic Meadow</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          {screen !== 'home' && (
-            <div className="bg-teal-50 border border-teal-200 px-3 py-1.5 rounded-full flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wider font-bold text-teal-700">Level {currentLevelIdx + 1}</span>
-              <div className="w-16 h-2 bg-teal-200 rounded-full overflow-hidden hidden xs:block">
-                <div
-                  className="bg-emerald-500 h-full transition-all duration-300"
-                  style={{ width: `${(currentLevelIdx / LEVELS.length) * 100}%` }}
-                />
-              </div>
-            </div>
-          )}
-          <div className="bg-amber-50 border border-amber-200 px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm animate-bounce">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-500 fill-amber-400" viewBox="0 0 24 24">
-              <path d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.787 1.4 8.168L12 18.896l-7.334 3.857 1.4-8.168L.133 9.21l8.2-1.192z"/>
-            </svg>
-            <span className="font-extrabold text-amber-800 text-lg">{stars}</span>
-          </div>
-        </div>
-      </header>
-
-      {/* --- MAIN GAME CONTAINER --- */}
-      <main className="max-w-4xl w-full mx-auto px-4 py-6 flex-grow flex flex-col justify-center">
-
-        {/* --- SCREEN 1: HOME --- */}
-        {screen === 'home' && (
-          <div className="bg-white rounded-3xl p-6 md:p-10 shadow-xl border border-teal-100 text-center relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-32 h-32 bg-emerald-100 rounded-full filter blur-xl opacity-50 -translate-x-12 -translate-y-12"></div>
-            <div className="absolute bottom-0 right-0 w-48 h-48 bg-teal-100 rounded-full filter blur-2xl opacity-50 translate-x-16 translate-y-16"></div>
-
-            <div className="relative z-10 flex flex-col items-center">
-              <div className="w-32 h-32 mb-4 animate-bounce">
-                <PipMascot />
-              </div>
-              <h2 className="text-3xl md:text-5xl font-black text-slate-800 tracking-tight mb-2">
-                Pattern Quest!
-              </h2>
-              <p className="text-teal-700 text-lg md:text-xl font-medium mb-8 max-w-md mx-auto">
-                Restore magic to the Meadow by solving numerical sequences and patterns!
-              </p>
-              <button
-                onClick={handleStartGame}
-                className="group relative bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-extrabold text-xl px-12 py-5 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 border-b-4 border-emerald-700"
-              >
-                Let's Play!
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 inline-block ml-2 group-hover:translate-x-1.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                </svg>
-              </button>
-              <div className="mt-10 grid grid-cols-2 gap-3 text-left max-w-lg w-full text-xs text-slate-500 border-t border-slate-100 pt-6">
-                <div className="flex items-center gap-2"><span className="p-1 bg-emerald-100 text-emerald-700 rounded-md">🔢</span>Even, Odd & Ordinals</div>
-                <div className="flex items-center gap-2"><span className="p-1 bg-teal-100 text-teal-700 rounded-md">♾️</span>Finite vs. Infinite</div>
-                <div className="flex items-center gap-2"><span className="p-1 bg-sky-100 text-sky-700 rounded-md">✖️</span>Skip-Counting Grids</div>
-                <div className="flex items-center gap-2"><span className="p-1 bg-amber-100 text-amber-700 rounded-md">🧮</span>Change Operators (+ - x ÷)</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- SCREEN 2: LEVEL INTRODUCTION --- */}
-        {screen === 'levelIntro' && currentLevel && (
-          <div className="bg-white rounded-3xl p-6 md:p-8 shadow-xl border border-teal-100">
-            <div className="flex flex-col md:flex-row items-center gap-6">
-              <div className="flex flex-col items-center shrink-0">
-                <div className={`w-28 h-28 ${isSpeaking ? 'animate-pulse scale-105' : 'animate-bounce'}`}>
-                  <PipMascot />
-                </div>
-                <span className="font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full text-xs mt-2 border border-emerald-100">
-                  Pip the Pixie
-                </span>
-              </div>
-              <div className="flex-grow bg-emerald-50/60 border-2 border-emerald-100 p-6 rounded-2xl relative">
-                <div className="hidden md:block absolute top-10 -left-3 w-6 h-6 bg-emerald-50 border-l-2 border-b-2 border-emerald-100 rotate-45"></div>
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs uppercase font-extrabold tracking-widest text-emerald-600">
-                    Quest Level {currentLevel.id}
-                  </span>
-                  <button
-                    onClick={() => speakText(currentLevel.pipIntro)}
-                    className={`p-2 rounded-full border transition-all duration-200 ${isSpeaking ? 'bg-emerald-500 border-emerald-600 text-white animate-pulse' : 'bg-white border-emerald-200 text-emerald-600 hover:bg-emerald-50'}`}
-                    title="Read Instructions Aloud"
-                  >
-                    <SpeakerIcon />
-                  </button>
-                </div>
-                <h3 className="text-2xl font-bold text-slate-800 mb-2">{currentLevel.title}</h3>
-                <p className="text-slate-600 text-base md:text-lg leading-relaxed">"{currentLevel.pipIntro}"</p>
-              </div>
-            </div>
-            <div className="mt-8 flex justify-end gap-3">
-              <button
-                onClick={() => handleNavigate('tutorial')}
-                className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-lg px-8 py-4 rounded-xl shadow-md border-b-4 border-emerald-700 active:scale-95 transition-all"
-              >
-                Learn How! 📖
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* --- SCREEN 3: TUTORIAL --- */}
-        {screen === 'tutorial' && currentLevel && (
-          <div className="bg-white rounded-3xl p-6 md:p-8 shadow-xl border border-teal-100">
-            <div className="mb-6 border-b border-teal-100 pb-4">
-              <div className="flex items-center justify-between">
-                <span className="bg-teal-50 text-teal-700 border border-teal-200 font-bold px-3 py-1 rounded-full text-xs">
-                  Tutorial Book
-                </span>
-                <button
-                  onClick={() => speakText(currentLevel.tutorial.text)}
-                  className={`p-2 rounded-full border transition-all duration-200 ${isSpeaking ? 'bg-teal-500 border-teal-600 text-white' : 'bg-white border-teal-200 text-teal-600 hover:bg-teal-50'}`}
-                  title="Read Aloud"
-                >
-                  <SpeakerIcon />
-                </button>
-              </div>
-              <h2 className="text-2xl font-black text-slate-800 mt-2">{currentLevel.tutorial.title}</h2>
-            </div>
-            <div className="space-y-6 text-slate-600">
-              <p className="text-base md:text-lg leading-relaxed bg-teal-50/40 p-5 rounded-2xl border border-teal-100/60 text-slate-700">
-                {currentLevel.tutorial.text}
-              </p>
-              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5">
-                <h4 className="font-bold text-amber-800 mb-1.5 flex items-center gap-1.5 text-sm uppercase">
-                  ⭐ Tip &amp; Example
-                </h4>
-                <p className="text-amber-900 font-medium text-base">{currentLevel.tutorial.example}</p>
-              </div>
-            </div>
-            <div className="mt-8 pt-4 border-t border-teal-50 flex justify-between gap-4">
-              <button
-                onClick={() => handleNavigate('levelIntro')}
-                className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-6 py-3 rounded-xl transition"
-              >
-                Back
-              </button>
-              <button
-                onClick={() => handleNavigate('play')}
-                className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-lg px-8 py-4 rounded-xl shadow-md border-b-4 border-emerald-700 active:scale-95 transition-all"
-              >
-                Start Challenge! 🚀
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* --- SCREEN 4: ACTIVE PLAY SCREEN --- */}
-        {screen === 'play' && currentLevel && (
-          <div className="bg-white rounded-3xl p-5 md:p-8 shadow-xl border border-teal-100 relative">
-
-            {/* Mascot Prompt Bar */}
-            <div className="flex items-start gap-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 mb-6">
-              <div className="w-12 h-12 shrink-0 animate-pulse">
-                <svg viewBox="0 0 120 120" className="w-full h-full">
-                  <circle cx="60" cy="65" r="45" fill="#10B981" />
-                  <circle cx="60" cy="65" r="40" fill="#34D399" />
-                  <ellipse cx="25" cy="50" rx="15" ry="25" fill="#93C5FD" opacity="0.8" transform="rotate(-20 25 50)"/>
-                  <ellipse cx="95" cy="50" rx="15" ry="25" fill="#93C5FD" opacity="0.8" transform="rotate(20 95 50)"/>
-                  <circle cx="48" cy="55" r="5" fill="#1E293B" />
-                  <circle cx="72" cy="55" r="5" fill="#1E293B" />
-                  <path d="M 52 68 Q 60 74 68 68" stroke="#1E293B" strokeWidth="4" strokeLinecap="round" fill="none" />
-                </svg>
-              </div>
-              <div className="flex-grow">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-black uppercase text-emerald-600">Challenge Prompt</span>
-                  <button
-                    onClick={() => {
-                      const textToRead = currentLevel.id === 2
-                        ? "Sort these sequence portals! Click or tap either Finite or Infinite on each item card."
-                        : currentQuestion?.instruction;
-                      speakText(textToRead);
-                    }}
-                    className={`p-1.5 rounded-full transition ${isSpeaking ? 'bg-emerald-500 text-white' : 'bg-white border text-emerald-600 hover:bg-emerald-50'}`}
-                  >
-                    <SpeakerIcon />
-                  </button>
-                </div>
-                <p className="text-slate-800 font-bold text-base md:text-lg">
-                  {currentLevel.id === 2 ? "Sort all sequences to clear the magic portals!" : currentQuestion?.instruction}
-                </p>
-              </div>
-            </div>
-
-            {/* --- LEVEL 1: STEPPING STONES --- */}
-            {currentLevel.id === 1 && currentQuestion && (
-              <div className="my-6">
-                <div className="mb-4 bg-teal-50 border border-teal-100 rounded-xl p-3 text-center text-xs font-semibold text-teal-800">
-                  💡 Hint: Ordinal numbers describe exact sequence slots!
-                  <span className="ml-1 font-bold">(1st = First, 2nd = Second, 3rd = Third, 4th = Fourth, 5th = Fifth)</span>
-                </div>
-                <div className="flex flex-wrap justify-center gap-4 py-8 px-4 bg-sky-50 rounded-3xl border border-sky-100">
-                  {currentQuestion.sequence.map((num, idx) => {
-                    const suffixes = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th"];
-                    const isSelected = selectedStoneIdx === idx;
-                    const isTarget = currentQuestion.targetIndex === idx;
-
-                    let bgClass = "bg-white hover:bg-teal-50 border-slate-200 text-slate-800 scale-100";
-                    if (selectedStoneIdx !== null) {
-                      if (isTarget) {
-                        bgClass = "bg-emerald-500 border-emerald-600 text-white ring-4 ring-emerald-200 scale-105";
-                      } else if (isSelected) {
-                        bgClass = "bg-rose-500 border-rose-600 text-white ring-4 ring-rose-200";
-                      } else {
-                        bgClass = "opacity-45 bg-white border-slate-100 text-slate-400";
-                      }
-                    }
-
-                    return (
-                      <button
-                        key={idx}
-                        disabled={showExplanation}
-                        onClick={() => handleSelectStone(idx)}
-                        className={`w-20 h-24 rounded-2xl border-b-8 font-extrabold flex flex-col items-center justify-between p-3 shadow-md transition-all duration-200 ${bgClass}`}
-                      >
-                        <span className="text-xs uppercase text-slate-400 bg-slate-100 rounded px-1.5 py-0.5 font-bold">
-                          {suffixes[idx]}
-                        </span>
-                        <span className="text-2xl font-black">{num}</span>
-                        <div className="w-4 h-4 rounded-full border border-slate-200 bg-white"></div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* --- LEVEL 2: PORTAL SORTING --- */}
-            {currentLevel.id === 2 && (
-              <div className="my-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-amber-50/70 border-2 border-amber-200 rounded-3xl p-4 flex flex-col min-h-40">
-                    <h4 className="text-amber-800 font-extrabold text-lg flex items-center gap-2 border-b border-amber-200 pb-2">
-                      <span className="text-2xl">🛑</span> Finite Sequences (Has an End)
-                    </h4>
-                    <p className="text-xs text-amber-700 mt-1 mb-4">Cards that stop or have a fixed limit go here.</p>
-                    <div className="flex-grow space-y-3">
-                      {currentLevel.sortingItems.filter(item => sortedItems[item.id] === 'finite').map(item => (
-                        <div key={item.id} className="bg-white border border-amber-300 p-3 rounded-xl shadow-sm text-sm font-bold text-amber-900 flex justify-between items-center">
-                          <span>{item.sequenceText}</span>
-                          <span className="text-emerald-600">✓ Correct!</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="bg-indigo-50/70 border-2 border-indigo-200 rounded-3xl p-4 flex flex-col min-h-40">
-                    <h4 className="text-indigo-800 font-extrabold text-lg flex items-center gap-2 border-b border-indigo-200 pb-2">
-                      <span className="text-2xl">♾️</span> Infinite Sequences (Goes Forever)
-                    </h4>
-                    <p className="text-xs text-indigo-700 mt-1 mb-4">Look for sequence patterns with the three dots (...)</p>
-                    <div className="flex-grow space-y-3">
-                      {currentLevel.sortingItems.filter(item => sortedItems[item.id] === 'infinite').map(item => (
-                        <div key={item.id} className="bg-white border border-indigo-300 p-3 rounded-xl shadow-sm text-sm font-bold text-indigo-950 flex justify-between items-center">
-                          <span>{item.sequenceText}</span>
-                          <span className="text-emerald-600">✓ Correct!</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {!sortingComplete && (
-                  <div className="mt-8 border-t border-slate-100 pt-6">
-                    <h4 className="font-extrabold text-slate-700 mb-3 text-center">Tap where each sequence belongs:</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {currentLevel.sortingItems.filter(item => !sortedItems[item.id]).map(item => (
-                        <div key={item.id} className="bg-slate-50 border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col justify-between">
-                          <span className="text-base font-black text-slate-800 mb-3 block text-center py-2 bg-white rounded-xl border border-slate-100">
-                            {item.sequenceText}
-                          </span>
-                          <div className="grid grid-cols-2 gap-2">
-                            <button
-                              onClick={() => handleSortItem(item.id, 'finite')}
-                              className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold py-2 px-3 rounded-xl text-xs shadow border-b-2 border-amber-700 active:scale-95 transition-all"
-                            >
-                              Stop (Finite) 🛑
-                            </button>
-                            <button
-                              onClick={() => handleSortItem(item.id, 'infinite')}
-                              className="bg-indigo-500 hover:bg-indigo-600 text-white font-extrabold py-2 px-3 rounded-xl text-xs shadow border-b-2 border-indigo-700 active:scale-95 transition-all"
-                            >
-                              Forever (Infinite) ♾️
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {sortingFeedback && (
-                  <div className="mt-4 p-3 bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-xl text-center text-sm font-bold animate-pulse">
-                    {sortingFeedback}
-                  </div>
-                )}
-
-                {sortingComplete && (
-                  <div className="mt-8 text-center bg-emerald-500/10 border border-emerald-300 p-6 rounded-3xl">
-                    <h3 className="text-2xl font-black text-emerald-800 mb-2">🎉 Portal Complete!</h3>
-                    <p className="text-emerald-700 mb-4 font-medium">You sorted all patterns with perfect accuracy. Extra stars added!</p>
-                    <button
-                      onClick={handleNextAction}
-                      className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-lg px-8 py-3 rounded-xl shadow border-b-4 border-emerald-700 active:scale-95 transition-all"
-                    >
-                      Awesome! Continue
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* --- LEVEL 3: SECRET GRID --- */}
-            {currentLevel.id === 3 && currentQuestion && (
-              <div className="my-6">
-                <div className="flex flex-col items-center gap-6">
-                  <div className="flex justify-center gap-3 py-6 px-4 bg-amber-50 rounded-3xl border border-amber-200 w-full max-w-lg">
-                    {currentQuestion.sequence.map((num, idx) => {
-                      if (num === null) {
-                        return (
-                          <div
-                            key={idx}
-                            // FIX: replaced animate-shake (non-existent) with animate-pulse for wrong answer
-                            className={`w-14 h-14 md:w-16 md:h-16 rounded-xl border-4 border-dashed font-black text-xl md:text-2xl flex items-center justify-center shadow-inner transition-all ${
-                              isAnswerCorrect === true
-                                ? 'bg-emerald-100 border-emerald-500 text-emerald-700'
-                                : isAnswerCorrect === false
-                                ? 'bg-rose-100 border-rose-500 text-rose-700 animate-pulse'
-                                : 'bg-white border-amber-400 text-amber-500'
-                            }`}
-                          >
-                            {gridAnswerSelected ? gridAnswerSelected : "?"}
-                          </div>
-                        );
-                      }
-                      return (
-                        <div
-                          key={idx}
-                          className="w-14 h-14 md:w-16 md:h-16 rounded-xl border-b-4 border-slate-300 bg-white border border-slate-200 text-slate-800 font-extrabold text-lg md:text-xl flex items-center justify-center shadow"
-                        >
-                          {num}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="w-full max-w-lg">
-                    <h4 className="font-extrabold text-slate-500 text-xs uppercase mb-3 text-center">Choose the missing term:</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      {currentQuestion.options.map((opt, idx) => {
-                        const isSelected = gridAnswerSelected === opt;
-                        const isCorrect = opt === currentQuestion.correctAnswer;
-
-                        let optStyle = "bg-white hover:bg-emerald-50 text-slate-800 border-slate-200 border-b-4";
-                        if (gridAnswerSelected !== null) {
-                          if (isCorrect) {
-                            // FIX: replaced scale-102 (non-existent) with scale-105
-                            optStyle = "bg-emerald-500 text-white border-emerald-700 pointer-events-none scale-105";
-                          } else if (isSelected) {
-                            optStyle = "bg-rose-500 text-white border-rose-700 pointer-events-none";
-                          } else {
-                            optStyle = "opacity-40 bg-white text-slate-300 pointer-events-none";
-                          }
-                        }
-
-                        return (
-                          <button
-                            key={idx}
-                            disabled={gridAnswerSelected !== null}
-                            onClick={() => handleSelectGridAnswer(opt)}
-                            className={`py-4 px-6 rounded-2xl text-lg font-black transition-all ${optStyle}`}
-                          >
-                            {opt}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* --- LEVEL 4: CHANGE CHAMBER --- */}
-            {currentLevel.id === 4 && currentQuestion && (
-              <div className="my-6">
-                <div className="flex flex-col items-center gap-6">
-                  <div className="bg-indigo-900 text-white px-6 py-6 rounded-3xl w-full text-center shadow-lg relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-white/5 rounded-full translate-x-4 -translate-y-4"></div>
-                    <span className="text-indigo-300 uppercase font-black text-xs tracking-widest block mb-2">Sequence Line</span>
-                    <span className="text-2xl md:text-4xl font-black tracking-wider text-amber-300">
-                      {currentQuestion.sequenceText}
-                    </span>
-                  </div>
-                  <div className="w-full max-w-lg">
-                    <h4 className="font-extrabold text-slate-500 text-xs uppercase mb-3 text-center">Select the correct change rule:</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {currentQuestion.options.map((opt, idx) => {
-                        const isSelected = changeAnswerSelected === idx;
-                        const isCorrect = idx === currentQuestion.correctIndex;
-
-                        let style = "bg-white hover:bg-indigo-50 text-slate-800 border-slate-200 border-b-4";
-                        if (changeAnswerSelected !== null) {
-                          if (isCorrect) {
-                            style = "bg-emerald-500 text-white border-emerald-700 pointer-events-none";
-                          } else if (isSelected) {
-                            style = "bg-rose-500 text-white border-rose-700 pointer-events-none";
-                          } else {
-                            style = "opacity-40 bg-white text-slate-300 pointer-events-none";
-                          }
-                        }
-
-                        return (
-                          <button
-                            key={idx}
-                            disabled={changeAnswerSelected !== null}
-                            onClick={() => handleSelectChangeAnswer(idx)}
-                            className={`py-4 px-6 rounded-2xl text-base font-black text-left flex items-center gap-3 transition-all ${style}`}
-                          >
-                            <span className="text-xl">⚙️</span>
-                            {opt}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* --- EXPLANATION BOX --- */}
-            {showExplanation && currentLevel.id !== 2 && (
-              <div className={`mt-6 p-5 rounded-2xl border-2 transition-all duration-300 ${
-                isAnswerCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'
-              }`}>
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">{isAnswerCorrect ? "🌟" : "💡"}</span>
-                  <div>
-                    <h5 className="font-extrabold text-base mb-1">
-                      {isAnswerCorrect ? "You Got It!" : "Not Quite! Learn from Pip:"}
-                    </h5>
-                    <p className="text-sm font-medium leading-relaxed">{currentQuestion?.explanation}</p>
-                  </div>
-                </div>
-                <div className="mt-4 flex justify-end">
-                  <button
-                    onClick={handleNextAction}
-                    className="bg-slate-800 hover:bg-slate-900 text-white font-extrabold py-2.5 px-6 rounded-xl text-sm transition"
-                  >
-                    Next Question ➔
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Progress indicators */}
-            {currentLevel.id !== 2 && (
-              <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-bold">
-                <span>Progress: {currentQuestionIdx + 1} of {currentLevel.questions.length} Questions</span>
-                <div className="flex gap-1.5">
-                  {currentLevel.questions.map((_, idx) => (
-                    <div
-                      key={idx}
-                      className={`w-3 h-3 rounded-full transition ${
-                        idx < currentQuestionIdx
-                          ? 'bg-emerald-500'
-                          : idx === currentQuestionIdx
-                          ? 'bg-teal-400 ring-2 ring-teal-100 scale-110'
-                          : 'bg-slate-200'
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* --- SCREEN 5: LEVEL CLEAR --- */}
-        {screen === 'levelClear' && currentLevel && (
-          <div className="bg-white rounded-3xl p-6 md:p-8 shadow-xl border border-teal-100 text-center relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-100 rounded-full filter blur-3xl opacity-50 translate-x-12 -translate-y-12"></div>
-            <div className="relative z-10 flex flex-col items-center py-6">
-              <div className="w-24 h-24 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-4xl mb-4 animate-bounce shadow-md">
-                🏆
-              </div>
-              <h2 className="text-3xl font-black text-slate-800 mb-1">Level Complete!</h2>
-              <p className="text-emerald-700 text-base md:text-lg font-bold mb-6">You cleared "{currentLevel.title}"!</p>
-              <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-6 max-w-sm w-full mb-8">
-                <span className="text-xs uppercase font-extrabold tracking-wider text-emerald-600 block mb-2">Sparks Restored</span>
-                <div className="flex justify-center items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-amber-500 fill-amber-400" viewBox="0 0 24 24">
-                    <path d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.787 1.4 8.168L12 18.896l-7.334 3.857 1.4-8.168L.133 9.21l8.2-1.192z"/>
-                  </svg>
-                  <span className="text-3xl font-black text-slate-800">{stars} total stars</span>
-                </div>
-              </div>
-              <p className="text-slate-500 italic max-w-md text-sm mb-8">
-                "Oh, look how bright the meadow is getting! Your logical pattern skills are truly magical. Let's tackle the next pattern forest!"
-              </p>
-              {/* FIX: replaced py-4.5 (invalid Tailwind) with py-4 */}
-              <button
-                onClick={handleNextLevel}
-                className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-extrabold text-xl px-10 py-4 rounded-xl shadow-md border-b-4 border-emerald-700 active:scale-95 transition-all"
-              >
-                {currentLevelIdx < LEVELS.length - 1 ? "Next Level! ➔" : "Claim Final Crown! 👑"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* --- SCREEN 6: GAME COMPLETE --- */}
-        {screen === 'gameComplete' && (
-          <div className="bg-white rounded-3xl p-6 md:p-10 shadow-xl border border-teal-100 text-center relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-tr from-emerald-50/30 to-sky-50/30 -z-10"></div>
-            <div className="flex flex-col items-center">
-              <div className="w-36 h-36 mb-6 animate-bounce">
-                <PipMascot crowned={true} />
-              </div>
-              <h2 className="text-4xl md:text-5xl font-black text-slate-800 tracking-tight mb-2">Meadow Restored!</h2>
-              <p className="text-emerald-700 text-lg md:text-xl font-bold mb-6 max-w-md mx-auto">
-                Amazing job! You analyzed all numerical sequence patterns to save the magical Sparks!
-              </p>
-              <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 max-w-sm w-full shadow-inner mb-8">
-                <span className="text-xs uppercase font-extrabold tracking-wider text-amber-700 block mb-2">Final Score</span>
-                <div className="flex justify-center items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-amber-500 fill-amber-400" viewBox="0 0 24 24">
-                    <path d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.787 1.4 8.168L12 18.896l-7.334 3.857 1.4-8.168L.133 9.21l8.2-1.192z"/>
-                  </svg>
-                  <span className="text-4xl font-extrabold text-slate-800">{stars} Stars Collected</span>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <button
-                  onClick={handleStartGame}
-                  className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black text-lg px-8 py-4 rounded-xl shadow-md border-b-4 border-emerald-700 active:scale-95 transition-all"
-                >
-                  Play Again 🔄
-                </button>
-                <button
-                  onClick={() => handleNavigate('home')}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-8 py-4 rounded-xl transition"
-                >
-                  Home
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-      </main>
-
-      <footer className="bg-slate-50 border-t border-slate-100 py-4 px-4 text-center text-xs text-slate-400">
-        <p>© 2026 Grade 3 Pattern Quest. Crafted using Alberta Curriculum Standards.</p>
-        <p className="mt-1">Built with high-contrast accessibility standards and voiceover synthesis. No ads or paywalls.</p>
-      </footer>
-    </div>
-  );
+// =============================================
+// SPEECH
+// =============================================
+function speak(text){
+  if(!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.rate=0.95; u.pitch=1.15;
+  u.onstart=()=>{ S.speaking=true;  refreshSpeakers(); };
+  u.onend  =()=>{ S.speaking=false; refreshSpeakers(); };
+  u.onerror=()=>{ S.speaking=false; refreshSpeakers(); };
+  window.speechSynthesis.speak(u);
 }
+function stopSpeak(){ if('speechSynthesis' in window) window.speechSynthesis.cancel(); S.speaking=false; }
+function refreshSpeakers(){ document.querySelectorAll('.btn-speaker').forEach(b=>b.classList.toggle('speaking',S.speaking)); }
+
+// Speak helpers called from inline onclick
+function readIntro()   { speak(LEVELS[S.levelIdx].pipIntro); }
+function readTutorial(){ speak(LEVELS[S.levelIdx].tutorial.text); }
+function readPrompt()  {
+  const lv=LEVELS[S.levelIdx];
+  speak(lv.id===2 ? 'Sort all sequences to clear the magic portals!' : lv.questions[S.questionIdx].instruction);
+}
+
+// =============================================
+// SHARED TEMPLATES
+// =============================================
+const SPEAKER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>`;
+const STAR_SVG  = `<svg width="28" height="28" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.787 1.4 8.168L12 18.896l-7.334 3.857 1.4-8.168L.133 9.21l8.2-1.192z"/></svg>`;
+const BIG_STAR  = `<svg width="40" height="40" viewBox="0 0 24 24" fill="#F59E0B"><path d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.787 1.4 8.168L12 18.896l-7.334 3.857 1.4-8.168L.133 9.21l8.2-1.192z"/></svg>`;
+
+function pipSVG(crowned=false){
+  return `<svg viewBox="0 0 120 120" class="pip-svg">
+    <circle cx="60" cy="65" r="45" fill="#10B981"/>
+    <circle cx="60" cy="65" r="40" fill="#34D399"/>
+    <ellipse cx="25" cy="50" rx="15" ry="25" fill="#93C5FD" opacity="0.8" transform="rotate(-20 25 50)"/>
+    <ellipse cx="95" cy="50" rx="15" ry="25" fill="#93C5FD" opacity="0.8" transform="rotate(20 95 50)"/>
+    ${crowned
+      ? '<path d="M 40 25 L 45 35 L 60 20 L 75 35 L 80 25 L 85 40 L 35 40 Z" fill="#F59E0B" stroke="#D97706" stroke-width="2"/>'
+      : '<path d="M 60 25 Q 60 15 68 12" stroke="#F59E0B" stroke-width="4" stroke-linecap="round" fill="none"/><circle cx="68" cy="12" r="6" fill="#F59E0B"/>'
+    }
+    <circle cx="48" cy="55" r="6" fill="#1E293B"/>
+    <circle cx="48" cy="53" r="2" fill="white"/>
+    <circle cx="72" cy="55" r="6" fill="#1E293B"/>
+    <circle cx="72" cy="53" r="2" fill="white"/>
+    <circle cx="42" cy="64" r="4" fill="#F43F5E" opacity="0.6"/>
+    <circle cx="78" cy="64" r="4" fill="#F43F5E" opacity="0.6"/>
+    <path d="M 52 68 Q 60 76 68 68" stroke="#1E293B" stroke-width="4" stroke-linecap="round" fill="none"/>
+  </svg>`;
+}
+
+function promptBar(instruction){
+  return `<div class="prompt-bar">
+    <div class="prompt-pip anim-pulse">${pipSVG()}</div>
+    <div class="prompt-content">
+      <div class="prompt-top">
+        <span class="prompt-label">Challenge Prompt</span>
+        <button class="btn-speaker" onclick="readPrompt()" title="Read aloud">${SPEAKER_SVG}</button>
+      </div>
+      <p class="prompt-text">${instruction}</p>
+    </div>
+  </div>`;
+}
+
+function explBox(){
+  const q=LEVELS[S.levelIdx].questions[S.questionIdx];
+  const ok=S.ansCorrect;
+  return `<div class="expl-box ${ok?'correct':'wrong'} anim-fade">
+    <div class="expl-inner">
+      <span class="expl-emoji">${ok?'🌟':'💡'}</span>
+      <div>
+        <div class="expl-title">${ok?'You Got It!':'Not Quite! Learn from Pip:'}</div>
+        <div class="expl-text">${q.explanation}</div>
+      </div>
+    </div>
+    <div class="expl-foot">
+      <button class="btn-next" onclick="nextAction()">Next Question ➔</button>
+    </div>
+  </div>`;
+}
+
+function progressDots(){
+  const lv=LEVELS[S.levelIdx];
+  const dots=lv.questions.map((_,i)=>{
+    let c='pdot';
+    if(i<S.questionIdx) c+=' done';
+    else if(i===S.questionIdx) c+=' current';
+    return `<div class="${c}"></div>`;
+  }).join('');
+  return `<div class="progress-row">
+    <span>Progress: ${S.questionIdx+1} of ${lv.questions.length} Questions</span>
+    <div class="progress-dots">${dots}</div>
+  </div>`;
+}
+
+// =============================================
+// NAVIGATION
+// =============================================
+function navigate(screen){
+  stopSpeak(); sound.playClick(); S.screen=screen; render();
+  if(screen==='levelIntro') setTimeout(readIntro,   400);
+  if(screen==='tutorial')   setTimeout(readTutorial,400);
+}
+function startGame(){
+  S.stars=0; S.levelIdx=0; S.questionIdx=0; resetLevel(); navigate('levelIntro');
+}
+function resetLevel(){
+  S.stoneIdx=null; S.gridAns=null; S.changeAns=null;
+  S.ansCorrect=null; S.showExpl=false;
+  S.sorted={}; S.sortFeedback=''; S.sortDone=false;
+}
+function nextAction(){
+  stopSpeak(); sound.playClick();
+  const lv=LEVELS[S.levelIdx];
+  if(lv.questions && S.questionIdx<lv.questions.length-1){
+    S.questionIdx++; S.stoneIdx=null; S.gridAns=null; S.changeAns=null;
+    S.ansCorrect=null; S.showExpl=false; render();
+  } else { sound.playWin(); S.screen='levelClear'; render(); }
+}
+function nextLevel(){
+  stopSpeak(); sound.playClick();
+  if(S.levelIdx<LEVELS.length-1){ S.levelIdx++; S.questionIdx=0; resetLevel(); S.screen='levelIntro'; }
+  else { S.screen='gameComplete'; }
+  render();
+}
+
+// =============================================
+// ANSWER HANDLERS
+// =============================================
+function selectStone(idx){
+  if(S.showExpl) return;
+  sound.playClick(); S.stoneIdx=idx;
+  const q=LEVELS[S.levelIdx].questions[S.questionIdx];
+  S.ansCorrect=(idx===q.targetIndex); S.showExpl=true;
+  S.ansCorrect?(sound.playCorrect(),S.stars++):sound.playIncorrect();
+  render();
+}
+function selectGrid(ans){
+  if(S.showExpl) return;
+  sound.playClick(); S.gridAns=ans;
+  const q=LEVELS[S.levelIdx].questions[S.questionIdx];
+  S.ansCorrect=(ans===q.correctAnswer); S.showExpl=true;
+  S.ansCorrect?(sound.playCorrect(),S.stars++):sound.playIncorrect();
+  render();
+}
+function selectChange(idx){
+  if(S.showExpl) return;
+  sound.playClick(); S.changeAns=idx;
+  const q=LEVELS[S.levelIdx].questions[S.questionIdx];
+  S.ansCorrect=(idx===q.correctIndex); S.showExpl=true;
+  S.ansCorrect?(sound.playCorrect(),S.stars++):sound.playIncorrect();
+  render();
+}
+function sortItem(id,cat){
+  sound.playClick();
+  const lv=LEVELS[S.levelIdx];
+  const item=lv.sortingItems.find(i=>i.id===id);
+  if(item.type===cat){
+    S.sorted[id]=cat; S.sortFeedback='Awesome! Correctly sorted.'; sound.playCorrect();
+    if(lv.sortingItems.every(i=>S.sorted[i.id]===i.type)){
+      S.sortDone=true; S.sortFeedback=''; sound.playWin(); S.stars+=3;
+    }
+  } else {
+    S.sortFeedback='Oops! Try sorting that one again.'; sound.playIncorrect();
+    setTimeout(()=>{ S.sortFeedback=''; render(); },1500);
+  }
+  render();
+}
+
+// =============================================
+// SCREEN RENDERERS
+// =============================================
+function renderHome(){
+  return `<div class="card anim-fade">
+    <div class="blob blob-tl"></div><div class="blob blob-br"></div>
+    <div class="home-inner">
+      <div style="width:120px;height:120px;margin-bottom:20px" class="anim-bounce">${pipSVG()}</div>
+      <h2 class="home-title">Pattern Quest!</h2>
+      <p class="home-sub">Restore magic to the Meadow by solving numerical sequences and patterns!</p>
+      <button class="btn btn-primary" onclick="startGame()" style="font-size:1.2rem;padding:18px 48px">
+        Let&rsquo;s Play! &nbsp;&#9654;&#9654;
+      </button>
+      <div class="curriculum-grid">
+        <div class="ci"><span class="ci-icon" style="background:#d1fae5;color:#065f46">🔢</span>Even, Odd &amp; Ordinals</div>
+        <div class="ci"><span class="ci-icon" style="background:#ccfbf1;color:#0f766e">♾️</span>Finite vs. Infinite</div>
+        <div class="ci"><span class="ci-icon" style="background:#e0f2fe;color:#0369a1">✖️</span>Skip-Counting Grids</div>
+        <div class="ci"><span class="ci-icon" style="background:#fef3c7;color:#92400e">🧮</span>Change Operators (+ − × ÷)</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderLevelIntro(){
+  const lv=LEVELS[S.levelIdx];
+  return `<div class="card anim-fade">
+    <div class="intro-row">
+      <div class="pip-col">
+        <div style="width:106px;height:106px" class="${S.speaking?'anim-pulse':'anim-bounce'}">${pipSVG()}</div>
+        <span class="pip-label">Pip the Pixie</span>
+      </div>
+      <div class="speech-bubble">
+        <div class="bubble-header">
+          <span class="level-tag">Quest Level ${lv.id}</span>
+          <button class="btn-speaker" onclick="readIntro()" title="Read aloud">${SPEAKER_SVG}</button>
+        </div>
+        <h3 class="bubble-title">${lv.title}</h3>
+        <p class="bubble-text">&ldquo;${lv.pipIntro}&rdquo;</p>
+      </div>
+    </div>
+    <div class="card-footer">
+      <button class="btn btn-primary" onclick="navigate('tutorial')">Learn How! 📖</button>
+    </div>
+  </div>`;
+}
+
+function renderTutorial(){
+  const lv=LEVELS[S.levelIdx];
+  return `<div class="card anim-fade">
+    <div class="tut-header">
+      <div>
+        <span class="tut-tag">Tutorial Book</span>
+        <h2 class="tut-title">${lv.tutorial.title}</h2>
+      </div>
+      <button class="btn-speaker" onclick="readTutorial()" title="Read aloud">${SPEAKER_SVG}</button>
+    </div>
+    <div class="tut-body">${lv.tutorial.text}</div>
+    <div class="example-box">
+      <div class="example-label">⭐ Tip &amp; Example</div>
+      <div class="example-text">${lv.tutorial.example}</div>
+    </div>
+    <div class="card-actions">
+      <button class="btn btn-secondary" onclick="navigate('levelIntro')">&#8592; Back</button>
+      <button class="btn btn-primary"   onclick="navigate('play')">Start Challenge! 🚀</button>
+    </div>
+  </div>`;
+}
+
+function renderLevel1(){
+  const q=LEVELS[S.levelIdx].questions[S.questionIdx];
+  const SFX=["1st","2nd","3rd","4th","5th","6th","7th"];
+  const stones=q.sequence.map((n,i)=>{
+    let cls='stone-btn';
+    if(S.stoneIdx!==null){
+      if(i===q.targetIndex) cls+=' stone-correct';
+      else if(i===S.stoneIdx) cls+=' stone-wrong';
+      else cls+=' stone-dim';
+    }
+    const dis=S.showExpl?'disabled':'';
+    return `<button class="${cls}" ${dis} onclick="selectStone(${i})">
+      <span class="stone-ord">${SFX[i]}</span>
+      <span class="stone-num">${n}</span>
+      <div class="stone-dot"></div>
+    </button>`;
+  }).join('');
+  return `
+    ${promptBar(q.instruction)}
+    <div class="hint-bar">💡 Ordinal numbers describe positions! <strong>(1st = First, 2nd = Second, 3rd = Third, 4th = Fourth, 5th = Fifth)</strong></div>
+    <div class="stones-area">${stones}</div>
+    ${S.showExpl?explBox():''}
+    ${progressDots()}`;
+}
+
+function renderLevel2(){
+  const lv=LEVELS[S.levelIdx];
+  const finCards=lv.sortingItems.filter(i=>S.sorted[i.id]==='finite')
+    .map(i=>`<div class="sorted-card"><span>${i.sequenceText}</span><span class="sorted-check">✓ Correct!</span></div>`).join('');
+  const infCards=lv.sortingItems.filter(i=>S.sorted[i.id]==='infinite')
+    .map(i=>`<div class="sorted-card"><span>${i.sequenceText}</span><span class="sorted-check">✓ Correct!</span></div>`).join('');
+  const unsorted=lv.sortingItems.filter(i=>!S.sorted[i.id])
+    .map(i=>`<div class="unsorted-card">
+      <div class="unsorted-seq">${i.sequenceText}</div>
+      <div class="unsorted-btns">
+        <button class="btn-fin" onclick="sortItem('${i.id}','finite')">Stop (Finite) 🛑</button>
+        <button class="btn-inf" onclick="sortItem('${i.id}','infinite')">Forever (Infinite) ♾️</button>
+      </div>
+    </div>`).join('');
+
+  return `
+    ${promptBar('Sort all sequences to clear the magic portals!')}
+    <div class="sort-cols">
+      <div class="sort-zone sz-finite">
+        <div class="sz-title"><span style="font-size:1.4rem">🛑</span>Finite (Has an End)</div>
+        <div class="sz-hint">Cards that stop or have a fixed limit go here.</div>
+        ${finCards||'<p style="color:#b45309;font-size:0.8rem;font-weight:600">Nothing sorted yet...</p>'}
+      </div>
+      <div class="sort-zone sz-infinite">
+        <div class="sz-title"><span style="font-size:1.4rem">♾️</span>Infinite (Goes Forever)</div>
+        <div class="sz-hint">Look for the three dots (...) at the end.</div>
+        ${infCards||'<p style="color:#4338ca;font-size:0.8rem;font-weight:600">Nothing sorted yet...</p>'}
+      </div>
+    </div>
+    ${S.sortFeedback?`<div class="sort-feedback">${S.sortFeedback}</div>`:''}
+    ${!S.sortDone?`<div class="unsorted-section">
+      <div class="unsorted-label">Tap where each sequence belongs:</div>
+      <div class="unsorted-grid">${unsorted||'<p style="color:#94a3b8;text-align:center;font-weight:600;grid-column:1/-1">All sorted!</p>'}</div>
+    </div>`:''}
+    ${S.sortDone?`<div class="sort-complete-box anim-pop">
+      <div class="sort-complete-title">🎉 Portal Complete!</div>
+      <p style="color:#065f46;font-weight:700;margin-bottom:16px">You sorted all patterns perfectly. Bonus stars added!</p>
+      <button class="btn btn-primary" onclick="nextAction()">Awesome! Continue</button>
+    </div>`:''}`;
+}
+
+function renderLevel3(){
+  const q=LEVELS[S.levelIdx].questions[S.questionIdx];
+  const tiles=q.sequence.map((n,i)=>{
+    if(n===null){
+      let bc='seq-tile seq-blank';
+      if(S.ansCorrect===true)  bc+=' correct';
+      if(S.ansCorrect===false) bc+=' wrong';
+      return `<div class="${bc}">${S.gridAns!==null?S.gridAns:'?'}</div>`;
+    }
+    return `<div class="seq-tile seq-filled">${n}</div>`;
+  }).join('');
+  const opts=q.options.map(o=>{
+    let c='opt-btn';
+    if(S.gridAns!==null){
+      if(o===q.correctAnswer) c+=' correct';
+      else if(o===S.gridAns)  c+=' wrong';
+      else c+=' dim';
+    }
+    const dis=S.gridAns!==null?'disabled':'';
+    return `<button class="${c}" ${dis} onclick="selectGrid(${o})">${o}</button>`;
+  }).join('');
+  return `
+    ${promptBar(q.instruction)}
+    <div class="seq-strip">${tiles}</div>
+    <div class="opts-label">Choose the missing term:</div>
+    <div class="opts-grid">${opts}</div>
+    ${S.showExpl?explBox():''}
+    ${progressDots()}`;
+}
+
+function renderLevel4(){
+  const q=LEVELS[S.levelIdx].questions[S.questionIdx];
+  const opts=q.options.map((o,i)=>{
+    let c='rule-btn';
+    if(S.changeAns!==null){
+      if(i===q.correctIndex) c+=' correct';
+      else if(i===S.changeAns) c+=' wrong';
+      else c+=' dim';
+    }
+    const dis=S.changeAns!==null?'disabled':'';
+    return `<button class="${c}" ${dis} onclick="selectChange(${i})"><span>⚙️</span>${o}</button>`;
+  }).join('');
+  return `
+    ${promptBar(q.instruction)}
+    <div class="seq-display">
+      <div class="sdl">Sequence Line</div>
+      <div class="sdt">${q.sequenceText}</div>
+    </div>
+    <div class="opts-label">Select the correct change rule:</div>
+    <div class="rules-grid">${opts}</div>
+    ${S.showExpl?explBox():''}
+    ${progressDots()}`;
+}
+
+function renderPlay(){
+  const id=LEVELS[S.levelIdx].id;
+  let body='';
+  if(id===1) body=renderLevel1();
+  if(id===2) body=renderLevel2();
+  if(id===3) body=renderLevel3();
+  if(id===4) body=renderLevel4();
+  return `<div class="card anim-fade">${body}</div>`;
+}
+
+function renderLevelClear(){
+  const lv=LEVELS[S.levelIdx];
+  const last=S.levelIdx>=LEVELS.length-1;
+  return `<div class="card anim-fade" style="overflow:hidden">
+    <div style="position:absolute;top:-50px;right:-50px;width:210px;height:210px;background:#d1fae5;border-radius:50%;filter:blur(50px);opacity:0.5"></div>
+    <div class="lc-content">
+      <div class="trophy">🏆</div>
+      <h2 class="lc-title">Level Complete!</h2>
+      <p class="lc-sub">You cleared &ldquo;${lv.title}&rdquo;!</p>
+      <div class="stars-recap">
+        <div class="sr-label">Sparks Restored</div>
+        <div class="sr-count">${STAR_SVG}<span>${S.stars} total stars</span></div>
+      </div>
+      <p class="pip-quote">&ldquo;Oh, look how bright the meadow is getting! Your logical pattern skills are truly magical. Let&rsquo;s tackle the next challenge!&rdquo;</p>
+      <button class="btn btn-primary" onclick="nextLevel()" style="font-size:1.1rem;padding:16px 40px">
+        ${last?'Claim Final Crown! 👑':'Next Level! ➔'}
+      </button>
+    </div>
+  </div>`;
+}
+
+function renderGameComplete(){
+  return `<div class="card anim-fade">
+    <div class="gc-content">
+      <div style="width:136px;height:136px;margin:0 auto 22px" class="anim-bounce">${pipSVG(true)}</div>
+      <h2 class="gc-title">Meadow Restored!</h2>
+      <p class="gc-sub">Amazing job! You analyzed all numerical sequence patterns to save the magical Sparks!</p>
+      <div class="final-box">
+        <div class="fb-label">Final Score</div>
+        <div class="fb-count">${BIG_STAR}<span>${S.stars} Stars Collected</span></div>
+      </div>
+      <div class="gc-btns">
+        <button class="btn btn-primary" onclick="startGame()">Play Again 🔄</button>
+        <button class="btn btn-secondary" onclick="navigate('home')">Home</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// =============================================
+// MAIN RENDER
+// =============================================
+function render(){
+  const badge=document.getElementById('level-badge');
+  document.getElementById('stars-display').textContent=S.stars;
+  if(S.screen==='home'){ badge.style.display='none'; }
+  else { badge.style.display='inline-block'; badge.textContent=`Level ${S.levelIdx+1}`; }
+
+  const main=document.getElementById('main-content');
+  const screens={
+    home:        renderHome,
+    levelIntro:  renderLevelIntro,
+    tutorial:    renderTutorial,
+    play:        renderPlay,
+    levelClear:  renderLevelClear,
+    gameComplete:renderGameComplete
+  };
+  main.innerHTML=(screens[S.screen]||renderHome)();
+}
+
+render();
+</script>
+</body>
+</html>
