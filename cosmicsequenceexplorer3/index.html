@@ -1,369 +1,413 @@
-import React, { useState, useEffect } from 'react';
-import { Rocket, Star, Infinity, AlertCircle, Play, ArrowRight, CheckCircle2, XCircle, Volume2, Lightbulb } from 'lucide-react';
-
-// --- Game Data ---
-const QUESTIONS = [
-  {
-    sequence: "10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0",
-    type: "finite",
-    explanation: "This is a finite sequence. It's a countdown that stops exactly at 0!",
-    hint: "Look at the very end. Does the sequence stop at a specific number?"
-  },
-  {
-    sequence: "1, 2, 3, 4, 5, 6, 7, ...",
-    type: "infinite",
-    explanation: "This is an infinite sequence. The '...' at the end means the numbers keep going forever!",
-    hint: "Do you see the three little dots (...) at the end? What do they mean?"
-  },
-  {
-    sequence: "2, 4, 6, 8, 10",
-    type: "finite",
-    explanation: "This is a finite sequence. It only has 5 numbers and then it ends.",
-    hint: "Are there any dots at the end, or does it just stop at 10?"
-  },
-  {
-    sequence: "10, 20, 30, 40, 50, ...",
-    type: "infinite",
-    explanation: "This is an infinite sequence. You can keep counting by 10s forever!",
-    hint: "What does the '...' symbol mean in math?"
-  },
-  {
-    sequence: "5, 4, 3, 2, 1",
-    type: "finite",
-    explanation: "This is a finite sequence. It's a short countdown that ends at 1.",
-    hint: "Does this countdown keep going below 1, or does it stop?"
-  },
-  {
-    sequence: "100, 200, 300, 400, ...",
-    type: "infinite",
-    explanation: "This is an infinite sequence. As long as you see '...', it never ends!",
-    hint: "If there is a '...', it means it keeps going and going!"
-  },
-  {
-    sequence: "A, B, C, D, E, F, G",
-    type: "finite",
-    explanation: "This is a finite sequence. It stops right at the letter G.",
-    hint: "Are there more letters after G shown here?"
-  },
-  {
-    sequence: "3, 6, 9, 12, 15, ...",
-    type: "infinite",
-    explanation: "This is an infinite sequence. We can count by 3s into infinity!",
-    hint: "Look closely at the very end of the sequence for a clue."
-  },
-  {
-    sequence: "10, 100, 1000, 10000",
-    type: "finite",
-    explanation: "This is a finite sequence. It has exactly four numbers and stops.",
-    hint: "Does it have the '...' symbol at the end? If not, it stops."
-  },
-  {
-    sequence: "1, 3, 5, 7, 9, 11, ...",
-    type: "infinite",
-    explanation: "This is an infinite sequence. The odd numbers keep going forever!",
-    hint: "Those three dots mean the sequence will never stop."
-  }
-];
-
-export default function SpaceSequenceGame() {
-  const [gameState, setGameState] = useState('start'); // start, playing, feedback, end
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [score, setScore] = useState(0);
-  const [lastAnswerCorrect, setLastAnswerCorrect] = useState(null);
-  const [stars, setStars] = useState([]);
-  const [showHint, setShowHint] = useState(false);
-  const [firstTry, setFirstTry] = useState(true);
-
-  // Text-to-Speech function
-  const speakText = (text) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel(); // Stop any currently playing audio
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9; // Slightly slower for grade 3
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-
-  // Generate starry background
-  useEffect(() => {
-    const newStars = Array.from({ length: 50 }).map((_, i) => ({
-      id: i,
-      left: `${Math.random() * 100}%`,
-      top: `${Math.random() * 100}%`,
-      animationDuration: `${Math.random() * 3 + 2}s`,
-      opacity: Math.random()
-    }));
-    setStars(newStars);
-  }, []);
-
-  const startGame = () => {
-    setGameState('playing');
-    setCurrentQuestion(0);
-    setScore(0);
-    setShowHint(false);
-    setFirstTry(true);
-  };
-
-  const handleAnswer = (answerType) => {
-    const isCorrect = answerType === QUESTIONS[currentQuestion].type;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Sequence Explorer</title>
     
-    if (isCorrect) {
-      setLastAnswerCorrect(true);
-      if (firstTry) setScore(score + 1);
-      setGameState('feedback');
-      setShowHint(false);
-    } else {
-      setLastAnswerCorrect(false);
-      setFirstTry(false);
-      setShowHint(true);
-      speakText("Oops! " + QUESTIONS[currentQuestion].hint);
-    }
-  };
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 
-  const nextQuestion = () => {
-    if (currentQuestion < QUESTIONS.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
-      setGameState('playing');
-      setFirstTry(true);
-      setShowHint(false);
-    } else {
-      setGameState('end');
-    }
-  };
+    <style>
+        /* Custom Animations to replace tailwindcss-animate plugin */
+        @keyframes fadeInZoom {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fade-in-zoom { animation: fadeInZoom 0.3s ease-out forwards; }
 
-  return (
-    <div className="min-h-screen bg-slate-900 text-white font-sans overflow-hidden relative flex flex-col items-center justify-center p-4">
-      {/* Starry Background */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        {stars.map(star => (
-          <div
-            key={star.id}
-            className="absolute bg-white rounded-full animate-pulse"
-            style={{
-              left: star.left,
-              top: star.top,
-              width: '4px',
-              height: '4px',
-              opacity: star.opacity,
-              animationDuration: star.animationDuration
-            }}
-          />
-        ))}
-      </div>
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slide-up { animation: slideUp 0.3s ease-out forwards; }
 
-      {/* Main Game Container */}
-      <div className="z-10 w-full max-w-3xl bg-slate-800/80 backdrop-blur-md rounded-3xl shadow-2xl border border-slate-600 p-6 md:p-10 relative">
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slide-down { animation: slideDown 0.3s ease-out forwards; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-900 text-white font-sans overflow-hidden relative flex flex-col items-center justify-center p-4">
+
+    <!-- Starry Background Container -->
+    <div id="stars-container" class="absolute inset-0 z-0 pointer-events-none"></div>
+
+    <!-- Main Game Container -->
+    <div class="z-10 w-full max-w-3xl bg-slate-800/80 backdrop-blur-md rounded-3xl shadow-2xl border border-slate-600 p-6 md:p-10 relative">
         
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8 border-b border-slate-600 pb-4">
-          <div className="flex items-center gap-3">
-            <Rocket className="text-blue-400 w-8 h-8" />
-            <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              Cosmic Sequences
-            </h1>
-          </div>
-          {gameState !== 'start' && (
-            <div className="flex items-center gap-2 bg-slate-700 px-4 py-2 rounded-full font-bold text-yellow-400">
-              <Star className="w-5 h-5 fill-yellow-400" />
-              <span>{score} / {QUESTIONS.length}</span>
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8 border-b border-slate-600 pb-4">
+            <div class="flex items-center gap-3">
+                <i data-lucide="rocket" class="text-blue-400 w-8 h-8"></i>
+                <h1 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                    Cosmic Sequences
+                </h1>
             </div>
-          )}
+            <div id="score-container" class="hidden flex items-center gap-2 bg-slate-700 px-4 py-2 rounded-full font-bold text-yellow-400">
+                <i data-lucide="star" class="w-5 h-5 fill-yellow-400 text-yellow-400"></i>
+                <span id="score-text">0 / 10</span>
+            </div>
         </div>
 
-        {/* --- START SCREEN --- */}
-        {gameState === 'start' && (
-          <div className="text-center space-y-6">
-            <div className="flex justify-center items-center gap-4 mb-4">
-              <h2 className="text-3xl font-bold text-white">Welcome, Space Explorer!</h2>
-              <button 
-                onClick={() => speakText("Welcome, Space Explorer! To navigate our spaceship through the galaxy, you need to understand math sequences. Finite Sequences have a definite end. Like a rocket countdown: 3, 2, 1, 0. Infinite Sequences never end. Like natural numbers: 1, 2, 3, 4, and so on.")}
-                className="bg-blue-500/20 hover:bg-blue-500/40 p-2 rounded-full text-blue-300 transition-colors"
-                title="Read to me"
-              >
-                <Volume2 className="w-6 h-6" />
-              </button>
-            </div>
-            <p className="text-lg text-slate-300">
-              To navigate our spaceship through the galaxy, you need to understand math sequences.
-            </p>
-            
-            <div className="grid md:grid-cols-2 gap-6 mt-8">
-              <div className="bg-slate-700/50 p-6 rounded-2xl border border-slate-600">
-                <div className="flex justify-center mb-3">
-                  <AlertCircle className="w-10 h-10 text-orange-400" />
-                </div>
-                <h3 className="text-xl font-bold text-orange-400 mb-2">Finite Sequences</h3>
-                <p className="text-slate-300">
-                  These sequences <strong>have a definite end</strong>.<br/><br/>
-                  <em>Like a rocket countdown:</em><br/>
-                  <span className="font-mono text-white bg-slate-800 px-2 py-1 rounded mt-2 inline-block">3, 2, 1, 0</span>
-                </p>
-              </div>
+        <!-- Dynamic Content Area -->
+        <div id="game-content"></div>
 
-              <div className="bg-slate-700/50 p-6 rounded-2xl border border-slate-600">
-                <div className="flex justify-center mb-3">
-                  <Infinity className="w-10 h-10 text-purple-400" />
-                </div>
-                <h3 className="text-xl font-bold text-purple-400 mb-2">Infinite Sequences</h3>
-                <p className="text-slate-300">
-                  These sequences <strong>never end</strong>.<br/><br/>
-                  <em>Like natural numbers:</em><br/>
-                  <span className="font-mono text-white bg-slate-800 px-2 py-1 rounded mt-2 inline-block">1, 2, 3, 4, ...</span>
-                </p>
-              </div>
-            </div>
-
-            <button 
-              onClick={startGame}
-              className="mt-8 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xl py-4 px-10 rounded-full flex items-center gap-3 mx-auto transition-transform hover:scale-105 active:scale-95 shadow-lg shadow-blue-500/30"
-            >
-              <Play className="fill-current w-6 h-6" /> Start Mission
-            </button>
-          </div>
-        )}
-
-        {/* --- PLAYING SCREEN --- */}
-        {gameState === 'playing' && (
-          <div className="text-center space-y-10 animate-in fade-in zoom-in duration-300">
-            <div>
-              <p className="text-slate-400 uppercase tracking-widest font-bold mb-2">
-                Transmission {currentQuestion + 1} of {QUESTIONS.length}
-              </p>
-              <div className="flex justify-center items-center gap-3 mb-2">
-                <h2 className="text-2xl md:text-3xl text-white">Is this sequence Finite or Infinite?</h2>
-                <button 
-                  onClick={() => speakText(`Is this sequence Finite or Infinite? The sequence is: ${QUESTIONS[currentQuestion].sequence.replace(/\.\.\./g, 'and so on')}`)}
-                  className="bg-blue-500/20 hover:bg-blue-500/40 p-2 rounded-full text-blue-300 transition-colors"
-                  title="Read to me"
-                >
-                  <Volume2 className="w-6 h-6" />
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-slate-900 border-2 border-blue-500/50 p-8 rounded-2xl shadow-inner shadow-blue-500/20">
-              <p className="text-4xl md:text-5xl font-mono text-white font-bold tracking-wider">
-                {QUESTIONS[currentQuestion].sequence}
-              </p>
-            </div>
-
-            {showHint && (
-              <div className="bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 p-4 rounded-xl flex items-start gap-3 max-w-xl mx-auto text-left animate-in slide-in-from-top-2">
-                <Lightbulb className="w-6 h-6 shrink-0 text-yellow-400 mt-0.5" />
-                <div>
-                  <p className="font-bold text-yellow-400 mb-1">Hint!</p>
-                  <p>{QUESTIONS[currentQuestion].hint}</p>
-                </div>
-                <button 
-                  onClick={() => speakText(QUESTIONS[currentQuestion].hint)}
-                  className="ml-auto bg-yellow-500/20 hover:bg-yellow-500/40 p-1.5 rounded-full text-yellow-300 transition-colors"
-                  title="Read hint"
-                >
-                  <Volume2 className="w-5 h-5" />
-                </button>
-              </div>
-            )}
-
-            <div className="flex flex-col md:flex-row gap-6 justify-center max-w-2xl mx-auto">
-              <button 
-                onClick={() => handleAnswer('finite')}
-                className="flex-1 bg-orange-500 hover:bg-orange-600 border-b-4 border-orange-700 text-white font-bold text-xl py-6 px-6 rounded-2xl transition-transform hover:-translate-y-1 active:translate-y-1 flex flex-col items-center gap-2"
-              >
-                <AlertCircle className="w-8 h-8" />
-                <span>Finite</span>
-                <span className="text-sm opacity-80 font-normal">(It Ends)</span>
-              </button>
-              
-              <button 
-                onClick={() => handleAnswer('infinite')}
-                className="flex-1 bg-purple-500 hover:bg-purple-600 border-b-4 border-purple-700 text-white font-bold text-xl py-6 px-6 rounded-2xl transition-transform hover:-translate-y-1 active:translate-y-1 flex flex-col items-center gap-2"
-              >
-                <Infinity className="w-8 h-8" />
-                <span>Infinite</span>
-                <span className="text-sm opacity-80 font-normal">(Never Ends)</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* --- FEEDBACK SCREEN --- */}
-        {gameState === 'feedback' && (
-          <div className="text-center space-y-8 animate-in slide-in-from-bottom-4 duration-300">
-            <div className="inline-flex items-center justify-center w-24 h-24 rounded-full mb-4 bg-green-500/20 text-green-400">
-              <CheckCircle2 className="w-16 h-16" />
-            </div>
-            
-            <div className="flex justify-center items-center gap-3">
-              <h2 className="text-3xl font-bold text-green-400">
-                Stellar Job!
-              </h2>
-              <button 
-                onClick={() => speakText(`Stellar Job! ${QUESTIONS[currentQuestion].explanation}`)}
-                className="bg-blue-500/20 hover:bg-blue-500/40 p-2 rounded-full text-blue-300 transition-colors"
-                title="Read to me"
-              >
-                <Volume2 className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="bg-slate-700 p-6 rounded-2xl max-w-xl mx-auto border border-slate-600">
-               <p className="text-2xl font-mono text-white mb-4 bg-slate-900 py-3 rounded-lg">
-                {QUESTIONS[currentQuestion].sequence}
-              </p>
-              <p className="text-xl text-slate-200">
-                {QUESTIONS[currentQuestion].explanation}
-              </p>
-            </div>
-
-            <button 
-              onClick={nextQuestion}
-              className="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xl py-4 px-10 rounded-full flex items-center gap-3 mx-auto transition-transform hover:scale-105 active:scale-95"
-            >
-              Continue <ArrowRight className="w-6 h-6" />
-            </button>
-          </div>
-        )}
-
-        {/* --- END SCREEN --- */}
-        {gameState === 'end' && (
-          <div className="text-center space-y-8 animate-in fade-in duration-500">
-            <Rocket className="w-24 h-24 text-blue-400 mx-auto animate-bounce" />
-            
-            <div className="flex justify-center items-center gap-3">
-              <h2 className="text-4xl font-bold text-white">Mission Complete!</h2>
-              <button 
-                onClick={() => speakText(`Mission Complete! You earned ${score} out of ${QUESTIONS.length} stars.`)}
-                className="bg-blue-500/20 hover:bg-blue-500/40 p-2 rounded-full text-blue-300 transition-colors"
-                title="Read to me"
-              >
-                <Volume2 className="w-6 h-6" />
-              </button>
-            </div>
-            
-            <div className="bg-slate-700 p-8 rounded-3xl max-w-md mx-auto">
-              <p className="text-slate-300 text-lg mb-2">You earned</p>
-              <div className="text-6xl font-black text-yellow-400 flex justify-center items-center gap-4">
-                {score} <Star className="w-12 h-12 fill-yellow-400" />
-              </div>
-              <p className="text-slate-300 text-lg mt-2">out of {QUESTIONS.length} stars</p>
-            </div>
-
-            <p className="text-xl text-blue-300 max-w-lg mx-auto">
-              {score === QUESTIONS.length 
-                ? "Perfect score! You are a master of Finite and Infinite sequences!" 
-                : "Great work! You helped navigate the ship safely using your sequence knowledge."}
-            </p>
-
-            <button 
-              onClick={startGame}
-              className="mt-8 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xl py-4 px-10 rounded-full flex items-center gap-3 mx-auto transition-transform hover:scale-105 active:scale-95"
-            >
-              <Play className="w-6 h-6" /> Play Again
-            </button>
-          </div>
-        )}
-
-      </div>
     </div>
-  );
-}
+
+    <script>
+        // --- Game Data ---
+        const QUESTIONS = [
+            {
+                sequence: "10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0",
+                type: "finite",
+                explanation: "This is a finite sequence. It's a countdown that stops exactly at 0!",
+                hint: "Look at the very end. Does the sequence stop at a specific number?"
+            },
+            {
+                sequence: "1, 2, 3, 4, 5, 6, 7, ...",
+                type: "infinite",
+                explanation: "This is an infinite sequence. The '...' at the end means the numbers keep going forever!",
+                hint: "Do you see the three little dots (...) at the end? What do they mean?"
+            },
+            {
+                sequence: "2, 4, 6, 8, 10",
+                type: "finite",
+                explanation: "This is a finite sequence. It only has 5 numbers and then it ends.",
+                hint: "Are there any dots at the end, or does it just stop at 10?"
+            },
+            {
+                sequence: "10, 20, 30, 40, 50, ...",
+                type: "infinite",
+                explanation: "This is an infinite sequence. You can keep counting by 10s forever!",
+                hint: "What does the '...' symbol mean in math?"
+            },
+            {
+                sequence: "5, 4, 3, 2, 1",
+                type: "finite",
+                explanation: "This is a finite sequence. It's a short countdown that ends at 1.",
+                hint: "Does this countdown keep going below 1, or does it stop?"
+            },
+            {
+                sequence: "100, 200, 300, 400, ...",
+                type: "infinite",
+                explanation: "This is an infinite sequence. As long as you see '...', it never ends!",
+                hint: "If there is a '...' , it means it keeps going and going!"
+            },
+            {
+                sequence: "A, B, C, D, E, F, G",
+                type: "finite",
+                explanation: "This is a finite sequence. It stops right at the letter G.",
+                hint: "Are there more letters after G shown here?"
+            },
+            {
+                sequence: "3, 6, 9, 12, 15, ...",
+                type: "infinite",
+                explanation: "This is an infinite sequence. We can count by 3s into infinity!",
+                hint: "Look closely at the very end of the sequence for a clue."
+            },
+            {
+                sequence: "10, 100, 1000, 10000",
+                type: "finite",
+                explanation: "This is a finite sequence. It has exactly four numbers and stops.",
+                hint: "Does it have the '...' symbol at the end? If not, it stops."
+            },
+            {
+                sequence: "1, 3, 5, 7, 9, 11, ...",
+                type: "infinite",
+                explanation: "This is an infinite sequence. The odd numbers keep going forever!",
+                hint: "Those three dots mean the sequence will never stop."
+            }
+        ];
+
+        // --- Game State ---
+        let gameState = 'start'; // start, playing, feedback, end
+        let currentQuestion = 0;
+        let score = 0;
+        let showHint = false;
+        let firstTry = true;
+
+        // --- DOM Elements ---
+        const gameContent = document.getElementById('game-content');
+        const scoreContainer = document.getElementById('score-container');
+        const scoreText = document.getElementById('score-text');
+
+        // --- Audio Functions ---
+        window.speakText = (text) => {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 0.9;
+                window.speechSynthesis.speak(utterance);
+            }
+        };
+
+        window.playStartText = () => {
+            speakText("Welcome, Space Explorer! To navigate our spaceship through the galaxy, you need to understand math sequences. Finite Sequences have a definite end. Like a rocket countdown: 3, 2, 1, 0. Infinite Sequences never end. Like natural numbers: 1, 2, 3, 4, and so on.");
+        };
+
+        window.playQuestionText = () => {
+            speakText(`Is this sequence Finite or Infinite? The sequence is: ${QUESTIONS[currentQuestion].sequence.replace(/\.\.\./g, 'and so on')}`);
+        };
+
+        window.playHintText = () => {
+            speakText(QUESTIONS[currentQuestion].hint);
+        };
+
+        window.playFeedbackText = () => {
+            speakText(`Stellar Job! ${QUESTIONS[currentQuestion].explanation}`);
+        };
+
+        window.playEndText = () => {
+            speakText(`Mission Complete! You earned ${score} out of ${QUESTIONS.length} stars.`);
+        };
+
+        // --- Game Actions ---
+        window.startGame = () => {
+            gameState = 'playing';
+            currentQuestion = 0;
+            score = 0;
+            showHint = false;
+            firstTry = true;
+            render();
+        };
+
+        window.handleAnswer = (answerType) => {
+            const isCorrect = answerType === QUESTIONS[currentQuestion].type;
+            
+            if (isCorrect) {
+                if (firstTry) score += 1;
+                gameState = 'feedback';
+                showHint = false;
+            } else {
+                firstTry = false;
+                showHint = true;
+                speakText("Oops! " + QUESTIONS[currentQuestion].hint);
+            }
+            render();
+        };
+
+        window.nextQuestion = () => {
+            if (currentQuestion < QUESTIONS.length - 1) {
+                currentQuestion++;
+                gameState = 'playing';
+                firstTry = true;
+                showHint = false;
+            } else {
+                gameState = 'end';
+            }
+            render();
+        };
+
+        // --- Render Engine ---
+        function render() {
+            // Update Score Header
+            if (gameState !== 'start') {
+                scoreContainer.classList.remove('hidden');
+                scoreText.innerText = `${score} / ${QUESTIONS.length}`;
+            } else {
+                scoreContainer.classList.add('hidden');
+            }
+
+            let html = '';
+
+            if (gameState === 'start') {
+                html = `
+                    <div class="text-center space-y-6">
+                        <div class="flex justify-center items-center gap-4 mb-4">
+                            <h2 class="text-3xl font-bold text-white">Welcome, Space Explorer!</h2>
+                            <button onclick="playStartText()" class="bg-blue-500/20 hover:bg-blue-500/40 p-2 rounded-full text-blue-300 transition-colors" title="Read to me">
+                                <i data-lucide="volume-2" class="w-6 h-6"></i>
+                            </button>
+                        </div>
+                        <p class="text-lg text-slate-300">
+                            To navigate our spaceship through the galaxy, you need to understand math sequences.
+                        </p>
+                        
+                        <div class="grid md:grid-cols-2 gap-6 mt-8">
+                            <div class="bg-slate-700/50 p-6 rounded-2xl border border-slate-600">
+                                <div class="flex justify-center mb-3">
+                                    <i data-lucide="alert-circle" class="w-10 h-10 text-orange-400"></i>
+                                </div>
+                                <h3 class="text-xl font-bold text-orange-400 mb-2">Finite Sequences</h3>
+                                <p class="text-slate-300">
+                                    These sequences <strong>have a definite end</strong>.<br/><br/>
+                                    <em>Like a rocket countdown:</em><br/>
+                                    <span class="font-mono text-white bg-slate-800 px-2 py-1 rounded mt-2 inline-block">3, 2, 1, 0</span>
+                                </p>
+                            </div>
+
+                            <div class="bg-slate-700/50 p-6 rounded-2xl border border-slate-600">
+                                <div class="flex justify-center mb-3">
+                                    <i data-lucide="infinity" class="w-10 h-10 text-purple-400"></i>
+                                </div>
+                                <h3 class="text-xl font-bold text-purple-400 mb-2">Infinite Sequences</h3>
+                                <p class="text-slate-300">
+                                    These sequences <strong>never end</strong>.<br/><br/>
+                                    <em>Like natural numbers:</em><br/>
+                                    <span class="font-mono text-white bg-slate-800 px-2 py-1 rounded mt-2 inline-block">1, 2, 3, 4, ...</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <button onclick="startGame()" class="mt-8 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xl py-4 px-10 rounded-full flex items-center gap-3 mx-auto transition-transform hover:scale-105 active:scale-95 shadow-lg shadow-blue-500/30">
+                            <i data-lucide="play" class="fill-current text-white w-6 h-6"></i> Start Mission
+                        </button>
+                    </div>
+                `;
+            } 
+            else if (gameState === 'playing') {
+                html = `
+                    <div class="text-center space-y-10 animate-fade-in-zoom">
+                        <div>
+                            <p class="text-slate-400 uppercase tracking-widest font-bold mb-2">
+                                Transmission ${currentQuestion + 1} of ${QUESTIONS.length}
+                            </p>
+                            <div class="flex justify-center items-center gap-3 mb-2">
+                                <h2 class="text-2xl md:text-3xl text-white">Is this sequence Finite or Infinite?</h2>
+                                <button onclick="playQuestionText()" class="bg-blue-500/20 hover:bg-blue-500/40 p-2 rounded-full text-blue-300 transition-colors" title="Read to me">
+                                    <i data-lucide="volume-2" class="w-6 h-6"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-900 border-2 border-blue-500/50 p-8 rounded-2xl shadow-inner shadow-blue-500/20">
+                            <p class="text-4xl md:text-5xl font-mono text-white font-bold tracking-wider">
+                                ${QUESTIONS[currentQuestion].sequence}
+                            </p>
+                        </div>
+
+                        ${showHint ? `
+                        <div class="bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 p-4 rounded-xl flex items-start gap-3 max-w-xl mx-auto text-left animate-slide-down">
+                            <i data-lucide="lightbulb" class="w-6 h-6 shrink-0 text-yellow-400 mt-0.5"></i>
+                            <div>
+                                <p class="font-bold text-yellow-400 mb-1">Hint!</p>
+                                <p>${QUESTIONS[currentQuestion].hint}</p>
+                            </div>
+                            <button onclick="playHintText()" class="ml-auto bg-yellow-500/20 hover:bg-yellow-500/40 p-1.5 rounded-full text-yellow-300 transition-colors" title="Read hint">
+                                <i data-lucide="volume-2" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        ` : ''}
+
+                        <div class="flex flex-col md:flex-row gap-6 justify-center max-w-2xl mx-auto">
+                            <button onclick="handleAnswer('finite')" class="flex-1 bg-orange-500 hover:bg-orange-600 border-b-4 border-orange-700 text-white font-bold text-xl py-6 px-6 rounded-2xl transition-transform hover:-translate-y-1 active:translate-y-1 flex flex-col items-center gap-2">
+                                <i data-lucide="alert-circle" class="w-8 h-8"></i>
+                                <span>Finite</span>
+                                <span class="text-sm opacity-80 font-normal">(It Ends)</span>
+                            </button>
+                            
+                            <button onclick="handleAnswer('infinite')" class="flex-1 bg-purple-500 hover:bg-purple-600 border-b-4 border-purple-700 text-white font-bold text-xl py-6 px-6 rounded-2xl transition-transform hover:-translate-y-1 active:translate-y-1 flex flex-col items-center gap-2">
+                                <i data-lucide="infinity" class="w-8 h-8"></i>
+                                <span>Infinite</span>
+                                <span class="text-sm opacity-80 font-normal">(Never Ends)</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+            else if (gameState === 'feedback') {
+                html = `
+                    <div class="text-center space-y-8 animate-slide-up">
+                        <div class="inline-flex items-center justify-center w-24 h-24 rounded-full mb-4 bg-green-500/20 text-green-400">
+                            <i data-lucide="check-circle-2" class="w-16 h-16"></i>
+                        </div>
+                        
+                        <div class="flex justify-center items-center gap-3">
+                            <h2 class="text-3xl font-bold text-green-400">
+                                Stellar Job!
+                            </h2>
+                            <button onclick="playFeedbackText()" class="bg-blue-500/20 hover:bg-blue-500/40 p-2 rounded-full text-blue-300 transition-colors" title="Read to me">
+                                <i data-lucide="volume-2" class="w-6 h-6"></i>
+                            </button>
+                        </div>
+
+                        <div class="bg-slate-700 p-6 rounded-2xl max-w-xl mx-auto border border-slate-600">
+                            <p class="text-2xl font-mono text-white mb-4 bg-slate-900 py-3 rounded-lg">
+                                ${QUESTIONS[currentQuestion].sequence}
+                            </p>
+                            <p class="text-xl text-slate-200">
+                                ${QUESTIONS[currentQuestion].explanation}
+                            </p>
+                        </div>
+
+                        <button onclick="nextQuestion()" class="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xl py-4 px-10 rounded-full flex items-center gap-3 mx-auto transition-transform hover:scale-105 active:scale-95">
+                            Continue <i data-lucide="arrow-right" class="w-6 h-6"></i>
+                        </button>
+                    </div>
+                `;
+            }
+            else if (gameState === 'end') {
+                html = `
+                    <div class="text-center space-y-8 animate-fade-in">
+                        <i data-lucide="rocket" class="w-24 h-24 text-blue-400 mx-auto animate-bounce"></i>
+                        
+                        <div class="flex justify-center items-center gap-3">
+                            <h2 class="text-4xl font-bold text-white">Mission Complete!</h2>
+                            <button onclick="playEndText()" class="bg-blue-500/20 hover:bg-blue-500/40 p-2 rounded-full text-blue-300 transition-colors" title="Read to me">
+                                <i data-lucide="volume-2" class="w-6 h-6"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="bg-slate-700 p-8 rounded-3xl max-w-md mx-auto">
+                            <p class="text-slate-300 text-lg mb-2">You earned</p>
+                            <div class="text-6xl font-black text-yellow-400 flex justify-center items-center gap-4">
+                                ${score} <i data-lucide="star" class="w-12 h-12 fill-yellow-400 text-yellow-400"></i>
+                            </div>
+                            <p class="text-slate-300 text-lg mt-2">out of ${QUESTIONS.length} stars</p>
+                        </div>
+
+                        <p class="text-xl text-blue-300 max-w-lg mx-auto">
+                            ${score === QUESTIONS.length 
+                                ? "Perfect score! You are a master of Finite and Infinite sequences!" 
+                                : "Great work! You helped navigate the ship safely using your sequence knowledge."}
+                        </p>
+
+                        <button onclick="startGame()" class="mt-8 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xl py-4 px-10 rounded-full flex items-center gap-3 mx-auto transition-transform hover:scale-105 active:scale-95">
+                            <i data-lucide="play" class="w-6 h-6 fill-white"></i> Play Again
+                        </button>
+                    </div>
+                `;
+            }
+
+            gameContent.innerHTML = html;
+
+            // Re-initialize Lucide icons after injecting new HTML
+            lucide.createIcons();
+        }
+
+        // --- Init Function ---
+        function init() {
+            // Generate Stars
+            const starsContainer = document.getElementById('stars-container');
+            for (let i = 0; i < 50; i++) {
+                const star = document.createElement('div');
+                star.className = 'absolute bg-white rounded-full animate-pulse';
+                star.style.left = `${Math.random() * 100}%`;
+                star.style.top = `${Math.random() * 100}%`;
+                star.style.width = '4px';
+                star.style.height = '4px';
+                star.style.opacity = Math.random();
+                star.style.animationDuration = `${Math.random() * 3 + 2}s`;
+                starsContainer.appendChild(star);
+            }
+
+            // Initial Render
+            render();
+        }
+
+        // Run Init
+        init();
+    </script>
+</body>
+</html>
