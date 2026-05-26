@@ -1,0 +1,1027 @@
+import React, { useState, useEffect, useRef } from 'react';
+
+// --- SOUND SYNTHESIZER UTILITIES ---
+class SoundSynth {
+  constructor() {
+    this.ctx = null;
+  }
+
+  init() {
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+  }
+
+  playClick() {
+    this.init();
+    if (!this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.12);
+  }
+
+  playCorrect() {
+    this.init();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((freq, idx) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+      gain.gain.setValueAtTime(0.08, now + idx * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.25);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now + idx * 0.08);
+      osc.stop(now + idx * 0.08 + 0.3);
+    });
+  }
+
+  playIncorrect() {
+    this.init();
+    if (!this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, this.ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(110, this.ctx.currentTime + 0.35);
+    gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.35);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.36);
+  }
+
+  playWin() {
+    this.init();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const notes = [523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50];
+    notes.forEach((freq, idx) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+      gain.gain.setValueAtTime(0.1, now + idx * 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.1 + 0.35);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now + idx * 0.1);
+      osc.stop(now + idx * 0.1 + 0.4);
+    });
+  }
+}
+
+const sound = new SoundSynth();
+
+// --- LEVEL DATA DEFINITION ---
+const LEVELS = [
+  {
+    id: 1,
+    title: "Stepping Stones",
+    shortDesc: "Odd, Even & Ordinal Positions",
+    pipIntro: "Welcome! The Magic Meadow is losing its light. Help me restore it! Can you find the correct stepping stones using their Ordinal Positions? Let's count who is 1st, 2nd, 3rd, and beyond!",
+    tutorial: {
+      title: "How to Play Stepping Stones",
+      text: "A sequence is a neat row of numbers. We use Ordinal Numbers to describe where a number sits! '1st' means the very first number, '2nd' is the second, '3rd' is the third, '4th' is the fourth, and '5th' is the fifth. We use them to find our place in the pattern!",
+      example: "In the sequence [2, 4, 6, 8]: The 1st number is 2, the 2nd is 4, the 3rd is 6, and the 4th is 8!"
+    },
+    questions: [
+      {
+        instruction: "Tap the 3rd stepping stone in this sequence of Odd numbers!",
+        // FIX: was empty — odd numbers 1–9
+        sequence: [1, 3, 5, 7, 9],
+        targetIndex: 2, // 5
+        explanation: "Excellent! The 3rd stone is 5. We count: 1st is 1, 2nd is 3, and the 3rd is 5."
+      },
+      {
+        instruction: "Tap the 5th stepping stone in this sequence of Even numbers!",
+        // FIX: was empty — even numbers 2–10
+        sequence: [2, 4, 6, 8, 10],
+        targetIndex: 4, // 10
+        explanation: "Correct! The 5th stone is 10. We count: 1st (2), 2nd (4), 3rd (6), 4th (8), and 5th (10)!"
+      },
+      {
+        instruction: "Tap the 2nd stepping stone in this Counting-by-10s sequence!",
+        // FIX: was empty — count by 10s
+        sequence: [10, 20, 30, 40, 50],
+        targetIndex: 1, // 20
+        explanation: "Great job! The 2nd stone is 20. Count with me: 1st is 10, 2nd is 20!"
+      },
+      {
+        instruction: "Tap the 1st stepping stone in this Counting-by-5s sequence!",
+        // FIX: was empty — count by 5s
+        sequence: [5, 10, 15, 20, 25],
+        targetIndex: 0, // 5
+        explanation: "Super! The 1st stone is 5. It is at the very beginning of our sequence!"
+      },
+      {
+        instruction: "Tap the 4th stepping stone in this Counting-by-100s sequence!",
+        // FIX: was empty — count by 100s
+        sequence: [100, 200, 300, 400, 500],
+        targetIndex: 3, // 400
+        explanation: "Awesome! The 4th stone is 400. Let's count them: 1st (100), 2nd (200), 3rd (300), 4th (400)!"
+      }
+    ]
+  },
+  {
+    id: 2,
+    title: "The Portal Sorting",
+    shortDesc: "Finite vs. Infinite Sequences",
+    pipIntro: "Amazing! Now we have to clean up the Portals. Some pattern lines stop and have an end (Finite). Others go on forever and never stop (Infinite)!",
+    tutorial: {
+      title: "Finite vs. Infinite Sequences",
+      text: "Finite sequences have a definite end. For example, counting down from 5 to 1: 5, 4, 3, 2, 1 - it stops! Infinite sequences never end, like the natural numbers [1, 2, 3, 4, ...] which go on forever! Look for the three dots (...) at the end of infinite sequences.",
+      // FIX: was missing the finite example sequence before "is Finite"
+      example: "[5, 4, 3, 2, 1] is Finite (ends). [5, 10, 15, 20, ...] is Infinite (goes forever)."
+    },
+    sortingItems: [
+      { id: "s1", sequenceText: "10, 9, 8, 7, 6, 5 (Countdown to takeoff!)", type: "finite", reason: "This sequence ends at 5." },
+      { id: "s2", sequenceText: "2, 4, 6, 8, 10, ... (Counting even numbers)", type: "infinite", reason: "The '...' means even numbers go on forever!" },
+      { id: "s3", sequenceText: "5, 4, 3, 2, 1, 0 (Blastoff!)", type: "finite", reason: "It stops when we hit 0!" },
+      { id: "s4", sequenceText: "3, 6, 9, 12, 15, ... (Skip-counting by 3)", type: "infinite", reason: "The numbers go on without stopping." },
+      { id: "s5", sequenceText: "Days of the week left: 3, 2, 1, Done!", type: "finite", reason: "It has a set limit of days." },
+      { id: "s6", sequenceText: "100, 200, 300, 400, ... (Counting to infinity!)", type: "infinite", reason: "It can go on as high as you can count!" }
+    ]
+  },
+  {
+    id: 3,
+    title: "The Secret Grid",
+    shortDesc: "Multiplication Tables & Missing Terms",
+    pipIntro: "You are a pattern master! Now let's explore patterns hidden in multiplication grids. We can find missing terms by skip-counting or multiplying!",
+    tutorial: {
+      title: "Multiplication Skip-Counting",
+      text: "Rows and columns on multiplication tables are just fun skip-counting patterns! You can figure out missing numbers by multiplying or finding what we count by.",
+      example: "In a '3s' column: 3, 6, 9, [?], 15. The missing number is 12 because 3 x 4 = 12!"
+    },
+    questions: [
+      {
+        instruction: "Find the missing number in this column of the 3s multiplication table!",
+        sequence: [3, 6, 9, null, 15],
+        // FIX: was empty — plausible wrong answers around 12
+        options: [9, 11, 12, 14],
+        correctAnswer: 12,
+        explanation: "Terrific! 12 is the 4th term (3 x 4 = 12). The sequence counts up by 3s!"
+      },
+      {
+        instruction: "Find the missing number in this section of the 5s multiplication table!",
+        sequence: [15, 20, 25, 30, null],
+        // FIX: was empty — plausible wrong answers around 35
+        options: [32, 33, 35, 40],
+        correctAnswer: 35,
+        explanation: "Correct! We are skip-counting by 5s. 30 + 5 is 35 (or 5 x 7 = 35)!"
+      },
+      {
+        instruction: "Find the missing number in this row of the 4s multiplication table!",
+        sequence: [8, 12, 16, null, 24],
+        // FIX: was empty — plausible wrong answers around 20
+        options: [18, 19, 20, 22],
+        correctAnswer: 20,
+        explanation: "Perfect! 20 is the missing term. 4 x 5 = 20."
+      }
+    ]
+  },
+  {
+    id: 4,
+    title: "The Change Chamber",
+    shortDesc: "Operation Rules & Term Changes",
+    pipIntro: "Final level! Let's decode the secret change from term to term. Is the pattern using Addition, Subtraction, Multiplication, or Division?",
+    tutorial: {
+      title: "What is the Magic Rule?",
+      text: "Every sequence progresses according to a rule. We can describe how we get from one number to the next using math operations like (+), (-), (x), or (÷)!",
+      example: "From 2 to 4 to 8: the rule is 'Multiply by 2' (x2). From 10 to 8 to 6: the rule is 'Subtract 2' (-2)."
+    },
+    questions: [
+      {
+        sequenceText: "4 ➔ 8 ➔ 12 ➔ 16 ➔ 20",
+        instruction: "What is the math rule to get from term to term?",
+        options: ["Add 4 (+4)", "Subtract 4 (-4)", "Multiply by 2 (x2)", "Divide by 2 (÷2)"],
+        correctIndex: 0,
+        explanation: "Fantastic! Each step adds 4. (4 + 4 = 8, 8 + 4 = 12)."
+      },
+      {
+        sequenceText: "30 ➔ 25 ➔ 20 ➔ 15 ➔ 10",
+        instruction: "What is the math rule to get from term to term?",
+        options: ["Add 5 (+5)", "Subtract 5 (-5)", "Multiply by 5 (x5)", "Divide by 5 (÷5)"],
+        correctIndex: 1,
+        explanation: "Yes! The sequence is counting backwards by 5, which is subtracting 5 (-5)."
+      },
+      {
+        sequenceText: "3 ➔ 6 ➔ 12 ➔ 24 ➔ 48",
+        instruction: "What is the math rule to get from term to term?",
+        options: ["Add 3 (+3)", "Subtract 3 (-3)", "Multiply by 2 (x2)", "Multiply by 3 (x3)"],
+        correctIndex: 2,
+        explanation: "Brilliant! Each term is doubled: 3 x 2 = 6, 6 x 2 = 12, 12 x 2 = 24. So the rule is Multiply by 2!"
+      },
+      {
+        sequenceText: "40 ➔ 20 ➔ 10 ➔ 5",
+        instruction: "What is the math rule to get from term to term?",
+        options: ["Subtract 20 (-20)", "Divide by 2 (÷2)", "Add 10 (+10)", "Divide by 10 (÷10)"],
+        correctIndex: 1,
+        explanation: "Wow, master status! 40 cut in half is 20, 20 cut in half is 10. That's dividing by 2 (÷2)!"
+      }
+    ]
+  }
+];
+
+export default function App() {
+  const [screen, setScreen] = useState('home');
+  const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
+  const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
+  const [stars, setStars] = useState(0);
+
+  const [selectedStoneIdx, setSelectedStoneIdx] = useState(null);
+  const [gridAnswerSelected, setGridAnswerSelected] = useState(null);
+  const [changeAnswerSelected, setChangeAnswerSelected] = useState(null);
+  const [isAnswerCorrect, setIsAnswerCorrect] = useState(null);
+  const [showExplanation, setShowExplanation] = useState(false);
+
+  const [sortedItems, setSortedItems] = useState({});
+  const [sortingFeedback, setSortingFeedback] = useState("");
+  const [sortingComplete, setSortingComplete] = useState(false);
+
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const currentLevel = LEVELS[currentLevelIdx];
+  const currentQuestion = currentLevel?.questions?.[currentQuestionIdx];
+
+  const speakText = (text) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.95;
+      utterance.pitch = 1.15;
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const stopSpeaking = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  };
+
+  const triggerTactileTap = () => {
+    sound.playClick();
+  };
+
+  const handleNavigate = (nextScreen) => {
+    stopSpeaking();
+    sound.playClick();
+    setScreen(nextScreen);
+    if (nextScreen === 'levelIntro') {
+      setTimeout(() => speakText(LEVELS[currentLevelIdx].pipIntro), 400);
+    } else if (nextScreen === 'tutorial') {
+      setTimeout(() => speakText(LEVELS[currentLevelIdx].tutorial.text), 400);
+    }
+  };
+
+  const handleStartGame = () => {
+    setStars(0);
+    setCurrentLevelIdx(0);
+    setCurrentQuestionIdx(0);
+    resetLevelStates();
+    handleNavigate('levelIntro');
+  };
+
+  const resetLevelStates = () => {
+    setSelectedStoneIdx(null);
+    setGridAnswerSelected(null);
+    setChangeAnswerSelected(null);
+    setIsAnswerCorrect(null);
+    setShowExplanation(false);
+    setSortedItems({});
+    setSortingFeedback("");
+    setSortingComplete(false);
+  };
+
+  const handleSelectStone = (idx) => {
+    if (showExplanation) return;
+    triggerTactileTap();
+    setSelectedStoneIdx(idx);
+    const isCorrect = idx === currentQuestion.targetIndex;
+    setIsAnswerCorrect(isCorrect);
+    setShowExplanation(true);
+    if (isCorrect) {
+      sound.playCorrect();
+      setStars(prev => prev + 1);
+    } else {
+      sound.playIncorrect();
+    }
+  };
+
+  const handleSelectGridAnswer = (ans) => {
+    if (showExplanation) return;
+    triggerTactileTap();
+    setGridAnswerSelected(ans);
+    const isCorrect = ans === currentQuestion.correctAnswer;
+    setIsAnswerCorrect(isCorrect);
+    setShowExplanation(true);
+    if (isCorrect) {
+      sound.playCorrect();
+      setStars(prev => prev + 1);
+    } else {
+      sound.playIncorrect();
+    }
+  };
+
+  const handleSelectChangeAnswer = (idx) => {
+    if (showExplanation) return;
+    triggerTactileTap();
+    setChangeAnswerSelected(idx);
+    const isCorrect = idx === currentQuestion.correctIndex;
+    setIsAnswerCorrect(isCorrect);
+    setShowExplanation(true);
+    if (isCorrect) {
+      sound.playCorrect();
+      setStars(prev => prev + 1);
+    } else {
+      sound.playIncorrect();
+    }
+  };
+
+  const handleSortItem = (itemId, targetCategory) => {
+    sound.playClick();
+    const updated = { ...sortedItems, [itemId]: targetCategory };
+    setSortedItems(updated);
+    const item = currentLevel.sortingItems.find(i => i.id === itemId);
+    if (item.type === targetCategory) {
+      setSortingFeedback(`Awesome! Correctly sorted.`);
+      sound.playCorrect();
+    } else {
+      setSortingFeedback(`Oops! Try sorting that one again.`);
+      sound.playIncorrect();
+      setTimeout(() => {
+        setSortedItems(prev => {
+          const reset = { ...prev };
+          delete reset[itemId];
+          return reset;
+        });
+        setSortingFeedback("");
+      }, 1500);
+    }
+  };
+
+  useEffect(() => {
+    if (screen === 'play' && currentLevel?.id === 2) {
+      const items = currentLevel.sortingItems;
+      const allCorrect = items.every(item => sortedItems[item.id] === item.type);
+      if (allCorrect && items.length > 0) {
+        setSortingComplete(true);
+        sound.playWin();
+        setStars(prev => prev + 3);
+      }
+    }
+  }, [sortedItems, screen, currentLevelIdx]);
+
+  const handleNextAction = () => {
+    stopSpeaking();
+    sound.playClick();
+    if (currentLevel.questions && currentQuestionIdx < currentLevel.questions.length - 1) {
+      setCurrentQuestionIdx(prev => prev + 1);
+      setSelectedStoneIdx(null);
+      setGridAnswerSelected(null);
+      setChangeAnswerSelected(null);
+      setIsAnswerCorrect(null);
+      setShowExplanation(false);
+    } else {
+      sound.playWin();
+      setScreen('levelClear');
+    }
+  };
+
+  const handleNextLevel = () => {
+    stopSpeaking();
+    sound.playClick();
+    if (currentLevelIdx < LEVELS.length - 1) {
+      setCurrentLevelIdx(prev => prev + 1);
+      setCurrentQuestionIdx(0);
+      resetLevelStates();
+      setScreen('levelIntro');
+    } else {
+      setScreen('gameComplete');
+    }
+  };
+
+  // Pip SVG mascot — shared component to reduce repetition
+  const PipMascot = ({ size = "w-full h-full", crowned = false, pulsing = false }) => (
+    <svg viewBox="0 0 120 120" className={`${size} drop-shadow-lg`}>
+      <circle cx="60" cy="65" r="45" fill="#10B981" />
+      <circle cx="60" cy="65" r="40" fill="#34D399" />
+      <ellipse cx="25" cy="50" rx="15" ry="25" fill="#93C5FD" opacity="0.8" transform="rotate(-20 25 50)"/>
+      <ellipse cx="95" cy="50" rx="15" ry="25" fill="#93C5FD" opacity="0.8" transform="rotate(20 95 50)"/>
+      {crowned && (
+        <path d="M 40 25 L 45 35 L 60 20 L 75 35 L 80 25 L 85 40 L 35 40 Z" fill="#F59E0B" stroke="#D97706" strokeWidth="2" />
+      )}
+      {!crowned && (
+        <>
+          <path d="M 60 25 Q 60 15 68 12" stroke="#F59E0B" strokeWidth="4" strokeLinecap="round" fill="none" />
+          <circle cx="68" cy="12" r="6" fill="#F59E0B" />
+        </>
+      )}
+      <circle cx="48" cy="55" r="6" fill="#1E293B" />
+      <circle cx="48" cy="53" r="2" fill="white" />
+      <circle cx="72" cy="55" r="6" fill="#1E293B" />
+      <circle cx="72" cy="53" r="2" fill="white" />
+      <circle cx="42" cy="64" r="4" fill="#F43F5E" opacity="0.6" />
+      <circle cx="78" cy="64" r="4" fill="#F43F5E" opacity="0.6" />
+      <path d="M 52 68 Q 60 76 68 68" stroke="#1E293B" strokeWidth="4" strokeLinecap="round" fill="none" />
+    </svg>
+  );
+
+  const SpeakerIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+    </svg>
+  );
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 via-teal-50 to-sky-100 font-sans text-gray-800 flex flex-col justify-between select-none">
+
+      {/* --- HEADER --- */}
+      <header className="bg-white/80 backdrop-blur-md border-b border-teal-100 py-3 px-4 md:px-8 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+        <div className="flex items-center gap-2">
+          <div className="bg-emerald-500 text-white p-2 rounded-xl shadow-md transform rotate-3">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-700 bg-clip-text text-transparent">
+              Pattern Quest
+            </h1>
+            <p className="text-xs text-emerald-600 font-medium hidden sm:block">Grade 3 Magic Meadow</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          {screen !== 'home' && (
+            <div className="bg-teal-50 border border-teal-200 px-3 py-1.5 rounded-full flex items-center gap-2">
+              <span className="text-xs uppercase tracking-wider font-bold text-teal-700">Level {currentLevelIdx + 1}</span>
+              <div className="w-16 h-2 bg-teal-200 rounded-full overflow-hidden hidden xs:block">
+                <div
+                  className="bg-emerald-500 h-full transition-all duration-300"
+                  style={{ width: `${(currentLevelIdx / LEVELS.length) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+          <div className="bg-amber-50 border border-amber-200 px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm animate-bounce">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-500 fill-amber-400" viewBox="0 0 24 24">
+              <path d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.787 1.4 8.168L12 18.896l-7.334 3.857 1.4-8.168L.133 9.21l8.2-1.192z"/>
+            </svg>
+            <span className="font-extrabold text-amber-800 text-lg">{stars}</span>
+          </div>
+        </div>
+      </header>
+
+      {/* --- MAIN GAME CONTAINER --- */}
+      <main className="max-w-4xl w-full mx-auto px-4 py-6 flex-grow flex flex-col justify-center">
+
+        {/* --- SCREEN 1: HOME --- */}
+        {screen === 'home' && (
+          <div className="bg-white rounded-3xl p-6 md:p-10 shadow-xl border border-teal-100 text-center relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-32 h-32 bg-emerald-100 rounded-full filter blur-xl opacity-50 -translate-x-12 -translate-y-12"></div>
+            <div className="absolute bottom-0 right-0 w-48 h-48 bg-teal-100 rounded-full filter blur-2xl opacity-50 translate-x-16 translate-y-16"></div>
+
+            <div className="relative z-10 flex flex-col items-center">
+              <div className="w-32 h-32 mb-4 animate-bounce">
+                <PipMascot />
+              </div>
+              <h2 className="text-3xl md:text-5xl font-black text-slate-800 tracking-tight mb-2">
+                Pattern Quest!
+              </h2>
+              <p className="text-teal-700 text-lg md:text-xl font-medium mb-8 max-w-md mx-auto">
+                Restore magic to the Meadow by solving numerical sequences and patterns!
+              </p>
+              <button
+                onClick={handleStartGame}
+                className="group relative bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-extrabold text-xl px-12 py-5 rounded-2xl shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 border-b-4 border-emerald-700"
+              >
+                Let's Play!
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 inline-block ml-2 group-hover:translate-x-1.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                </svg>
+              </button>
+              <div className="mt-10 grid grid-cols-2 gap-3 text-left max-w-lg w-full text-xs text-slate-500 border-t border-slate-100 pt-6">
+                <div className="flex items-center gap-2"><span className="p-1 bg-emerald-100 text-emerald-700 rounded-md">🔢</span>Even, Odd & Ordinals</div>
+                <div className="flex items-center gap-2"><span className="p-1 bg-teal-100 text-teal-700 rounded-md">♾️</span>Finite vs. Infinite</div>
+                <div className="flex items-center gap-2"><span className="p-1 bg-sky-100 text-sky-700 rounded-md">✖️</span>Skip-Counting Grids</div>
+                <div className="flex items-center gap-2"><span className="p-1 bg-amber-100 text-amber-700 rounded-md">🧮</span>Change Operators (+ - x ÷)</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- SCREEN 2: LEVEL INTRODUCTION --- */}
+        {screen === 'levelIntro' && currentLevel && (
+          <div className="bg-white rounded-3xl p-6 md:p-8 shadow-xl border border-teal-100">
+            <div className="flex flex-col md:flex-row items-center gap-6">
+              <div className="flex flex-col items-center shrink-0">
+                <div className={`w-28 h-28 ${isSpeaking ? 'animate-pulse scale-105' : 'animate-bounce'}`}>
+                  <PipMascot />
+                </div>
+                <span className="font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full text-xs mt-2 border border-emerald-100">
+                  Pip the Pixie
+                </span>
+              </div>
+              <div className="flex-grow bg-emerald-50/60 border-2 border-emerald-100 p-6 rounded-2xl relative">
+                <div className="hidden md:block absolute top-10 -left-3 w-6 h-6 bg-emerald-50 border-l-2 border-b-2 border-emerald-100 rotate-45"></div>
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs uppercase font-extrabold tracking-widest text-emerald-600">
+                    Quest Level {currentLevel.id}
+                  </span>
+                  <button
+                    onClick={() => speakText(currentLevel.pipIntro)}
+                    className={`p-2 rounded-full border transition-all duration-200 ${isSpeaking ? 'bg-emerald-500 border-emerald-600 text-white animate-pulse' : 'bg-white border-emerald-200 text-emerald-600 hover:bg-emerald-50'}`}
+                    title="Read Instructions Aloud"
+                  >
+                    <SpeakerIcon />
+                  </button>
+                </div>
+                <h3 className="text-2xl font-bold text-slate-800 mb-2">{currentLevel.title}</h3>
+                <p className="text-slate-600 text-base md:text-lg leading-relaxed">"{currentLevel.pipIntro}"</p>
+              </div>
+            </div>
+            <div className="mt-8 flex justify-end gap-3">
+              <button
+                onClick={() => handleNavigate('tutorial')}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-lg px-8 py-4 rounded-xl shadow-md border-b-4 border-emerald-700 active:scale-95 transition-all"
+              >
+                Learn How! 📖
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* --- SCREEN 3: TUTORIAL --- */}
+        {screen === 'tutorial' && currentLevel && (
+          <div className="bg-white rounded-3xl p-6 md:p-8 shadow-xl border border-teal-100">
+            <div className="mb-6 border-b border-teal-100 pb-4">
+              <div className="flex items-center justify-between">
+                <span className="bg-teal-50 text-teal-700 border border-teal-200 font-bold px-3 py-1 rounded-full text-xs">
+                  Tutorial Book
+                </span>
+                <button
+                  onClick={() => speakText(currentLevel.tutorial.text)}
+                  className={`p-2 rounded-full border transition-all duration-200 ${isSpeaking ? 'bg-teal-500 border-teal-600 text-white' : 'bg-white border-teal-200 text-teal-600 hover:bg-teal-50'}`}
+                  title="Read Aloud"
+                >
+                  <SpeakerIcon />
+                </button>
+              </div>
+              <h2 className="text-2xl font-black text-slate-800 mt-2">{currentLevel.tutorial.title}</h2>
+            </div>
+            <div className="space-y-6 text-slate-600">
+              <p className="text-base md:text-lg leading-relaxed bg-teal-50/40 p-5 rounded-2xl border border-teal-100/60 text-slate-700">
+                {currentLevel.tutorial.text}
+              </p>
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5">
+                <h4 className="font-bold text-amber-800 mb-1.5 flex items-center gap-1.5 text-sm uppercase">
+                  ⭐ Tip &amp; Example
+                </h4>
+                <p className="text-amber-900 font-medium text-base">{currentLevel.tutorial.example}</p>
+              </div>
+            </div>
+            <div className="mt-8 pt-4 border-t border-teal-50 flex justify-between gap-4">
+              <button
+                onClick={() => handleNavigate('levelIntro')}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-6 py-3 rounded-xl transition"
+              >
+                Back
+              </button>
+              <button
+                onClick={() => handleNavigate('play')}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-lg px-8 py-4 rounded-xl shadow-md border-b-4 border-emerald-700 active:scale-95 transition-all"
+              >
+                Start Challenge! 🚀
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* --- SCREEN 4: ACTIVE PLAY SCREEN --- */}
+        {screen === 'play' && currentLevel && (
+          <div className="bg-white rounded-3xl p-5 md:p-8 shadow-xl border border-teal-100 relative">
+
+            {/* Mascot Prompt Bar */}
+            <div className="flex items-start gap-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 mb-6">
+              <div className="w-12 h-12 shrink-0 animate-pulse">
+                <svg viewBox="0 0 120 120" className="w-full h-full">
+                  <circle cx="60" cy="65" r="45" fill="#10B981" />
+                  <circle cx="60" cy="65" r="40" fill="#34D399" />
+                  <ellipse cx="25" cy="50" rx="15" ry="25" fill="#93C5FD" opacity="0.8" transform="rotate(-20 25 50)"/>
+                  <ellipse cx="95" cy="50" rx="15" ry="25" fill="#93C5FD" opacity="0.8" transform="rotate(20 95 50)"/>
+                  <circle cx="48" cy="55" r="5" fill="#1E293B" />
+                  <circle cx="72" cy="55" r="5" fill="#1E293B" />
+                  <path d="M 52 68 Q 60 74 68 68" stroke="#1E293B" strokeWidth="4" strokeLinecap="round" fill="none" />
+                </svg>
+              </div>
+              <div className="flex-grow">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-black uppercase text-emerald-600">Challenge Prompt</span>
+                  <button
+                    onClick={() => {
+                      const textToRead = currentLevel.id === 2
+                        ? "Sort these sequence portals! Click or tap either Finite or Infinite on each item card."
+                        : currentQuestion?.instruction;
+                      speakText(textToRead);
+                    }}
+                    className={`p-1.5 rounded-full transition ${isSpeaking ? 'bg-emerald-500 text-white' : 'bg-white border text-emerald-600 hover:bg-emerald-50'}`}
+                  >
+                    <SpeakerIcon />
+                  </button>
+                </div>
+                <p className="text-slate-800 font-bold text-base md:text-lg">
+                  {currentLevel.id === 2 ? "Sort all sequences to clear the magic portals!" : currentQuestion?.instruction}
+                </p>
+              </div>
+            </div>
+
+            {/* --- LEVEL 1: STEPPING STONES --- */}
+            {currentLevel.id === 1 && currentQuestion && (
+              <div className="my-6">
+                <div className="mb-4 bg-teal-50 border border-teal-100 rounded-xl p-3 text-center text-xs font-semibold text-teal-800">
+                  💡 Hint: Ordinal numbers describe exact sequence slots!
+                  <span className="ml-1 font-bold">(1st = First, 2nd = Second, 3rd = Third, 4th = Fourth, 5th = Fifth)</span>
+                </div>
+                <div className="flex flex-wrap justify-center gap-4 py-8 px-4 bg-sky-50 rounded-3xl border border-sky-100">
+                  {currentQuestion.sequence.map((num, idx) => {
+                    const suffixes = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th"];
+                    const isSelected = selectedStoneIdx === idx;
+                    const isTarget = currentQuestion.targetIndex === idx;
+
+                    let bgClass = "bg-white hover:bg-teal-50 border-slate-200 text-slate-800 scale-100";
+                    if (selectedStoneIdx !== null) {
+                      if (isTarget) {
+                        bgClass = "bg-emerald-500 border-emerald-600 text-white ring-4 ring-emerald-200 scale-105";
+                      } else if (isSelected) {
+                        bgClass = "bg-rose-500 border-rose-600 text-white ring-4 ring-rose-200";
+                      } else {
+                        bgClass = "opacity-45 bg-white border-slate-100 text-slate-400";
+                      }
+                    }
+
+                    return (
+                      <button
+                        key={idx}
+                        disabled={showExplanation}
+                        onClick={() => handleSelectStone(idx)}
+                        className={`w-20 h-24 rounded-2xl border-b-8 font-extrabold flex flex-col items-center justify-between p-3 shadow-md transition-all duration-200 ${bgClass}`}
+                      >
+                        <span className="text-xs uppercase text-slate-400 bg-slate-100 rounded px-1.5 py-0.5 font-bold">
+                          {suffixes[idx]}
+                        </span>
+                        <span className="text-2xl font-black">{num}</span>
+                        <div className="w-4 h-4 rounded-full border border-slate-200 bg-white"></div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* --- LEVEL 2: PORTAL SORTING --- */}
+            {currentLevel.id === 2 && (
+              <div className="my-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-amber-50/70 border-2 border-amber-200 rounded-3xl p-4 flex flex-col min-h-40">
+                    <h4 className="text-amber-800 font-extrabold text-lg flex items-center gap-2 border-b border-amber-200 pb-2">
+                      <span className="text-2xl">🛑</span> Finite Sequences (Has an End)
+                    </h4>
+                    <p className="text-xs text-amber-700 mt-1 mb-4">Cards that stop or have a fixed limit go here.</p>
+                    <div className="flex-grow space-y-3">
+                      {currentLevel.sortingItems.filter(item => sortedItems[item.id] === 'finite').map(item => (
+                        <div key={item.id} className="bg-white border border-amber-300 p-3 rounded-xl shadow-sm text-sm font-bold text-amber-900 flex justify-between items-center">
+                          <span>{item.sequenceText}</span>
+                          <span className="text-emerald-600">✓ Correct!</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-indigo-50/70 border-2 border-indigo-200 rounded-3xl p-4 flex flex-col min-h-40">
+                    <h4 className="text-indigo-800 font-extrabold text-lg flex items-center gap-2 border-b border-indigo-200 pb-2">
+                      <span className="text-2xl">♾️</span> Infinite Sequences (Goes Forever)
+                    </h4>
+                    <p className="text-xs text-indigo-700 mt-1 mb-4">Look for sequence patterns with the three dots (...)</p>
+                    <div className="flex-grow space-y-3">
+                      {currentLevel.sortingItems.filter(item => sortedItems[item.id] === 'infinite').map(item => (
+                        <div key={item.id} className="bg-white border border-indigo-300 p-3 rounded-xl shadow-sm text-sm font-bold text-indigo-950 flex justify-between items-center">
+                          <span>{item.sequenceText}</span>
+                          <span className="text-emerald-600">✓ Correct!</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {!sortingComplete && (
+                  <div className="mt-8 border-t border-slate-100 pt-6">
+                    <h4 className="font-extrabold text-slate-700 mb-3 text-center">Tap where each sequence belongs:</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {currentLevel.sortingItems.filter(item => !sortedItems[item.id]).map(item => (
+                        <div key={item.id} className="bg-slate-50 border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col justify-between">
+                          <span className="text-base font-black text-slate-800 mb-3 block text-center py-2 bg-white rounded-xl border border-slate-100">
+                            {item.sequenceText}
+                          </span>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={() => handleSortItem(item.id, 'finite')}
+                              className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold py-2 px-3 rounded-xl text-xs shadow border-b-2 border-amber-700 active:scale-95 transition-all"
+                            >
+                              Stop (Finite) 🛑
+                            </button>
+                            <button
+                              onClick={() => handleSortItem(item.id, 'infinite')}
+                              className="bg-indigo-500 hover:bg-indigo-600 text-white font-extrabold py-2 px-3 rounded-xl text-xs shadow border-b-2 border-indigo-700 active:scale-95 transition-all"
+                            >
+                              Forever (Infinite) ♾️
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {sortingFeedback && (
+                  <div className="mt-4 p-3 bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-xl text-center text-sm font-bold animate-pulse">
+                    {sortingFeedback}
+                  </div>
+                )}
+
+                {sortingComplete && (
+                  <div className="mt-8 text-center bg-emerald-500/10 border border-emerald-300 p-6 rounded-3xl">
+                    <h3 className="text-2xl font-black text-emerald-800 mb-2">🎉 Portal Complete!</h3>
+                    <p className="text-emerald-700 mb-4 font-medium">You sorted all patterns with perfect accuracy. Extra stars added!</p>
+                    <button
+                      onClick={handleNextAction}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-lg px-8 py-3 rounded-xl shadow border-b-4 border-emerald-700 active:scale-95 transition-all"
+                    >
+                      Awesome! Continue
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* --- LEVEL 3: SECRET GRID --- */}
+            {currentLevel.id === 3 && currentQuestion && (
+              <div className="my-6">
+                <div className="flex flex-col items-center gap-6">
+                  <div className="flex justify-center gap-3 py-6 px-4 bg-amber-50 rounded-3xl border border-amber-200 w-full max-w-lg">
+                    {currentQuestion.sequence.map((num, idx) => {
+                      if (num === null) {
+                        return (
+                          <div
+                            key={idx}
+                            // FIX: replaced animate-shake (non-existent) with animate-pulse for wrong answer
+                            className={`w-14 h-14 md:w-16 md:h-16 rounded-xl border-4 border-dashed font-black text-xl md:text-2xl flex items-center justify-center shadow-inner transition-all ${
+                              isAnswerCorrect === true
+                                ? 'bg-emerald-100 border-emerald-500 text-emerald-700'
+                                : isAnswerCorrect === false
+                                ? 'bg-rose-100 border-rose-500 text-rose-700 animate-pulse'
+                                : 'bg-white border-amber-400 text-amber-500'
+                            }`}
+                          >
+                            {gridAnswerSelected ? gridAnswerSelected : "?"}
+                          </div>
+                        );
+                      }
+                      return (
+                        <div
+                          key={idx}
+                          className="w-14 h-14 md:w-16 md:h-16 rounded-xl border-b-4 border-slate-300 bg-white border border-slate-200 text-slate-800 font-extrabold text-lg md:text-xl flex items-center justify-center shadow"
+                        >
+                          {num}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="w-full max-w-lg">
+                    <h4 className="font-extrabold text-slate-500 text-xs uppercase mb-3 text-center">Choose the missing term:</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      {currentQuestion.options.map((opt, idx) => {
+                        const isSelected = gridAnswerSelected === opt;
+                        const isCorrect = opt === currentQuestion.correctAnswer;
+
+                        let optStyle = "bg-white hover:bg-emerald-50 text-slate-800 border-slate-200 border-b-4";
+                        if (gridAnswerSelected !== null) {
+                          if (isCorrect) {
+                            // FIX: replaced scale-102 (non-existent) with scale-105
+                            optStyle = "bg-emerald-500 text-white border-emerald-700 pointer-events-none scale-105";
+                          } else if (isSelected) {
+                            optStyle = "bg-rose-500 text-white border-rose-700 pointer-events-none";
+                          } else {
+                            optStyle = "opacity-40 bg-white text-slate-300 pointer-events-none";
+                          }
+                        }
+
+                        return (
+                          <button
+                            key={idx}
+                            disabled={gridAnswerSelected !== null}
+                            onClick={() => handleSelectGridAnswer(opt)}
+                            className={`py-4 px-6 rounded-2xl text-lg font-black transition-all ${optStyle}`}
+                          >
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* --- LEVEL 4: CHANGE CHAMBER --- */}
+            {currentLevel.id === 4 && currentQuestion && (
+              <div className="my-6">
+                <div className="flex flex-col items-center gap-6">
+                  <div className="bg-indigo-900 text-white px-6 py-6 rounded-3xl w-full text-center shadow-lg relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-16 h-16 bg-white/5 rounded-full translate-x-4 -translate-y-4"></div>
+                    <span className="text-indigo-300 uppercase font-black text-xs tracking-widest block mb-2">Sequence Line</span>
+                    <span className="text-2xl md:text-4xl font-black tracking-wider text-amber-300">
+                      {currentQuestion.sequenceText}
+                    </span>
+                  </div>
+                  <div className="w-full max-w-lg">
+                    <h4 className="font-extrabold text-slate-500 text-xs uppercase mb-3 text-center">Select the correct change rule:</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {currentQuestion.options.map((opt, idx) => {
+                        const isSelected = changeAnswerSelected === idx;
+                        const isCorrect = idx === currentQuestion.correctIndex;
+
+                        let style = "bg-white hover:bg-indigo-50 text-slate-800 border-slate-200 border-b-4";
+                        if (changeAnswerSelected !== null) {
+                          if (isCorrect) {
+                            style = "bg-emerald-500 text-white border-emerald-700 pointer-events-none";
+                          } else if (isSelected) {
+                            style = "bg-rose-500 text-white border-rose-700 pointer-events-none";
+                          } else {
+                            style = "opacity-40 bg-white text-slate-300 pointer-events-none";
+                          }
+                        }
+
+                        return (
+                          <button
+                            key={idx}
+                            disabled={changeAnswerSelected !== null}
+                            onClick={() => handleSelectChangeAnswer(idx)}
+                            className={`py-4 px-6 rounded-2xl text-base font-black text-left flex items-center gap-3 transition-all ${style}`}
+                          >
+                            <span className="text-xl">⚙️</span>
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* --- EXPLANATION BOX --- */}
+            {showExplanation && currentLevel.id !== 2 && (
+              <div className={`mt-6 p-5 rounded-2xl border-2 transition-all duration-300 ${
+                isAnswerCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">{isAnswerCorrect ? "🌟" : "💡"}</span>
+                  <div>
+                    <h5 className="font-extrabold text-base mb-1">
+                      {isAnswerCorrect ? "You Got It!" : "Not Quite! Learn from Pip:"}
+                    </h5>
+                    <p className="text-sm font-medium leading-relaxed">{currentQuestion?.explanation}</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <button
+                    onClick={handleNextAction}
+                    className="bg-slate-800 hover:bg-slate-900 text-white font-extrabold py-2.5 px-6 rounded-xl text-sm transition"
+                  >
+                    Next Question ➔
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Progress indicators */}
+            {currentLevel.id !== 2 && (
+              <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-bold">
+                <span>Progress: {currentQuestionIdx + 1} of {currentLevel.questions.length} Questions</span>
+                <div className="flex gap-1.5">
+                  {currentLevel.questions.map((_, idx) => (
+                    <div
+                      key={idx}
+                      className={`w-3 h-3 rounded-full transition ${
+                        idx < currentQuestionIdx
+                          ? 'bg-emerald-500'
+                          : idx === currentQuestionIdx
+                          ? 'bg-teal-400 ring-2 ring-teal-100 scale-110'
+                          : 'bg-slate-200'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* --- SCREEN 5: LEVEL CLEAR --- */}
+        {screen === 'levelClear' && currentLevel && (
+          <div className="bg-white rounded-3xl p-6 md:p-8 shadow-xl border border-teal-100 text-center relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-100 rounded-full filter blur-3xl opacity-50 translate-x-12 -translate-y-12"></div>
+            <div className="relative z-10 flex flex-col items-center py-6">
+              <div className="w-24 h-24 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-4xl mb-4 animate-bounce shadow-md">
+                🏆
+              </div>
+              <h2 className="text-3xl font-black text-slate-800 mb-1">Level Complete!</h2>
+              <p className="text-emerald-700 text-base md:text-lg font-bold mb-6">You cleared "{currentLevel.title}"!</p>
+              <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-6 max-w-sm w-full mb-8">
+                <span className="text-xs uppercase font-extrabold tracking-wider text-emerald-600 block mb-2">Sparks Restored</span>
+                <div className="flex justify-center items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-amber-500 fill-amber-400" viewBox="0 0 24 24">
+                    <path d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.787 1.4 8.168L12 18.896l-7.334 3.857 1.4-8.168L.133 9.21l8.2-1.192z"/>
+                  </svg>
+                  <span className="text-3xl font-black text-slate-800">{stars} total stars</span>
+                </div>
+              </div>
+              <p className="text-slate-500 italic max-w-md text-sm mb-8">
+                "Oh, look how bright the meadow is getting! Your logical pattern skills are truly magical. Let's tackle the next pattern forest!"
+              </p>
+              {/* FIX: replaced py-4.5 (invalid Tailwind) with py-4 */}
+              <button
+                onClick={handleNextLevel}
+                className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-extrabold text-xl px-10 py-4 rounded-xl shadow-md border-b-4 border-emerald-700 active:scale-95 transition-all"
+              >
+                {currentLevelIdx < LEVELS.length - 1 ? "Next Level! ➔" : "Claim Final Crown! 👑"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* --- SCREEN 6: GAME COMPLETE --- */}
+        {screen === 'gameComplete' && (
+          <div className="bg-white rounded-3xl p-6 md:p-10 shadow-xl border border-teal-100 text-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-tr from-emerald-50/30 to-sky-50/30 -z-10"></div>
+            <div className="flex flex-col items-center">
+              <div className="w-36 h-36 mb-6 animate-bounce">
+                <PipMascot crowned={true} />
+              </div>
+              <h2 className="text-4xl md:text-5xl font-black text-slate-800 tracking-tight mb-2">Meadow Restored!</h2>
+              <p className="text-emerald-700 text-lg md:text-xl font-bold mb-6 max-w-md mx-auto">
+                Amazing job! You analyzed all numerical sequence patterns to save the magical Sparks!
+              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 max-w-sm w-full shadow-inner mb-8">
+                <span className="text-xs uppercase font-extrabold tracking-wider text-amber-700 block mb-2">Final Score</span>
+                <div className="flex justify-center items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-amber-500 fill-amber-400" viewBox="0 0 24 24">
+                    <path d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.787 1.4 8.168L12 18.896l-7.334 3.857 1.4-8.168L.133 9.21l8.2-1.192z"/>
+                  </svg>
+                  <span className="text-4xl font-extrabold text-slate-800">{stars} Stars Collected</span>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <button
+                  onClick={handleStartGame}
+                  className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black text-lg px-8 py-4 rounded-xl shadow-md border-b-4 border-emerald-700 active:scale-95 transition-all"
+                >
+                  Play Again 🔄
+                </button>
+                <button
+                  onClick={() => handleNavigate('home')}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-8 py-4 rounded-xl transition"
+                >
+                  Home
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </main>
+
+      <footer className="bg-slate-50 border-t border-slate-100 py-4 px-4 text-center text-xs text-slate-400">
+        <p>© 2026 Grade 3 Pattern Quest. Crafted using Alberta Curriculum Standards.</p>
+        <p className="mt-1">Built with high-contrast accessibility standards and voiceover synthesis. No ads or paywalls.</p>
+      </footer>
+    </div>
+  );
+}
