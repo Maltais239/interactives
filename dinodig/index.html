@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>STRATA — Virtual Excavation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Spline+Sans:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --pit-dark:#15100b;
+    --topsoil:#a8825a;
+    --sandstone:#c2925f;
+    --ochre:#9e5b34;
+    --silt:#d9c19a;
+    --shale:#3a2c20;
+    --bone:#efe4cf;
+    --bone-deep:#cdbb96;
+    --chalk:#eef3ec;
+    --amber:#e0a341;
+    --amber-deep:#b87a23;
+    --ink:#221a12;
+    --paper:#1c1611;
+    --paper-2:#241c14;
+    --line:#42342400;
+    --rule:rgba(224,163,65,.22);
+    --rule-strong:rgba(224,163,65,.5);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(120% 90% at 50% -10%, #2a2015 0%, #15100b 55%, #0d0a06 100%);
+    color:var(--bone);
+    font-family:"Spline Sans",system-ui,sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* faint stratigraphic striations across the whole page */
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+    background:repeating-linear-gradient(180deg,
+      transparent 0 38px, rgba(0,0,0,.13) 38px 40px);
+    mix-blend-mode:multiply;
+  }
+  .wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:28px 20px 60px;}
+
+  /* ---------- masthead ---------- */
+  header{display:flex;flex-direction:column;gap:6px;margin-bottom:22px;}
+  .eyebrow{
+    font-family:"Space Mono",monospace;font-size:11.5px;letter-spacing:.32em;
+    text-transform:uppercase;color:var(--amber);display:flex;gap:14px;flex-wrap:wrap;align-items:center;
+  }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);display:inline-block;
+    box-shadow:0 0 10px var(--amber);animation:pulse 2.4s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  h1{
+    font-family:"Oswald",sans-serif;font-weight:700;letter-spacing:.06em;
+    font-size:clamp(46px,11vw,104px);line-height:.86;margin:2px 0 0;
+    color:var(--chalk);text-transform:uppercase;
+    text-shadow:0 2px 0 rgba(0,0,0,.35), 0 0 40px rgba(224,163,65,.08);
+  }
+  h1 .thin{font-weight:300;color:var(--bone-deep);}
+  .tagline{
+    font-family:"Oswald",sans-serif;font-weight:300;letter-spacing:.34em;text-transform:uppercase;
+    font-size:clamp(11px,2.4vw,14px);color:var(--bone-deep);margin-top:8px;
+  }
+
+  /* ---------- site selector ---------- */
+  .sites{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 18px;}
+  .site-tab{
+    appearance:none;border:1px solid var(--rule);background:rgba(255,255,255,.015);
+    color:var(--bone-deep);font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.12em;
+    padding:9px 13px;border-radius:3px;cursor:pointer;transition:.18s;display:flex;align-items:center;gap:8px;
+    text-transform:uppercase;
+  }
+  .site-tab:hover{border-color:var(--rule-strong);color:var(--bone);}
+  .site-tab[aria-pressed="true"]{
+    background:linear-gradient(180deg,rgba(224,163,65,.18),rgba(224,163,65,.06));
+    border-color:var(--amber);color:var(--chalk);
+  }
+  .site-tab .grid{font-weight:700;}
+  .site-tab .pip{width:7px;height:7px;border-radius:1px;background:var(--shale);border:1px solid rgba(255,255,255,.18);}
+  .site-tab[data-found="true"] .pip{background:var(--amber);border-color:var(--amber);box-shadow:0 0 8px var(--amber);}
+
+  /* ---------- main layout ---------- */
+  .field{display:grid;grid-template-columns:118px 1fr;gap:18px;align-items:stretch;}
+
+  /* depth gauge column */
+  .gauge{
+    border:1px solid var(--rule);border-radius:5px;background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);
+    padding:14px 12px;display:flex;flex-direction:column;gap:14px;min-height:0;
+  }
+  .gauge h2{font-family:"Oswald";font-weight:500;letter-spacing:.18em;text-transform:uppercase;
+    font-size:11px;color:var(--amber);margin:0;}
+  .ruler{position:relative;flex:1;min-height:240px;border-left:1px solid var(--rule-strong);margin-left:4px;}
+  .ruler .tick{position:absolute;left:0;width:9px;height:1px;background:var(--rule-strong);}
+  .ruler .tick.major{width:15px;background:var(--amber);}
+  .ruler .lab{position:absolute;left:18px;transform:translateY(-50%);
+    font-family:"Space Mono";font-size:9.5px;color:var(--bone-deep);letter-spacing:.04em;white-space:nowrap;}
+  .ruler .fill{position:absolute;left:-1px;top:0;width:3px;background:linear-gradient(180deg,var(--amber),var(--amber-deep));
+    box-shadow:0 0 12px rgba(224,163,65,.6);transition:height .25s ease;}
+  .ruler .head{position:absolute;left:-5px;width:11px;height:11px;border-radius:50%;
+    background:var(--chalk);box-shadow:0 0 10px var(--amber);transition:top .25s ease;transform:translateY(-50%);}
+  .readout{display:flex;flex-direction:column;gap:3px;}
+  .readout .big{font-family:"Oswald";font-weight:600;font-size:30px;line-height:1;color:var(--chalk);}
+  .readout .small{font-family:"Space Mono";font-size:10px;color:var(--bone-deep);letter-spacing:.08em;}
+
+  /* the dig pit */
+  .stage{display:flex;flex-direction:column;gap:14px;min-width:0;}
+  .pit-frame{
+    position:relative;border-radius:6px;overflow:hidden;
+    border:1px solid rgba(224,163,65,.28);
+    box-shadow:0 30px 60px -28px rgba(0,0,0,.9), inset 0 0 0 1px rgba(0,0,0,.4),
+      inset 0 60px 70px -50px rgba(0,0,0,.85);
+    background:#0c0805;
+    aspect-ratio:4/3;
+    touch-action:none;
+  }
+  /* corner stakes */
+  .stake{position:absolute;width:16px;height:16px;z-index:6;pointer-events:none;opacity:.85;}
+  .stake::before,.stake::after{content:"";position:absolute;background:var(--amber);}
+  .stake::before{width:16px;height:2px;top:0;}
+  .stake::after{height:16px;width:2px;left:0;}
+  .stake.tl{top:8px;left:8px;}
+  .stake.tr{top:8px;right:8px;transform:scaleX(-1);}
+  .stake.bl{bottom:8px;left:8px;transform:scaleY(-1);}
+  .stake.br{bottom:8px;right:8px;transform:scale(-1,-1);}
+
+  .fossil-img,.fossil-fallback{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;
+    background:#0c0805;}
+  .fossil-fallback{display:none;z-index:1;align-items:center;justify-content:center;
+    background:radial-gradient(120% 120% at 50% 38%,#efe4cf 0%,#cdbb96 42%,#8d7c5d 100%);}
+  .fossil-fallback svg{width:62%;height:62%;opacity:.82;}
+  canvas.dirt{position:absolute;inset:0;width:100%;height:100%;z-index:3;cursor:none;touch-action:none;}
+  canvas.dust{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;}
+  /* soft vignette + glow on reveal */
+  .pit-frame::after{content:"";position:absolute;inset:0;z-index:5;pointer-events:none;
+    box-shadow:inset 0 0 120px 10px rgba(0,0,0,.55);transition:box-shadow .8s, background .8s;}
+  .pit-frame.revealed::after{box-shadow:inset 0 0 90px 6px rgba(0,0,0,.3);
+    background:radial-gradient(80% 70% at 50% 45%,rgba(239,228,207,.10),transparent 70%);}
+
+  /* custom cursor ring */
+  .cursor{position:absolute;z-index:7;border-radius:50%;pointer-events:none;mix-blend-mode:screen;
+    border:1.5px solid rgba(238,243,236,.7);box-shadow:0 0 0 1px rgba(0,0,0,.35);
+    transform:translate(-50%,-50%);display:none;}
+
+  /* discovery banner inside pit */
+  .discovery{position:absolute;left:14px;right:14px;bottom:14px;z-index:6;
+    background:linear-gradient(180deg,rgba(20,15,9,.82),rgba(20,15,9,.94));
+    border:1px solid var(--amber);border-radius:5px;backdrop-filter:blur(6px);
+    padding:13px 16px;display:flex;gap:14px;align-items:flex-start;
+    transform:translateY(140%);opacity:0;transition:transform .6s cubic-bezier(.2,.9,.25,1),opacity .5s;}
+  .discovery.show{transform:translateY(0);opacity:1;}
+  .discovery .tag{font-family:"Space Mono";font-size:10px;color:var(--amber);letter-spacing:.16em;
+    text-transform:uppercase;white-space:nowrap;padding-top:3px;}
+  .discovery .body{flex:1;min-width:0;}
+  .discovery .nm{font-family:"Oswald";font-weight:600;font-size:21px;letter-spacing:.02em;color:var(--chalk);line-height:1.05;}
+  .discovery .nm i{font-style:italic;font-weight:300;color:var(--bone);}
+  .discovery .meta{font-family:"Space Mono";font-size:10.5px;color:var(--bone-deep);margin:3px 0 6px;letter-spacing:.03em;}
+  .discovery .fact{font-size:13px;line-height:1.45;color:var(--bone);}
+  .discovery button{margin-left:auto;align-self:center;}
+
+  /* tool dock */
+  .dock{display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+    border:1px solid var(--rule);border-radius:5px;padding:10px 12px;
+    background:linear-gradient(180deg,rgba(255,255,255,.018),transparent);}
+  .dock .label{font-family:"Space Mono";font-size:10px;letter-spacing:.16em;color:var(--bone-deep);
+    text-transform:uppercase;margin-right:2px;}
+  .tool{appearance:none;border:1px solid var(--rule);background:rgba(255,255,255,.02);color:var(--bone);
+    font-family:"Oswald";font-weight:500;letter-spacing:.08em;text-transform:uppercase;font-size:13px;
+    padding:9px 14px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:.16s;}
+  .tool:hover{border-color:var(--rule-strong);color:var(--chalk);}
+  .tool[aria-pressed="true"]{background:linear-gradient(180deg,rgba(224,163,65,.2),rgba(224,163,65,.05));
+    border-color:var(--amber);color:var(--chalk);}
+  .tool svg{width:17px;height:17px;}
+  .spacer{flex:1;}
+  .ghost{appearance:none;border:1px solid var(--rule);background:transparent;color:var(--bone-deep);
+    font-family:"Space Mono";font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    padding:9px 13px;border-radius:4px;cursor:pointer;transition:.16s;}
+  .ghost:hover{border-color:var(--rule-strong);color:var(--bone);}
+
+  /* ---------- field catalog ---------- */
+  .catalog{margin-top:34px;}
+  .cat-head{display:flex;align-items:baseline;gap:14px;border-bottom:1px solid var(--rule);
+    padding-bottom:10px;margin-bottom:18px;flex-wrap:wrap;}
+  .cat-head h2{font-family:"Oswald";font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    font-size:20px;margin:0;color:var(--chalk);}
+  .cat-head .count{font-family:"Space Mono";font-size:12px;color:var(--amber);letter-spacing:.1em;}
+  .cat-head .hint{margin-left:auto;font-size:12px;color:var(--bone-deep);}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px;}
+  .card{border:1px solid var(--rule);border-radius:5px;overflow:hidden;background:var(--paper-2);
+    display:flex;flex-direction:column;min-height:200px;position:relative;transition:.25s;}
+  .card.locked{opacity:.5;}
+  .card .thumb{aspect-ratio:1/1;background:#0c0805;position:relative;overflow:hidden;}
+  .card .thumb img{width:100%;height:100%;object-fit:cover;}
+  .card.locked .thumb{display:flex;align-items:center;justify-content:center;
+    background:repeating-linear-gradient(135deg,#1d160f 0 9px,#221a12 9px 18px);}
+  .card.locked .thumb img{display:none;}
+  .card .qmark{font-family:"Oswald";font-weight:700;font-size:42px;color:rgba(239,228,207,.16);}
+  .card .info{padding:10px 11px 12px;display:flex;flex-direction:column;gap:3px;}
+  .card .cn{font-family:"Space Mono";font-size:9px;letter-spacing:.08em;color:var(--amber);text-transform:uppercase;}
+  .card .nm{font-family:"Oswald";font-weight:600;font-size:15px;line-height:1.05;color:var(--chalk);}
+  .card .nm i{font-style:italic;font-weight:300;}
+  .card.locked .cn,.card.locked .nm{color:var(--bone-deep);}
+  .card .pd{font-family:"Space Mono";font-size:9.5px;color:var(--bone-deep);margin-top:2px;letter-spacing:.02em;}
+  .card.found{box-shadow:0 0 0 1px rgba(224,163,65,.3), 0 14px 30px -22px rgba(224,163,65,.5);}
+  .card.found .thumb::after{content:"LOGGED";position:absolute;top:7px;right:7px;
+    font-family:"Space Mono";font-size:8px;letter-spacing:.14em;color:var(--ink);background:var(--amber);
+    padding:2px 6px;border-radius:2px;}
+
+  .colophon{margin-top:30px;font-family:"Space Mono";font-size:10.5px;color:#6a5d49;
+    letter-spacing:.04em;line-height:1.7;border-top:1px solid rgba(255,255,255,.05);padding-top:16px;}
+  .colophon a{color:#8a7a5f;}
+
+  @media (max-width:720px){
+    .field{grid-template-columns:1fr;}
+    .gauge{flex-direction:row;align-items:center;gap:18px;}
+    .gauge h2{display:none;}
+    .ruler{display:none;}
+    .readout{flex:1;flex-direction:row;align-items:baseline;gap:10px;}
+    .readout .small{margin-top:0;}
+    .gauge .mini-ruler{flex:1;height:8px;border-radius:4px;background:var(--shale);overflow:hidden;}
+    .gauge .mini-ruler .mf{height:100%;width:0;background:linear-gradient(90deg,var(--amber-deep),var(--amber));transition:width .25s;}
+    .discovery{flex-direction:column;gap:8px;}
+    .discovery button{margin-left:0;align-self:flex-start;}
+  }
+  @media (min-width:721px){ .gauge .mini-ruler{display:none;} }
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.001ms!important;transition-duration:.05ms!important;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">
+      <span class="dot"></span>
+      <span>Field Station · Hell Creek &amp; Beyond</span>
+      <span id="quadReadout">Quadrant —</span>
+    </div>
+    <h1>Stra<span class="thin">ta</span></h1>
+    <div class="tagline">A virtual excavation · brush away the ages, register the bones</div>
+  </header>
+
+  <div class="sites" id="sites" role="tablist" aria-label="Dig sites"></div>
+
+  <div class="field">
+    <!-- depth gauge -->
+    <aside class="gauge">
+      <h2>Depth</h2>
+      <div class="ruler" id="ruler">
+        <div class="fill" id="rulerFill" style="height:0"></div>
+        <div class="head" id="rulerHead" style="top:0"></div>
+      </div>
+      <div class="mini-ruler"><div class="mf" id="miniFill"></div></div>
+      <div class="readout">
+        <span class="big" id="pctOut">0%</span>
+        <span class="small">excavated</span>
+        <span class="small" id="depthOut" style="color:var(--amber)">0 cm cleared</span>
+      </div>
+    </aside>
+
+    <!-- the dig -->
+    <div class="stage">
+      <div class="pit-frame" id="pit">
+        <span class="stake tl"></span><span class="stake tr"></span>
+        <span class="stake bl"></span><span class="stake br"></span>
+        <img class="fossil-img" id="fossilImg" alt="" />
+        <div class="fossil-fallback" id="fossilFallback">
+          <svg viewBox="0 0 100 100" aria-hidden="true"><path fill="#5b4a30" d="M50 8c-9 0-15 6-15 14 0 4 2 7 2 10-3 2-7 4-7 9 0 4 3 6 6 7-2 3-5 6-5 11 0 8 7 14 15 14h6c8 0 15-6 15-14 0-5-3-8-5-11 3-1 6-3 6-7 0-5-4-7-7-9 0-3 2-6 2-10 0-8-6-14-15-14h-3z"/></svg>
+        </div>
+        <canvas class="dirt" id="dirt"></canvas>
+        <canvas class="dust" id="dust"></canvas>
+        <div class="cursor" id="cursor"></div>
+        <div class="discovery" id="discovery">
+          <span class="tag">Specimen<br>registered</span>
+          <div class="body">
+            <div class="nm" id="dNm"></div>
+            <div class="meta" id="dMeta"></div>
+            <div class="fact" id="dFact"></div>
+          </div>
+          <button class="tool" id="dNext">Next site →</button>
+        </div>
+      </div>
+
+      <div class="dock">
+        <span class="label">Tools</span>
+        <button class="tool" id="tBrush" aria-pressed="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c2.5 0 4-1 4-3.5 0-1.4-1-2.5-2.5-2.5S2 16 2 17.5 3 21 3 21z"/><path d="M6.5 15.5 16 6c1-1 2.5-1 3.5 0s1 2.5 0 3.5l-9.5 9.5"/></svg>
+          Brush</button>
+        <button class="tool" id="tPick" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 14 10"/><path d="M3 8c4-4 13-4 18 1-4-1-7 0-9 2-2-2-5-4-9-3z"/></svg>
+          Pick</button>
+        <button class="tool" id="tBlow" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h9a3 3 0 1 0-3-3"/><path d="M4 16h12a3 3 0 1 1-3 3"/></svg>
+          Air</button>
+        <span class="spacer"></span>
+        <button class="ghost" id="bMute">Sound: on</button>
+        <button class="ghost" id="bReset">Re-bury site</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- field catalog -->
+  <section class="catalog">
+    <div class="cat-head">
+      <h2>Field Catalog</h2>
+      <span class="count" id="catCount">0 / 6 logged</span>
+      <span class="hint">Each site holds one real museum specimen. Clear the strata to log it.</span>
+    </div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <div class="colophon">
+    Specimen photographs are real museum fossils from Wikimedia Commons (Sue · AMNH 5027 · UCMP Triceratops ·
+    Berlin Archaeopteryx · Stegosaurus · Velociraptor), used under their respective Creative Commons / public-domain
+    licenses. Sediment is simulated. Depth readings are illustrative, not to scale.
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------------- specimen data (real museum fossils) ---------------- */
+const SPECIMENS = [
+  {
+    grid:"A-1",
+    img:"https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Sue_TRex_Skull_Full_Frontal.JPG/1000px-Sue_TRex_Skull_Full_Frontal.JPG",
+    name:"Tyrannosaurus rex", common:'"Sue"', cat:"FMNH PR2081",
+    period:"Late Cretaceous · ~67 mya", place:"Hell Creek Fm., South Dakota",
+    fact:"The most complete T. rex ever found — about 90% of the skeleton. Its skull alone is roughly 1.5 m long and weighs more than 270 kg.",
+    palette:"iron"
+  },
+  {
+    grid:"B-2",
+    img:"https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/AMNH_5027_Tyrannosaurus_skull_cast.jpg/1000px-AMNH_5027_Tyrannosaurus_skull_cast.jpg",
+    name:"Tyrannosaurus rex", common:"AMNH 5027", cat:"AMNH 5027",
+    period:"Late Cretaceous · ~66 mya", place:"Collected by B. Brown, 1908, Montana",
+    fact:"For most of the 20th century this was THE skull every textbook drew. Banana-sized teeth let it bite with a force of around 35,000 newtons.",
+    palette:"sand"
+  },
+  {
+    grid:"C-1",
+    img:"https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Adult_Triceratops_horridus_skull_UCMP_1.JPG/1000px-Adult_Triceratops_horridus_skull_UCMP_1.JPG",
+    name:"Triceratops horridus", common:"three-horned face", cat:"UCMP specimen",
+    period:"Late Cretaceous · ~66 mya", place:"Western North America",
+    fact:"That huge head is up to a third of the whole animal's length. The bony neck frill and three horns may have been for display and defense against tyrannosaurs.",
+    palette:"clay"
+  },
+  {
+    grid:"D-3",
+    img:"https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Berlin_Archaeopteryx.jpg/1000px-Berlin_Archaeopteryx.jpg",
+    name:"Archaeopteryx", common:"Berlin specimen", cat:"MB.Av.101",
+    period:"Late Jurassic · ~150 mya", place:"Solnhofen limestone, Germany",
+    fact:"A snapshot of evolution in stone: it has feathers and a wishbone like a bird, but teeth, a long bony tail, and clawed fingers like a dinosaur.",
+    palette:"lime"
+  },
+  {
+    grid:"E-2",
+    img:"https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Stegosaurus_Struct.jpg/1000px-Stegosaurus_Struct.jpg",
+    name:"Stegosaurus stenops", common:"plated lizard", cat:"AMNH mount",
+    period:"Late Jurassic · ~150 mya", place:"Morrison Fm., western USA",
+    fact:"Two rows of tall back plates and four tail spikes (nicknamed the 'thagomizer'). Despite being bus-sized, its brain was only about the size of a walnut.",
+    palette:"sand"
+  },
+  {
+    grid:"F-1",
+    img:"https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Velociraptor_skull_white_background.jpg/1000px-Velociraptor_skull_white_background.jpg",
+    name:"Velociraptor mongoliensis", common:"swift seizer", cat:"skull, GIN",
+    period:"Late Cretaceous · ~75 mya", place:"Gobi Desert, Mongolia",
+    fact:"The real animal was only turkey-sized and covered in feathers. Each foot carried a retractable sickle claw it likely used to pin prey.",
+    palette:"clay"
+  }
+];
+
+/* sediment palettes per site */
+const PALETTES = {
+  iron:{base:"#9d5f37",bands:["#8a4e2b","#b07a4c","#7a4424","#a86a3e","#6f3d22"],grain:"#4f2c16"},
+  sand:{base:"#bd9663",bands:["#caa873","#a8814f","#d4b683","#9a7344","#bf9a66"],grain:"#7a5a33"},
+  clay:{base:"#a8794e",bands:["#946539","#bb8c5c","#82542d","#b08355","#6f4524"],grain:"#5b3a1d"},
+  lime:{base:"#c9b78c",bands:["#d8caa0","#b6a071","#e0d4ac","#a89366","#cdbd92"],grain:"#8a7a52"}
+};
+
+/* ---------------- state ---------------- */
+let current = 0;
+const found = new Array(SPECIMENS.length).fill(false);
+let tool = "brush";
+let muted = false;
+let revealed = false;
+let isDown = false;
+let lastX=0,lastY=0;
+
+const TOOLS = {
+  brush:{r:34, hardness:.55, flow:1},
+  pick:{r:13, hardness:.9, flow:1},
+  blow:{r:48, hardness:.3, flow:.6}
+};
+
+/* ---------------- elements ---------------- */
+const pit = document.getElementById("pit");
+const dirt = document.getElementById("dirt");
+const dctx = dirt.getContext("2d", {willReadFrequently:true});
+const dust = document.getElementById("dust");
+const xctx = dust.getContext("2d");
+const fossilImg = document.getElementById("fossilImg");
+const fossilFallback = document.getElementById("fossilFallback");
+const cursor = document.getElementById("cursor");
+const sitesEl = document.getElementById("sites");
+const cardsEl = document.getElementById("cards");
+
+/* ---------------- audio ---------------- */
+let actx=null;
+function audio(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return actx; }
+let lastScrub=0;
+function scrub(intensity){
+  if(muted) return; const a=audio(); if(!a) return;
+  const now=performance.now(); if(now-lastScrub<28) return; lastScrub=now;
+  const dur=0.05+Math.random()*0.04;
+  const buf=a.createBuffer(1, a.sampleRate*dur, a.sampleRate);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2); }
+  const src=a.createBufferSource(); src.buffer=buf;
+  const bp=a.createBiquadFilter(); bp.type="bandpass";
+  bp.frequency.value = tool==="blow"? 2600 : (tool==="pick"? 1400 : 900);
+  bp.Q.value=0.9;
+  const g=a.createGain(); g.gain.value=Math.min(.22,.06+intensity*0.16);
+  src.connect(bp); bp.connect(g); g.connect(a.destination);
+  src.start();
+}
+function chime(){
+  if(muted) return; const a=audio(); if(!a) return;
+  const notes=[523.25,659.25,783.99,1046.5];
+  notes.forEach((f,i)=>{
+    const o=a.createOscillator(); o.type="sine"; o.frequency.value=f;
+    const g=a.createGain(); const t=a.currentTime+i*0.09;
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.18,t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0008,t+0.9);
+    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t+0.95);
+  });
+}
+
+/* ---------------- sizing ---------------- */
+let W=0,H=0,DPR=1;
+function sizeCanvases(){
+  const rect = pit.getBoundingClientRect();
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  W = Math.round(rect.width); H = Math.round(rect.height);
+  [dirt,dust].forEach(c=>{
+    c.width = Math.round(W*DPR); c.height = Math.round(H*DPR);
+  });
+  dctx.setTransform(DPR,0,0,DPR,0,0);
+  xctx.setTransform(DPR,0,0,DPR,0,0);
+}
+
+/* ---------------- procedural sediment ---------------- */
+function rand(seed){ // deterministic-ish per call is fine; use Math.random for organic look
+  return Math.random();
+}
+function paintStrata(){
+  const sp = SPECIMENS[current];
+  const pal = PALETTES[sp.palette] || PALETTES.sand;
+  dctx.globalCompositeOperation="source-over";
+  dctx.clearRect(0,0,W,H);
+  // base
+  dctx.fillStyle = pal.base; dctx.fillRect(0,0,W,H);
+
+  // horizontal sediment bands with wavy boundaries
+  let y=0;
+  while(y < H){
+    const bh = 14 + Math.random()*46;
+    const col = pal.bands[(Math.random()*pal.bands.length)|0];
+    dctx.fillStyle = col;
+    dctx.globalAlpha = 0.5 + Math.random()*0.4;
+    dctx.beginPath();
+    dctx.moveTo(0,y);
+    const segs=6;
+    for(let s=0;s<=segs;s++){
+      const px=(s/segs)*W;
+      const py=y + Math.sin(s*1.3 + y*0.05)*4 + (Math.random()*6-3);
+      dctx.lineTo(px,py);
+    }
+    dctx.lineTo(W,y+bh); dctx.lineTo(0,y+bh);
+    dctx.closePath(); dctx.fill();
+    y += bh*0.7;
+  }
+  dctx.globalAlpha=1;
+
+  // fine grain speckle
+  const grains = Math.round(W*H/55);
+  for(let i=0;i<grains;i++){
+    const gx=Math.random()*W, gy=Math.random()*H;
+    const t=Math.random();
+    if(t<0.5){ dctx.fillStyle="rgba(0,0,0,"+(0.05+Math.random()*0.14)+")"; }
+    else { dctx.fillStyle="rgba(255,235,200,"+(0.03+Math.random()*0.1)+")"; }
+    const r=Math.random()*1.6+0.3;
+    dctx.fillRect(gx,gy,r,r);
+  }
+  // scattered pebbles
+  const pebbles=Math.round(W*H/9000);
+  for(let i=0;i<pebbles;i++){
+    const gx=Math.random()*W, gy=Math.random()*H, r=2+Math.random()*5;
+    dctx.beginPath(); dctx.ellipse(gx,gy,r,r*0.8,Math.random()*6.28,0,6.28);
+    dctx.fillStyle=pal.grain; dctx.globalAlpha=0.35+Math.random()*0.3; dctx.fill();
+    dctx.globalAlpha=0.25; dctx.fillStyle="rgba(255,240,210,.5)";
+    dctx.beginPath(); dctx.ellipse(gx-r*0.3,gy-r*0.3,r*0.4,r*0.3,0,0,6.28); dctx.fill();
+  }
+  dctx.globalAlpha=1;
+
+  // top darker excavation lip + bottom shadow for depth
+  const topg=dctx.createLinearGradient(0,0,0,H*0.28);
+  topg.addColorStop(0,"rgba(0,0,0,.34)"); topg.addColorStop(1,"rgba(0,0,0,0)");
+  dctx.fillStyle=topg; dctx.fillRect(0,0,W,H*0.28);
+}
+
+/* ---------------- excavation ---------------- */
+function eraseAt(x,y){
+  const t=TOOLS[tool];
+  const r=t.r;
+  const grad=dctx.createRadialGradient(x,y,0,x,y,r);
+  grad.addColorStop(0,"rgba(0,0,0,1)");
+  grad.addColorStop(t.hardness,"rgba(0,0,0,"+(0.9*t.flow)+")");
+  grad.addColorStop(1,"rgba(0,0,0,0)");
+  dctx.globalCompositeOperation="destination-out";
+  dctx.fillStyle=grad;
+  dctx.beginPath(); dctx.arc(x,y,r,0,6.28); dctx.fill();
+  dctx.globalCompositeOperation="source-over";
+}
+function strokeLine(x0,y0,x1,y1){
+  const dist=Math.hypot(x1-x0,y1-y0);
+  const step=Math.max(2, TOOLS[tool].r*0.32);
+  const n=Math.max(1,Math.ceil(dist/step));
+  for(let i=0;i<=n;i++){
+    const x=x0+(x1-x0)*(i/n), y=y0+(y1-y0)*(i/n);
+    eraseAt(x,y);
+  }
+  spawnDust((x0+x1)/2,(y0+y1)/2, Math.min(1,dist/14));
+  scrub(Math.min(1,dist/20));
+}
+
+/* ---------------- dust particles ---------------- */
+let particles=[];
+let dustRAF=null;
+function spawnDust(x,y,amt){
+  const n=2+Math.round(amt*4);
+  const pal=PALETTES[SPECIMENS[current].palette]||PALETTES.sand;
+  for(let i=0;i<n;i++){
+    particles.push({
+      x:x+(Math.random()*16-8), y:y+(Math.random()*10-5),
+      vx:(Math.random()*2-1)*0.5, vy:-(0.4+Math.random()*1.1),
+      life:1, r:1+Math.random()*3.2,
+      c: Math.random()<0.5? pal.grain : "#e6d3ad"
+    });
+  }
+  if(!dustRAF) dustRAF=requestAnimationFrame(tickDust);
+}
+function tickDust(){
+  xctx.clearRect(0,0,W,H);
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.035; p.life-=0.026;
+    if(p.life<=0){ particles.splice(i,1); continue; }
+    xctx.globalAlpha=Math.max(0,p.life)*0.5;
+    xctx.fillStyle=p.c;
+    xctx.beginPath(); xctx.arc(p.x,p.y,p.r,0,6.28); xctx.fill();
+  }
+  xctx.globalAlpha=1;
+  if(particles.length){ dustRAF=requestAnimationFrame(tickDust); }
+  else { dustRAF=null; xctx.clearRect(0,0,W,H); }
+}
+
+/* ---------------- progress sampling ---------------- */
+let lastSample=0, clearedPct=0;
+const TOTAL_DEPTH=180; // cm, illustrative
+function sampleProgress(){
+  const now=performance.now();
+  if(now-lastSample<140) return; lastSample=now;
+  // sample on a coarse grid for speed
+  const cols=40, rows=30;
+  let clear=0,total=0;
+  const sw=dirt.width, sh=dirt.height;
+  try{
+    const img=dctx.getImageData(0,0,sw,sh).data;
+    for(let cy=0;cy<rows;cy++){
+      for(let cx=0;cx<cols;cx++){
+        const px=Math.floor((cx+0.5)/cols*sw);
+        const py=Math.floor((cy+0.5)/rows*sh);
+        const idx=(py*sw+px)*4+3;
+        total++; if(img[idx]<40) clear++;
+      }
+    }
+  }catch(e){ return; }
+  clearedPct = clear/total;
+  updateGauge(clearedPct);
+  if(!revealed && clearedPct>=0.66){ reveal(); }
+}
+function updateGauge(p){
+  const pct=Math.round(p*100);
+  document.getElementById("pctOut").textContent=pct+"%";
+  document.getElementById("depthOut").textContent=Math.round(p*TOTAL_DEPTH)+" cm cleared";
+  document.getElementById("rulerFill").style.height=(p*100)+"%";
+  document.getElementById("rulerHead").style.top=(p*100)+"%";
+  const mf=document.getElementById("miniFill"); if(mf) mf.style.width=(p*100)+"%";
+}
+
+/* ---------------- reveal ---------------- */
+function reveal(){
+  if(revealed) return; revealed=true;
+  // sweep away remaining dirt
+  const t0=performance.now();
+  function sweep(){
+    const k=Math.min(1,(performance.now()-t0)/650);
+    dctx.globalCompositeOperation="destination-out";
+    dctx.fillStyle="rgba(0,0,0,"+(0.12+k*0.2)+")";
+    dctx.fillRect(0,0,W,H);
+    dctx.globalCompositeOperation="source-over";
+    if(k<1){ requestAnimationFrame(sweep); }
+    else { dctx.clearRect(0,0,W,H); }
+  }
+  sweep();
+  updateGauge(1);
+  pit.classList.add("revealed");
+  chime();
+  // burst of dust
+  for(let i=0;i<40;i++) spawnDust(W*Math.random(),H*0.5+Math.random()*H*0.4,1);
+  // log specimen
+  if(!found[current]){
+    found[current]=true;
+    renderSites(); renderCards(); updateCount();
+  }
+  showDiscovery();
+}
+function showDiscovery(){
+  const sp=SPECIMENS[current];
+  document.getElementById("dNm").innerHTML = '<i>'+sp.name+'</i> '+ (sp.common? '· '+sp.common : '');
+  document.getElementById("dMeta").textContent = sp.cat+"  ·  "+sp.period+"  ·  "+sp.place;
+  document.getElementById("dFact").textContent = sp.fact;
+  const d=document.getElementById("discovery"); d.classList.add("show");
+}
+function hideDiscovery(){ document.getElementById("discovery").classList.remove("show"); }
+
+/* ---------------- pointer ---------------- */
+function pos(e){
+  const rect=dirt.getBoundingClientRect();
+  const cx=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+  const cy=(e.touches?e.touches[0].clientY:e.clientY)-rect.top;
+  return {x:cx, y:cy};
+}
+function down(e){
+  if(revealed){ moveCursor(e); return; }
+  e.preventDefault(); isDown=true; audio();
+  const p=pos(e); lastX=p.x; lastY=p.y;
+  eraseAt(p.x,p.y); spawnDust(p.x,p.y,0.6); scrub(0.4);
+  moveCursor(e);
+}
+function move(e){
+  moveCursor(e);
+  if(!isDown||revealed) return;
+  e.preventDefault();
+  const p=pos(e);
+  strokeLine(lastX,lastY,p.x,p.y);
+  lastX=p.x; lastY=p.y;
+  sampleProgress();
+}
+function up(){ if(isDown){ isDown=false; sampleProgress(); } }
+function moveCursor(e){
+  const rect=pit.getBoundingClientRect();
+  const cx=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+  const cy=(e.touches?e.touches[0].clientY:e.clientY)-rect.top;
+  const r=TOOLS[tool].r;
+  cursor.style.display = revealed? "none":"block";
+  cursor.style.width=r*2+"px"; cursor.style.height=r*2+"px";
+  cursor.style.left=cx+"px"; cursor.style.top=cy+"px";
+}
+dirt.addEventListener("mousedown",down);
+window.addEventListener("mousemove",move);
+window.addEventListener("mouseup",up);
+dirt.addEventListener("mouseleave",()=>{cursor.style.display="none";});
+dirt.addEventListener("touchstart",down,{passive:false});
+dirt.addEventListener("touchmove",move,{passive:false});
+window.addEventListener("touchend",up);
+
+/* ---------------- load a site ---------------- */
+function loadSite(i){
+  current=i; revealed=false; clearedPct=0; particles=[];
+  pit.classList.remove("revealed");
+  hideDiscovery();
+  document.getElementById("quadReadout").textContent="Quadrant "+SPECIMENS[i].grid;
+  // image
+  fossilImg.style.display="block"; fossilFallback.style.display="none";
+  fossilImg.alt = SPECIMENS[i].name+" fossil";
+  fossilImg.onerror=()=>{ fossilImg.style.display="none"; fossilFallback.style.display="flex"; };
+  fossilImg.src = SPECIMENS[i].img;
+  sizeCanvases();
+  paintStrata();
+  updateGauge(found[i]?1:0);
+  if(found[i]){ // already logged: show it cleared
+    dctx.clearRect(0,0,W,H); revealed=true; pit.classList.add("revealed");
+  }
+  renderSites();
+}
+
+/* ---------------- UI render ---------------- */
+function renderSites(){
+  sitesEl.innerHTML="";
+  SPECIMENS.forEach((sp,i)=>{
+    const b=document.createElement("button");
+    b.className="site-tab"; b.setAttribute("role","tab");
+    b.setAttribute("aria-pressed", i===current?"true":"false");
+    b.dataset.found = found[i]?"true":"false";
+    b.innerHTML='<span class="pip"></span><span class="grid">'+sp.grid+'</span>';
+    b.title = found[i]? sp.name+" (logged)" : "Unexcavated site "+sp.grid;
+    b.addEventListener("click",()=>loadSite(i));
+    sitesEl.appendChild(b);
+  });
+}
+function renderCards(){
+  cardsEl.innerHTML="";
+  SPECIMENS.forEach((sp,i)=>{
+    const c=document.createElement("div");
+    c.className="card "+(found[i]?"found":"locked");
+    c.innerHTML =
+      '<div class="thumb">'+(found[i]
+          ? '<img src="'+sp.img+'" alt="'+sp.name+'" onerror="this.style.display=\'none\'">'
+          : '<span class="qmark">?</span>')+'</div>'+
+      '<div class="info">'+
+        '<span class="cn">'+(found[i]? sp.cat : 'Site '+sp.grid+' · sealed')+'</span>'+
+        '<span class="nm">'+(found[i]? '<i>'+sp.name+'</i>' : 'Unidentified')+'</span>'+
+        '<span class="pd">'+(found[i]? sp.period : '— · — mya')+'</span>'+
+      '</div>';
+    if(found[i]) c.addEventListener("click",()=>{loadSite(i); window.scrollTo({top:0,behavior:"smooth"});});
+    cardsEl.appendChild(c);
+  });
+}
+function updateCount(){
+  const n=found.filter(Boolean).length;
+  document.getElementById("catCount").textContent=n+" / "+SPECIMENS.length+" logged";
+}
+
+/* ---------------- tools & buttons ---------------- */
+function setTool(t){
+  tool=t;
+  document.getElementById("tBrush").setAttribute("aria-pressed", t==="brush");
+  document.getElementById("tPick").setAttribute("aria-pressed", t==="pick");
+  document.getElementById("tBlow").setAttribute("aria-pressed", t==="blow");
+}
+document.getElementById("tBrush").onclick=()=>setTool("brush");
+document.getElementById("tPick").onclick=()=>setTool("pick");
+document.getElementById("tBlow").onclick=()=>setTool("blow");
+document.getElementById("bMute").onclick=function(){ muted=!muted; this.textContent="Sound: "+(muted?"off":"on"); };
+document.getElementById("bReset").onclick=()=>{
+  revealed=false; clearedPct=0; pit.classList.remove("revealed"); hideDiscovery();
+  found[current]=found[current]; // keep logged status; just re-bury visual
+  sizeCanvases(); paintStrata(); updateGauge(0);
+};
+document.getElementById("dNext").onclick=()=>{
+  let nxt=(current+1)%SPECIMENS.length;
+  // prefer next unfound
+  for(let k=1;k<=SPECIMENS.length;k++){ const j=(current+k)%SPECIMENS.length; if(!found[j]){ nxt=j; break; } }
+  loadSite(nxt);
+};
+
+/* ---------------- resize ---------------- */
+let rT;
+window.addEventListener("resize",()=>{
+  clearTimeout(rT);
+  rT=setTimeout(()=>{
+    sizeCanvases();
+    if(!revealed) paintStrata(); else dctx.clearRect(0,0,W,H);
+    updateGauge(revealed?1:clearedPct);
+  },180);
+});
+
+/* ---------------- build ruler ticks ---------------- */
+(function buildRuler(){
+  const r=document.getElementById("ruler");
+  for(let i=0;i<=9;i++){
+    const t=document.createElement("div");
+    t.className="tick"+(i%5===0?" major":"");
+    t.style.top=(i/9*100)+"%"; r.appendChild(t);
+    if(i%3===0){
+      const l=document.createElement("div"); l.className="lab";
+      l.style.top=(i/9*100)+"%";
+      l.textContent=Math.round(i/9*TOTAL_DEPTH)+" cm";
+      r.appendChild(l);
+    }
+  }
+})();
+
+/* ---------------- init ---------------- */
+renderSites(); renderCards(); updateCount();
+window.addEventListener("load",()=>{ loadSite(0); });
+// also init immediately in case load already fired
+loadSite(0);
+</script>
+</body>
+</html>
