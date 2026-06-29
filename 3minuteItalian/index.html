@@ -264,6 +264,18 @@ body{margin:0;font-family:'Nunito',ui-sans-serif,system-ui,sans-serif;background
 .lvl-chip:hover{border-color:#a78bfa;background:#f8f5ff}
 .lvl-chip.active{border-color:#7030c8;background:#7030c8;color:#fff}
 
+
+/* Match-the-pairs grid */
+.match-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px auto 0;max-width:580px}
+.match-chip{background:#fff;border:2px solid var(--border);border-bottom:4px solid var(--border-b);border-radius:14px;padding:14px 12px;font-weight:800;font-size:.95rem;cursor:pointer;text-align:center;font-family:inherit;transition:all .12s ease;min-height:58px;display:flex;align-items:center;justify-content:center;user-select:none;color:var(--ink);line-height:1.2}
+.match-chip:hover{border-color:#94a3b8;transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.07)}
+.match-chip:active{border-bottom-width:2px;transform:translateY(2px)}
+.match-chip.it{color:#0c4a6e}
+.match-chip.en{color:#4a3c2e}
+.match-chip.selected{border-color:var(--blue);background:var(--blues);color:var(--blue);transform:scale(1.02)}
+.match-chip.matched{background:var(--gxs);border-color:var(--green);color:var(--gd);opacity:.5;pointer-events:none}
+.match-chip.wrong{background:#ffe4e6;border-color:#ef4444;color:#b91c1c;animation:match-shake .4s}
+@keyframes match-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
 </style>
 </head>
 <body>
@@ -293,22 +305,34 @@ body{margin:0;font-family:'Nunito',ui-sans-serif,system-ui,sans-serif;background
 // To add a new lesson with a pack:            [12, [['sp','en']], {'Pack name': [['sp','en'],...]}]
 // Lessons with no core words will still appear in the list but be disabled.
 const RAW = [
-  [1, [['è','is / it is'],['assolutamente','absolutely'],['fantastico','fantastic'],['buono','good'],['qui','here'],['molto','very'],['non','not'],['no','no'],['ciao','hello / hi'],['benvenuto','welcome (m.)']]],
-  [2, [['per','for'],['mio','my (m.)'],['mia','my (f.)'],['delizioso','delicious'],['bellissimo','beautiful / lovely'],['per me','for me'],['straordinario','extraordinary']]],
-  [3, [['ma','but'],['grazie','thank you'],['sì','yes'],['sempre','always'],['perfetto','perfect']]],
-  [4, [['il','the (m.)'],['lo','the (m. before s+consonant, z)'],['lei','she / her'],['il ristorante','the restaurant'],['questo è','this is / that is'],['per lei','for her'],['tutto','everything / all'],['cattivo','bad']]],
-  [5, [['il pollo','chicken'],['terribile','terrible'],['la pizza','the pizza'],['la','the (f.)'],['buona','good (f.)'],['deliziosa','delicious (f.)'],['perfetta','perfect (f.)'],['cattiva','bad (f.)'],['fantastica','fantastic (f.)'],['bellissima','beautiful / lovely (f.)']],
+  [1, [['è','is / it is'],['assolutamente','absolutely'],['fantastico','fantastic'],['buono','good'],['qui','here'],['molto','very'],['non','not'],['non è','is not'],['no','no'],['ciao','hello / hi'],['benvenuto','welcome (m.)']]],
+  [2, [['per','for'],['mio','my (m.)'],['mia','my (f.)'],['delizioso','delicious'],['squisito','exquisite / delicious'],['bellissimo','beautiful / lovely (m.)'],['bello','beautiful / lovely (m.)'],['bella','beautiful / lovely (f.)'],['per me','for me'],['straordinario','extraordinary']]],
+  [3, [['ma','but'],['grazie','thank you'],['sì','yes'],['sempre','always'],['perfetto','perfect'],['quello','that']]],
+  [4, [['il','the (m.)'],['lo','the (m. before s+consonant, z)'],['lei','she / her'],['lui','he / him'],['il ristorante','the restaurant'],['questo è','this is / that is'],['per lei','for her'],['per lui','for him'],['tutto','everything / all'],['cattivo','bad']]],
+  [5, [['il pollo','chicken'],['terribile','terrible'],['la pizza','the pizza'],['la','the (f.)'],['buona','good (f.)'],['deliziosa','delicious (f.)'],['perfetta','perfect (f.)'],['cattiva','bad (f.)'],['fantastica','fantastic (f.)'],['bellissima','beautiful / lovely (f.)'],['il ragazzo','the boy'],['la ragazza','the girl']],
     {'Food and drink':[['un uovo alla coque','soft-boiled egg'],['un uovo fritto','fried egg'],['le uova strapazzate','scrambled eggs'],['una frittata','omelette'],['la zuppa','soup'],['il riso','rice'],['la pasta','pasta'],['il pane','bread'],['il burro','butter'],['il sale','salt'],['il pepe','pepper'],["l'olio d'oliva",'olive oil'],["l'aglio",'garlic'],['il miele','honey'],['gli antipasti','appetisers / starters'],['il salame','salami'],['i biscotti','biscuits'],['un gelato','ice cream'],['ben cotto','well done (steak)'],['al sangue','rare (steak)']],
      'Vegetables':[['un fungo','mushroom'],['un cavolfiore','cauliflower'],['una patata','potato'],['il mais','corn / sweetcorn'],['i piselli','peas'],['una melanzana','aubergine / eggplant'],['un broccolo','broccoli'],['un peperone','pepper (vegetable)'],['una lattuga','lettuce'],['un pomodoro','tomato'],['un cetriolo','cucumber'],['gli spinaci','spinach']],
-     'Fruit':[['una banana','banana'],['una fragola','strawberry'],["un'arancia",'orange'],['una pera','pear'],['un limone','lemon'],['un lime','lime'],['un melone','melon'],["un avocado",'avocado'],["un ananas",'pineapple'],["un'anguria",'watermelon'],['una pesca','peach'],['una mela','apple'],["l'uva",'grapes']],
+     'Fruit':[['una banana','banana'],['una fragola','strawberry'],["un'arancia",'orange'],['una pera','pear'],['un limone','lemon'],['un lime','lime'],['un melone','melon'],['un avocado','avocado'],['un ananas','pineapple'],["un'anguria",'watermelon'],['una pesca','peach'],['una mela','apple'],["l'uva",'grapes']],
      'Meat and fish':[['il prosciutto','ham'],['il maiale','pork'],['il tacchino','turkey'],['la salsiccia','sausage'],["l'anatra",'duck'],['il salmone','salmon'],['il tonno','tuna'],['il merluzzo','cod'],['un gambero','prawn / shrimp'],['il calamaro','squid / calamari']],
-     'Drinks':[['una birra','beer'],['un succo di frutta','fruit juice'],["un succo d'arancia",'orange juice'],['frizzante','sparkling'],['naturale','still (water)'],['una birra alla spina','draft beer'],['una limonata','lemonade'],['un sidro','cider'],['con ghiaccio','with ice'],['senza ghiaccio','without ice']]}],
-  [6, [["l'hotel",'the hotel'],['simpatico','nice / pleasant'],['tutti','everyone / everybody'],['non è','is not']]],
-  [7, [['un','a / an (m.)'],['una','a / an (f.)'],['il caffè','coffee'],['il tè','tea'],['un tavolo','a table'],['una finestra','window'],['voglio','I want'],['vorrei','I would like (polite)'],['una prenotazione','a reservation'],['per favore','please'],['due persone','two people']],
-    {'Numbers 0–20':[['zero','zero'],['uno','one'],['due','two'],['tre','three'],['quattro','four'],['cinque','five'],['sei','six'],['sette','seven'],['otto','eight'],['nove','nine'],['dieci','ten'],['undici','eleven'],['dodici','twelve'],['tredici','thirteen'],['quattordici','fourteen'],['quindici','fifteen'],['sedici','sixteen'],['diciassette','seventeen'],['diciotto','eighteen'],['diciannove','nineteen'],['venti','twenty']],
-     'Numbers 21–99':[['ventuno','twenty-one'],['ventidue','twenty-two'],['ventitré','twenty-three'],['ventiquattro','twenty-four'],['venticinque','twenty-five'],['ventisei','twenty-six'],['ventisette','twenty-seven'],['ventotto','twenty-eight'],['ventinove','twenty-nine'],['trenta','thirty'],['quaranta','forty'],['cinquanta','fifty'],['sessanta','sixty'],['settanta','seventy'],['ottanta','eighty'],['novanta','ninety']],
-     'Numbers 100+':[['cento','one hundred'],['centouno','one hundred and one'],['duecento','two hundred'],['trecento','three hundred'],['quattrocento','four hundred'],['cinquecento','five hundred'],['seicento','six hundred'],['settecento','seven hundred'],['novecento','nine hundred'],['mille','one thousand'],['un milione','one million']]}],
-  [8, [['il cibo','the food'],['molto buono','very good'],['una carota','a carrot'],['e','and'],['le banane','the bananas'],['sono','are / they are'],['non sono','are not'],['quello','that'],['i','the (m. pl., before consonant)'],['gli','the (m. pl., before vowel / s+cons.)'],['le','the (f. pl.)']]],
+     'Drinks':[['una birra','beer'],['un succo di frutta','fruit juice'],["un succo d'arancia",'orange juice'],['frizzante','sparkling'],['naturale','still (water)'],['una birra alla spina','draft beer'],['una limonata','lemonade'],['un sidro','cider'],['con ghiaccio','with ice'],['senza ghiaccio','without ice']],
+     'Salad (Al ristorante)':[['un cetriolo','a cucumber'],['una lattuga','a lettuce'],['una cipolla','an onion'],['un pomodoro','a tomato'],['il sedano','the celery'],['un peperone','a pepper'],['gli spinaci','the spinach'],['un ravanello','a radish'],['una barbabietola','a beetroot'],['il crescione','the cress'],["il condimento per l'insalata",'the salad dressing'],['un crostino','a crouton']],
+     'Vegetables (extended)':[['una carota','a carrot'],['un fagiolo','a bean'],['il mais dolce','sweetcorn'],['i bisi','peas (Northern Italy)'],['un cavolo','a cabbage'],['gli asparagi','asparagus'],['i broccoli','broccoli'],['un porro','a leek'],['un fagiolo di Spagna','a runner bean'],['un fagiolino','a green bean'],['il pisello mangiatutto','mangetout / snow pea'],['una pastinaca','a parsnip'],['una zucca','a pumpkin'],['uno zucchino','a marrow'],['una zucchina','a courgette / zucchini'],['un cetriolino','a gherkin'],['un cavolo di Bruxelles','a brussels sprout'],['un carciofo','an artichoke'],['una rapa','a turnip'],['un navone','a swede'],['una patata dolce','a sweet potato'],['un cece','a chickpea'],['una lenticchia','a lentil'],['un seme di soia','a soy bean']],
+     'Fish':[['il salmone','the salmon'],['il tonno','the tuna'],['la trota','the trout'],['il merluzzo','the cod'],["l'eglefino",'the haddock'],['la platessa','the plaice'],['la sogliola','the sole'],['la rana pescatrice','the monkfish']],
+     'Seafood':[['un gambaretto','a small prawn'],['un gambero','a large prawn'],['gli scampi','scampi'],["un'ostrica",'an oyster'],['una cozza','a mussel'],["un'astice",'a lobster'],['un granchio','a crab'],['un calamaro','a squid / calamari'],['un polpo','an octopus'],["un'acciuga",'an anchovy']],
+     'Meat (extended)':[["l'agnello",'the lamb'],['la bistecca','the steak'],['ben cotto','well done'],['con cottura media','medium-rare'],['poco cotto','rare'],['al sangue','blue (very rare)'],['il tacchino','the turkey'],['il prosciutto','the ham'],['la carne di maiale','the pork'],['il pollo','the chicken'],['il manzo','the beef'],['la salsiccia','the sausage'],["l'anatra",'the duck'],['il coniglio','the rabbit'],['il vitello','the veal'],['il cervo','the venison'],['la faraona','the guinea-fowl'],['la quaglia','the quail'],['un fegato','a liver'],['un rognone','a kidney']],
+     'Other foods':[['il patè','the pâté'],['il formaggio','the cheese'],['un uovo sodo','a hard-boiled egg'],['un uovo alla coque','a soft-boiled egg'],['un uovo fritto','a fried egg'],['le uova strapazzate','the scrambled eggs'],['una frittata','an omelette'],['la minestra','the soup'],['i cereali','the cereal'],['il porridge','the porridge'],['il riso','the rice'],['la pasta','the pasta'],['le tagliatelle','the noodles / tagliatelle'],['le patate fritte','the chips / fries'],['le patatine','the crisps'],['un cocktail di gamberetti','a prawn cocktail'],['un panino','a sandwich'],['un hamburger','a hamburger'],['un hot dog','a hot dog'],['un kebab','a kebab']],
+     'Condiments':[['il sale','the salt'],['il pepe','the pepper'],["l'aceto",'the vinegar'],['la senape','the mustard'],['la salsa di menta','the mint sauce'],['lo zucchero','the sugar'],['il dolcificante','the sweetener'],['il miele','the honey'],["l'aglio",'the garlic'],['la marmellata','the marmalade'],['il ketchup','the tomato sauce'],['la salsa di soia','the soy sauce'],['la maionese','the mayonnaise'],["l'olio d'oliva",'the olive oil'],["la maionese all'aglio",'the garlic mayonnaise'],['il burro','the butter'],['il pane bianco','the white bread'],['il pane integrale','the brown bread'],['il pane tostato','the toast'],['lo yogurt','the yoghurt']],
+     'Desserts':[['una torta','a cake / a pie'],['il gelato','an ice cream'],['alla fragola','strawberry (flavour)'],['alla vaniglia','vanilla'],['al cioccolato','chocolate'],['alla menta','mint'],['i dolciumi','the sweets'],['un crêpe','a pancake'],['il cioccolato','the chocolate'],['la panna','the cream'],['un biscotto','a biscuit'],['una tortina','a muffin'],['la crema pasticcera','the custard'],['un tiramisù','a tiramisu'],['una mousse','a mousse'],['il rabarbaro','the rhubarb'],['una macedonia','a fruit cocktail / salad']],
+     'Fruit (extended)':[["un'ananas",'a pineapple'],['un lampone','a raspberry'],['un pompelmo','a grapefruit'],['un mirtillo','a blueberry'],['una pesca nettarina','a nectarine'],['una prugna','a plum'],['una susina','a plum'],['una limetta','a lime'],['una clementina','a clementine'],['un tangerino','a tangerine'],["un'albicocca",'an apricot'],['una ciliegia','a cherry'],['una mora','a blackberry'],['un ribes nero','a blackcurrant'],['un dattero','a date'],['un frutto della passione','a passion fruit'],["un'uva spina",'a gooseberry'],['una guaiava','a guava'],['un kiwi','a kiwi'],['un kumquat','a kumquat'],['un litchi','a lychee'],['un mango','a mango'],["un melone d'inverno",'a honeydew melon'],['un melone di cantalupo','a cantaloupe'],['una melagrana','a pomegranate'],['un mirtillo rosso','a cranberry'],["un'arachide",'a peanut'],['una noce','a walnut'],['un pistacchio','a pistachio'],['una nocciola','a hazelnut'],["un'oliva",'an olive']],
+     'Drinks (extended)':[['un caffè','a coffee'],['un caffè latte','a coffee with milk'],['un tè','a tea'],["un'acqua gassata",'a sparkling water'],["un'acqua naturale",'a still water'],["un'acqua del rubinetto",'tap water'],["un'acqua tonica",'a tonic water'],['una coca','a cola'],['il latte','the milk'],['un vino','a wine'],['vino rosso','red wine'],['vino bianco','white wine'],['vino rosato','rosé wine'],['una birra bionda','a lager'],['uno sherry','a sherry'],['un brandy','a brandy'],['un whisky','a whisky'],['un gin','a gin'],['un liquore','a liqueur'],['una vodka','a vodka'],['un vermut','a vermouth'],['un Martini','a Martini'],['un rum','a rum'],['un porto','a port'],['un cocktail','a cocktail'],['dietetico','diet (as in diet cola)']],
+     'Cutlery':[['un coltello','a knife'],['un coltello da burro','a butter knife'],['un coltello da pane','a bread knife'],['un coltello da formaggio','a cheese knife'],['un coltello trinciante','a carving knife'],['un coltello da pesce','a fish knife'],['un coltello da bistecca','a steak knife'],['un cucchiaio','a spoon'],['un cucchiaino','a teaspoon'],['un cucchiaio da minestra','a soup spoon'],['una forchetta','a fork'],['un piatto','a plate'],['una scodella','a bowl'],['una tazza','a cup'],['un bicchiere','a glass'],['uno stuzzicadenti','a toothpick'],['un tovagliolo','a napkin'],['un secchiello del ghiaccio','an ice bucket'],["una caraffa d'acqua",'a water jug']],
+     'Italian cuisine':[['la polenta','finely-ground maize porridge'],['il fegato alla veneziana','sliced veal liver with onions'],['la cotoletta alla milanese','breaded veal cutlet'],['i ravioli','filled pasta pillows'],['il risotto','rice cooked slowly with stock'],['il gianduiotto','chocolate from Piedmont']]}],
+  [6, [["l'hotel",'the hotel'],["l'albergo",'the hotel (more Italian)'],['simpatico','nice / pleasant (m.)'],['simpatica','nice / pleasant (f.)'],['tutti','everyone (m.) / all (m. pl.)'],['tutte','everyone (f.) / all (f. pl.)'],['ognuno','everyone / each one'],['non è','is not']]],
+  [7, [['un','a / an (m.)'],['una','a / an (f.)'],['il caffè','coffee'],['il tè','tea'],['un tavolo','a table'],['una finestra','window'],['voglio','I want'],['vorrei','I would like (polite)'],['una prenotazione','a reservation'],['per favore','please'],['due persone','two people'],['tre persone','three people'],['otto persone','eight people']],
+    {'Numbers 0–20':[['zero','0'],['uno','1'],['due','2'],['tre','3'],['quattro','4'],['cinque','5'],['sei','6'],['sette','7'],['otto','8'],['nove','9'],['dieci','10'],['undici','11'],['dodici','12'],['tredici','13'],['quattordici','14'],['quindici','15'],['sedici','16'],['diciassette','17'],['diciotto','18'],['diciannove','19'],['venti','20']],
+     'Numbers 21–99':[['ventuno','21'],['ventidue','22'],['ventitré','23'],['ventiquattro','24'],['venticinque','25'],['ventisei','26'],['ventisette','27'],['ventotto','28'],['ventinove','29'],['trenta','30'],['trentuno','31'],['trentadue','32'],['trentatré','33'],['trentaquattro','34'],['trentacinque','35'],['trentasei','36'],['trentasette','37'],['trentotto','38'],['trentanove','39'],['quaranta','40'],['quarantuno','41'],['quarantadue','42'],['quarantatré','43'],['quarantaquattro','44'],['quarantacinque','45'],['quarantasei','46'],['quarantasette','47'],['quarantotto','48'],['quarantanove','49'],['cinquanta','50'],['cinquantuno','51'],['cinquantadue','52'],['cinquantatré','53'],['cinquantaquattro','54'],['cinquantacinque','55'],['cinquantasei','56'],['cinquantasette','57'],['cinquantotto','58'],['cinquantanove','59'],['sessanta','60'],['sessantuno','61'],['sessantadue','62'],['sessantatré','63'],['sessantaquattro','64'],['sessantacinque','65'],['sessantasei','66'],['sessantasette','67'],['sessantotto','68'],['sessantanove','69'],['settanta','70'],['settantuno','71'],['settantadue','72'],['settantatré','73'],['settantaquattro','74'],['settantacinque','75'],['settantasei','76'],['settantasette','77'],['settantotto','78'],['settantanove','79'],['ottanta','80'],['ottantuno','81'],['ottantadue','82'],['ottantatré','83'],['ottantaquattro','84'],['ottantacinque','85'],['ottantasei','86'],['ottantasette','87'],['ottantotto','88'],['ottantanove','89'],['novanta','90'],['novantuno','91'],['novantadue','92'],['novantatré','93'],['novantaquattro','94'],['novantacinque','95'],['novantasei','96'],['novantasette','97'],['novantotto','98'],['novantanove','99']],
+     'Numbers 100+':[['cento','100'],['centouno','101'],['centodue','102'],['centotré','103'],['centoquattro','104'],['centocinque','105'],['centosei','106'],['centosette','107'],['centootto','108'],['centonove','109'],['centodieci','110'],['duecento','200'],['duecentouno','201'],['duecentodue','202'],['duecentotré','203'],['duecentoquattro','204'],['duecentocinque','205'],['duecentodieci','210'],['trecento','300'],['trecentouno','301'],['trecentodue','302'],['trecentotré','303'],['quattrocento','400'],['cinquecento','500'],['seicento','600'],['settecento','700'],['ottocento','800'],['novecento','900'],['mille','1000']]}],
+  [8, [['il cibo','the food'],['molto buono','very good'],['una carota','a carrot'],['e','and'],['le banane','the bananas'],['sono','are / they are'],['non sono','are not'],['quello','that'],['i','the (m. pl., before consonant)'],['gli','the (m. pl., before vowel / s+cons.)'],['le','the (f. pl.)'],['vecchio','old (m.)'],['vecchia','old (f.)'],['chiaro','clear / light'],['certo','certain / sure'],['che','that / what / which'],['caro','dear / expensive (m.)'],['anche','also'],['la città','the city'],['il libro','the book'],['i libri','the books'],['i tavoli','the tables'],['le pizze','the pizzas'],['i polli','the chickens'],['le persone','the people'],['i bicchieri','the glasses'],['i vini','the wines'],['le chiavi','the keys']]],
   [9, [['ciao','hello / hi (informal)'],['vuole','wants / do you want (formal)'],['va','goes / is going'],['voglio','I want'],['buongiorno','good morning / good day'],['anche','also'],['buonanotte','good night (going to bed)'],['buon pomeriggio','good afternoon'],['buonasera','good evening'],['a dopo','see you later']]],
   [10, [['il conto','the bill / check'],['quanto costa','how much is it'],['quanto','how much'],['scusi','sorry / excuse me (formal)'],['scusa','sorry / excuse me (informal)'],['una bottiglia','a bottle'],['una bottiglia di vino','a bottle of wine'],["una bottiglia d'acqua",'a bottle of water'],['i miei','my (m. pl.)'],['le mie','my (f. pl.)'],["l'acqua",'water'],['il vino','wine']]],
   [11, [['provare','to try'],['arrivederci','goodbye'],['il formaggio','cheese'],['pagare','to pay'],['fare','to do / to make'],['posso','I can']]],
@@ -446,60 +470,100 @@ const VERBS=[
 // ── Practice phrases ──────────────────────────────────────────────────────────
 // Format: [spanish, english]  — SRS is applied just like vocab words
 const PHRASES=[
-  ['Vorrei un tavolo per due persone, per favore.','I would like a table for two people, please.'],
-  ["Quant'è il conto, per favore?",'How much is the bill, please?'],
-  ['Per me, il pollo è assolutamente delizioso.','For me, the chicken is absolutely delicious.'],
-  ['Una bottiglia di vino rosso e una di acqua, per favore.','A bottle of red wine and one of water, please.'],
-  ['La pizza non è buona qui.','The pizza is not good here.'],
-  ['Voglio noleggiare una macchina per due settimane.','I want to rent a car for two weeks.'],
-  ['A che ora è la colazione?','What time is breakfast?'],
-  ["Il pranzo è all'una.",'Lunch is at one o\'clock.'],
-  ['Sono le tre e mezza del pomeriggio.','It\'s half past three in the afternoon.'],
-  ['Sono le otto meno un quarto di mattina.','It\'s quarter to eight in the morning.'],
-  ["Qual è l'indirizzo dell'hotel?",'What is the address of the hotel?'],
-  ['Voglio andare in spiaggia domani.','I want to go to the beach tomorrow.'],
-  ["Dov'è la panetteria?",'Where is the bakery?'],
-  ['Vada sempre dritto e giri a destra.','Go straight ahead and turn right.'],
-  ['Come arrivo alla stazione?','How do I get to the train station?'],
-  ['Vorrei una camera con balcone, per favore.','I would like a room with a balcony, please.'],
-  ['Il televisore non funziona nella mia camera.','The television in my room doesn\'t work.'],
-  ["Quant'è a persona, a notte?",'How much is it per person, per night?'],
-  ['Ha una mappa della città?','Do you have a map of the city?'],
-  ["Mi piace l'agnello della regione.",'I like the lamb from the region.'],
-  ['Preferisco il cappotto in nero.','I prefer the coat in black.'],
-  ['Lo voglio in azzurro, per favore.','I want it in blue, please.'],
-  ['Buongiorno, come sta?','Good morning, how are you? (formal)'],
-  ['Sono un po\' stanco, ma bene, grazie.','I\'m a little tired, but well, thank you.'],
-  ['Come va? Tutti sono molto simpatici qui.','How\'s it going? Everyone is very pleasant here.'],
-  ['Il cibo qui è assolutamente fantastico.','The food here is absolutely fantastic.'],
-  ["Dov'è la banca? È sempre dritto.",'Where is the bank? It\'s straight ahead.'],
-  ['Vorrei un biglietto di andata e ritorno, per favore.','I want a return ticket, please.'],
-  ['Scusi, quant\'è a notte?','Sorry, how much is it per night?'],
-  ['Stasera voglio andare al cinema.','Tonight I want to go to the cinema.'],
-  // ── L38–45 phrases (there is/are, past tense) ────────────────────────────
-  ["C'è un buon ristorante qui.",'There\'s a good restaurant here.'],
-  ["C'è un supermercato qui vicino.",'There\'s a supermarket near here.'],
-  ["C'è una farmacia qui vicino?",'Is there a pharmacy nearby?'],
-  ['La spiaggia è molto lontana da qui.','The beach is very far from here.'],
-  ["C'è un grande problema in camera.",'There\'s a big problem in the room.'],
-  ["Non c'è problema.",'No problem.'],
-  ['Ci sono troppe persone qui.','There are too many people here.'],
-  ["C'è molto rumore in camera.",'There is a lot of noise in the room.'],
-  ['Non ho tempo, mi dispiace.','I don\'t have time, sorry.'],
-  ['Ho portato il mio passaporto con me.','I have brought my passport with me.'],
-  ['Ho preso il treno per Roma.','I have taken the train to Rome.'],
-  ['Hanno visto la cattedrale.','They have seen the cathedral.'],
-  ['Abbiamo messo la macchina nel garage.','We have put the car in the garage.'],
-  ['È tornato a Milano con sua moglie.','He has returned to Milan with his wife.'],
-  ['Sofia ha scelto il vino rosso.','Sofia has chosen the red wine.'],
-  ['Ho scritto tutto sul biglietto.','I have written everything on the ticket.'],
-  ["Cosa c'è per i bambini?",'What is there for the children?'],
-  ['Lui non ha ancora mangiato.','He hasn\'t eaten yet.'],
-  ['Non abbiamo visto il film.','We haven\'t seen the movie.'],
-  ['Hai prenotato un tavolo per stasera?','Have you reserved a table for tonight?'],
-  ['Avete ordinato il vino?','Have you all ordered wine?'],
-  ['Maria ha finito tutto.','María has finished everything.'],
-  ['Abbiamo aspettato molto tempo.','We have waited a long time.'],
+  ['Vorrei un tavolo per due persone, per favore.','I would like a table for two people, please.',7],
+  ["Quant'è il conto, per favore?",'How much is the bill, please?',10],
+  ['Per me, il pollo è assolutamente delizioso.','For me, the chicken is absolutely delicious.',5],
+  ['Una bottiglia di vino rosso e una di acqua, per favore.','A bottle of red wine and one of water, please.',24],
+  ['La pizza non è buona qui.','The pizza is not good here.',5],
+  ['Voglio noleggiare una macchina per due settimane.','I want to rent a car for two weeks.',12],
+  ['A che ora è la colazione?','What time is breakfast?',14],
+  ["Il pranzo è all'una.","Lunch is at one o'clock.",15],
+  ['Sono le tre e mezza del pomeriggio.',"It's half past three in the afternoon.",15],
+  ['Sono le otto meno un quarto di mattina.',"It's quarter to eight in the morning.",15],
+  ["Qual è l'indirizzo dell'hotel?",'What is the address of the hotel?',16],
+  ['Voglio andare in spiaggia domani.','I want to go to the beach tomorrow.',17],
+  ["Dov'è la panetteria?",'Where is the bakery?',20],
+  ['Vada sempre dritto e giri a destra.','Go straight ahead and turn right.',21],
+  ['Come arrivo alla stazione?','How do I get to the train station?',22],
+  ['Vorrei una camera con balcone, per favore.','I would like a room with a balcony, please.',18],
+  ['Il televisore non funziona nella mia camera.',"The television in my room doesn't work.",18],
+  ["Quant'è a persona, a notte?",'How much is it per person, per night?',18],
+  ['Ha una mappa della città?','Do you have a map of the city?',19],
+  ["Mi piace l'agnello della regione.",'I like the lamb from the region.',25],
+  ['Preferisco il cappotto in nero.','I prefer the coat in black.',25],
+  ['Lo voglio in azzurro, per favore.','I want it in blue, please.',25],
+  ['Buongiorno, come sta?','Good morning, how are you? (formal)',27],
+  ["Sono un po' stanco, ma bene, grazie.","I'm a little tired, but well, thank you.",27],
+  ['Come va? Tutti sono molto simpatici qui.',"How's it going? Everyone is very pleasant here.",27],
+  ['Il cibo qui è assolutamente fantastico.','The food here is absolutely fantastic.',8],
+  ["Dov'è la banca? È sempre dritto.","Where is the bank? It's straight ahead.",20],
+  ['Vorrei un biglietto di andata e ritorno, per favore.','I want a return ticket, please.',26],
+  ["Scusi, quant'è a notte?",'Sorry, how much is it per night?',18],
+  ['Stasera voglio andare al cinema.','Tonight I want to go to the cinema.',17],
+  ["C'è un buon ristorante qui.","There's a good restaurant here.",38],
+  ["C'è un supermercato qui vicino.","There's a supermarket near here.",38],
+  ["C'è una farmacia qui vicino?",'Is there a pharmacy nearby?',38],
+  ['La spiaggia è molto lontana da qui.','The beach is very far from here.',39],
+  ["C'è un grande problema in camera.","There's a big problem in the room.",40],
+  ["Non c'è problema.",'No problem.',38],
+  ['Ci sono troppe persone qui.','There are too many people here.',41],
+  ["C'è molto rumore in camera.",'There is a lot of noise in the room.',41],
+  ['Non ho tempo, mi dispiace.',"I don't have time, sorry.",42],
+  ['Ho portato il mio passaporto con me.','I have brought my passport with me.',42],
+  ['Ho preso il treno per Roma.','I have taken the train to Rome.',43],
+  ['Hanno visto la cattedrale.','They have seen the cathedral.',43],
+  ['Abbiamo messo la macchina nel garage.','We have put the car in the garage.',43],
+  ['È tornato a Milano con sua moglie.','He has returned to Milan with his wife.',43],
+  ['Sofia ha scelto il vino rosso.','Sofia has chosen the red wine.',43],
+  ['Ho scritto tutto sul biglietto.','I have written everything on the ticket.',43],
+  ["Cosa c'è per i bambini?",'What is there for the children?',38],
+  ['Lui non ha ancora mangiato.',"He hasn't eaten yet.",44],
+  ['Non abbiamo visto il film.',"We haven't seen the movie.",44],
+  ['Hai prenotato un tavolo per stasera?','Have you reserved a table for tonight?',45],
+  ['Avete ordinato il vino?','Have you all ordered wine?',45],
+  ['Maria ha finito tutto.','Maria has finished everything.',45],
+  ['Abbiamo aspettato molto tempo.','We have waited a long time.',45],
+  ['Non è qui.',"It's not here.",1],
+  ['Non è buono.',"It's not good.",1],
+  ['Non è molto buono.',"It's not very good.",1],
+  ['È molto buono!',"It's very good!",1],
+  ['È assolutamente fantastico!',"It's absolutely fantastic!",1],
+  ['Per me è squisito.',"For me it's exquisite.",2],
+  ['Per me è straordinario.',"For me it's extraordinary.",2],
+  ['È bello qui.',"It's beautiful here.",2],
+  ['Non è sempre molto buono qui.',"It's not always very good here.",3],
+  ['Per me è sempre bello qui.',"For me it's always beautiful here.",3],
+  ['È sempre assolutamente squisito.',"It's always absolutely exquisite.",3],
+  ['Sì, ma non è perfetto.',"Yes, but it's not perfect.",3],
+  ['Quello per me, grazie.','That for me, thanks.',3],
+  ['Maria non è qui.','Maria is not here.',4],
+  ['Il ristorante non è perfetto.','The restaurant is not perfect.',4],
+  ['Il ristorante è qui.','The restaurant is here.',4],
+  ['Tutto è molto cattivo per me, ma è assolutamente squisito.',"Everything is very bad for me, but it's absolutely exquisite.",4],
+  ['Tutto qui è squisito.','Everything here is exquisite.',4],
+  ['Per me il ristorante è fantastico.','For me the restaurant is fantastic.',4],
+  ['Quello è per lei.',"That's for her.",4],
+  ['Quello è per lui.',"That's for him.",4],
+  ['Il pollo è per me.','The chicken is for me.',5],
+  ['La pizza è deliziosa.','The pizza is delicious.',5],
+  ['Il pollo è terribile.','The chicken is terrible.',5],
+  ['La ragazza è simpatica.','The girl is nice.',5],
+  ['Il ragazzo è qui.','The boy is here.',5],
+  ["L'albergo è fantastico.",'The hotel is fantastic.',6],
+  ['Ognuno è simpatico qui.','Everyone is nice here.',6],
+  ['Tutti sono molto simpatici.','Everyone is very nice.',6],
+  ['Il mio caffè è terribile.','My coffee is terrible.',7],
+  ['Un tè per me, per favore.','A tea for me, please.',7],
+  ['Vorrei un tavolo per tre persone.','I would like a table for three people.',7],
+  ['Vorrei un tavolo per otto persone.','I would like a table for eight people.',7],
+  ['Vorrei una prenotazione, per favore.','I would like a reservation, please.',7],
+  ['Il cibo è molto buono.','The food is very good.',8],
+  ['La città è bella.','The city is beautiful.',8],
+  ['Il libro è caro.','The book is expensive.',8],
+  ['I tavoli sono qui.','The tables are here.',8],
+  ['Le pizze sono squisite.','The pizzas are exquisite.',8],
+  ['Anche il vino è buono.','The wine is also good.',8],
+  ['Le chiavi sono qui.','The keys are here.',8],
 ];
 const STORAGE_KEY = 'tmItalian_v1';
 const MAX_LESSON  = 50; // raise this as new lessons come out
@@ -711,11 +775,107 @@ function buildCard(word,i,pool) {
     : {...word,ex:'typed',promptLabel:'Typed recall: English → Italian',taskText:'Type the Italian answer.',prompt:word.english,answer:word.spanish||'',speak:word.spanish,ph:'Type the Italian answer.'};
 }
 
+
+// ── Lesson sentences + Match-the-pairs (built into Practice queue) ────────
+function buildPhraseCards() {
+  if(typeof PHRASES === 'undefined' || !PHRASES.length) return [];
+  const selWords = selectedWords();
+  if(!selWords.length) return [];
+  const sel = new Set(selWords.map(w => w.lessonId));
+  const eligible = [];
+  PHRASES.forEach((p, idx) => {
+    if(!p || p.length < 2) return;
+    const sp = p[0], en = p[1], lesson = p[2];
+    if(lesson && sel.has(lesson)) eligible.push({sp, en, lesson, idx});
+  });
+  if(!eligible.length) return [];
+  const phraseDue = i => {
+    const pr = state.phraseProgress && state.phraseProgress[i];
+    return !pr || !pr.dueAt || pr.dueAt <= todayISO();
+  };
+  const due = eligible.filter(e => phraseDue(e.idx));
+  const pool = due.length ? due : eligible;
+  // Up to 5 phrase cards per session; more for larger lesson selections
+  const cap = Math.min(5, Math.max(2, Math.ceil(sel.size * 0.8)));
+  const picks = shuffle([...pool]).slice(0, Math.min(cap, pool.length));
+  return picks.map((p, i) => {
+    const dir = i % 2 === 0 ? 'it-en' : 'en-it';
+    return {
+      ex: 'phrase',
+      srsType: 'phrase',
+      phraseIdx: p.idx,
+      id: 'phrase_' + p.idx,
+      spanish: p.sp,
+      english: p.en,
+      lessonId: p.lesson,
+      lessonTitle: 'Lesson ' + p.lesson + ' sentence',
+      promptLabel: dir === 'it-en' ? 'Sentence: Italian → English' : 'Sentence: English → Italian',
+      taskText: dir === 'it-en' ? 'Type the English meaning.' : 'Type the Italian sentence.',
+      prompt: dir === 'it-en' ? p.sp : p.en,
+      answer: dir === 'it-en' ? p.en : p.sp,
+      speak: p.sp,
+      ph: dir === 'it-en' ? 'Type the English…' : 'Type the Italian sentence…',
+    };
+  });
+}
+
+function buildMatchCard(words) {
+  if(!words || words.length < 4) return null;
+  const pairs = words.slice(0, 4).map((w, i) => ({pairId: i, sp: w.spanish, en: w.english, wordId: w.id}));
+  const chips = [
+    ...pairs.map(p => ({type:'sp', text: p.sp, pairId: p.pairId, wordId: p.wordId})),
+    ...pairs.map(p => ({type:'en', text: p.en, pairId: p.pairId, wordId: p.wordId})),
+  ];
+  return {
+    ex: 'match',
+    srsType: 'match',
+    id: 'match_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+    chips: shuffle(chips),
+    pairs,
+    promptLabel: 'Match the pairs',
+    lessonTitle: '4-pair quick review',
+    taskText: 'Tap an Italian word, then its English meaning.',
+  };
+}
+
 function buildQueue() {
   const words = selectedWords();
   if(!words.length){ state.rev.queue=[]; state.rev.idx=0; return false; }
-  const due = words.filter(isDue), src = due.length?due:words;
-  state.rev = {queue:shuffle(src.map((w,i)=>buildCard(w,i,src))),idx:0,correct:0,total:0,reveal:false,typed:'',lastResult:''};
+  const due = words.filter(isDue), srcW = due.length?due:words;
+  const wordCards = shuffle(srcW.map((w,i)=>buildCard(w,i,srcW)));
+
+  // Mix in lesson-sentence cards from selected lessons.
+  const phraseCards = buildPhraseCards();
+  const combined = [...wordCards];
+  phraseCards.forEach((pc, i) => {
+    if(combined.length < 2) { combined.push(pc); return; }
+    const insertAt = Math.floor((i+1) * combined.length / (phraseCards.length+1));
+    combined.splice(insertAt, 0, pc);
+  });
+
+  // Inject a Match-the-pairs card every ~7 cards, built from preceding 4 distinct vocab.
+  const final = [];
+  combined.forEach((card, i) => {
+    final.push(card);
+    if((i+1) % 7 === 0 && i < combined.length - 1) {
+      const recent = [];
+      for(let j = final.length - 1; j >= 0 && recent.length < 4; j--) {
+        const c = final[j];
+        if(c.ex !== 'match' && c.ex !== 'phrase' && c.spanish && c.english) {
+          if(!recent.some(r => r.id === c.id)) {
+            recent.push({spanish: c.spanish, english: c.english, id: c.id});
+          }
+        }
+      }
+      if(recent.length === 4) {
+        const m = buildMatchCard(recent);
+        if(m) final.push(m);
+      }
+    }
+  });
+
+  state.rev = {queue: final, idx:0, correct:0, total:0, reveal:false, typed:'', lastResult:''};
+  state.match = null;
   return true;
 }
 
@@ -1054,9 +1214,78 @@ function renderReview() {
     return;
   }
 
-  const isInput=['typed','dictation','cloze'].includes(card.ex);
+  // ── Match-the-pairs card branch ─────────────────────────────────────────
+  if(card.ex === 'match'){
+    if(!state.match) state.match = {selected:null, matched:new Set(), wrong:null};
+    const m = state.match;
+    const allDone = m.matched.size === 4;
+    const chipsHTML = card.chips.map((chip, i) => {
+      let cls = 'match-chip ' + (chip.type === 'sp' ? 'it' : 'en');
+      if(m.matched.has(chip.pairId)) cls += ' matched';
+      else if(m.selected === i) cls += ' selected';
+      else if(m.wrong && (m.wrong.a === i || m.wrong.b === i)) cls += ' wrong';
+      return `<button class="${cls}" data-mi="${i}">${esc(chip.text)}</button>`;
+    }).join('');
+    host.innerHTML = `<div class="card review-card anim-pop">
+      <div class="ex-label">
+        <span class="pill purple">${esc(card.promptLabel)}</span>
+        <span class="pill green">${m.matched.size}/4 matched</span>
+      </div>
+      <div class="task-hint">${esc(card.taskText)}</div>
+      <div class="match-grid">${chipsHTML}</div>
+      ${allDone ? '<div class="action-row" style="margin-top:14px;justify-content:center;"><button class="btn primary" id="matchContBtn">Continue →</button></div>' : '<div class="action-row" style="margin-top:10px;justify-content:center;"><button class="btn" id="matchSkipBtn">Skip</button></div>'}
+    </div>`;
+    host.querySelectorAll('.match-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if(allDone) return;
+        const i = +btn.dataset.mi;
+        const chip = card.chips[i];
+        if(m.matched.has(chip.pairId)) return;
+        if(m.wrong) return; // wait for wrong animation
+        if(m.selected === null){
+          m.selected = i;
+          if(chip.type === 'sp' && 'speechSynthesis' in window){
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(chip.text),{lang:'it-IT'}));
+          }
+          renderReview();
+        } else if(m.selected === i){
+          m.selected = null;
+          renderReview();
+        } else {
+          const other = card.chips[m.selected];
+          if(chip.pairId === other.pairId && chip.type !== other.type){
+            m.matched.add(chip.pairId);
+            m.selected = null;
+            reviewWord(chip.wordId, 'good');
+            rev.correct++; rev.total++;
+            renderReview();
+          } else {
+            m.wrong = {a: m.selected, b: i};
+            rev.total++;
+            renderReview();
+            setTimeout(() => { m.wrong = null; m.selected = null; renderReview(); }, 650);
+          }
+        }
+      });
+    });
+    document.getElementById('matchContBtn')?.addEventListener('click', () => {
+      state.match = null;
+      nextCard();
+    });
+    document.getElementById('matchSkipBtn')?.addEventListener('click', () => {
+      state.match = null;
+      nextCard();
+    });
+    const pct = Math.round((rev.idx / rev.queue.length) * 100);
+    const bar = document.querySelector('.session-bar'); if(bar) bar.style.width = pct + '%';
+    const badge = document.querySelector('.score-badge'); if(badge) badge.textContent = '⭐ ' + rev.correct;
+    return;
+  }
+
+  const isInput=['typed','dictation','cloze','phrase'].includes(card.ex);
   const isChoice=['mcq','listen'].includes(card.ex);
-  const exColors={typed:'blue',mcq:'purple',listen:'yellow',dictation:'blue',cloze:'green'};
+  const exColors={typed:'blue',mcq:'purple',listen:'yellow',dictation:'blue',cloze:'green',phrase:'purple'};
 
   const speakHTML=card.speak?`<div class="speak-row"><button class="speak-btn" id="speakBtn">🔊 Play Italian</button></div>`:'';
   const inputHTML=isInput?`<div class="ans-wrap"><input id="ans" placeholder="${esc(card.ph||'Type your answer…')}" value="${esc(rev.typed)}" autocomplete="off" autocorrect="off" spellcheck="false"/></div>`:'';
@@ -1108,7 +1337,8 @@ function renderReview() {
     const t=(document.getElementById('ans')?.value||'').trim(); rev.typed=t; rev.total++;
     const ok=splitAns(card.answer).map(norm).includes(norm(t));
     if(ok){
-      rev.correct++; reviewWord(card.id,'good');
+      rev.correct++;
+      if(card.srsType==='phrase') reviewPhrase(card.phraseIdx,'good'); else reviewWord(card.id,'good');
       rev.showPraise=randPraise(); rev.typed=''; rev.reveal=false;
       renderReview();
       setTimeout(()=>{ rev.showPraise=null; nextCard(); },900);
@@ -1131,8 +1361,8 @@ function renderReview() {
     }
   }));
 
-  document.getElementById('revealBtn')?.addEventListener('click',()=>{ rev.total++; reviewWord(card.id,'again'); rev.reveal=true; rev.lastResult='Answer revealed — review and continue.'; renderReview(); });
-  document.getElementById('skipBtn')?.addEventListener('click',()=>{ rev.total++; reviewWord(card.id,'again'); nextCard(); });
+  document.getElementById('revealBtn')?.addEventListener('click',()=>{ rev.total++; if(card.srsType==='phrase') reviewPhrase(card.phraseIdx,'again'); else reviewWord(card.id,'again'); rev.reveal=true; rev.lastResult='Answer revealed — review and continue.'; renderReview(); });
+  document.getElementById('skipBtn')?.addEventListener('click',()=>{ rev.total++; if(card.srsType==='phrase'){ if(card.phraseIdx!=null) reviewPhrase(card.phraseIdx,'again'); } else { reviewWord(card.id,'again'); } nextCard(); });
   document.getElementById('nextBtn')?.addEventListener('click',nextCard);
 }
 
@@ -1395,6 +1625,7 @@ const TOPIC_META = {
   past:   {label:'Past tense',    icon:'⏪', desc:'Perfect tense (L42–45)'},
   neg:    {label:'Negatives',     icon:'🚫', desc:'Saying "not"'},
   greet:  {label:'Greetings',     icon:'👋', desc:'Hello, intros'},
+  basics: {label:'Basics',        icon:'⭐', desc:'Lesson 1–8 combinations'},
 };
 
 const CHALLENGES = [
@@ -1523,7 +1754,44 @@ const CHALLENGES = [
   {en:"He hasn't eaten yet.",              tokens:[['lui','n'],['non ha mangiato','c'],['ancora','x']], topic:'neg', lvl:2},
   {en:"We haven't seen the movie.",        tokens:[['non abbiamo visto','c'],['il film','n']], topic:'neg', lvl:2},
   {en:"I don't want to pay now.",          tokens:[['non voglio','c'],['pagare','i'],['adesso','e']], topic:'neg', lvl:2},
-  {en:"You can't eat at the hotel.",       tokens:[['non puoi','c'],['mangiare','i'],["all'hotel",'e']], topic:'neg', lvl:3},
+  {en:"You can't eat at the hotel.",       tokens:[['non puoi','c'],['mangiare','i'],["all'hotel",'e']], topic:'neg', lvl:3},,
+  {en:'It\'s good.', tokens:[['è','c'],['buono','x']], topic:'basics', lvl:1},
+  {en:'It\'s good here.', tokens:[['è','c'],['buono','x'],['qui','e']], topic:'basics', lvl:1},
+  {en:'It\'s very good.', tokens:[['è','c'],['molto','x'],['buono','x']], topic:'basics', lvl:1},
+  {en:'It\'s perfect.', tokens:[['è','c'],['perfetto','x']], topic:'basics', lvl:1},
+  {en:'It\'s terrible.', tokens:[['è','c'],['terribile','x']], topic:'basics', lvl:1},
+  {en:'It\'s fantastic.', tokens:[['è','c'],['fantastico','x']], topic:'basics', lvl:1},
+  {en:'It\'s not good.', tokens:[['non è','c'],['buono','x']], topic:'basics', lvl:1},
+  {en:'It\'s not here.', tokens:[['non è','c'],['qui','e']], topic:'basics', lvl:1},
+  {en:'It\'s not very good.', tokens:[['non è','c'],['molto','x'],['buono','x']], topic:'basics', lvl:1},
+  {en:'For me, it\'s exquisite.', tokens:[['per me','x'],['è','c'],['squisito','x']], topic:'basics', lvl:2},
+  {en:'For me, it\'s perfect.', tokens:[['per me','x'],['è','c'],['perfetto','x']], topic:'basics', lvl:2},
+  {en:'For me, it\'s fantastic.', tokens:[['per me','x'],['è','c'],['fantastico','x']], topic:'basics', lvl:2},
+  {en:'That\'s for her.', tokens:[['quello','n'],['è','c'],['per lei','x']], topic:'basics', lvl:2},
+  {en:'That\'s for him.', tokens:[['quello','n'],['è','c'],['per lui','x']], topic:'basics', lvl:2},
+  {en:'That\'s for me.', tokens:[['quello','n'],['è','c'],['per me','x']], topic:'basics', lvl:2},
+  {en:'It\'s always good.', tokens:[['è','c'],['sempre','x'],['buono','x']], topic:'basics', lvl:2},
+  {en:'It\'s always perfect.', tokens:[['è','c'],['sempre','x'],['perfetto','x']], topic:'basics', lvl:2},
+  {en:'It\'s always absolutely exquisite.', tokens:[['è','c'],['sempre','x'],['assolutamente','x'],['squisito','x']], topic:'basics', lvl:2},
+  {en:'Maria is not here.', tokens:[['Maria','n'],['non è','c'],['qui','e']], topic:'basics', lvl:2},
+  {en:'The restaurant is here.', tokens:[['il ristorante','n'],['è','c'],['qui','e']], topic:'basics', lvl:2},
+  {en:'The restaurant is not perfect.', tokens:[['il ristorante','n'],['non è','c'],['perfetto','x']], topic:'basics', lvl:2},
+  {en:'The chicken is for me.', tokens:[['il pollo','n'],['è','c'],['per me','x']], topic:'basics', lvl:2},
+  {en:'My coffee is terrible.', tokens:[['il mio caffè','n'],['è','c'],['terribile','x']], topic:'basics', lvl:2},
+  {en:'The pizza is delicious.', tokens:[['la pizza','n'],['è','c'],['deliziosa','x']], topic:'basics', lvl:2},
+  {en:'The food is very good.', tokens:[['il cibo','n'],['è','c'],['molto','x'],['buono','x']], topic:'basics', lvl:2},
+  {en:'The hotel is fantastic.', tokens:[['l\'hotel','n'],['è','c'],['fantastico','x']], topic:'basics', lvl:2},
+  {en:'The girl is nice.', tokens:[['la ragazza','n'],['è','c'],['simpatica','x']], topic:'basics', lvl:2},
+  {en:'For me, the restaurant is fantastic.', tokens:[['per me','x'],['il ristorante','n'],['è','c'],['fantastico','x']], topic:'basics', lvl:3},
+  {en:'Everything here is exquisite.', tokens:[['tutto','n'],['qui','e'],['è','c'],['squisito','x']], topic:'basics', lvl:3},
+  {en:'For me, it\'s always beautiful here.', tokens:[['per me','x'],['è','c'],['sempre','x'],['bello','x'],['qui','e']], topic:'basics', lvl:3},
+  {en:'Yes, but it\'s not perfect.', tokens:[['sì','x'],['ma','x'],['non è','c'],['perfetto','x']], topic:'basics', lvl:3},
+  {en:'A tea for me, please.', tokens:[['un tè','n'],['per me','x'],['per favore','x']], topic:'basics', lvl:2},
+  {en:'A coffee, please.', tokens:[['un caffè','n'],['per favore','x']], topic:'basics', lvl:1},
+  {en:'I would like a table for two.', tokens:[['vorrei','c'],['un tavolo','n'],['per due persone','e']], topic:'basics', lvl:2},
+  {en:'I would like a table for three.', tokens:[['vorrei','c'],['un tavolo','n'],['per tre persone','e']], topic:'basics', lvl:2},
+  {en:'I would like a table for eight.', tokens:[['vorrei','c'],['un tavolo','n'],['per otto persone','e']], topic:'basics', lvl:2},
+  {en:'I would like a reservation, please.', tokens:[['vorrei','c'],['una prenotazione','n'],['per favore','x']], topic:'basics', lvl:2}
 ];
 
 // Convert legacy {q,c,i,e,neg} shape to token array (only used if any old data slips in).
