@@ -276,13 +276,32 @@ body{margin:0;font-family:'Nunito',ui-sans-serif,system-ui,sans-serif;background
 .match-chip.matched{background:var(--gxs);border-color:var(--green);color:var(--gd);opacity:.5;pointer-events:none}
 .match-chip.wrong{background:#ffe4e6;border-color:#ef4444;color:#b91c1c;animation:match-shake .4s}
 @keyframes match-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+
+/* ── Design refresh ─────────────────────────────────────────────── */
+.topbar{padding:10px 16px !important}
+.topbar-inner h1{font-size:1.2rem;margin:0}
+.topbar-inner p{display:none}
+/* lesson tile mastery bar */
+.lt-prog{display:block;height:3px;background:#e2e8f0;border-radius:2px;margin-top:4px;overflow:hidden;width:100%}
+.lt-prog span{display:block;height:100%;background:var(--green);border-radius:2px;transition:width .3s}
+.lesson-tile.sel .lt-prog{background:rgba(255,255,255,.35)}
+.lesson-tile.sel .lt-prog span{background:#fff}
+/* two-color session bar */
+.session-prog-wrap{display:flex;overflow:hidden}
+.session-bar.ok{background:linear-gradient(90deg,var(--green),#7ddd20);min-width:0;border-radius:7px 0 0 7px}
+.session-bar.miss{background:linear-gradient(90deg,#fbbf24,#fb923c);min-width:0;border-radius:0 7px 7px 0}
+/* bigger secondary buttons */
+.btn.big2{padding:11px 20px;font-size:.95rem}
+/* word context line */
+.word-context{text-align:center;color:#64748b;font-size:.92rem;margin:-4px 0 10px}
+/* listening-first toggle */
+.toggle-chip.on{background:var(--blues);border-color:var(--blue);color:var(--blue);font-weight:800}
 </style>
 </head>
 <body>
 <header class="topbar">
   <div class="topbar-inner">
-    <h1>3 Minute Italian</h1>
-    <p>Italian for travelers · Vocab · SRS · Listening · Sentence builder</p>
+    <h1>🇮🇹 3 Minute Italian</h1>
   </div>
 </header>
 <main class="app">
@@ -388,6 +407,24 @@ const RAW = [
 const RAW_CBE = [
   // Coffee Break Italian episodes go here. Same shape as RAW.
   // Example: [1, [['ciao','hello'],['come stai?','how are you?']]],
+];
+
+// ── Other Sources (videos, articles, misc — separate track) ────────────────────
+// Same shape as RAW: [seriesId, [[sp, en], ...], {packLabel:[[sp, en], ...]}?, {title, shortLabel}?]
+const RAW_OTHER = [
+  [1, [
+    ['salve','hello / hi (formal, any time of day)'],
+    ['vorrei','I would like (polite)'],
+    ['grazie','thank you'],
+    ['per favore','please'],
+    ['arrivederci','goodbye'],
+    ['altrettanto','likewise / same to you'],
+    ["dov'è?",'where is...?'],
+    ['scusi','excuse me / sorry (formal)'],
+    ['permesso','excuse me (asking to pass through)'],
+    ["prego","you're welcome / please / go ahead"],
+    ['posso?','can I...?'],
+  ], {}, {title:'Essential phrases', shortLabel:'OS1'}],
 ];
 
 
@@ -584,9 +621,11 @@ const makeWord = (lessonId,sp,en,pack=null) =>
   ({id:uid(),lessonId,spanish:sp,english:en,pack,attempts:0,correct:0,level:0,dueAt:todayISO(),lastReviewedAt:'',mastered:false});
 
 // ── Build seeded lessons from RAW + RAW_CBE ──────────────────────────────────
-// Each lesson carries a `course` field: '3MS' (Three Minute Italian) or 'CBE' (Coffee Break Italian).
-// 3MS uses IDs 1–MAX_LESSON; CBE episodes use IDs 1001+ so they never collide with 3MS.
+// Each lesson carries a `course` field: '3MS' (Three Minute Italian),
+// 'CBE' (Coffee Break Italian), or 'OTHER' (video/article notes).
+// 3MS uses 1–MAX_LESSON; CBE uses 1001+; OTHER uses 2001+ so they never collide.
 const CBE_ID_OFFSET = 1000;
+const OTHER_ID_OFFSET = 2000;
 function buildSeeded() {
   const out = [];
   // 3 Minute Italian lessons
@@ -613,8 +652,21 @@ function buildSeeded() {
       ]
     });
   }
-  // Sort: 3MS first by id, then CBE by id
-  return out.sort((a,b)=> (a.course===b.course ? a.id-b.id : (a.course==='3MS'?-1:1)));
+  // Other Sources — separate id namespace (2001, 2002, …)
+  for(const [ep, core, packs={}, meta={}] of RAW_OTHER){
+    const id = OTHER_ID_OFFSET + ep;
+    const packVocab = Object.entries(packs).flatMap(([label,items])=>items.map(([sp,en])=>({spanish:sp,english:en,pack:label})));
+    out.push({
+      id,
+      course:'OTHER',
+      title: meta.title || `Notes ${ep}`,
+      shortLabel: meta.shortLabel || `OS${ep}`,
+      vocab:[...core.map(([sp,en])=>({spanish:sp,english:en,pack:null})), ...packVocab]
+    });
+  }
+  // Sort: 3MS first by id, then OTHER, then CBE
+  const courseOrder = {'3MS':0, 'OTHER':1, 'CBE':2};
+  return out.sort((a,b)=> (a.course===b.course ? a.id-b.id : (courseOrder[a.course]||9) - (courseOrder[b.course]||9)));
 }
 
 // ── Merge seeded with saved progress ──────────────────────────────────────────
@@ -659,7 +711,7 @@ function initChallengeProgress(saved=[]) {
   return CHALLENGES.map((_,i)=>saved[i]||{correct:0,attempts:0});
 }
 
-function saveState() { localStorage.setItem(STORAGE_KEY,JSON.stringify({lessons:state.lessons,selLessons:state.selLessons,selPacks:state.selPacks,phraseProgress:state.phraseProgress,challengeProgress:state.challengeProgress})); }
+function saveState() { localStorage.setItem(STORAGE_KEY,JSON.stringify({lessons:state.lessons,selLessons:state.selLessons,selPacks:state.selPacks,phraseProgress:state.phraseProgress,challengeProgress:state.challengeProgress,listenFirst:!!state.listenFirst})); }
 
 function loadState() {
   const seeded = buildSeeded();
@@ -672,6 +724,7 @@ function loadState() {
     state.selPacks         = p.selPacks||[];
     state.phraseProgress   = initPhraseProgress(p.phraseProgress||[]);
     state.challengeProgress= initChallengeProgress(p.challengeProgress||[]);
+    state.listenFirst      = !!p.listenFirst;
   } catch { state.lessons=seeded; state.selLessons=defaultLessonIds(seeded); state.selPacks=[]; state.phraseProgress=initPhraseProgress(); state.challengeProgress=initChallengeProgress(); }
 }
 
@@ -719,6 +772,28 @@ function reviewWord(id,rating) {
   saveState();
 }
 
+// ── Session bar (two-color) + per-session log ────────────────────────────────
+function updateSessionBar() {
+  const rev=state.rev; if(!rev.queue||!rev.queue.length) return;
+  const prog=Math.min(1,rev.idx/rev.queue.length);
+  const acc=rev.total?rev.correct/rev.total:1;
+  const ok=document.querySelector('.session-bar.ok');
+  const miss=document.querySelector('.session-bar.miss');
+  if(ok) ok.style.width=(prog*acc*100).toFixed(1)+'%';
+  if(miss) miss.style.width=(prog*(1-acc)*100).toFixed(1)+'%';
+  const badge=document.querySelector('#practiceSection .score-badge'); if(badge) badge.textContent='⭐ '+rev.correct;
+}
+
+function logSession(id, rating) {
+  const rev=state.rev; if(!rev.slog) rev.slog={good:new Set(),again:new Set(),mastered:new Set()};
+  if(rating==='good'){
+    rev.slog.good.add(id);
+    for(const l of state.lessons){ const w=l.vocab.find(v=>v.id===id); if(w){ if(w.level>=6) rev.slog.mastered.add(id); break; } }
+  } else {
+    rev.slog.again.add(id);
+  }
+}
+
 // ── Review card builder ───────────────────────────────────────────────────────
 function sampleChoices(correct,pool,field,n=4) {
   const choices=[correct], seen=new Set([norm(correct)]);
@@ -735,7 +810,21 @@ function buildCard(word,i,pool) {
   const types = p.length>=4
     ? (hasPhrases ? ['typed','mcq','listen','dictation','cloze'] : ['typed','mcq','listen','dictation'])
     : ['typed','mcq','listen'];
-  const ex  = types[0|Math.random()*types.length];
+  let ex  = types[0|Math.random()*types.length];
+  // Listening-first mode: force audio-driven card types.
+  if(state.listenFirst && !['listen','dictation'].includes(ex)) ex = Math.random()<0.5?'listen':'dictation';
+  // Word context — a real phrase containing this word, shown on Italian→English cards.
+  let ctx=null;
+  if(dir==='es-en' && (ex==='typed'||ex==='mcq') && hasPhrases){
+    const spc=word.spanish.toLowerCase().replace(/[¿?¡!.,;:]/g,'').trim();
+    if(spc && spc.length>1){
+      const spcEsc=spc.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      const cb="(?:^|[^a-zàèéìíòóùú0-9])", cbe="(?:$|[^a-zàèéìíòóùú0-9])";
+      const cre=new RegExp(cb+spcEsc+cbe,'i');
+      const cm=PHRASES.filter(([psp])=>psp.toLowerCase()!==spc && cre.test(psp.toLowerCase()));
+      if(cm.length) ctx=cm[0|Math.random()*cm.length][0];
+    }
+  }
   if(ex==='cloze'){
     // Find a phrase containing this Spanish word as a WHOLE word (not a substring in another word).
     // This prevents partial blanks like "me__" matching "mesa", or blanking "es" inside "peres".
@@ -768,10 +857,10 @@ function buildCard(word,i,pool) {
   if(ex==='listen')    return {...word,ex,promptLabel:'Listening recognition',taskText:'Tap Play Italian, then choose the English meaning.',prompt:'Listen to the Italian word.',answer:word.english||'',speak:word.spanish,choices:sampleChoices(word.english,p,'english')};
   if(ex==='dictation') return {...word,ex,promptLabel:'Dictation',taskText:'Tap Play Italian, then type what you hear.',prompt:word.english||'',answer:word.spanish||'',speak:word.spanish,ph:'Type the Italian you hear.'};
   if(ex==='mcq') return dir==='es-en'
-    ? {...word,ex,promptLabel:'Multiple choice: Italian → English',taskText:'Choose the correct English meaning.',prompt:word.spanish,answer:word.english||'',speak:word.spanish,choices:sampleChoices(word.english,p,'english')}
+    ? {...word,ex,promptLabel:'Multiple choice: Italian → English',taskText:'Choose the correct English meaning.',prompt:word.spanish,answer:word.english||'',speak:word.spanish,choices:sampleChoices(word.english,p,'english'),context:ctx}
     : {...word,ex,promptLabel:'Multiple choice: English → Italian',taskText:'Choose the correct Italian word.',prompt:word.english,answer:word.spanish||'',speak:word.spanish,choices:sampleChoices(word.spanish,p,'spanish')};
   return dir==='es-en'
-    ? {...word,ex:'typed',promptLabel:'Typed recall: Italian → English',taskText:'Type the English meaning.',prompt:word.spanish,answer:word.english||'',speak:word.spanish,ph:'Type the English meaning.'}
+    ? {...word,ex:'typed',promptLabel:'Typed recall: Italian → English',taskText:'Type the English meaning.',prompt:word.spanish,answer:word.english||'',speak:word.spanish,ph:'Type the English meaning.',context:ctx}
     : {...word,ex:'typed',promptLabel:'Typed recall: English → Italian',taskText:'Type the Italian answer.',prompt:word.english,answer:word.spanish||'',speak:word.spanish,ph:'Type the Italian answer.'};
 }
 
@@ -859,12 +948,15 @@ function buildQueue() {
     final.push(card);
     if((i+1) % 7 === 0 && i < combined.length - 1) {
       const recent = [];
+      // English "roots" — split on / and strip parentheticals so that e.g.
+      // "everyone (m.) / all (m. pl.)" doesn't share a chip with "everyone / everybody".
+      const engRoots = s => (s||'').split('/').map(x => x.replace(/\(.*?\)/g,'').trim().toLowerCase()).filter(Boolean);
+      const sharesRoot = (a, b) => { const ra=engRoots(a), rb=engRoots(b); return ra.some(x => rb.includes(x)); };
       for(let j = final.length - 1; j >= 0 && recent.length < 4; j--) {
         const c = final[j];
         if(c.ex !== 'match' && c.ex !== 'phrase' && c.spanish && c.english) {
-          if(!recent.some(r => r.id === c.id)) {
-            recent.push({spanish: c.spanish, english: c.english, id: c.id});
-          }
+          const dup = recent.some(r => r.id === c.id || r.spanish === c.spanish || sharesRoot(r.english, c.english));
+          if(!dup) recent.push({spanish: c.spanish, english: c.english, id: c.id});
         }
       }
       if(recent.length === 4) {
@@ -874,8 +966,20 @@ function buildQueue() {
     }
   });
 
-  state.rev = {queue: final, idx:0, correct:0, total:0, reveal:false, typed:'', lastResult:''};
+  state.rev = {queue: final, idx:0, correct:0, total:0, reveal:false, typed:'', lastResult:'', slog:null};
   state.match = null;
+  return true;
+}
+
+// ── Weak Words: session from your lowest-accuracy words ──────────────────────
+function buildWeakQueue() {
+  let pool = selectedWords().filter(w=>w.attempts>0);
+  if(pool.length<4) pool = allWords().filter(w=>w.attempts>0);
+  if(pool.length<4) return false;
+  const ranked=[...pool].sort((a,b)=>(a.correct/a.attempts)-(b.correct/b.attempts));
+  const weak=ranked.slice(0,10);
+  state.rev={queue:shuffle(weak.map((w,i)=>buildCard(w,i,pool))),idx:0,correct:0,total:0,reveal:false,typed:'',lastResult:'',slog:null};
+  state.match=null;
   return true;
 }
 
@@ -891,8 +995,10 @@ const randPraise = () => PRAISE[0|Math.random()*PRAISE.length];
 function render() { renderNav(); switchSections(); renderPractice(); renderVerbs(); renderPhrases(); renderBuild(); renderStats(); }
 
 function renderNav() {
-  const icons={practice:'🎯',verbs:'🔤',phrases:'💬',build:'🏗️',stats:'📊'};
-  const labels={practice:'Practice',verbs:'Verbs',phrases:'Phrases',build:'Build',stats:'Stats'};
+  // Verbs/Phrases/Build tabs hidden for focus — their code + data remain below,
+  // add entries back here to restore them.
+  const icons={practice:'🎯',stats:'📊'};
+  const labels={practice:'Practice',stats:'Stats'};
   const nav=document.getElementById('nav');
   nav.innerHTML=Object.keys(labels).map(id=>`<button class="${state.tab===id?'active':''}" data-tab="${id}"><span class="ni">${icons[id]}</span>${labels[id]}</button>`).join('');
   nav.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ state.tab=b.dataset.tab; render(); }));
@@ -909,10 +1015,13 @@ function renderPractice() {
   const renderTile = l => {
     const core=coreWords(l.id), hasWords=core.length>0;
     const isSel=selLessons().includes(l.id);
-    return `<button class="lesson-tile${isSel?' sel':''}${!hasWords?' off':''}" data-lid="${l.id}" title="${esc(l.title)} — ${core.length} words">
+    const m=core.filter(w=>getStatus(w)==='mastered').length;
+    const pc=core.length?Math.round(m/core.length*100):0;
+    return `<button class="lesson-tile${isSel?' sel':''}${!hasWords?' off':''}" data-lid="${l.id}" title="${esc(l.title)} — ${m}/${core.length} mastered">
       <span class="lt-num">${esc(l.shortLabel||String(l.id))}</span>
       <span class="lt-words">${core.length}w</span>
       <span class="lt-dot"></span>
+      <span class="lt-prog"><span style="width:${pc}%"></span></span>
     </button>`;
   };
   const tilesByCourse = (course) =>
@@ -920,6 +1029,7 @@ function renderPractice() {
 
   const lessons3MS = tilesByCourse('3MS');
   const lessonsCBE = tilesByCourse('CBE');
+  const lessonsOTHER = tilesByCourse('OTHER');
   const cbeIds = state.lessons.filter(l=>l.course==='CBE'&&coreWords(l.id).length).map(l=>l.id);
   const tmsIds = state.lessons.filter(l=>(l.course||'3MS')==='3MS'&&coreWords(l.id).length).map(l=>l.id);
 
@@ -929,6 +1039,13 @@ function renderPractice() {
       <div style="flex:1;height:2px;background:var(--gs);border-radius:2px;"></div>
     </div>
     <div class="lesson-grid">${lessons3MS}</div>
+    ${lessonsOTHER ? `
+      <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px;">
+        <span style="font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:#0369a1;background:#e0f2fe;padding:3px 9px;border-radius:999px;">🌐 Other Sources</span>
+        <div style="flex:1;height:2px;background:#bae6fd;border-radius:2px;"></div>
+      </div>
+      <div class="lesson-grid">${lessonsOTHER}</div>
+    ` : ''}
     ${lessonsCBE ? `
       <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px;">
         <span style="font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:#7030c8;background:var(--purples);padding:3px 9px;border-radius:999px;">☕ Coffee Break Italian</span>
@@ -974,8 +1091,12 @@ function renderPractice() {
         <div class="summary-box"><div class="value">${due}</div><div class="label">Due now</div></div>
         <div class="summary-box"><div class="value">${mastered}</div><div class="label">Mastered</div></div>
       </div>
-      <div class="toolbar" style="margin-top:16px;justify-content:flex-end;">
-        <button class="btn primary" id="goBtn" style="font-size:1.05rem;padding:13px 28px;">Let's Go! 🚀</button>
+      <div class="toolbar" style="margin-top:16px;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <button class="btn toggle-chip${state.listenFirst?' on':''}" id="listenFirstBtn" title="All cards become audio-driven — hear Italian first, then answer.">👂 Listening-first: ${state.listenFirst?'ON':'OFF'}</button>
+        <div class="toolbar" style="gap:10px;">
+          <button class="btn big2" id="weakBtn" title="Drill your 10 lowest-accuracy words.">💪 Weak words</button>
+          <button class="btn primary" id="goBtn" style="font-size:1.05rem;padding:13px 28px;">Let's Go! 🚀</button>
+        </div>
       </div>
     </div>
     <div class="card" style="margin-top:14px;background:linear-gradient(135deg,#e8f7ff,#f3e8ff);border-color:#8dd9f8;">
@@ -988,12 +1109,14 @@ function renderPractice() {
       </div>
     </div>`;
 
-  const pct = state.rev.queue.length ? Math.round((state.rev.idx/state.rev.queue.length)*100) : 0;
+  const _rq=state.rev, _prog=_rq.queue.length?Math.min(1,_rq.idx/_rq.queue.length):0;
+  const _acc=_rq.total?_rq.correct/_rq.total:1;
   const session = `
     <div class="session-header">
       <button class="btn-icon" id="changeBtn" title="Change selection">✕</button>
       <div class="session-prog-wrap">
-        <div class="session-bar" style="width:${pct}%"></div>
+        <div class="session-bar ok" style="width:${(_prog*_acc*100).toFixed(1)}%"></div>
+        <div class="session-bar miss" style="width:${(_prog*(1-_acc)*100).toFixed(1)}%"></div>
       </div>
       <div class="score-badge">⭐ ${state.rev.correct}</div>
     </div>`;
@@ -1033,6 +1156,13 @@ function renderPractice() {
     document.getElementById('clrP')?.addEventListener('click',()=>{ state.selPacks=[]; saveState(); renderPractice(); });
     document.getElementById('goBtn')?.addEventListener('click',()=>{
       if(!buildQueue()){ alert('Select at least one lesson or pack with words.'); return; }
+      state.started=true; renderPractice();
+    });
+    document.getElementById('listenFirstBtn')?.addEventListener('click',()=>{
+      state.listenFirst=!state.listenFirst; saveState(); renderPractice();
+    });
+    document.getElementById('weakBtn')?.addEventListener('click',()=>{
+      if(!buildWeakQueue()){ alert('Weak Words needs at least 4 words with practice history — do a regular session first.'); return; }
       state.started=true; renderPractice();
     });
     document.getElementById('numDrillStartBtn')?.addEventListener('click',()=>{
@@ -1191,10 +1321,14 @@ function renderReview() {
 
   const card=curCard();
 
-  // ── Session complete ───────────────────────────────────────────────────────
+  // ── Session complete (with learning summary) ────────────────────────────────
   if(!card){
     const accuracy=rev.total?Math.round(rev.correct/rev.total*100):0;
     const emoji=accuracy>=90?'🏆':accuracy>=70?'🎉':accuracy>=50?'💪':'📚';
+    const slog=rev.slog||{good:new Set(),again:new Set(),mastered:new Set()};
+    const nMastered=slog.mastered.size;
+    const nProgressed=[...slog.good].filter(id=>!slog.mastered.has(id)).length;
+    const nBack=[...slog.again].filter(id=>!slog.good.has(id)).length;
     host.innerHTML=`<div class="card session-complete anim-pop">
       <span class="complete-icon">${emoji}</span>
       <div class="complete-title">${accuracy>=70?'Great work!':'Keep going!'}</div>
@@ -1202,15 +1336,23 @@ function renderReview() {
         <span class="ring-pct">${accuracy}%</span>
         <span class="ring-label">correct</span>
       </div>
-      <div class="toolbar" style="justify-content:center;margin-bottom:20px;">
-        <span class="pill green">✓ ${rev.correct} correct</span>
-        <span class="pill red">✗ ${rev.total-rev.correct} missed</span>
+      <div class="toolbar" style="justify-content:center;margin-bottom:8px;flex-wrap:wrap;">
+        ${nMastered?`<span class="pill green">🏆 ${nMastered} newly mastered</span>`:''}
+        ${nProgressed?`<span class="pill blue">📈 ${nProgressed} progressed</span>`:''}
+        ${nBack?`<span class="pill yellow">🔁 ${nBack} coming back sooner</span>`:''}
       </div>
-      <button class="btn primary" id="restartBtn" style="font-size:1rem;padding:12px 28px;">Go again 🚀</button>
+      ${nBack?`<div class="muted small" style="text-align:center;margin-bottom:16px;">Missed words return sooner — that's the spaced repetition working for you.</div>`:'<div style="margin-bottom:16px;"></div>'}
+      <div class="toolbar" style="justify-content:center;gap:10px;">
+        <button class="btn primary" id="restartBtn" style="font-size:1rem;padding:12px 28px;">Go again 🚀</button>
+        <button class="btn big2" id="weakAgainBtn">💪 Weak words</button>
+      </div>
     </div>`;
     document.getElementById('restartBtn')?.addEventListener('click',()=>{ buildQueue(); renderReview(); });
-    // Update session header score after completion
-    const bar=document.querySelector('.session-bar'); if(bar) bar.style.width='100%';
+    document.getElementById('weakAgainBtn')?.addEventListener('click',()=>{
+      if(!buildWeakQueue()){ alert('Not enough practiced words yet.'); return; }
+      renderReview();
+    });
+    updateSessionBar();
     return;
   }
 
@@ -1257,7 +1399,7 @@ function renderReview() {
           if(chip.pairId === other.pairId && chip.type !== other.type){
             m.matched.add(chip.pairId);
             m.selected = null;
-            reviewWord(chip.wordId, 'good');
+            reviewWord(chip.wordId, 'good'); logSession(chip.wordId,'good');
             rev.correct++; rev.total++;
             renderReview();
           } else {
@@ -1277,9 +1419,7 @@ function renderReview() {
       state.match = null;
       nextCard();
     });
-    const pct = Math.round((rev.idx / rev.queue.length) * 100);
-    const bar = document.querySelector('.session-bar'); if(bar) bar.style.width = pct + '%';
-    const badge = document.querySelector('.score-badge'); if(badge) badge.textContent = '⭐ ' + rev.correct;
+    updateSessionBar();
     return;
   }
 
@@ -1292,8 +1432,8 @@ function renderReview() {
   const hintHTML=card.hint?`<div class="cloze-hint">💡 ${esc(card.hint)}</div>`:'';
   const choicesHTML=isChoice?`<div class="choices">${card.choices.map(c=>`<button class="choice" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>`:'';
   const actionHTML=isInput
-    ?`<div class="action-row"><button class="btn primary" id="checkBtn">Check ✓</button><button class="btn" id="revealBtn">Show answer</button><button class="btn" id="skipBtn">Skip</button></div>`
-    :`<div class="action-row"><button class="btn" id="skipBtn">Skip</button></div>`;
+    ?`<div class="action-row"><button class="btn primary" id="checkBtn">Check ✓</button><button class="btn big2" id="revealBtn">Show answer</button><button class="btn big2" id="skipBtn">Skip</button></div>`
+    :`<div class="action-row"><button class="btn big2" id="skipBtn">Skip</button></div>`;
   const feedbackHTML=rev.reveal
     ?`<div class="feedback-bar wrong-fb anim-pop">✗ ${esc(rev.lastResult)}</div>
        <div class="answer-reveal anim-pop"><div class="reveal-label">Correct answer</div><div class="reveal-text">${esc(card.answer)}</div></div>
@@ -1312,14 +1452,13 @@ function renderReview() {
     </div>
     <div class="task-hint">${esc(card.taskText)}</div>
     ${promptHTML}
+    ${card.context?`<div class="word-context">💬 <em>${esc(card.context)}</em></div>`:''}
     ${hintHTML||''}
     ${speakHTML}${inputHTML}${choicesHTML}${actionHTML}${feedbackHTML}
   </div>`;
 
-  // Update session bar
-  const pct=Math.round((rev.idx/rev.queue.length)*100);
-  const bar=document.querySelector('.session-bar'); if(bar) bar.style.width=pct+'%';
-  const badge=document.querySelector('.score-badge'); if(badge) badge.textContent='⭐ '+rev.correct;
+  // Update session bar (two-color)
+  updateSessionBar();
 
   // Focus input
   const inp=document.getElementById('ans');
@@ -1339,10 +1478,12 @@ function renderReview() {
     if(ok){
       rev.correct++;
       if(card.srsType==='phrase') reviewPhrase(card.phraseIdx,'good'); else reviewWord(card.id,'good');
+      logSession(card.id,'good');
       rev.showPraise=randPraise(); rev.typed=''; rev.reveal=false;
       renderReview();
       setTimeout(()=>{ rev.showPraise=null; nextCard(); },900);
     } else {
+      if(t){ if(card.srsType==='phrase') reviewPhrase(card.phraseIdx,'again'); else reviewWord(card.id,'again'); logSession(card.id,'again'); }
       rev.reveal=true; rev.lastResult=t?'Not an exact match — check the answer below.':'No answer entered.'; renderReview();
     }
   });
@@ -1351,18 +1492,19 @@ function renderReview() {
     if(b.dataset.clicked) return; b.dataset.clicked='1';
     const ok=norm(b.dataset.c)===norm(card.answer); rev.total++;
     if(ok){
-      b.classList.add('correct'); rev.correct++; reviewWord(card.id,'good');
+      b.classList.add('correct'); rev.correct++; reviewWord(card.id,'good'); logSession(card.id,'good');
       setTimeout(()=>nextCard(), 700);
     } else {
       b.classList.add('wrong');
+      reviewWord(card.id,'again'); logSession(card.id,'again');
       document.querySelectorAll('.choice').forEach(cb=>{ if(norm(cb.dataset.c)===norm(card.answer)) cb.classList.add('correct'); });
       rev.reveal=true; rev.lastResult='Not quite — see the correct answer above.';
       setTimeout(()=>renderReview(), 800);
     }
   }));
 
-  document.getElementById('revealBtn')?.addEventListener('click',()=>{ rev.total++; if(card.srsType==='phrase') reviewPhrase(card.phraseIdx,'again'); else reviewWord(card.id,'again'); rev.reveal=true; rev.lastResult='Answer revealed — review and continue.'; renderReview(); });
-  document.getElementById('skipBtn')?.addEventListener('click',()=>{ rev.total++; if(card.srsType==='phrase'){ if(card.phraseIdx!=null) reviewPhrase(card.phraseIdx,'again'); } else { reviewWord(card.id,'again'); } nextCard(); });
+  document.getElementById('revealBtn')?.addEventListener('click',()=>{ rev.total++; if(card.srsType==='phrase') reviewPhrase(card.phraseIdx,'again'); else reviewWord(card.id,'again'); logSession(card.id,'again'); rev.reveal=true; rev.lastResult='Answer revealed — review and continue.'; renderReview(); });
+  document.getElementById('skipBtn')?.addEventListener('click',()=>{ rev.total++; if(card.srsType==='phrase'){ if(card.phraseIdx!=null) reviewPhrase(card.phraseIdx,'again'); } else { reviewWord(card.id,'again'); } logSession(card.id,'again'); nextCard(); });
   document.getElementById('nextBtn')?.addEventListener('click',nextCard);
 }
 
