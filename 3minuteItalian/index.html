@@ -687,7 +687,10 @@ function mergeSeeded(seeded, saved) {
       const seed = seedLookup.get(`${norm(w.spanish)}|${norm(w.english)}`);
       // pack is structural (defined by code) — always take seed value if available so that
       // re-seeding (e.g. splitting 'Numbers' into 'Numbers 0–20' / '21–99' / '100+') migrates correctly.
-      return {...w, pack: seed?.pack ?? w.pack ?? null};
+      // id must always be valid: backfill from the seed word, or mint a fresh one, so that
+      // words saved by older buggy versions (id:undefined) don't collapse together in selectedWords().
+      const id = (w.id!=null && w.id!=='') ? w.id : (seed?.id ?? uid());
+      return {...w, id, pack: seed?.pack ?? w.pack ?? null};
     });
     const seen = new Set(merged.map(w=>`${norm(w.spanish)}|${norm(w.english)}`));
     sl.vocab.filter(w=>!seen.has(`${norm(w.spanish)}|${norm(w.english)}`)).forEach(w=>merged.push(w));
