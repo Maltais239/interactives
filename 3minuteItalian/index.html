@@ -292,10 +292,25 @@ body{margin:0;font-family:'Nunito',ui-sans-serif,system-ui,sans-serif;background
 .session-bar.miss{background:linear-gradient(90deg,#fbbf24,#fb923c);min-width:0;border-radius:0 7px 7px 0}
 /* bigger secondary buttons */
 .btn.big2{padding:11px 20px;font-size:.95rem}
-/* word context line */
-.word-context{text-align:center;color:#64748b;font-size:.92rem;margin:-4px 0 10px}
+/* word context line — tappable to hear the sentence */
+.word-context{display:block;width:100%;text-align:center;color:#64748b;font-size:.92rem;margin:-4px 0 10px;background:none;border:none;cursor:pointer;font-family:inherit;padding:6px 8px;border-radius:10px;transition:background .12s,color .12s}
+.word-context:hover{background:#f1f5f9;color:#0369a1}
+.word-context:active{background:#e0f2fe}
 /* listening-first toggle */
 .toggle-chip.on{background:var(--blues);border-color:var(--blue);color:var(--blue);font-weight:800}
+
+/* Scenarios */
+.scenario-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.scenario-tile{background:#fff;border:2px solid var(--border);border-bottom:4px solid var(--border-b);border-radius:14px;padding:14px 12px;cursor:pointer;text-align:center;font-family:inherit;transition:all .12s ease;display:flex;flex-direction:column;align-items:center;gap:2px}
+.scenario-tile:hover{border-color:#f59e0b;transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.07)}
+.scenario-tile:active{border-bottom-width:2px;transform:translateY(2px)}
+.sc-icon{font-size:1.6rem}
+.sc-title{font-weight:900;font-size:.95rem;color:var(--ink)}
+.sc-desc{font-size:.75rem;color:#64748b}
+.sc-line{display:flex;gap:10px;align-items:flex-start;margin:8px 0;line-height:1.35}
+.sc-line.you{justify-content:flex-end;text-align:right}
+.sc-line .sc-who{font-size:1.3rem;flex-shrink:0}
+.sc-transcript{background:#f8fafc;border-radius:12px;padding:10px 14px;max-height:340px;overflow-y:auto}
 </style>
 </head>
 <body>
@@ -517,6 +532,137 @@ const NUM_GROUPS = [
   {label:'30 – 90',  pairs:[['trenta','thirty'],['quaranta','forty'],['cinquanta','fifty'],['sessanta','sixty'],['settanta','seventy'],['ottanta','eighty'],['novanta','ninety']]},
   {label:'100 – 1,000,000', pairs:[['cento','one hundred'],['centouno','one hundred and one'],['duecento','two hundred'],['trecento','three hundred'],['quattrocento','four hundred'],['cinquecento','five hundred'],['seicento','six hundred'],['settecento','seven hundred'],['novecento','nine hundred'],['mille','one thousand'],['un milione','one million']]},
 ];
+
+// Numeric values for each NUM_GROUPS entry (same order) — powers the ordering
+// and digit-matching stages of the Numbers Studio.
+const NUM_VALUES = [
+  [0,1,2,3,4,5,6,7,8,9,10],
+  [11,12,13,14,15,16,17,18,19,20],
+  [21,22,23,24,25,26,27,28,29],
+  [30,40,50,60,70,80,90],
+  [100,101,200,300,400,500,600,700,900,1000,1000000],
+];
+const fmtNum = v => v.toLocaleString('en-US');
+
+// ── Scenario conversations (uses lesson 1–10 + Other Sources vocab) ──────────
+// Each step: npc line (+ English), your task, the correct reply, and wrong
+// options with a short "why not" hint.
+const SCENARIOS = [
+  {id:'bar', icon:'☕', title:'Al bar', desc:'Order coffee like a local', steps:[
+    {npc:'Buongiorno! Prego?', npcEn:'Good morning! What can I get you?',
+     task:'Order a coffee, politely.',
+     good:'Vorrei un caffè, per favore.', goodEn:'I would like a coffee, please.',
+     wrong:[{t:'Il conto, per favore.', why:'That asks for the bill — you haven\'t ordered yet!'},
+            {t:'Buonanotte!', why:'That\'s "good night" — for going to bed.'}]},
+    {npc:'Certo! Altro?', npcEn:'Sure! Anything else?',
+     task:'Ask for a tea for her (your friend).',
+     good:'Un tè per lei, per favore.', goodEn:'A tea for her, please.',
+     wrong:[{t:'Un tavolo per otto persone.', why:'A table for eight people? It\'s just the two of you.'},
+            {t:'Il pollo è terribile.', why:'Insulting the chicken doesn\'t get your friend a tea.'}]},
+    {npc:'Ecco il caffè e il tè.', npcEn:'Here are the coffee and the tea.',
+     task:'Say thank you — it\'s delicious here.',
+     good:'Grazie! È delizioso qui.', goodEn:'Thank you! It\'s delicious here.',
+     wrong:[{t:'Non è buono.', why:'"It\'s not good" — ouch, and you haven\'t even tasted it.'},
+            {t:'Quanto costa la pizza?', why:'Asking the price of pizza you didn\'t order confuses everyone.'}]},
+    {npc:'Prego!', npcEn:'You\'re welcome!',
+     task:'Ask how much it is.',
+     good:'Quanto costa, per favore?', goodEn:'How much is it, please?',
+     wrong:[{t:'Dov\'è il ristorante?', why:'You\'re asking where the restaurant is… from inside a café.'},
+            {t:'Per me è terribile.', why:'"For me it\'s terrible" — the barista will remember you.'}]},
+    {npc:'Tre euro.', npcEn:'Three euros.',
+     task:'Say thanks and goodbye nicely.',
+     good:'Grazie, arrivederci!', goodEn:'Thank you, goodbye!',
+     wrong:[{t:'No, grazie.', why:'"No, thanks"? You already drank it!'},
+            {t:'Il conto non è perfetto.', why:'Disputing a 3-euro bill is a bold move.'}]},
+  ]},
+  {id:'ristorante', icon:'🍝', title:'Al ristorante', desc:'Dinner for two, start to finish', steps:[
+    {npc:'Buonasera! Prego?', npcEn:'Good evening! Can I help you?',
+     task:'You\'d like a table for two.',
+     good:'Vorrei un tavolo per due persone, per favore.', goodEn:'I would like a table for two people, please.',
+     wrong:[{t:'La pizza non è buona qui.', why:'Insulting the pizza before sitting down — risky strategy.'},
+            {t:'Buongiorno!', why:'It\'s evening — and that doesn\'t ask for a table.'}]},
+    {npc:'Perfetto. Ecco il menù.', npcEn:'Perfect. Here\'s the menu.',
+     task:'Order the chicken for yourself.',
+     good:'Il pollo per me, per favore.', goodEn:'The chicken for me, please.',
+     wrong:[{t:'La chiave, per favore.', why:'You asked for "the key" — wrong kind of establishment.'},
+            {t:'Quello non è qui.', why:'"That is not here" — cryptic, and not an order.'}]},
+    {npc:'E da bere?', npcEn:'And to drink?',
+     task:'A bottle of water, please.',
+     good:'Una bottiglia d\'acqua, per favore.', goodEn:'A bottle of water, please.',
+     wrong:[{t:'Un caffè per il pollo.', why:'A coffee… for the chicken? It\'s beyond caring.'},
+            {t:'L\'acqua non è qui.', why:'"The water is not here" — that\'s their line, not yours.'}]},
+    {npc:'Tutto bene?', npcEn:'Everything okay?',
+     task:'Yes — everything is exquisite, thanks!',
+     good:'Sì, tutto è squisito, grazie!', goodEn:'Yes, everything is exquisite, thank you!',
+     wrong:[{t:'No, tutto è molto cattivo.', why:'"Everything is very bad" — only if you mean it!'},
+            {t:'Il ristorante non è qui.', why:'"The restaurant is not here" — you\'re sitting in it.'}]},
+    {npc:'Prego!', npcEn:'My pleasure!',
+     task:'Ask for the bill.',
+     good:'Il conto, per favore.', goodEn:'The bill, please.',
+     wrong:[{t:'Una prenotazione, per favore.', why:'A reservation? You\'re already at the end of dinner.'},
+            {t:'Quanto costa il tavolo?', why:'The table isn\'t for sale.'}]},
+    {npc:'Ecco. Grazie e buonasera!', npcEn:'Here you are. Thanks and good evening!',
+     task:'Thank them — it\'s fantastic here — and say goodbye.',
+     good:'Grazie! È fantastico qui. Arrivederci!', goodEn:'Thank you! It\'s fantastic here. Goodbye!',
+     wrong:[{t:'Il conto è terribile. Ciao.', why:'"The bill is terrible. Bye." Technically Italian. Socially… no.'},
+            {t:'Non è molto buono.', why:'Ending on "it\'s not very good" after saying everything was exquisite?'}]},
+  ]},
+  {id:'incontro', icon:'👋', title:'Piacere!', desc:'Meet someone new', steps:[
+    {npc:'Salve!', npcEn:'Hello!',
+     task:'Greet back and ask how it\'s going.',
+     good:'Salve! Come va?', goodEn:'Hello! How\'s it going?',
+     wrong:[{t:'Il conto, per favore.', why:'Asking a stranger for the bill is a strange opener.'},
+            {t:'Buonanotte.', why:'"Good night" ends conversations — you\'re starting one.'}]},
+    {npc:'Tutto bene, grazie! E Lei?', npcEn:'All good, thanks! And you?',
+     task:'Say you\'re fine too, thanks.',
+     good:'Tutto bene, grazie!', goodEn:'All good, thanks!',
+     wrong:[{t:'No.', why:'Just "no"? Give them something to work with.'},
+            {t:'È terribile qui.', why:'"It\'s terrible here" — heavy for small talk with a stranger.'}]},
+    {npc:'Come si chiama?', npcEn:'What\'s your name? (formal)',
+     task:'Say your name is Maria — nice to meet them.',
+     good:'Mi chiamo Maria. Piacere!', goodEn:'My name is Maria. Nice to meet you!',
+     wrong:[{t:'Maria non è qui.', why:'"Maria is not here" — but… you\'re Maria.'},
+            {t:'Quello è per lei.', why:'"That\'s for her" doesn\'t answer the name question.'}]},
+    {npc:'Piacere, Marco!', npcEn:'Nice to meet you — I\'m Marco!',
+     task:'Say the city is beautiful.',
+     good:'La città è bella!', goodEn:'The city is beautiful!',
+     wrong:[{t:'La città è cattiva.', why:'Telling a local their city is bad — brave.'},
+            {t:'Dov\'è la città?', why:'"Where is the city?" You\'re standing in it.'}]},
+    {npc:'Sì! Buona giornata!', npcEn:'Yes! Have a good day!',
+     task:'Wish the same back — see you soon!',
+     good:'Altrettanto! A presto!', goodEn:'Likewise! See you soon!',
+     wrong:[{t:'Permesso?', why:'That\'s for squeezing past someone in a crowd.'},
+            {t:'Il libro è caro.', why:'"The book is expensive" — what book? Marco is confused.'}]},
+  ]},
+  {id:'chiacchiere', icon:'💬', title:'Due chiacchiere', desc:'Small talk with a friend', steps:[
+    {npc:'Ciao! Come va?', npcEn:'Hi! How\'s it going?',
+     task:'Going well — and you? (informal)',
+     good:'Bene, grazie! E tu?', goodEn:'Well, thanks! And you?',
+     wrong:[{t:'Il pollo per me.', why:'They asked how you are, not for your order.'},
+            {t:'Quanto costa?', why:'"How much does it cost?" — friendship is free.'}]},
+    {npc:'Tutto bene! Il caffè qui è buono, no?', npcEn:'All good! The coffee here is good, right?',
+     task:'Agree enthusiastically — absolutely delicious!',
+     good:'Sì, è assolutamente delizioso!', goodEn:'Yes, it\'s absolutely delicious!',
+     wrong:[{t:'No, è per lui.', why:'"No, it\'s for him" — that answers a different question.'},
+            {t:'La chiave è qui.', why:'"The key is here" — nobody asked about a key.'}]},
+    {npc:'Sei qui per una settimana?', npcEn:'Are you here for a week?',
+     task:'Yes! And the hotel is fantastic.',
+     good:'Sì! L\'hotel è fantastico.', goodEn:'Yes! The hotel is fantastic.',
+     wrong:[{t:'No, il cibo non è qui.', why:'"The food is not here" — a mysterious reply.'},
+            {t:'L\'albergo è cattivo.', why:'That says the hotel is bad — opposite of the task.'}]},
+    {npc:'Perfetto! E il cibo?', npcEn:'Perfect! And the food?',
+     task:'The food is very good — everything is exquisite!',
+     good:'Il cibo è molto buono. Tutto è squisito!', goodEn:'The food is very good. Everything is exquisite!',
+     wrong:[{t:'Il cibo è per la ragazza.', why:'"The food is for the girl" — not a food review.'},
+            {t:'Non c\'è problema.', why:'"No problem" answers an apology, not a food question.'}]},
+    {npc:'Bene! Ci vediamo!', npcEn:'Great! See you around!',
+     task:'See you — have a good evening!',
+     good:'Ci vediamo! Buona serata!', goodEn:'See you! Have a good evening!',
+     wrong:[{t:'Buongiorno!', why:'"Good morning" at the end of an evening chat — time travel.'},
+            {t:'Scusi, dov\'è?', why:'"Excuse me, where is…?" Where is what? The chat is over.'}]},
+  ]},
+];
+
 // ── Conjugation groups ────────────────────────────────────────────────────────
 // Format: [groupLabel, [[spanish form, english meaning], ...]]
 const VERBS=[
@@ -734,7 +880,8 @@ const state = {
   phraseProgress:[], // SRS progress per phrase, indexed parallel to PHRASES
   phraseRev:{queue:[],idx:0,correct:0,total:0,reveal:false,typed:'',lastResult:'',started:false},
   verbDrill:{queue:[],idx:0,reveal:false,correct:0,total:0}, // simple drill, no SRS
-  numDrill:{active:false,group:0,idx:0,reveal:false,correct:0,total:0,queue:null}, // sequential number drill
+  numDrill:{active:false,stage:'order',group:0,idx:0,reveal:false,correct:0,total:0,queue:null,order:null,match:null}, // Numbers Studio
+  scenario:{active:false,id:null,step:0,correct:0,total:0,picked:null,choiceOrder:null,transcript:[]}, // conversation scenarios
   challengeProgress:[], // {correct, attempts} per CHALLENGES index; 3 correct = star
 };
 
@@ -1135,12 +1282,21 @@ function renderPractice() {
       </div>
     </div>
     <div class="card" style="margin-top:14px;background:linear-gradient(135deg,#e8f7ff,#f3e8ff);border-color:#8dd9f8;">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-        <div>
-          <h3 style="margin:0 0 4px;">🔢 Sequential number drill</h3>
-          <div class="muted small">Drill 0–10 first, then 11–20, 21–29, 30–90, and 100+ in order. Mixed card types; SRS updates too.</div>
-        </div>
-        <button class="btn primary" id="numDrillStartBtn">Start at 0–10 →</button>
+      <h3 style="margin:0 0 4px;">🔢 Numbers Studio</h3>
+      <div class="muted small" style="margin-bottom:10px;">Learn each range in three steps: put them in order, match digits to words, then quiz.</div>
+      <div class="toolbar" style="gap:8px;flex-wrap:wrap;">
+        ${NUM_GROUPS.map((g,i)=>`<button class="btn num-group-chip" data-ng="${i}">${esc(g.label)}</button>`).join('')}
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px;background:linear-gradient(135deg,#fff7e8,#ffe8f3);border-color:#f8c98d;">
+      <h3 style="margin:0 0 4px;">🎭 Scenarios</h3>
+      <div class="muted small" style="margin-bottom:10px;">Play out a real conversation — pick the right reply at each turn. Uses lesson 1–10 vocab.</div>
+      <div class="scenario-grid">
+        ${SCENARIOS.map(s=>`<button class="scenario-tile" data-sc="${s.id}">
+          <span class="sc-icon">${s.icon}</span>
+          <span class="sc-title">${esc(s.title)}</span>
+          <span class="sc-desc">${esc(s.desc)}</span>
+        </button>`).join('')}
       </div>
     </div>`;
 
@@ -1158,7 +1314,7 @@ function renderPractice() {
 
 
 
-  document.getElementById('practiceSection').innerHTML = `${state.started?session:(state.numDrill.active?'':setup)}<div id="numDrillArea" style="margin-top:16px;"></div><div id="reviewArea" style="margin-top:16px;"></div>`;
+  document.getElementById('practiceSection').innerHTML = `${state.started?session:((state.numDrill.active||state.scenario.active)?'':setup)}<div id="numDrillArea" style="margin-top:16px;"></div><div id="scenarioArea" style="margin-top:16px;"></div><div id="reviewArea" style="margin-top:16px;"></div>`;
 
   if(!state.started) {
     document.querySelectorAll('.lesson-tile').forEach(tile=>{
@@ -1200,10 +1356,12 @@ function renderPractice() {
       if(!buildWeakQueue()){ alert('Weak Words needs at least 4 words with practice history — do a regular session first.'); return; }
       state.started=true; renderPractice();
     });
-    document.getElementById('numDrillStartBtn')?.addEventListener('click',()=>{
-      state.numDrill={active:true,group:0,idx:0,reveal:false,correct:0,total:0,queue:buildNumQueue(0)};
-      renderPractice();
-    });
+    document.querySelectorAll('.num-group-chip').forEach(b=>b.addEventListener('click',()=>{
+      startNumStudio(+b.dataset.ng);
+    }));
+    document.querySelectorAll('.scenario-tile').forEach(b=>b.addEventListener('click',()=>{
+      startScenario(b.dataset.sc);
+    }));
   } else {
     document.getElementById('changeBtn')?.addEventListener('click',()=>{
       state.started=false; state.rev={queue:[],idx:0,correct:0,total:0,reveal:false,typed:'',lastResult:'',showPraise:null};
@@ -1213,6 +1371,7 @@ function renderPractice() {
 
   renderReview();
   renderNumDrill();
+  renderScenario();
 }
 
 // ── Number drill: build mixed card queue from a group ─────────────────────────
@@ -1247,6 +1406,48 @@ function buildNumQueue(gi) {
 }
 
 // ── Number drill: render ───────────────────────────────────────────────────────
+function speakIt(text){
+  if('speechSynthesis' in window){ window.speechSynthesis.cancel(); window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(text),{lang:'it-IT'})); }
+}
+
+function startNumStudio(gi){
+  const items = NUM_GROUPS[gi].pairs.map(([sp,en],i)=>({sp,en,val:NUM_VALUES[gi][i],origIdx:i}));
+  state.numDrill = {active:true,stage:'order',group:gi,idx:0,reveal:false,correct:0,total:0,queue:null,
+    order:{chips:shuffle([...items]),next:0,locked:new Set(),wrong:null},
+    match:null};
+  renderPractice();
+}
+
+function startNumMatch(){
+  const nd=state.numDrill, gi=nd.group;
+  const items = NUM_GROUPS[gi].pairs.map(([sp,en],i)=>({sp,en,val:NUM_VALUES[gi][i],origIdx:i}));
+  const rounds=[]; const pool=shuffle([...items]);
+  for(let i=0;i<pool.length;i+=4) rounds.push(pool.slice(i,i+4));
+  // merge a lone last item into the previous round
+  if(rounds.length>1 && rounds[rounds.length-1].length===1){ rounds[rounds.length-2].push(rounds.pop()[0]); }
+  nd.stage='match';
+  nd.match={rounds,round:0,chips:null,matched:new Set(),sel:null,wrong:null};
+  buildMatchRound();
+  renderPractice();
+}
+
+function buildMatchRound(){
+  const m=state.numDrill.match;
+  const items=m.rounds[m.round];
+  m.chips=shuffle([
+    ...items.map(it=>({kind:'digit',text:fmtNum(it.val),pid:it.origIdx,sp:it.sp})),
+    ...items.map(it=>({kind:'word', text:it.sp,        pid:it.origIdx,sp:it.sp})),
+  ]);
+  m.matched=new Set(); m.sel=null; m.wrong=null;
+}
+
+function startNumQuiz(){
+  const nd=state.numDrill;
+  nd.stage='quiz'; nd.idx=0; nd.reveal=false; nd.correct=0; nd.total=0;
+  nd.queue=buildNumQueue(nd.group);
+  renderPractice();
+}
+
 function renderNumDrill() {
   const host = document.getElementById('numDrillArea');
   if(!host) return;
@@ -1254,6 +1455,102 @@ function renderNumDrill() {
   if(!nd.active){ host.innerHTML=''; return; }
 
   const g = NUM_GROUPS[nd.group];
+
+  // ── Stage 1: put them in order ────────────────────────────────────────────
+  if(nd.stage==='order'){
+    const o=nd.order;
+    const done=o.locked.size===o.chips.length;
+    host.innerHTML=`<div class="card anim-pop">
+      <div class="ex-label">
+        <span class="pill blue">🔢 ${esc(g.label)} — Step 1 of 3</span>
+        <span class="pill green">${o.locked.size}/${o.chips.length}</span>
+        <button class="btn-icon" id="nStopBtn" title="Stop" style="margin-left:auto;">✕</button>
+      </div>
+      <div class="task-hint">Tap the numbers in order, smallest first. Each one is spoken as you get it.</div>
+      <div class="match-grid" style="grid-template-columns:1fr 1fr 1fr;">
+        ${o.chips.map((c,i)=>{
+          const locked=o.locked.has(c.origIdx);
+          let cls='match-chip it'+(locked?' matched':'')+(o.wrong===i?' wrong':'');
+          return `<button class="${cls}" data-oi="${i}" style="${locked?'opacity:.75;':''}">${locked?fmtNum(c.val)+' · ':''}${esc(c.sp)}</button>`;
+        }).join('')}
+      </div>
+      ${done
+        ? `<div class="action-row" style="margin-top:14px;justify-content:center;"><button class="btn primary" id="nToMatchBtn">Step 2: Match →</button></div>`
+        : `<div class="action-row" style="margin-top:10px;justify-content:center;"><button class="btn" id="nSkipStageBtn">Skip to matching</button></div>`}
+    </div>`;
+    host.querySelectorAll('[data-oi]').forEach(b=>b.addEventListener('click',()=>{
+      if(done) return;
+      const i=+b.dataset.oi, c=nd.order.chips[i];
+      if(o.locked.has(c.origIdx)||o.wrong!==null) return;
+      if(c.origIdx===o.next){
+        o.locked.add(c.origIdx); o.next++;
+        speakIt(c.sp);
+        renderNumDrill();
+      } else {
+        o.wrong=i; renderNumDrill();
+        setTimeout(()=>{ o.wrong=null; renderNumDrill(); },500);
+      }
+    }));
+    document.getElementById('nToMatchBtn')?.addEventListener('click',startNumMatch);
+    document.getElementById('nSkipStageBtn')?.addEventListener('click',startNumMatch);
+    document.getElementById('nStopBtn')?.addEventListener('click',()=>{ nd.active=false; renderPractice(); });
+    return;
+  }
+
+  // ── Stage 2: match digits ↔ words ─────────────────────────────────────────
+  if(nd.stage==='match'){
+    const m=nd.match;
+    const items=m.rounds[m.round];
+    const allDone=m.matched.size===items.length;
+    const lastRound=m.round===m.rounds.length-1;
+    host.innerHTML=`<div class="card anim-pop">
+      <div class="ex-label">
+        <span class="pill purple">🔢 ${esc(g.label)} — Step 2 of 3</span>
+        <span class="pill yellow">Round ${m.round+1}/${m.rounds.length}</span>
+        <span class="pill green">${m.matched.size}/${items.length}</span>
+        <button class="btn-icon" id="nStopBtn" title="Stop" style="margin-left:auto;">✕</button>
+      </div>
+      <div class="task-hint">Tap a digit, then the Italian word that matches (or vice versa).</div>
+      <div class="match-grid">
+        ${m.chips.map((c,i)=>{
+          let cls='match-chip '+(c.kind==='digit'?'en':'it');
+          if(m.matched.has(c.pid)) cls+=' matched';
+          else if(m.sel===i) cls+=' selected';
+          else if(m.wrong&&(m.wrong.a===i||m.wrong.b===i)) cls+=' wrong';
+          return `<button class="${cls}" data-mi="${i}">${esc(c.text)}</button>`;
+        }).join('')}
+      </div>
+      ${allDone
+        ? `<div class="action-row" style="margin-top:14px;justify-content:center;"><button class="btn primary" id="nMatchNextBtn">${lastRound?'Step 3: Quiz →':'Next round →'}</button></div>`
+        : `<div class="action-row" style="margin-top:10px;justify-content:center;"><button class="btn" id="nSkipStageBtn">Skip to quiz</button></div>`}
+    </div>`;
+    host.querySelectorAll('[data-mi]').forEach(b=>b.addEventListener('click',()=>{
+      if(allDone||m.wrong) return;
+      const i=+b.dataset.mi, c=m.chips[i];
+      if(m.matched.has(c.pid)) return;
+      if(c.kind==='word') speakIt(c.sp);
+      if(m.sel===null){ m.sel=i; renderNumDrill(); }
+      else if(m.sel===i){ m.sel=null; renderNumDrill(); }
+      else{
+        const other=m.chips[m.sel];
+        if(other.pid===c.pid && other.kind!==c.kind){
+          m.matched.add(c.pid); m.sel=null; renderNumDrill();
+        } else {
+          m.wrong={a:m.sel,b:i}; renderNumDrill();
+          setTimeout(()=>{ m.wrong=null; m.sel=null; renderNumDrill(); },550);
+        }
+      }
+    }));
+    document.getElementById('nMatchNextBtn')?.addEventListener('click',()=>{
+      if(lastRound) startNumQuiz();
+      else { m.round++; buildMatchRound(); renderNumDrill(); }
+    });
+    document.getElementById('nSkipStageBtn')?.addEventListener('click',startNumQuiz);
+    document.getElementById('nStopBtn')?.addEventListener('click',()=>{ nd.active=false; renderPractice(); });
+    return;
+  }
+
+  // ── Stage 3: quiz (mixed card types) ──────────────────────────────────────
   const card = nd.queue ? nd.queue[nd.idx] : null;
   const pct = nd.queue ? Math.round((nd.idx/nd.queue.length)*100) : 0;
 
@@ -1271,7 +1568,7 @@ function renderNumDrill() {
       </div>
     </div>`;
     document.getElementById('nRepeatBtn')?.addEventListener('click',()=>{ nd.idx=0; nd.reveal=false; nd.correct=0; nd.total=0; nd.queue=buildNumQueue(nd.group); renderNumDrill(); renderPractice(); });
-    document.getElementById('nNextGroupBtn')?.addEventListener('click',()=>{ nd.group++; nd.idx=0; nd.reveal=false; nd.correct=0; nd.total=0; nd.queue=buildNumQueue(nd.group); renderNumDrill(); renderPractice(); });
+    document.getElementById('nNextGroupBtn')?.addEventListener('click',()=>{ startNumStudio(nd.group+1); });
     document.getElementById('nStopBtn')?.addEventListener('click',()=>{ nd.active=false; renderNumDrill(); renderPractice(); });
     return;
   }
@@ -1331,6 +1628,120 @@ function renderNumDrill() {
       setTimeout(()=>renderNumDrill(), 800);
     }
   }));
+}
+
+// ── Scenarios: conversation role-play ─────────────────────────────────────────
+function startScenario(id){
+  const sc=SCENARIOS.find(s=>s.id===id); if(!sc) return;
+  state.scenario={active:true,id,step:0,correct:0,total:0,picked:null,choiceOrder:null,transcript:[]};
+  renderPractice();
+  const first=sc.steps[0]; if(first) setTimeout(()=>speakIt(first.npc),350);
+}
+
+function scenarioChoices(step, st){
+  if(!st.choiceOrder){
+    st.choiceOrder=shuffle([{t:step.good,ok:true,en:step.goodEn}, ...step.wrong.map(w=>({t:w.t,ok:false,why:w.why}))]);
+  }
+  return st.choiceOrder;
+}
+
+function renderScenario(){
+  const host=document.getElementById('scenarioArea');
+  if(!host) return;
+  const st=state.scenario;
+  if(!st.active){ host.innerHTML=''; return; }
+  const sc=SCENARIOS.find(s=>s.id===st.id);
+  const step=sc.steps[st.step];
+
+  // Completed
+  if(!step){
+    const acc=st.total?Math.round(st.correct/st.total*100):0;
+    host.innerHTML=`<div class="card anim-pop">
+      <div style="text-align:center;padding:6px 0 2px;">
+        <div style="font-size:2.5rem;">${acc>=90?'🏆':acc>=70?'🎉':'💪'}</div>
+        <div style="font-weight:900;font-size:1.2rem;margin:4px 0 2px;">${sc.icon} ${esc(sc.title)} — complete!</div>
+        <div class="muted small" style="margin-bottom:12px;">${acc}% on the first try. Here's the whole conversation:</div>
+      </div>
+      <div class="sc-transcript">
+        ${st.transcript.map(t=>`
+          <div class="sc-line them"><span class="sc-who">🇮🇹</span><span><strong>${esc(t.npc)}</strong><br><span class="muted small">${esc(t.npcEn)}</span></span></div>
+          <div class="sc-line you"><span><strong>${esc(t.you)}</strong><br><span class="muted small">${esc(t.youEn)}</span></span><span class="sc-who">🙋</span></div>
+        `).join('')}
+      </div>
+      <div class="action-row" style="justify-content:center;margin-top:14px;">
+        <button class="btn primary" id="scReplayBtn">🔊 Hear it all</button>
+        <button class="btn big2" id="scAgainBtn">↺ Play again</button>
+        <button class="btn big2" id="scExitBtn">✕ Done</button>
+      </div>
+    </div>`;
+    document.getElementById('scReplayBtn')?.addEventListener('click',()=>{
+      if(!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      st.transcript.forEach(t=>{
+        const u1=Object.assign(new SpeechSynthesisUtterance(t.npc),{lang:'it-IT'});
+        const u2=Object.assign(new SpeechSynthesisUtterance(t.you),{lang:'it-IT'});
+        window.speechSynthesis.speak(u1); window.speechSynthesis.speak(u2);
+      });
+    });
+    document.getElementById('scAgainBtn')?.addEventListener('click',()=>startScenario(st.id));
+    document.getElementById('scExitBtn')?.addEventListener('click',()=>{ st.active=false; renderPractice(); });
+    return;
+  }
+
+  const choices=scenarioChoices(step, st);
+  const answered=st.picked!==null && choices[st.picked]?.ok;
+  host.innerHTML=`<div class="card anim-pop">
+    <div class="ex-label">
+      <span class="pill purple">${sc.icon} ${esc(sc.title)}</span>
+      <span class="pill yellow">${st.step+1} / ${sc.steps.length}</span>
+      <button class="btn-icon" id="scStopBtn" title="Stop" style="margin-left:auto;">✕</button>
+    </div>
+    <div class="sc-line them" style="margin-top:6px;">
+      <span class="sc-who">🇮🇹</span>
+      <span><strong style="font-size:1.05rem;">${esc(step.npc)}</strong>
+        <button class="speak-btn" id="scHearBtn" style="padding:2px 10px;font-size:.8rem;margin-left:6px;">🔊</button>
+        <br><span class="muted small">${esc(step.npcEn)}</span></span>
+    </div>
+    <div class="task-hint" style="margin:12px 0 8px;font-weight:700;">🎯 ${esc(step.task)}</div>
+    <div class="choices">
+      ${choices.map((c,i)=>{
+        let cls='choice';
+        if(st.picked===i) cls+=c.ok?' correct':' wrong';
+        else if(answered&&c.ok) cls+=' correct';
+        return `<button class="${cls}" data-sci="${i}">${esc(c.t)}</button>`;
+      }).join('')}
+    </div>
+    ${st.whyMsg?`<div class="feedback-bar wrong anim-pop">🤔 ${esc(st.whyMsg)}</div>`:''}
+    ${answered?`
+      <div class="feedback-bar correct anim-pop">✓ ${esc(choices.find(c=>c.ok).en)}</div>
+      <div class="action-row" style="margin-top:10px;"><button class="btn primary" id="scNextBtn">${st.step+1<sc.steps.length?'Next →':'Finish 🎉'}</button></div>
+    `:''}
+  </div>`;
+
+  document.getElementById('scHearBtn')?.addEventListener('click',()=>speakIt(step.npc));
+  document.getElementById('scStopBtn')?.addEventListener('click',()=>{ st.active=false; renderPractice(); });
+  host.querySelectorAll('[data-sci]').forEach(b=>b.addEventListener('click',()=>{
+    if(answered) return;
+    const i=+b.dataset.sci, c=choices[i];
+    st.total++;
+    if(c.ok){
+      st.correct += (st.picked===null && !st.hadWrong) ? 1 : 0;
+      st.picked=i; st.whyMsg=null;
+      speakIt(c.t);
+      renderScenario();
+    } else {
+      st.hadWrong=true; st.picked=i; st.whyMsg=c.why;
+      renderScenario();
+      setTimeout(()=>{ st.picked=null; renderScenario(); },1400);
+    }
+  }));
+  document.getElementById('scNextBtn')?.addEventListener('click',()=>{
+    const good=choices.find(c=>c.ok);
+    st.transcript.push({npc:step.npc,npcEn:step.npcEn,you:good.t,youEn:good.en});
+    st.step++; st.picked=null; st.choiceOrder=null; st.whyMsg=null; st.hadWrong=false;
+    renderScenario();
+    const nxt=sc.steps[st.step]; if(nxt) setTimeout(()=>speakIt(nxt.npc),300);
+  });
 }
 
 function renderReview() {
@@ -1487,7 +1898,7 @@ function renderReview() {
     </div>
     <div class="task-hint">${esc(card.taskText)}</div>
     ${promptHTML}
-    ${card.context?`<div class="word-context">💬 <em>${esc(card.context)}</em></div>`:''}
+    ${card.context?`<button class="word-context" id="ctxSpeakBtn" title="Tap to hear this sentence">🔊 <em>${esc(card.context)}</em></button>`:''}
     ${hintHTML||''}
     ${speakHTML}${inputHTML}${choicesHTML}${actionHTML}${feedbackHTML}
   </div>`;
@@ -1506,6 +1917,8 @@ function renderReview() {
   document.getElementById('speakBtn')?.addEventListener('click',()=>{
     if('speechSynthesis'in window){window.speechSynthesis.cancel();window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(card.speak),{lang:'it-IT'}));}
   });
+
+  document.getElementById('ctxSpeakBtn')?.addEventListener('click',()=>speakIt(card.context));
 
   document.getElementById('checkBtn')?.addEventListener('click',()=>{
     const t=(document.getElementById('ans')?.value||'').trim(); rev.typed=t; rev.total++;
