@@ -311,6 +311,10 @@ body{margin:0;font-family:'Nunito',ui-sans-serif,system-ui,sans-serif;background
 .sc-line.you{justify-content:flex-end;text-align:right}
 .sc-line .sc-who{font-size:1.3rem;flex-shrink:0}
 .sc-transcript{background:#f8fafc;border-radius:12px;padding:10px 14px;max-height:340px;overflow-y:auto}
+
+.sc-band-label{font-size:.78rem;font-weight:900;text-transform:uppercase;letter-spacing:.05em;color:#b45309;margin:12px 0 6px}
+.sc-band-label:first-of-type{margin-top:2px}
+.sc-best{font-size:.72rem;font-weight:800;color:#b45309;background:#fef3c7;border-radius:999px;padding:2px 8px;margin-top:3px}
 </style>
 </head>
 <body>
@@ -547,8 +551,12 @@ const fmtNum = v => v.toLocaleString('en-US');
 // ── Scenario conversations (uses lesson 1–10 + Other Sources vocab) ──────────
 // Each step: npc line (+ English), your task, the correct reply, and wrong
 // options with a short "why not" hint.
+const SCENARIO_BANDS = [
+  {band:1, label:'Lessons 1–9',   hint:'Greetings, opinions, ordering basics'},
+  {band:2, label:'Lessons 10–18', hint:'Paying, renting, taxi, hotel, telling time'},
+];
 const SCENARIOS = [
-  {id:'bar', icon:'☕', title:'Al bar', desc:'Order coffee like a local', steps:[
+  {id:'bar', band:1, icon:'☕', title:'Al bar', desc:'Order coffee like a local', steps:[
     {npc:'Buongiorno! Prego?', npcEn:'Good morning! What can I get you?',
      task:'Order a coffee, politely.',
      good:'Vorrei un caffè, per favore.', goodEn:'I would like a coffee, please.',
@@ -575,7 +583,7 @@ const SCENARIOS = [
      wrong:[{t:'No, grazie.', why:'"No, thanks"? You already drank it!'},
             {t:'Il conto non è perfetto.', why:'Disputing a 3-euro bill is a bold move.'}]},
   ]},
-  {id:'ristorante', icon:'🍝', title:'Al ristorante', desc:'Dinner for two, start to finish', steps:[
+  {id:'ristorante', band:1, icon:'🍝', title:'Al ristorante', desc:'Dinner for two, start to finish', steps:[
     {npc:'Buonasera! Prego?', npcEn:'Good evening! Can I help you?',
      task:'You\'d like a table for two.',
      good:'Vorrei un tavolo per due persone, per favore.', goodEn:'I would like a table for two people, please.',
@@ -607,7 +615,7 @@ const SCENARIOS = [
      wrong:[{t:'Il conto è terribile. Ciao.', why:'"The bill is terrible. Bye." Technically Italian. Socially… no.'},
             {t:'Non è molto buono.', why:'Ending on "it\'s not very good" after saying everything was exquisite?'}]},
   ]},
-  {id:'incontro', icon:'👋', title:'Piacere!', desc:'Meet someone new', steps:[
+  {id:'incontro', band:1, icon:'👋', title:'Piacere!', desc:'Meet someone new', steps:[
     {npc:'Salve!', npcEn:'Hello!',
      task:'Greet back and ask how it\'s going.',
      good:'Salve! Come va?', goodEn:'Hello! How\'s it going?',
@@ -634,7 +642,7 @@ const SCENARIOS = [
      wrong:[{t:'Permesso?', why:'That\'s for squeezing past someone in a crowd.'},
             {t:'Il libro è caro.', why:'"The book is expensive" — what book? Marco is confused.'}]},
   ]},
-  {id:'chiacchiere', icon:'💬', title:'Due chiacchiere', desc:'Small talk with a friend', steps:[
+  {id:'chiacchiere', band:1, icon:'💬', title:'Due chiacchiere', desc:'Small talk with a friend', steps:[
     {npc:'Ciao! Come va?', npcEn:'Hi! How\'s it going?',
      task:'Going well — and you? (informal)',
      good:'Bene, grazie! E tu?', goodEn:'Well, thanks! And you?',
@@ -660,6 +668,120 @@ const SCENARIOS = [
      good:'Ci vediamo! Buona serata!', goodEn:'See you! Have a good evening!',
      wrong:[{t:'Buongiorno!', why:'"Good morning" at the end of an evening chat — time travel.'},
             {t:'Scusi, dov\'è?', why:'"Excuse me, where is…?" Where is what? The chat is over.'}]},
+  ]},
+  // ── Band 2: lessons 10–18 (paying, renting, taxi, hotel, times) ──────────
+  {id:'noleggio', band:2, icon:'🚗', title:'Autonoleggio', desc:'Rent a car for the trip', steps:[
+    {npc:'Buongiorno! Prego?', npcEn:'Good morning! Can I help you?',
+     task:'You want to rent a car.',
+     good:'Vorrei noleggiare una macchina, per favore.', goodEn:'I would like to rent a car, please.',
+     wrong:[{t:'Vorrei affittare una camera.', why:'"Affittare" is for renting housing — and a room isn\'t a car.'},
+            {t:'La macchina non funziona.', why:'Complaining that the car doesn\'t work — before you even have one.'}]},
+    {npc:'Certo! Per quanto tempo?', npcEn:'Sure! For how long?',
+     task:'For two weeks, please.',
+     good:'Per due settimane, per favore.', goodEn:'For two weeks, please.',
+     wrong:[{t:'Per due persone, per favore.', why:'They asked how long, not for how many people.'},
+            {t:'Alle otto di mattina.', why:'"At eight in the morning" answers a when-question — a different one.'}]},
+    {npc:'Va bene. Una macchina piccola?', npcEn:'Alright. A small car?',
+     task:'Yes — and ask how much it costs.',
+     good:'Sì. Quanto costa?', goodEn:'Yes. How much does it cost?',
+     wrong:[{t:'Sì. Dov\'è la spiaggia?', why:'The beach can wait — you\'re mid-transaction.'},
+            {t:'No, il conto per favore.', why:'Asking for the bill at a rental desk — there\'s nothing to pay yet.'}]},
+    {npc:'Trecento euro per due settimane.', npcEn:'Three hundred euros for two weeks.',
+     task:'Ask if you can pay by card.',
+     good:'Posso pagare con carta?', goodEn:'Can I pay by card?',
+     wrong:[{t:'Posso pagare ieri?', why:'"Can I pay yesterday?" — not without a time machine.'},
+            {t:'Voglio pagare a persona.', why:'"Per person" pricing is for hotels, not one car.'}]},
+    {npc:'Certo! Ecco la chiave.', npcEn:'Of course! Here\'s the key.',
+     task:'Say thanks and goodbye.',
+     good:'Grazie! Arrivederci!', goodEn:'Thank you! Goodbye!',
+     wrong:[{t:'No, grazie.', why:'"No thanks"? You just rented it!'},
+            {t:'L\'auto è terribile.', why:'Reviewing the car as terrible while taking the key — bold.'}]},
+  ]},
+  {id:'hotel', band:2, icon:'🏨', title:'In hotel', desc:'Check in & ask about breakfast', steps:[
+    {npc:'Buonasera! Prego?', npcEn:'Good evening! Can I help you?',
+     task:'You would like a room, please.',
+     good:'Vorrei una camera, per favore.', goodEn:'I would like a room, please.',
+     wrong:[{t:'Vorrei una macchina, per favore.', why:'A car? This is the hotel front desk.'},
+            {t:'La camera non funziona.', why:'You don\'t even have a room yet to complain about.'}]},
+    {npc:'Per quante persone?', npcEn:'For how many people?',
+     task:'For two people, for one week.',
+     good:'Per due persone, per una settimana.', goodEn:'For two people, for one week.',
+     wrong:[{t:'Per otto persone, per un anno.', why:'Eight people for a year — that\'s a lease, not a stay.'},
+            {t:'A che ora è la cena?', why:'Dinner time matters, but answer their question first.'}]},
+    {npc:'Perfetto. Quaranta euro a persona, a notte.', npcEn:'Perfect. Forty euros per person, per night.',
+     task:'Ask: can I pay by card?',
+     good:'Posso pagare con carta?', goodEn:'Can I pay by card?',
+     wrong:[{t:'Voglio la colazione in contanti.', why:'"I want breakfast in cash" — a puzzling meal plan.'},
+            {t:'Quanto costa il taxi?', why:'Taxi prices are a question for the taxi driver.'}]},
+    {npc:'Certo. Ecco la chiave della camera.', npcEn:'Of course. Here\'s the room key.',
+     task:'Ask at what time breakfast is.',
+     good:'A che ora è la colazione?', goodEn:'At what time is breakfast?',
+     wrong:[{t:'Che ora è?', why:'That asks the time right now — not when breakfast is served.'},
+            {t:'A che ora è la spiaggia?', why:'The beach doesn\'t have opening hours.'}]},
+    {npc:'Alle otto di mattina.', npcEn:'At eight in the morning.',
+     task:'Say thanks — the hotel is fantastic.',
+     good:'Grazie! L\'hotel è fantastico.', goodEn:'Thank you! The hotel is fantastic.',
+     wrong:[{t:'Grazie! L\'hotel è terribile.', why:'Thanking them while calling the hotel terrible — mixed signals.'},
+            {t:'Il televisore non funziona.', why:'You haven\'t even seen the room yet.'}]},
+    {npc:'Grazie! Buonasera!', npcEn:'Thank you! Good evening!',
+     task:'Good evening — everything is perfect!',
+     good:'Buonasera! Tutto è perfetto.', goodEn:'Good evening! Everything is perfect.',
+     wrong:[{t:'Buongiorno! Tutto è cattivo.', why:'Wrong time of day AND a harsh review.'},
+            {t:'Scusi, quanto costa?', why:'You already know the price — forty a head, remember?'}]},
+  ]},
+  {id:'taxi', band:2, icon:'🚕', title:'In taxi', desc:'Get where you\'re going', steps:[
+    {npc:'Buongiorno! Dove?', npcEn:'Good morning! Where to?',
+     task:'To the hotel, please.',
+     good:'All\'hotel, per favore.', goodEn:'To the hotel, please.',
+     wrong:[{t:'Alla settimana, per favore.', why:'"To the week" — not a destination a taxi can reach.'},
+            {t:'Il taxi è qui.', why:'Yes… you\'re in it. The driver knows.'}]},
+    {npc:'Qual è l\'indirizzo?', npcEn:'What\'s the address?',
+     task:'Say: Via Roma, fifteen.',
+     good:'Via Roma, quindici.', goodEn:'Via Roma, fifteen.',
+     wrong:[{t:'Alle cinque e mezza.', why:'"At half past five" is a time, not an address.'},
+            {t:'Quanto costa la casa?', why:'House prices are a chat for another day.'}]},
+    {npc:'Va bene!', npcEn:'Alright!',
+     task:'Ask how much it costs.',
+     good:'Quanto costa, per favore?', goodEn:'How much does it cost, please?',
+     wrong:[{t:'Quanto costa la colazione?', why:'Asking breakfast prices — in a taxi.'},
+            {t:'Dov\'è il taxi?', why:'You\'re sitting in it.'}]},
+    {npc:'Dieci euro.', npcEn:'Ten euros.',
+     task:'Say: and tomorrow, to the beach!',
+     good:'E domani, alla spiaggia!', goodEn:'And tomorrow, to the beach!',
+     wrong:[{t:'E ieri, alla spiaggia!', why:'"And yesterday, to the beach" — taxis can\'t drive into the past.'},
+            {t:'E il formaggio, per favore.', why:'"And the cheese, please" — this isn\'t a delicatessen.'}]},
+    {npc:'Perfetto! Ecco l\'hotel.', npcEn:'Perfect! Here\'s the hotel.',
+     task:'Say thanks and goodbye.',
+     good:'Grazie! Arrivederci!', goodEn:'Thank you! Goodbye!',
+     wrong:[{t:'Grazie! A che ora?', why:'"At what time?" — at what time what? The ride is over.'},
+            {t:'L\'indirizzo non è perfetto.', why:'Criticizing the address you gave them yourself.'}]},
+  ]},
+  {id:'orari', band:2, icon:'🕐', title:'A che ora?', desc:'Meal times, told in Italian', steps:[
+    {npc:'Buongiorno! Prego?', npcEn:'Good morning! Can I help you?',
+     task:'Ask at what time breakfast is.',
+     good:'A che ora è la colazione?', goodEn:'At what time is breakfast?',
+     wrong:[{t:'Dov\'è la colazione?', why:'Where vs when — you want the time, not the location.'},
+            {t:'Quanto costa il pranzo?', why:'That asks the price of lunch — different question entirely.'}]},
+    {npc:'La colazione è alle sette e mezza.', npcEn:'Breakfast is at half past seven.',
+     task:'And lunch? Ask what time it is at.',
+     good:'A che ora è il pranzo?', goodEn:'At what time is lunch?',
+     wrong:[{t:'A che ora è il taxi?', why:'The taxi doesn\'t have a schedule here — meals do.'},
+            {t:'Il pranzo è terribile.', why:'Reviewing a lunch you haven\'t eaten yet.'}]},
+    {npc:'All\'una di pomeriggio.', npcEn:'At one in the afternoon.',
+     task:'And dinner, please?',
+     good:'E la cena, per favore?', goodEn:'And dinner, please?',
+     wrong:[{t:'E la macchina, per favore?', why:'"And the car, please?" — we\'re listing meals, not vehicles.'},
+            {t:'La cena è per lui.', why:'"Dinner is for him" — nobody asked whose dinner it is.'}]},
+    {npc:'Alle otto di sera.', npcEn:'At eight in the evening.',
+     task:'Repeat it back: dinner is at eight in the evening — perfect!',
+     good:'La cena è alle otto di sera. Perfetto!', goodEn:'Dinner is at eight in the evening. Perfect!',
+     wrong:[{t:'La cena è alle otto di mattina.', why:'Dinner at eight in the MORNING — that\'s just breakfast with ambition.'},
+            {t:'La colazione è di sera.', why:'Breakfast in the evening — you\'ve reversed the whole day.'}]},
+    {npc:'Sì! A dopo!', npcEn:'Yes! See you later!',
+     task:'Say thanks — see you later!',
+     good:'Grazie! A dopo!', goodEn:'Thanks! See you later!',
+     wrong:[{t:'Grazie! Buonanotte!', why:'It\'s morning — "good night" is for bedtime.'},
+            {t:'Che ore sono?', why:'Asking the time out of nowhere — the schedule talk is done.'}]},
   ]},
 ];
 
@@ -882,6 +1004,7 @@ const state = {
   verbDrill:{queue:[],idx:0,reveal:false,correct:0,total:0}, // simple drill, no SRS
   numDrill:{active:false,stage:'order',group:0,idx:0,reveal:false,correct:0,total:0,queue:null,order:null,match:null}, // Numbers Studio
   scenario:{active:false,id:null,step:0,correct:0,total:0,picked:null,choiceOrder:null,transcript:[]}, // conversation scenarios
+  scenarioBest:{}, // per-scenario best first-try accuracy
   challengeProgress:[], // {correct, attempts} per CHALLENGES index; 3 correct = star
 };
 
@@ -893,7 +1016,7 @@ function initChallengeProgress(saved=[]) {
   return CHALLENGES.map((_,i)=>saved[i]||{correct:0,attempts:0});
 }
 
-function saveState() { localStorage.setItem(STORAGE_KEY,JSON.stringify({lessons:state.lessons,selLessons:state.selLessons,selPacks:state.selPacks,phraseProgress:state.phraseProgress,challengeProgress:state.challengeProgress,listenFirst:!!state.listenFirst})); }
+function saveState() { localStorage.setItem(STORAGE_KEY,JSON.stringify({lessons:state.lessons,selLessons:state.selLessons,selPacks:state.selPacks,phraseProgress:state.phraseProgress,challengeProgress:state.challengeProgress,listenFirst:!!state.listenFirst,scenarioBest:state.scenarioBest||{}})); }
 
 function loadState() {
   const seeded = buildSeeded();
@@ -907,6 +1030,7 @@ function loadState() {
     state.phraseProgress   = initPhraseProgress(p.phraseProgress||[]);
     state.challengeProgress= initChallengeProgress(p.challengeProgress||[]);
     state.listenFirst      = !!p.listenFirst;
+    state.scenarioBest     = p.scenarioBest||{};
   } catch { state.lessons=seeded; state.selLessons=defaultLessonIds(seeded); state.selPacks=[]; state.phraseProgress=initPhraseProgress(); state.challengeProgress=initChallengeProgress(); }
 }
 
@@ -1291,13 +1415,19 @@ function renderPractice() {
     <div class="card" style="margin-top:14px;background:linear-gradient(135deg,#fff7e8,#ffe8f3);border-color:#f8c98d;">
       <h3 style="margin:0 0 4px;">🎭 Scenarios</h3>
       <div class="muted small" style="margin-bottom:10px;">Play out a real conversation — pick the right reply at each turn. Uses lesson 1–10 vocab.</div>
-      <div class="scenario-grid">
-        ${SCENARIOS.map(s=>`<button class="scenario-tile" data-sc="${s.id}">
-          <span class="sc-icon">${s.icon}</span>
-          <span class="sc-title">${esc(s.title)}</span>
-          <span class="sc-desc">${esc(s.desc)}</span>
-        </button>`).join('')}
-      </div>
+      ${SCENARIO_BANDS.map(b=>`
+        <div class="sc-band-label">${esc(b.label)} <span class="muted small" style="font-weight:400;">· ${esc(b.hint)}</span></div>
+        <div class="scenario-grid">
+          ${SCENARIOS.filter(s=>s.band===b.band).map(s=>{
+            const best=(state.scenarioBest||{})[s.id];
+            return `<button class="scenario-tile" data-sc="${s.id}">
+              <span class="sc-icon">${s.icon}</span>
+              <span class="sc-title">${esc(s.title)}</span>
+              <span class="sc-desc">${esc(s.desc)}</span>
+              ${best!=null?`<span class="sc-best">${best>=90?'🏆':'⭐'} ${best}%</span>`:''}
+            </button>`;
+          }).join('')}
+        </div>`).join('')}
     </div>`;
 
   const _rq=state.rev, _prog=_rq.queue.length?Math.min(1,_rq.idx/_rq.queue.length):0;
@@ -1656,6 +1786,8 @@ function renderScenario(){
   // Completed
   if(!step){
     const acc=st.total?Math.round(st.correct/st.total*100):0;
+    state.scenarioBest=state.scenarioBest||{};
+    if(acc>(state.scenarioBest[st.id]??-1)){ state.scenarioBest[st.id]=acc; saveState(); }
     host.innerHTML=`<div class="card anim-pop">
       <div style="text-align:center;padding:6px 0 2px;">
         <div style="font-size:2.5rem;">${acc>=90?'🏆':acc>=70?'🎉':'💪'}</div>
