@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fretwork — Guitar Note &amp; Chord Trainer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Outfit:wght@400;600;700;800&display=swap" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; background: #211812; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+
+/* Storage adapter: works in the Claude canvas (window.storage),
+   a normal browser / GitHub Pages (localStorage), or falls back to memory. */
+const MEM = {};
+const Store = {
+  async get(key) {
+    try { if (window.storage && window.storage.get) { const r = await window.storage.get(key); return r ? r.value : null; } } catch (e) {}
+    try { const v = localStorage.getItem(key); if (v != null) return v; } catch (e) {}
+    return MEM[key] ?? null;
+  },
+  async set(key, value) {
+    try { if (window.storage && window.storage.set) { await window.storage.set(key, value); return; } } catch (e) {}
+    try { localStorage.setItem(key, value); return; } catch (e) {}
+    MEM[key] = value;
+  },
+};
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+/* ============================================================
+   FRETWORK — Guitar Note & Chord Trainer
+   - Karplus-Strong plucked-string audio (real guitar-ish tone)
+   - Note trainer: 6 levels, frets 0-3 up to the full neck
+   - Chord trainer: open → 7ths → barre → CAGED → inversions
+   - Chord library with strum & arpeggio playback
+   - Progress tracking with fretboard heatmap (persistent)
+   ============================================================ */
+
+/* ---------------- Music data ---------------- */
+const NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const NATURALS = ["C", "D", "E", "F", "G", "A", "B"];
+const OPEN_FREQ = [82.41, 110.0, 146.83, 196.0, 246.94, 329.63]; // low E -> high E
+const OPEN_PC = [4, 9, 2, 7, 11, 4]; // pitch classes of open strings
+const STRING_NAMES = ["E (low)", "A", "D", "G", "B", "E (high)"];
+const noteAt = (s, f) => NOTES[(OPEN_PC[s] + f) % 12];
+const freqAt = (s, f) => OPEN_FREQ[s] * Math.pow(2, f / 12);
+
+/* Interval color code (matches the classic CAGED chart: R red, 3rd blue, 5th yellow) */
+const rootPcOf = (name) => {
+  const m = name.match(/^([A-G])(#|b)?/);
+  let pc = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]];
+  if (m && m[2] === "#") pc = (pc + 1) % 12;
+  if (m && m[2] === "b") pc = (pc + 11) % 12;
+  return pc;
+};
+const IV_COLORS = {
+  0: { label: "R", color: "#D6453C", text: "#FFF3EA" },
+  1: { label: "♭9", color: "#D77BA8", text: "#3A0F22" },
+  3: { label: "♭3", color: "#3E7CC4", text: "#F0F6FF" },
+  4: { label: "3", color: "#3E7CC4", text: "#F0F6FF" },
+  6: { label: "♭5", color: "#EFC94C", text: "#3A2B08" },
+  7: { label: "5", color: "#EFC94C", text: "#3A2B08" },
+  9: { label: "6", color: "#A47CC7", text: "#F6EFFC" },
+  10: { label: "♭7", color: "#6FA05C", text: "#F2FFE9" },
+  11: { label: "7", color: "#6FA05C", text: "#F2FFE9" },
+};
+const DEGREE_LABEL = { 0: "R", 1: "♭2", 2: "2", 3: "♭3", 4: "3", 5: "4", 6: "♭5", 7: "5", 8: "♭6", 9: "6", 10: "♭7", 11: "7" };
+const SCALES = [
+  { id: "maj", name: "Major", ivs: [0, 2, 4, 5, 7, 9, 11] },
+  { id: "majp", name: "Major Pentatonic", ivs: [0, 2, 4, 7, 9] },
+  { id: "minp", name: "Minor Pentatonic", ivs: [0, 3, 5, 7, 10] },
+  { id: "nmin", name: "Natural Minor", ivs: [0, 2, 3, 5, 7, 8, 10] },
+];
+/* Fret windows for each CAGED scale position, offset from the root's low-E fret */
+const SHAPE_WINDOWS = { E: [-1, 2], D: [1, 5], C: [4, 7], A: [6, 9], G: [8, 12] };
+
+const NOTE_LEVELS = [
+  { id: 1, name: "First Position", desc: "Frets 0–3, natural notes", maxFret: 3, naturals: true },
+  { id: 2, name: "First Position +", desc: "Frets 0–3, sharps & flats", maxFret: 3, naturals: false },
+  { id: 3, name: "Fifth Fret", desc: "Frets 0–5, all notes", maxFret: 5, naturals: false },
+  { id: 4, name: "Seventh Fret", desc: "Frets 0–7, all notes", maxFret: 7, naturals: false },
+  { id: 5, name: "Ninth Fret", desc: "Frets 0–9, all notes", maxFret: 9, naturals: false },
+  { id: 6, name: "Full Neck", desc: "Frets 0–12, all notes", maxFret: 12, naturals: false },
+];
+
+/* Chord voicings: frets low E -> high E, -1 = muted */
+const CHORD_TIERS = [
+  {
+    id: "c1", name: "Open Chords", desc: "The eight essential shapes",
+    quiz: "name",
+    chords: [
+      { name: "C", frets: [-1, 3, 2, 0, 1, 0] },
+      { name: "A", frets: [-1, 0, 2, 2, 2, 0] },
+      { name: "G", frets: [3, 2, 0, 0, 0, 3] },
+      { name: "E", frets: [0, 2, 2, 1, 0, 0] },
+      { name: "D", frets: [-1, -1, 0, 2, 3, 2] },
+      { name: "Em", frets: [0, 2, 2, 0, 0, 0] },
+      { name: "Am", frets: [-1, 0, 2, 2, 1, 0] },
+      { name: "Dm", frets: [-1, -1, 0, 2, 3, 1] },
+    ],
+  },
+  {
+    id: "c2", name: "Seventh Chords", desc: "Dominant & minor 7ths",
+    quiz: "name",
+    chords: [
+      { name: "E7", frets: [0, 2, 0, 1, 0, 0] },
+      { name: "A7", frets: [-1, 0, 2, 0, 2, 0] },
+      { name: "D7", frets: [-1, -1, 0, 2, 1, 2] },
+      { name: "G7", frets: [3, 2, 0, 0, 0, 1] },
+      { name: "C7", frets: [-1, 3, 2, 3, 1, 0] },
+      { name: "B7", frets: [-1, 2, 1, 2, 0, 2] },
+      { name: "Am7", frets: [-1, 0, 2, 0, 1, 0] },
+      { name: "Em7", frets: [0, 2, 0, 0, 0, 0] },
+      { name: "Dm7", frets: [-1, -1, 0, 2, 1, 1] },
+    ],
+  },
+  {
+    id: "c3", name: "Barre Chords", desc: "E-shape & A-shape barres",
+    quiz: "name",
+    chords: [
+      { name: "F", frets: [1, 3, 3, 2, 1, 1] },
+      { name: "Fm", frets: [1, 3, 3, 1, 1, 1] },
+      { name: "F#m", frets: [2, 4, 4, 2, 2, 2] },
+      { name: "Gm", frets: [3, 5, 5, 3, 3, 3] },
+      { name: "Bb", frets: [-1, 1, 3, 3, 3, 1] },
+      { name: "B", frets: [-1, 2, 4, 4, 4, 2] },
+      { name: "Bm", frets: [-1, 2, 4, 4, 3, 2] },
+      { name: "C#m", frets: [-1, 4, 6, 6, 5, 4] },
+    ],
+  },
+  {
+    id: "c4", name: "CAGED Shapes", desc: "One chord, five places on the neck",
+    quiz: "shape",
+    chords: [
+      { name: "C major", shape: "C", frets: [-1, 3, 2, 0, 1, 0] },
+      { name: "C major", shape: "A", frets: [-1, 3, 5, 5, 5, 3] },
+      { name: "C major", shape: "G", frets: [8, 7, 5, 5, 5, 8] },
+      { name: "C major", shape: "E", frets: [8, 10, 10, 9, 8, 8] },
+      { name: "C major", shape: "D", frets: [-1, -1, 10, 12, 13, 12] },
+      { name: "G major", shape: "G", frets: [3, 2, 0, 0, 0, 3] },
+      { name: "G major", shape: "E", frets: [3, 5, 5, 4, 3, 3] },
+      { name: "G major", shape: "D", frets: [-1, -1, 5, 7, 8, 7] },
+      { name: "G major", shape: "C", frets: [-1, 10, 9, 7, 8, 7] },
+      { name: "G major", shape: "A", frets: [-1, 10, 12, 12, 12, 10] },
+    ],
+  },
+  {
+    id: "c5", name: "Triads & Inversions", desc: "Top-string triads in all inversions",
+    quiz: "inversion",
+    chords: [
+      { name: "C major", inv: "Root position", frets: [-1, -1, -1, 5, 5, 3] },
+      { name: "C major", inv: "1st inversion", frets: [-1, -1, -1, 9, 8, 8] },
+      { name: "C major", inv: "2nd inversion", frets: [-1, -1, -1, 0, 1, 0] },
+      { name: "G major", inv: "Root position", frets: [-1, -1, -1, 12, 12, 10] },
+      { name: "G major", inv: "1st inversion", frets: [-1, -1, -1, 4, 3, 3] },
+      { name: "G major", inv: "2nd inversion", frets: [-1, -1, -1, 7, 8, 7] },
+      { name: "D major", inv: "Root position", frets: [-1, -1, -1, 7, 7, 5] },
+      { name: "D major", inv: "1st inversion", frets: [-1, -1, -1, 11, 10, 10] },
+      { name: "D major", inv: "2nd inversion", frets: [-1, -1, -1, 2, 3, 2] },
+    ],
+  },
+  {
+    id: "c6", name: "Django / Gypsy Jazz", desc: "Compact la pompe rhythm voicings — muted inner strings, movable everywhere",
+    quiz: "name",
+    chords: [
+      { name: "Am6", shape: "root-6", frets: [5, -1, 4, 5, 5, -1] },
+      { name: "Dm6", shape: "root-5", frets: [-1, 5, 3, 4, 3, -1] },
+      { name: "Em6", shape: "root-5", frets: [-1, 7, 5, 6, 5, -1] },
+      { name: "C6", shape: "root-6", frets: [8, -1, 7, 9, 8, -1] },
+      { name: "G6", shape: "root-6", frets: [3, -1, 2, 4, 3, -1] },
+      { name: "D6", shape: "root-5", frets: [-1, 5, 4, 4, 3, -1] },
+      { name: "E7", shape: "root-6", frets: [0, -1, 0, 1, 0, -1] },
+      { name: "A7", shape: "root-6", frets: [5, -1, 5, 6, 5, -1] },
+      { name: "G7", shape: "root-6", frets: [3, -1, 3, 4, 3, -1] },
+      { name: "D7", shape: "root-5", frets: [-1, 5, 4, 5, 3, -1] },
+      { name: "E7♭9", shape: "root-6", frets: [0, -1, 0, 1, 0, 1] },
+      { name: "A7♭9", shape: "root-6", frets: [5, -1, 5, 6, 5, 6] },
+      { name: "C#°7", shape: "passing", frets: [-1, 4, 5, 3, 5, -1] },
+      { name: "G#°7", shape: "passing", frets: [4, -1, 3, 4, 3, -1] },
+      { name: "Dm7", shape: "root-5", frets: [-1, 5, 3, 5, 3, -1] },
+      { name: "E7", shape: "rootless upper", frets: [-1, -1, -1, 7, 9, 7] },
+    ],
+  },
+];
+
+/* ---- Django progression drills & voice-leading challenges ---- */
+const DJANGO = () => CHORD_TIERS.find((t) => t.id === "c6").chords;
+const djangoVoicing = (nm) => DJANGO().find((c) => c.name === nm);
+const DJANGO_PROGRESSIONS = [
+  { name: "Minor Swing", seq: ["Am6", "Dm6", "E7", "Am6"] },
+  { name: "ii–V–I in C", seq: ["Dm7", "G7", "C6"] },
+  { name: "Diminished passing", seq: ["C6", "C#°7", "Dm7", "G7"] },
+  { name: "Minor turnaround", seq: ["Am6", "A7", "Dm6", "E7♭9"] },
+];
+const VL_CHALLENGES = [
+  {
+    context: "Minor Swing turnaround", from: { name: "Am6", frets: [5, -1, 4, 5, 5, -1] }, toName: "E7",
+    options: [
+      { frets: [-1, -1, -1, 7, 9, 7], tag: "rootless · 7th pos" },
+      { frets: [0, -1, 0, 1, 0, -1], tag: "open position" },
+      { frets: [12, -1, 12, 13, 12, -1], tag: "root-6 · 12th fret" },
+    ],
+    correct: 0, why: "the rootless grip sits right beside your Am6 — barely any hand travel.",
+  },
+  {
+    context: "ii–V–I in C", from: { name: "Dm7", frets: [-1, 5, 3, 5, 3, -1] }, toName: "G7",
+    options: [
+      { frets: [-1, 10, 9, 10, 8, -1], tag: "root-5 · 10th fret" },
+      { frets: [3, -1, 3, 4, 3, -1], tag: "root-6 · 3rd fret" },
+      { frets: [-1, -1, -1, 10, 12, 10], tag: "rootless · 10th pos" },
+    ],
+    correct: 1, why: "Dm7 lives around frets 3–5, and this G7 is right underneath it.",
+  },
+  {
+    context: "Diminished passing chord", from: { name: "C6", frets: [8, -1, 7, 9, 8, -1] }, toName: "C#°7",
+    options: [
+      { frets: [-1, 4, 5, 3, 5, -1], tag: "root-5 · 4th fret" },
+      { frets: [-1, 10, 11, 9, 11, -1], tag: "root-5 · 10th fret" },
+      { frets: [9, -1, 8, 9, 8, -1], tag: "root-6 · 9th fret" },
+    ],
+    correct: 2, why: "slide the C6 grip up one fret and adjust one finger — that's the passing chord.",
+  },
+  {
+    context: "Minor turnaround", from: { name: "A7", frets: [5, -1, 5, 6, 5, -1] }, toName: "Dm6",
+    options: [
+      { frets: [10, -1, 9, 10, 10, -1], tag: "root-6 · 10th fret" },
+      { frets: [-1, -1, 0, 2, 0, 1], tag: "upper strings · open" },
+      { frets: [-1, 5, 3, 4, 3, -1], tag: "root-5 · 5th fret" },
+    ],
+    correct: 2, why: "it shares the 5th-fret anchor with your A7 — two fingers barely move.",
+  },
+  {
+    context: "ii–V–I resolution", from: { name: "G7", frets: [3, -1, 3, 4, 3, -1] }, toName: "C6",
+    options: [
+      { frets: [8, -1, 7, 9, 8, -1], tag: "root-6 · 8th fret" },
+      { frets: [-1, 3, 2, 2, 1, -1], tag: "root-5 · 3rd fret" },
+      { frets: [-1, -1, -1, 5, 5, 5], tag: "upper triad · 5th fret" },
+    ],
+    correct: 1, why: "resolving into the low C6 keeps everything within one fret of your G7.",
+  },
+];
+
+/* Mastery gate: 18 of your last 20 answers (min 20 attempts) */
+const WINDOW = 20;
+const NEED = 18;
+const masteryOf = (hist) => {
+  const h = (hist || []).slice(-WINDOW);
+  return { correct: h.filter(Boolean).length, count: h.length, done: h.length >= WINDOW && h.filter(Boolean).length >= NEED };
+};
+
+/* ---------------- Audio engine (Karplus-Strong pluck) ---------------- */
+let ACTX = null;
+let MASTER = null;
+function audioCtx() {
+  if (!ACTX) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    ACTX = new AC();
+    const comp = ACTX.createDynamicsCompressor();
+    const lp = ACTX.createBiquadFilter();
+    lp.type = "lowpass"; lp.frequency.value = 5200;
+    const g = ACTX.createGain(); g.gain.value = 0.9;
+    g.connect(lp); lp.connect(comp); comp.connect(ACTX.destination);
+    MASTER = g;
+  }
+  if (ACTX.state === "suspended") ACTX.resume();
+  return ACTX;
+}
+function pluck(freq, delaySec = 0, { gain = 0.42, dur = 2.4, damp = 0.996 } = {}) {
+  const ctx = audioCtx();
+  if (!ctx) return;
+  const sr = ctx.sampleRate;
+  const N = Math.max(2, Math.round(sr / freq));
+  const len = Math.floor(sr * dur);
+  const buf = ctx.createBuffer(1, len, sr);
+  const out = buf.getChannelData(0);
+  const line = new Float32Array(N);
+  // Softened noise burst (pre-averaged for a warmer pick attack)
+  let prev = 0;
+  for (let i = 0; i < N; i++) {
+    const n = Math.random() * 2 - 1;
+    line[i] = (n + prev) * 0.5;
+    prev = n;
+  }
+  let idx = 0;
+  for (let i = 0; i < len; i++) {
+    const next = (idx + 1) % N;
+    line[idx] = damp * 0.5 * (line[idx] + line[next]);
+    out[i] = line[idx];
+    idx = next;
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const g = ctx.createGain();
+  g.gain.value = gain;
+  src.connect(g); g.connect(MASTER);
+  src.start(ctx.currentTime + delaySec);
+}
+function playPosition(s, f) { pluck(freqAt(s, f)); }
+function strum(frets, arpeggio = false, at = 0) {
+  const gap = arpeggio ? 0.24 : 0.045;
+  let i = 0;
+  for (let s = 0; s < 6; s++) {
+    if (frets[s] >= 0) { pluck(freqAt(s, frets[s]), at + i * gap, { gain: 0.34, dur: arpeggio ? 2.6 : 2.2 }); i++; }
+  }
+}
+function thud() { pluck(87, 0, { gain: 0.2, dur: 0.35, damp: 0.9 }); }
+
+/* ---------------- Small helpers ---------------- */
+const rand = (n) => Math.floor(Math.random() * n);
+const shuffle = (a) => { const x = [...a]; for (let i = x.length - 1; i > 0; i--) { const j = rand(i + 1); [x[i], x[j]] = [x[j], x[i]]; } return x; };
+
+/* ---------------- Theme ---------------- */
+const T = {
+  bg: "#211812", surface: "#2C211A", raised: "#37291F", line: "#4A382A",
+  cream: "#F3E9D7", muted: "#C4B097", faint: "#8D7A63",
+  amber: "#E9A13B", amberDeep: "#B87718",
+  green: "#8BB871", red: "#CE6644",
+  wood: "#4A3524", woodDark: "#3A2919", fretWire: "#C9AE7E", inlay: "#E4D9BF",
+};
+
+/* ---------------- Fretboard (horizontal, the signature element) ---------------- */
+function Fretboard({ maxFret = 12, marker, tapped, onTap, disabled, dots }) {
+  const FRETS = 12;
+  const W = 980, H = 258;
+  const nutX = 64, endX = W - 12;
+  const fw = (endX - nutX) / FRETS;
+  const yOf = (s) => 226 - s * 39; // s=0 low E bottom
+  const fretCenter = (f) => (f === 0 ? nutX - 30 : nutX + (f - 0.5) * fw);
+  const inlays = [3, 5, 7, 9];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", display: "block", touchAction: "manipulation" }} role="img" aria-label="Guitar fretboard">
+      <defs>
+        <linearGradient id="woodg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#54402C" />
+          <stop offset="0.5" stopColor={T.wood} />
+          <stop offset="1" stopColor={T.woodDark} />
+        </linearGradient>
+        <linearGradient id="wireg" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#A88F60" />
+          <stop offset="0.5" stopColor="#E3CFA0" />
+          <stop offset="1" stopColor="#A88F60" />
+        </linearGradient>
+      </defs>
+      {/* board */}
+      <rect x={nutX} y={8} width={endX - nutX} height={H - 16} rx={6} fill="url(#woodg)" />
+      {/* faded region beyond level range */}
+      {maxFret < FRETS && (
+        <rect x={nutX + maxFret * fw} y={8} width={(FRETS - maxFret) * fw} height={H - 16} fill="#1B130D" opacity="0.72" rx={6} />
+      )}
+      {/* inlays */}
+      {inlays.map((f) => (
+        <circle key={f} cx={nutX + (f - 0.5) * fw} cy={H / 2} r={9} fill={T.inlay} opacity={f <= maxFret ? 0.85 : 0.25} />
+      ))}
+      <circle cx={nutX + 11.5 * fw} cy={H / 2 - 40} r={9} fill={T.inlay} opacity={maxFret >= 12 ? 0.85 : 0.25} />
+      <circle cx={nutX + 11.5 * fw} cy={H / 2 + 40} r={9} fill={T.inlay} opacity={maxFret >= 12 ? 0.85 : 0.25} />
+      {/* nut */}
+      <rect x={nutX - 7} y={8} width={9} height={H - 16} rx={3} fill={T.inlay} />
+      {/* fret wires */}
+      {Array.from({ length: FRETS }, (_, i) => i + 1).map((f) => (
+        <rect key={f} x={nutX + f * fw - 2} y={10} width={4} height={H - 20} rx={2} fill="url(#wireg)" opacity={f <= maxFret ? 1 : 0.35} />
+      ))}
+      {/* strings (thicker = lower) */}
+      {[0, 1, 2, 3, 4, 5].map((s) => (
+        <line key={s} x1={nutX - 7} x2={endX} y1={yOf(s)} y2={yOf(s)} stroke="#C7B594" strokeWidth={4.4 - s * 0.62} opacity="0.9" />
+      ))}
+      {/* string labels */}
+      {[0, 1, 2, 3, 4, 5].map((s) => (
+        <text key={s} x={14} y={yOf(s) + 5} fill={T.muted} fontSize="15" fontFamily="inherit" fontWeight="600">
+          {["E", "A", "D", "G", "B", "e"][s]}
+        </text>
+      ))}
+      {/* fret numbers */}
+      {[3, 5, 7, 9, 12].map((f) => (
+        <text key={f} x={nutX + (f - 0.5) * fw} y={H - 0} fill={T.faint} fontSize="13" textAnchor="middle" fontFamily="inherit">{f}</text>
+      ))}
+      {/* scale / interval dots */}
+      {dots &&
+        dots.map((d, i) => (
+          <g key={"sd" + i}>
+            <circle cx={fretCenter(d.f)} cy={yOf(d.s)} r={13.5} fill={d.color} stroke="rgba(0,0,0,0.4)" strokeWidth="1.5" />
+            <text x={fretCenter(d.f)} y={yOf(d.s) + 4.5} textAnchor="middle" fontSize="12" fontWeight="800" fill={d.text} fontFamily="inherit">{d.label}</text>
+          </g>
+        ))}
+      {/* question marker */}
+      {marker && (
+        <g>
+          <circle cx={fretCenter(marker.f)} cy={yOf(marker.s)} r={16} fill={T.amber} stroke="#FFDFA8" strokeWidth="2">
+            <animate attributeName="r" values="14;16;14" dur="1.6s" repeatCount="indefinite" />
+          </circle>
+          {marker.label && (
+            <text x={fretCenter(marker.f)} y={yOf(marker.s) + 5.5} textAnchor="middle" fontSize="15" fontWeight="800" fill="#2A1C0B" fontFamily="inherit">{marker.label}</text>
+          )}
+        </g>
+      )}
+      {/* tapped feedback */}
+      {tapped && (
+        <g>
+          <circle cx={fretCenter(tapped.f)} cy={yOf(tapped.s)} r={16} fill={tapped.ok ? T.green : T.red} stroke={T.cream} strokeWidth="2" />
+          <text x={fretCenter(tapped.f)} y={yOf(tapped.s) + 5.5} textAnchor="middle" fontSize="14" fontWeight="800" fill="#221A12" fontFamily="inherit">{noteAt(tapped.s, tapped.f)}</text>
+        </g>
+      )}
+      {/* tap targets */}
+      {onTap && !disabled &&
+        [0, 1, 2, 3, 4, 5].map((s) =>
+          Array.from({ length: maxFret + 1 }, (_, f) => (
+            <rect
+              key={`${s}-${f}`}
+              x={f === 0 ? 0 : nutX + (f - 1) * fw}
+              y={yOf(s) - 19}
+              width={f === 0 ? nutX - 5 : fw}
+              height={38}
+              fill="transparent"
+              style={{ cursor: "pointer" }}
+              onClick={() => onTap(s, f)}
+            />
+          ))
+        )}
+    </svg>
+  );
+}
+
+/* ---------------- Chord diagram (vertical, classic chart) ---------------- */
+function ChordDiagram({ frets, size = 150, label, rootPc = null }) {
+  const ivInfo = (s, f) => {
+    if (rootPc == null) return { label: "", color: T.amber, text: "#2A1C0B" };
+    const iv = (OPEN_PC[s] + f - rootPc + 1200) % 12;
+    return IV_COLORS[iv] || { label: DEGREE_LABEL[iv], color: T.faint, text: T.cream };
+  };
+  const fretted = frets.filter((f) => f > 0);
+  const maxF = Math.max(0, ...fretted);
+  const minF = fretted.length ? Math.min(...fretted) : 1;
+  const base = maxF > 4 ? minF : 1;
+  const W = 150, H = 186;
+  const left = 26, right = 134, top = 40, bottom = 172;
+  const sx = (s) => left + (s * (right - left)) / 5;
+  const rowH = (bottom - top) / 5;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: size, display: "block" }} role="img" aria-label={label || "chord diagram"}>
+      {/* nut or base fret */}
+      {base === 1 ? (
+        <rect x={left - 2} y={top - 5} width={right - left + 4} height={6} rx={2} fill={T.cream} />
+      ) : (
+        <text x={left - 8} y={top + rowH * 0.66} fontSize="13" fill={T.muted} textAnchor="end" fontFamily="inherit">{base}fr</text>
+      )}
+      {/* grid */}
+      {Array.from({ length: 6 }, (_, i) => (
+        <line key={"v" + i} x1={sx(i)} x2={sx(i)} y1={top} y2={bottom} stroke={T.muted} strokeWidth={i === 0 ? 2 : 1.4} opacity="0.75" />
+      ))}
+      {Array.from({ length: 6 }, (_, i) => (
+        <line key={"h" + i} x1={left} x2={right} y1={top + i * rowH} y2={top + i * rowH} stroke={T.muted} strokeWidth="1.2" opacity="0.55" />
+      ))}
+      {/* markers above nut (open strings carry their interval color) */}
+      {frets.map((f, s) => {
+        if (f < 0)
+          return <text key={"x" + s} x={sx(s)} y={top - 13} fontSize="14" fill={T.faint} textAnchor="middle" fontWeight="700" fontFamily="inherit">×</text>;
+        if (f !== 0) return null;
+        const info = ivInfo(s, 0);
+        return (
+          <g key={"o" + s}>
+            <circle cx={sx(s)} cy={top - 18} r={7.5} fill={info.color} stroke="rgba(0,0,0,0.4)" strokeWidth="1.2" />
+            <text x={sx(s)} y={top - 15} fontSize="8" fontWeight="800" fill={info.text} textAnchor="middle" fontFamily="inherit">{info.label}</text>
+          </g>
+        );
+      })}
+      {/* fretted dots */}
+      {frets.map((f, s) => {
+        if (f <= 0) return null;
+        const info = ivInfo(s, f);
+        const cy = top + (f - base + 0.5) * rowH;
+        return (
+          <g key={"d" + s}>
+            <circle cx={sx(s)} cy={cy} r={9.5} fill={info.color} stroke="rgba(0,0,0,0.4)" strokeWidth="1.2" />
+            <text x={sx(s)} y={cy + 3.2} fontSize="9" fontWeight="800" fill={info.text} textAnchor="middle" fontFamily="inherit">{info.label}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/* ---------------- Shared UI bits ---------------- */
+function MasteryBar({ hist }) {
+  const m = masteryOf(hist);
+  const pct = Math.min(100, (m.correct / NEED) * 100);
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: T.muted, marginBottom: 5 }}>
+        <span>Mastery — {m.correct}/{NEED} correct in last {WINDOW}</span>
+        <span>{m.done ? "Level complete ★" : m.count < WINDOW ? `${WINDOW - m.count} more to qualify` : "keep going"}</span>
+      </div>
+      <div style={{ height: 8, borderRadius: 5, background: T.raised, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: pct + "%", borderRadius: 5, background: m.done ? T.green : `linear-gradient(90deg, ${T.amberDeep}, ${T.amber})`, transition: "width .35s ease" }} />
+      </div>
+    </div>
+  );
+}
+
+function IntervalLegend({ seventh = true, gray = false, extended = false }) {
+  const items = [["R", "#D6453C", "Root"], ["3", "#3E7CC4", "3rd"], ["5", "#EFC94C", "5th"]];
+  if (seventh || extended) items.push(["7", "#6FA05C", "7th"]);
+  if (extended) items.push(["6", "#A47CC7", "6th"], ["♭9", "#D77BA8", "♭9"]);
+  if (gray) items.push(["·", "#6B5B47", "other scale tones"]);
+  return (
+    <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", marginTop: 12, fontSize: 12.5, color: T.muted }}>
+      {items.map(([l, c, name]) => (
+        <span key={name} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 16, height: 16, borderRadius: "50%", background: c, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 800, color: l === "5" ? "#3A2B08" : "#FFF3EA" }}>{l === "·" ? "" : l}</span>
+          {name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function LevelChips({ items, current, unlocked, doneMap, onPick }) {
+  return (
+    <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 6 }}>
+      {items.map((lv, i) => {
+        const locked = i + 1 > unlocked;
+        const done = doneMap[lv.id];
+        const active = lv.id === current;
+        return (
+          <button
+            key={lv.id}
+            className="chip"
+            disabled={locked}
+            onClick={() => onPick(lv.id)}
+            style={{
+              flexShrink: 0, padding: "8px 13px", borderRadius: 999, fontSize: 13, fontWeight: 600,
+              border: `1.5px solid ${active ? T.amber : T.line}`,
+              background: active ? "rgba(233,161,59,0.16)" : T.surface,
+              color: locked ? T.faint : done ? T.green : T.cream,
+              opacity: locked ? 0.55 : 1, cursor: locked ? "default" : "pointer",
+            }}
+          >
+            {locked ? "🔒 " : done ? "★ " : ""}{lv.name}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Feedback({ result, correctText }) {
+  if (!result) return <div style={{ height: 26 }} />;
+  return (
+    <div style={{ height: 26, fontWeight: 700, fontSize: 15, color: result === "right" ? T.green : T.red }} className="pop">
+      {result === "right" ? "Correct!" : `Not quite — it's ${correctText}`}
+    </div>
+  );
+}
+
+/* ---------------- Note Trainer ---------------- */
+function NoteTrainer({ save, record, onLevelDone }) {
+  const [levelId, setLevelId] = useState(Math.min(save.noteUnlocked, 6));
+  const [mode, setMode] = useState("name"); // name | find
+  const level = NOTE_LEVELS.find((l) => l.id === levelId);
+  const [q, setQ] = useState(null);
+  const [result, setResult] = useState(null);
+  const [streak, setStreak] = useState(0);
+  const timer = useRef(null);
+
+  const newQuestion = useCallback(() => {
+    setResult(null);
+    let s, f;
+    let guard = 0;
+    do {
+      s = rand(6);
+      f = rand(level.maxFret + 1);
+      guard++;
+    } while (((level.naturals && !NATURALS.includes(noteAt(s, f))) || (q && q.s === s && q.f === f)) && guard < 60);
+    setQ({ s, f, note: noteAt(s, f) });
+  }, [level, q]);
+
+  useEffect(() => { setQ(null); setResult(null); setStreak(0); }, [levelId, mode]);
+  useEffect(() => { if (!q) newQuestion(); }, [q, newQuestion]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const finish = (ok, s, f) => {
+    setResult(ok ? "right" : "wrong");
+    setStreak(ok ? streak + 1 : 0);
+    record("note", levelId, ok, s, f, onLevelDone);
+    if (ok) playPosition(q.s, q.f); else { thud(); setTimeout(() => playPosition(q.s, q.f), 380); }
+    timer.current = setTimeout(newQuestion, ok ? 950 : 1900);
+  };
+
+  const answerName = (n) => { if (result || !q) return; finish(n === q.note, q.s, q.f); };
+  const answerTap = (s, f) => {
+    if (result || !q) return;
+    pluck(freqAt(s, f), 0, { gain: 0.3 });
+    const ok = s === q.s && noteAt(s, f) === q.note;
+    setTap({ s, f, ok });
+    finish(ok, q.s, q.f);
+  };
+  const [tap, setTap] = useState(null);
+  useEffect(() => { if (!result) setTap(null); }, [result]);
+
+  const choices = level.naturals ? NATURALS : NOTES;
+  const hist = save.noteHist[levelId] || [];
+
+  return (
+    <div>
+      <LevelChips items={NOTE_LEVELS} current={levelId} unlocked={save.noteUnlocked} doneMap={save.noteDone} onPick={setLevelId} />
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        {[["name", "Name the note"], ["find", "Find the note"]].map(([m, label]) => (
+          <button key={m} className="chip" onClick={() => setMode(m)}
+            style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: `1.5px solid ${mode === m ? T.amber : T.line}`, background: mode === m ? "rgba(233,161,59,0.16)" : T.surface, color: T.cream }}>
+            {label}
+          </button>
+        ))}
+        <div style={{ marginLeft: "auto", alignSelf: "center", fontSize: 13, color: streak >= 3 ? T.amber : T.muted, fontWeight: 700 }}>
+          {streak > 0 ? `🔥 ${streak} streak` : ""}
+        </div>
+      </div>
+
+      <div className="card">
+        {q && mode === "name" && (
+          <>
+            <div style={{ fontSize: 15, color: T.muted, marginBottom: 8 }}>
+              What note is marked on the <b style={{ color: T.cream }}>{STRING_NAMES[q.s]}</b> string?
+            </div>
+            <Fretboard maxFret={level.maxFret} marker={{ s: q.s, f: q.f, label: result ? q.note : "?" }} />
+            <Feedback result={result} correctText={q.note} />
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${level.naturals ? 7 : 6}, 1fr)`, gap: 8, marginTop: 6 }}>
+              {choices.map((n) => (
+                <button key={n} className="ans" onClick={() => answerName(n)}
+                  style={{
+                    padding: "13px 0", borderRadius: 10, fontSize: 16, fontWeight: 800,
+                    border: `1.5px solid ${result && n === q.note ? T.green : T.line}`,
+                    background: result && n === q.note ? "rgba(139,184,113,0.18)" : T.raised, color: T.cream,
+                  }}>
+                  {n}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {q && mode === "find" && (
+          <>
+            <div style={{ fontSize: 15, color: T.muted, marginBottom: 8 }}>
+              Tap <b style={{ color: T.amber, fontSize: 17 }}>{q.note}</b> on the <b style={{ color: T.cream }}>{STRING_NAMES[q.s]}</b> string
+            </div>
+            <Fretboard maxFret={level.maxFret} tapped={tap} onTap={answerTap} disabled={!!result}
+              marker={result && !tap?.ok ? { s: q.s, f: q.f, label: q.note } : null} />
+            <Feedback result={result} correctText={`fret ${q.f}`} />
+          </>
+        )}
+        <MasteryBar hist={hist} />
+      </div>
+      <p style={{ fontSize: 12.5, color: T.faint, marginTop: 10 }}>
+        Get {NEED} of your last {WINDOW} right to complete the level and unlock the next fret range. Correct answers play the note — listen as you learn.
+      </p>
+    </div>
+  );
+}
+
+/* ---------------- Django progression drills ---------------- */
+function ProgressionDrills() {
+  const [live, setLive] = useState(null); // { p, i } — which chord is sounding
+  const timers = useRef([]);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  const play = (pi) => {
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+    const prog = DJANGO_PROGRESSIONS[pi];
+    prog.seq.forEach((nm, i) => {
+      const c = djangoVoicing(nm);
+      strum(c.frets, false, i * 1.15);
+      strum(c.frets, false, i * 1.15 + 0.56);
+      timers.current.push(setTimeout(() => setLive({ p: pi, i }), i * 1150));
+    });
+    timers.current.push(setTimeout(() => setLive(null), prog.seq.length * 1150));
+  };
+  return (
+    <div>
+      {DJANGO_PROGRESSIONS.map((prog, pi) => (
+        <div key={prog.name} className="card" style={{ marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 8, flexWrap: "wrap" }}>
+            <div style={{ fontWeight: 800, fontSize: 15.5 }}>{prog.name}</div>
+            <button className="chip" style={btnAmber} onClick={() => play(pi)}>▶ Play</button>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {prog.seq.map((nm, i) => {
+              const c = djangoVoicing(nm);
+              const active = live && live.p === pi && live.i === i;
+              return (
+                <div key={i} onClick={() => strum(c.frets)}
+                  style={{
+                    cursor: "pointer", textAlign: "center", background: T.raised, borderRadius: 10, padding: "4px 6px",
+                    border: `2px solid ${active ? T.amber : T.line}`, transition: "border-color .15s",
+                  }}>
+                  <div style={{ fontSize: 13, fontWeight: 800 }}>{nm}</div>
+                  <ChordDiagram frets={c.frets} size={88} label={nm} rootPc={rootPcOf(nm)} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      <p style={{ fontSize: 12.5, color: T.faint }}>
+        Each chord gets two swing strums, la pompe style. Tap any diagram to hear it alone, then play along.
+      </p>
+    </div>
+  );
+}
+
+/* ---------------- Voice-leading challenge ---------------- */
+function VoiceLeadingDrill({ record, onLevelDone, hist }) {
+  const [qi, setQi] = useState(() => rand(VL_CHALLENGES.length));
+  const [result, setResult] = useState(null);
+  const [picked, setPicked] = useState(null);
+  const timer = useRef(null);
+  const q = VL_CHALLENGES[qi];
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const answer = (i) => {
+    if (result) return;
+    strum(q.options[i].frets);
+    const ok = i === q.correct;
+    setPicked(i);
+    setResult(ok ? "right" : "wrong");
+    record("chord", "c6", ok, null, null, onLevelDone);
+    if (!ok) setTimeout(() => strum(q.options[q.correct].frets), 950);
+    timer.current = setTimeout(() => {
+      let n;
+      do { n = rand(VL_CHALLENGES.length); } while (n === qi && VL_CHALLENGES.length > 1);
+      setQi(n); setResult(null); setPicked(null);
+    }, ok ? 1700 : 3000);
+  };
+  return (
+    <div className="card">
+      <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>{q.context}</div>
+      <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 12.5, color: T.muted }}>You're on</div>
+          <div style={{ fontWeight: 800, fontSize: 16 }}>{q.from.name}</div>
+          <div style={{ background: T.raised, borderRadius: 12, padding: "4px 8px", border: `1px solid ${T.line}` }}>
+            <ChordDiagram frets={q.from.frets} size={106} label={q.from.name} rootPc={rootPcOf(q.from.name)} />
+          </div>
+          <button className="chip" style={{ ...btnGhost, fontSize: 12, padding: "5px 10px", marginTop: 6 }} onClick={() => strum(q.from.frets)}>▶ Hear</button>
+        </div>
+        <div style={{ flex: 1, minWidth: 190, fontSize: 15, color: T.muted }}>
+          Next chord is <b style={{ color: T.amber, fontSize: 16 }}>{q.toName}</b>. Which voicing keeps your hand closest?
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(128px, 1fr))", gap: 10 }}>
+        {q.options.map((o, i) => {
+          const isCorrect = result && i === q.correct;
+          const isWrongPick = result === "wrong" && picked === i;
+          return (
+            <button key={i} className="ans" onClick={() => answer(i)}
+              style={{
+                padding: "8px 4px 4px", borderRadius: 12, background: T.raised, color: T.cream, cursor: "pointer",
+                border: `2px solid ${isCorrect ? T.green : isWrongPick ? T.red : T.line}`,
+              }}>
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <ChordDiagram frets={o.frets} size={100} label={q.toName} rootPc={rootPcOf(q.toName)} />
+              </div>
+              <div style={{ fontSize: 11.5, color: T.muted, paddingBottom: 4 }}>{o.tag}</div>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ minHeight: 24, marginTop: 8, fontSize: 13.5, fontWeight: 600, color: result === "right" ? T.green : T.red, opacity: result ? 1 : 0 }} className={result ? "pop" : ""}>
+        {result === "right" ? `Yes — ${q.why}` : `The green one — ${q.why}`}
+      </div>
+      <MasteryBar hist={hist} />
+    </div>
+  );
+}
+
+/* ---------------- Chord Trainer ---------------- */
+function ChordTrainer({ save, record, onLevelDone }) {
+  const [tierIdx, setTierIdx] = useState(Math.min(save.chordUnlocked, CHORD_TIERS.length) - 1);
+  const tier = CHORD_TIERS[tierIdx];
+  const [q, setQ] = useState(null);
+  const [choices, setChoices] = useState([]);
+  const [result, setResult] = useState(null);
+  const [streak, setStreak] = useState(0);
+  const [sub, setSub] = useState("quiz"); // Django tier: quiz | prog | vl
+  const timer = useRef(null);
+
+  const answerKey = (c) => (tier.quiz === "name" ? c.name : tier.quiz === "shape" ? c.shape + " shape" : c.inv);
+
+  const newQuestion = useCallback(() => {
+    setResult(null);
+    let c;
+    let guard = 0;
+    do { c = tier.chords[rand(tier.chords.length)]; guard++; } while (q && c === q && guard < 30);
+    let opts;
+    if (tier.quiz === "shape") opts = ["C shape", "A shape", "G shape", "E shape", "D shape"];
+    else if (tier.quiz === "inversion") opts = ["Root position", "1st inversion", "2nd inversion"];
+    else {
+      const names = [...new Set(tier.chords.map((x) => x.name))].filter((n) => n !== c.name);
+      opts = shuffle([c.name, ...shuffle(names).slice(0, 3)]);
+    }
+    setQ(c); setChoices(opts);
+    setTimeout(() => strum(c.frets), 250);
+  }, [tier, q]);
+
+  useEffect(() => { setQ(null); setResult(null); setStreak(0); setSub("quiz"); }, [tierIdx]);
+  useEffect(() => { if (!q) newQuestion(); }, [q, newQuestion]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const answer = (opt) => {
+    if (result || !q) return;
+    const ok = opt === answerKey(q);
+    setResult(ok ? "right" : "wrong");
+    setStreak(ok ? streak + 1 : 0);
+    record("chord", tier.id, ok, null, null, onLevelDone);
+    if (ok) strum(q.frets); else thud();
+    timer.current = setTimeout(newQuestion, ok ? 1100 : 2100);
+  };
+
+  const prompt =
+    tier.quiz === "shape" ? <>This is <b style={{ color: T.cream }}>{q?.name}</b> — which <b style={{ color: T.amber }}>CAGED shape</b> is it?</>
+    : tier.quiz === "inversion" ? <>This is a <b style={{ color: T.cream }}>{q?.name}</b> triad — which <b style={{ color: T.amber }}>inversion</b>?</>
+    : <>Name this chord</>;
+
+  const hist = save.chordHist[tier.id] || [];
+
+  return (
+    <div>
+      <LevelChips
+        items={CHORD_TIERS.map((t, i) => ({ ...t, id: t.id, name: t.name }))}
+        current={tier.id}
+        unlocked={save.chordUnlocked}
+        doneMap={save.chordDone}
+        onPick={(id) => setTierIdx(CHORD_TIERS.findIndex((t) => t.id === id))}
+      />
+      <div style={{ fontSize: 13, color: T.faint, marginBottom: 10 }}>{tier.desc}</div>
+      {tier.id === "c6" && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+          {[["quiz", "Name the chord"], ["prog", "Progressions"], ["vl", "Voice leading"]].map(([m, label]) => (
+            <button key={m} className="chip" onClick={() => setSub(m)}
+              style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: `1.5px solid ${sub === m ? T.amber : T.line}`, background: sub === m ? "rgba(233,161,59,0.16)" : T.surface, color: T.cream, cursor: "pointer" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {tier.id === "c6" && sub === "prog" ? (
+        <ProgressionDrills />
+      ) : tier.id === "c6" && sub === "vl" ? (
+        <VoiceLeadingDrill record={record} onLevelDone={onLevelDone} hist={hist} />
+      ) : (
+      <div className="card">
+        {q && (
+          <>
+            <div style={{ display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ background: T.raised, borderRadius: 14, padding: "10px 14px", border: `1px solid ${T.line}` }}>
+                <ChordDiagram frets={q.frets} size={158} label="mystery chord" rootPc={rootPcOf(q.name)} />
+              </div>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <div style={{ fontSize: 15.5, color: T.muted, marginBottom: 10 }}>{prompt}</div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                  <button className="chip" onClick={() => strum(q.frets)} style={btnAmber}>▶ Strum</button>
+                  <button className="chip" onClick={() => strum(q.frets, true)} style={btnGhost}>♪ Arpeggio</button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {choices.map((opt) => (
+                    <button key={opt} className="ans" onClick={() => answer(opt)}
+                      style={{
+                        padding: "13px 8px", borderRadius: 10, fontSize: 15, fontWeight: 700,
+                        border: `1.5px solid ${result && opt === answerKey(q) ? T.green : T.line}`,
+                        background: result && opt === answerKey(q) ? "rgba(139,184,113,0.18)" : T.raised, color: T.cream,
+                      }}>
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+                <Feedback result={result} correctText={q ? answerKey(q) : ""} />
+              </div>
+            </div>
+            <MasteryBar hist={hist} />
+            <IntervalLegend seventh={tier.id === "c2"} extended={tier.id === "c6"} />
+          </>
+        )}
+      </div>
+      )}
+      {streak >= 3 && <div style={{ marginTop: 8, color: T.amber, fontWeight: 700, fontSize: 13 }}>🔥 {streak} in a row</div>}
+    </div>
+  );
+}
+
+/* ---------------- Chord Library ---------------- */
+function ChordLibrary() {
+  const [open, setOpen] = useState("c1");
+  return (
+    <div>
+      <p style={{ fontSize: 14, color: T.muted, marginTop: 0, marginBottom: 4 }}>
+        Tap any chord to strum it. Every dot is colored by its job in the chord:
+      </p>
+      <div style={{ marginBottom: 14 }}><IntervalLegend /></div>
+      {CHORD_TIERS.map((tier) => (
+        <div key={tier.id} style={{ marginBottom: 12 }}>
+          <button onClick={() => setOpen(open === tier.id ? null : tier.id)}
+            style={{ width: "100%", textAlign: "left", background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, padding: "12px 16px", color: T.cream, fontSize: 15.5, fontWeight: 700, cursor: "pointer", display: "flex", justifyContent: "space-between" }}>
+            <span>{tier.name} <span style={{ color: T.faint, fontWeight: 400, fontSize: 13 }}> — {tier.chords.length} chords</span></span>
+            <span style={{ color: T.amber }}>{open === tier.id ? "−" : "+"}</span>
+          </button>
+          {open === tier.id && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10, marginTop: 10 }}>
+              {tier.chords.map((c, i) => (
+                <div key={i} className="libcard" onClick={() => strum(c.frets)}
+                  style={{ background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 8px 6px", cursor: "pointer", textAlign: "center" }}>
+                  <div style={{ fontWeight: 800, fontSize: 15, color: T.cream }}>
+                    {c.name}{c.shape ? <span style={{ color: T.amber, fontSize: 12 }}> · {c.shape} shape</span> : ""}{c.inv ? <span style={{ color: T.amber, fontSize: 11.5 }}> · {c.inv}</span> : ""}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "center" }}>
+                    <ChordDiagram frets={c.frets} size={120} label={c.name} rootPc={rootPcOf(c.name)} />
+                  </div>
+                  <button className="chip" onClick={(e) => { e.stopPropagation(); strum(c.frets, true); }}
+                    style={{ ...btnGhost, fontSize: 12, padding: "5px 10px", marginBottom: 6 }}>♪ Arpeggio</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------------- Scale Explorer ---------------- */
+function ScaleExplorer() {
+  const [rootPc, setRootPc] = useState(0);
+  const [scaleId, setScaleId] = useState("maj");
+  const [shape, setShape] = useState("All");
+  const scale = SCALES.find((s) => s.id === scaleId);
+
+  const win = useMemo(() => {
+    if (shape === "All") return [0, 12];
+    const f6 = (rootPc - OPEN_PC[0] + 12) % 12;
+    const [so, eo] = SHAPE_WINDOWS[shape];
+    let start = (f6 + so + 12) % 12;
+    const span = eo - so;
+    if (start + span > 12) start -= 12;
+    if (start < 0) start = 0;
+    return [start, Math.min(12, start + span)];
+  }, [shape, rootPc]);
+
+  const dots = useMemo(() => {
+    const out = [];
+    for (let s = 0; s < 6; s++)
+      for (let f = win[0]; f <= win[1]; f++) {
+        const iv = (OPEN_PC[s] + f - rootPc + 1200) % 12;
+        if (!scale.ivs.includes(iv)) continue;
+        const chordTone = iv === 0 || iv === 3 || iv === 4 || iv === 7;
+        out.push({
+          s, f,
+          color: chordTone ? IV_COLORS[iv].color : "#6B5B47",
+          text: chordTone ? IV_COLORS[iv].text : T.cream,
+          label: DEGREE_LABEL[iv],
+        });
+      }
+    return out;
+  }, [scale, rootPc, win]);
+
+  const playScale = () => {
+    const seen = new Set();
+    dots
+      .map((d) => ({ ...d, fr: freqAt(d.s, d.f) }))
+      .sort((a, b) => a.fr - b.fr)
+      .filter((d) => { const k = Math.round(d.fr * 10); if (seen.has(k)) return false; seen.add(k); return true; })
+      .slice(0, 17)
+      .forEach((d, i) => pluck(d.fr, i * 0.23, { gain: 0.33 }));
+  };
+
+  const chip = (active) => ({
+    flexShrink: 0, padding: "7px 12px", borderRadius: 999, fontSize: 13, fontWeight: 700, cursor: "pointer",
+    border: `1.5px solid ${active ? T.amber : T.line}`,
+    background: active ? "rgba(233,161,59,0.16)" : T.surface, color: T.cream,
+  });
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: T.faint, marginBottom: 10 }}>
+        Pick a root, a scale, and a CAGED position. Chord tones wear their colors — everything else is the connective tissue.
+      </div>
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
+        {NOTES.map((n, i) => (
+          <button key={n} className="chip" style={chip(rootPc === i)} onClick={() => setRootPc(i)}>{n}</button>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+        {SCALES.map((s) => (
+          <button key={s.id} className="chip" style={chip(scaleId === s.id)} onClick={() => setScaleId(s.id)}>{s.name}</button>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+        {["All", "C", "A", "G", "E", "D"].map((sh) => (
+          <button key={sh} className="chip" style={chip(shape === sh)} onClick={() => setShape(sh)}>
+            {sh === "All" ? "Whole neck" : `${sh} shape`}
+          </button>
+        ))}
+      </div>
+      <div className="card">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
+          <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif" }}>
+            {NOTES[rootPc]} {scale.name}
+            {shape !== "All" && <span style={{ color: T.amber }}> · {shape} shape</span>}
+            {shape !== "All" && <span style={{ color: T.faint, fontWeight: 400, fontSize: 13 }}> (frets {win[0]}–{win[1]})</span>}
+          </div>
+          <button className="chip" onClick={playScale} style={btnAmber}>▶ Play scale</button>
+        </div>
+        <Fretboard maxFret={12} dots={dots} onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
+        <IntervalLegend seventh={false} gray />
+      </div>
+      <p style={{ fontSize: 12.5, color: T.faint, marginTop: 10 }}>
+        Tap any position to hear it. Notice how the red roots and the chord shape from the Library sit inside each scale box — that's the whole CAGED idea.
+      </p>
+    </div>
+  );
+}
+
+/* ---------------- Progress ---------------- */
+function Progress({ save }) {
+  const acc = save.totals.answers ? Math.round((100 * save.totals.correct) / save.totals.answers) : 0;
+  const heat = save.posStats || {};
+  const cell = (s, f) => {
+    const d = heat[`${s}-${f}`];
+    if (!d || !d[1]) return { bg: T.raised, op: 0.45 };
+    const a = d[0] / d[1];
+    const col = a >= 0.85 ? T.green : a >= 0.6 ? T.amber : T.red;
+    return { bg: col, op: 0.35 + 0.65 * Math.min(1, d[1] / 6) };
+  };
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 18 }}>
+        {[["Answers", save.totals.answers], ["Accuracy", acc + "%"], ["Best streak", save.totals.bestStreak]].map(([k, v]) => (
+          <div key={k} className="card" style={{ textAlign: "center", padding: "16px 8px" }}>
+            <div style={{ fontSize: 26, fontWeight: 800, color: T.amber, fontFamily: "'Fraunces', Georgia, serif" }}>{v}</div>
+            <div style={{ fontSize: 12.5, color: T.muted }}>{k}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card" style={{ marginBottom: 18 }}>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>Fretboard heatmap</div>
+        <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 10 }}>Where you're strong (green) and where to drill (red). Fades in as you practice.</div>
+        <div style={{ display: "grid", gridTemplateColumns: "26px repeat(13, 1fr)", gap: 3 }}>
+          {[5, 4, 3, 2, 1, 0].map((s) => (
+            <React.Fragment key={s}>
+              <div style={{ fontSize: 11.5, color: T.muted, alignSelf: "center", fontWeight: 700 }}>{["E", "A", "D", "G", "B", "e"][s]}</div>
+              {Array.from({ length: 13 }, (_, f) => {
+                const c = cell(s, f);
+                return <div key={f} title={`${noteAt(s, f)} — string ${STRING_NAMES[s]}, fret ${f}`} style={{ aspectRatio: "1", borderRadius: 4, background: c.bg, opacity: c.op }} />;
+              })}
+            </React.Fragment>
+          ))}
+          <div />
+          {Array.from({ length: 13 }, (_, f) => (
+            <div key={f} style={{ fontSize: 10, color: T.faint, textAlign: "center" }}>{f}</div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 18 }}>
+        <div style={{ fontWeight: 700, marginBottom: 10 }}>Note levels</div>
+        {NOTE_LEVELS.map((lv) => {
+          const m = masteryOf(save.noteHist[lv.id]);
+          const locked = lv.id > save.noteUnlocked;
+          return (
+            <div key={lv.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: `1px solid ${T.line}` }}>
+              <div style={{ width: 20, textAlign: "center" }}>{save.noteDone[lv.id] ? "★" : locked ? "🔒" : "•"}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{lv.name} <span style={{ color: T.faint, fontWeight: 400, fontSize: 12 }}>{lv.desc}</span></div>
+              </div>
+              <div style={{ fontSize: 12.5, color: save.noteDone[lv.id] ? T.green : T.muted }}>{locked ? "" : `${m.correct}/${NEED}`}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="card">
+        <div style={{ fontWeight: 700, marginBottom: 10 }}>Chord tiers</div>
+        {CHORD_TIERS.map((t, i) => {
+          const m = masteryOf(save.chordHist[t.id]);
+          const locked = i + 1 > save.chordUnlocked;
+          return (
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: `1px solid ${T.line}` }}>
+              <div style={{ width: 20, textAlign: "center" }}>{save.chordDone[t.id] ? "★" : locked ? "🔒" : "•"}</div>
+              <div style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{t.name} <span style={{ color: T.faint, fontWeight: 400, fontSize: 12 }}>{t.desc}</span></div>
+              <div style={{ fontSize: 12.5, color: save.chordDone[t.id] ? T.green : T.muted }}>{locked ? "" : `${m.correct}/${NEED}`}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Button styles ---------------- */
+const btnAmber = { padding: "8px 14px", borderRadius: 9, fontSize: 13.5, fontWeight: 700, border: "none", background: T.amber, color: "#2A1C0B", cursor: "pointer" };
+const btnGhost = { padding: "8px 14px", borderRadius: 9, fontSize: 13.5, fontWeight: 700, border: `1.5px solid ${T.line}`, background: "transparent", color: T.cream, cursor: "pointer" };
+
+/* ---------------- App shell ---------------- */
+const DEFAULT_SAVE = {
+  noteUnlocked: 1, chordUnlocked: 1,
+  noteHist: {}, chordHist: {},
+  noteDone: {}, chordDone: {},
+  posStats: {},
+  totals: { answers: 0, correct: 0, bestStreak: 0 },
+};
+const SAVE_KEY = "fretwork:save:v1";
+
+function App() {
+  const [tab, setTab] = useState("notes");
+  const [save, setSave] = useState(DEFAULT_SAVE);
+  const [loaded, setLoaded] = useState(false);
+  const [toast, setToast] = useState(null);
+  const streakRef = useRef(0);
+  const saveTimer = useRef(null);
+
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Outfit:wght@400;600;700;800&display=swap";
+    document.head.appendChild(link);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const v = await Store.get(SAVE_KEY);
+        if (v) {
+          const parsed = { ...DEFAULT_SAVE, ...JSON.parse(v) };
+          if (parsed.chordDone && parsed.chordDone.c5) parsed.chordUnlocked = Math.max(parsed.chordUnlocked, 6);
+          setSave(parsed);
+        }
+      } catch (e) { /* fresh start */ }
+      setLoaded(true);
+    })();
+  }, []);
+
+  const persist = (next) => {
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try { await Store.set(SAVE_KEY, JSON.stringify(next)); } catch (e) { /* offline is fine */ }
+    }, 500);
+  };
+
+  const record = useCallback((kind, id, ok, s, f, onDone) => {
+    setSave((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      const histKey = kind === "note" ? "noteHist" : "chordHist";
+      const doneKey = kind === "note" ? "noteDone" : "chordDone";
+      const unlockKey = kind === "note" ? "noteUnlocked" : "chordUnlocked";
+      const h = next[histKey][id] || [];
+      h.push(ok ? 1 : 0);
+      next[histKey][id] = h.slice(-40);
+      if (kind === "note" && s != null) {
+        const k = `${s}-${f}`;
+        const d = next.posStats[k] || [0, 0];
+        next.posStats[k] = [d[0] + (ok ? 1 : 0), d[1] + 1];
+      }
+      next.totals.answers += 1;
+      next.totals.correct += ok ? 1 : 0;
+      streakRef.current = ok ? streakRef.current + 1 : 0;
+      next.totals.bestStreak = Math.max(next.totals.bestStreak, streakRef.current);
+      const m = masteryOf(next[histKey][id]);
+      if (m.done && !next[doneKey][id]) {
+        next[doneKey][id] = true;
+        const list = kind === "note" ? NOTE_LEVELS : CHORD_TIERS;
+        const idx = list.findIndex((x) => x.id === id);
+        if (idx >= 0 && idx + 2 > next[unlockKey] && idx + 1 < list.length) {
+          next[unlockKey] = idx + 2;
+          if (onDone) onDone(list[idx + 1].name);
+        } else if (onDone) onDone(null);
+      }
+      persist(next);
+      return next;
+    });
+  }, []);
+
+  const onLevelDone = (nextName) => {
+    setToast(nextName ? `Level complete! “${nextName}” unlocked 🎸` : "Level complete! ★");
+    setTimeout(() => setToast(null), 3200);
+  };
+
+  const tabs = [
+    ["notes", "Notes"], ["chords", "Chords"], ["scales", "Scales"], ["library", "Library"], ["progress", "Progress"],
+  ];
+
+  return (
+    <div style={{ minHeight: "100vh", background: T.bg, color: T.cream, fontFamily: "'Outfit', system-ui, sans-serif" }}>
+      <style>{`
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        button { font-family: inherit; }
+        .card { background: ${T.surface}; border: 1px solid ${T.line}; border-radius: 16px; padding: 18px; }
+        .ans { cursor: pointer; transition: transform .08s ease, background .15s ease; }
+        .ans:active { transform: scale(0.96); }
+        .ans:hover { background: #43342700; filter: brightness(1.15); }
+        .chip { cursor: pointer; transition: filter .15s ease; }
+        .chip:hover:not(:disabled) { filter: brightness(1.15); }
+        .libcard { transition: transform .1s ease, border-color .15s ease; }
+        .libcard:hover { transform: translateY(-2px); border-color: ${T.amber} !important; }
+        .pop { animation: pop .25s ease; }
+        @keyframes pop { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes slideup { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+        button:focus-visible { outline: 2px solid ${T.amber}; outline-offset: 2px; }
+        @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+      `}</style>
+
+      <div style={{ maxWidth: 940, margin: "0 auto", padding: "18px 14px 60px" }}>
+        <header style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4 }}>
+          <h1 style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: 34, margin: 0, letterSpacing: "-0.5px" }}>
+            Fret<span style={{ color: T.amber }}>work</span>
+          </h1>
+          <span style={{ fontSize: 12.5, color: T.faint, letterSpacing: "0.12em", textTransform: "uppercase" }}>note & chord trainer</span>
+        </header>
+        <div style={{ height: 3, borderRadius: 2, background: `linear-gradient(90deg, ${T.amber}, transparent 70%)`, marginBottom: 16 }} />
+
+        <nav style={{ display: "flex", gap: 6, marginBottom: 18, background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, padding: 5 }}>
+          {tabs.map(([id, label]) => (
+            <button key={id} className="chip" onClick={() => setTab(id)}
+              style={{
+                flex: 1, padding: "10px 2px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 700,
+                background: tab === id ? T.amber : "transparent", color: tab === id ? "#2A1C0B" : T.muted,
+              }}>
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        {!loaded ? (
+          <div style={{ color: T.muted, padding: 40, textAlign: "center" }}>Tuning up…</div>
+        ) : tab === "notes" ? (
+          <NoteTrainer save={save} record={record} onLevelDone={onLevelDone} />
+        ) : tab === "chords" ? (
+          <ChordTrainer save={save} record={record} onLevelDone={onLevelDone} />
+        ) : tab === "scales" ? (
+          <ScaleExplorer />
+        ) : tab === "library" ? (
+          <ChordLibrary />
+        ) : (
+          <Progress save={save} />
+        )}
+      </div>
+
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+          background: T.amber, color: "#2A1C0B", fontWeight: 800, fontSize: 14.5,
+          padding: "12px 20px", borderRadius: 12, boxShadow: "0 6px 24px rgba(0,0,0,.45)",
+          animation: "slideup .3s ease", zIndex: 50, whiteSpace: "nowrap",
+        }}>
+          {toast}
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
