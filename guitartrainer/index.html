@@ -725,6 +725,29 @@ function bestTriad(rootPc, quality, setIdx, win) {
   return best;
 }
 
+/* ---- Ear training: intervals → chord colors → progressions ---- */
+const INTERVALS = [
+  { iv: 1, name: "Minor 2nd" }, { iv: 2, name: "Major 2nd" }, { iv: 3, name: "Minor 3rd" },
+  { iv: 4, name: "Major 3rd" }, { iv: 5, name: "Perfect 4th" }, { iv: 6, name: "Tritone" },
+  { iv: 7, name: "Perfect 5th" }, { iv: 8, name: "Minor 6th" }, { iv: 9, name: "Major 6th" },
+  { iv: 10, name: "Minor 7th" }, { iv: 11, name: "Major 7th" }, { iv: 12, name: "Octave" },
+];
+const CHORD_QUALITIES = {
+  "Major": [0, 4, 7, 12], "Minor": [0, 3, 7, 12],
+  "Dominant 7": [0, 4, 7, 10], "Minor 7": [0, 3, 7, 10],
+  "Major 6": [0, 4, 7, 9], "Minor 6": [0, 3, 7, 9],
+  "Diminished 7": [0, 3, 6, 9], "7♭9": [0, 4, 7, 10, 13],
+};
+const EAR_LEVELS = [
+  { id: "e1", name: "Intervals I", kind: "interval", set: [4, 5, 7, 12], desc: "Major 3rd, 4th, 5th, octave — the pillars" },
+  { id: "e2", name: "Intervals II", kind: "interval", set: [2, 3, 4, 5, 7, 9, 12], desc: "Add 2nds, minor 3rd and major 6th" },
+  { id: "e3", name: "Intervals III", kind: "interval", set: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], desc: "All twelve intervals" },
+  { id: "e4", name: "Chord Colors I", kind: "chord", set: ["Major", "Minor"], desc: "Bright vs dark — the big two" },
+  { id: "e5", name: "Chord Colors II", kind: "chord", set: ["Major", "Minor", "Dominant 7", "Minor 7"], desc: "Add the sevenths" },
+  { id: "e6", name: "Chord Colors III", kind: "chord", set: ["Major", "Minor", "Dominant 7", "Minor 7", "Major 6", "Minor 6", "Diminished 7", "7♭9"], desc: "Django's full palette" },
+  { id: "e7", name: "Progressions", kind: "prog", set: ["pop", "rock", "jazz", "doo", "blues"], desc: "Name the changes in a random key" },
+];
+
 /* ---------------- Django progression drills ---------------- */
 function ProgressionDrills() {
   const [live, setLive] = useState(null); // { p, i } — which chord is sounding
@@ -1084,6 +1107,113 @@ function ScaleExplorer() {
   );
 }
 
+/* ---------------- Ear Trainer ---------------- */
+function EarTrainer({ save, record, onLevelDone }) {
+  const [levelId, setLevelId] = useState(EAR_LEVELS[Math.min(save.earUnlocked || 1, EAR_LEVELS.length) - 1].id);
+  const level = EAR_LEVELS.find((l) => l.id === levelId);
+  const [q, setQ] = useState(null);
+  const [result, setResult] = useState(null);
+  const [streak, setStreak] = useState(0);
+  const timer = useRef(null);
+
+  const playQ = useCallback((qq) => {
+    const t = qq || q;
+    if (!t) return;
+    if (level.kind === "interval") {
+      pluck(t.root, 0, { gain: 0.42 });
+      pluck(t.root * Math.pow(2, t.iv / 12), 0.8, { gain: 0.42 });
+    } else if (level.kind === "chord") {
+      CHORD_QUALITIES[t.quality].forEach((v, i) => pluck(t.root * Math.pow(2, v / 12), i * 0.05, { gain: 0.3 }));
+    } else {
+      t.chart.forEach((c, i) => { strum(c.frets, false, i * 0.95); strum(c.frets, false, i * 0.95 + 0.48); });
+    }
+  }, [q, level]);
+
+  const newQuestion = useCallback(() => {
+    setResult(null);
+    let nq;
+    if (level.kind === "interval") {
+      let iv;
+      do { iv = level.set[rand(level.set.length)]; } while (q && iv === q.iv && level.set.length > 1);
+      nq = { iv, root: freqAt(1 + rand(3), rand(8)), answer: INTERVALS.find((x) => x.iv === iv).name };
+    } else if (level.kind === "chord") {
+      let quality;
+      do { quality = level.set[rand(level.set.length)]; } while (q && quality === q.quality && level.set.length > 1);
+      nq = { quality, root: freqAt(1 + rand(2), rand(8)), answer: quality };
+    } else {
+      let pid;
+      do { pid = level.set[rand(level.set.length)]; } while (q && pid === q.pid && level.set.length > 1);
+      const prog = PLAY_PROGRESSIONS.find((p) => p.id === pid);
+      const keyPc = rand(12);
+      const chart = prog.seq.map((rn) => {
+        const [off, qual] = ROMAN[rn];
+        return bestTriad((keyPc + off) % 12, qual, TRIAD_SETS["1–3"], [2, 9]);
+      });
+      nq = { pid, chart, answer: prog.name };
+    }
+    setQ(nq);
+    setTimeout(() => playQ(nq), 350);
+  }, [level, q, playQ]);
+
+  useEffect(() => { setQ(null); setResult(null); setStreak(0); }, [levelId]);
+  useEffect(() => { if (!q) newQuestion(); }, [q, newQuestion]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const options =
+    level.kind === "interval" ? level.set.map((iv) => INTERVALS.find((x) => x.iv === iv).name)
+    : level.kind === "chord" ? level.set
+    : level.set.map((pid) => PLAY_PROGRESSIONS.find((p) => p.id === pid).name);
+
+  const answer = (opt) => {
+    if (result || !q) return;
+    const ok = opt === q.answer;
+    setResult(ok ? "right" : "wrong");
+    setStreak(ok ? streak + 1 : 0);
+    record("ear", levelId, ok, null, null, onLevelDone);
+    if (ok) playQ(); else { thud(); setTimeout(() => playQ(), 500); }
+    const wait = level.kind === "prog" ? q.chart.length * 950 + 900 : ok ? 1500 : 2400;
+    timer.current = setTimeout(newQuestion, wait);
+  };
+
+  const prompt =
+    level.kind === "interval" ? "Two notes, low then high — what's the interval?"
+    : level.kind === "chord" ? "One chord — what's its color?"
+    : "Listen to the changes — which progression is it?";
+  const hist = save.earHist[levelId] || [];
+  const cols = level.kind === "interval" ? "repeat(auto-fill, minmax(105px, 1fr))" : level.kind === "chord" ? "1fr 1fr" : "1fr 1fr";
+
+  return (
+    <div>
+      <LevelChips items={EAR_LEVELS} current={levelId} unlocked={save.earUnlocked || 1} doneMap={save.earDone || {}} onPick={setLevelId} />
+      <div style={{ fontSize: 13, color: T.faint, marginBottom: 10 }}>{level.desc}</div>
+      <div className="card">
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
+          <button className="chip" style={{ ...btnAmber, fontSize: 15, padding: "12px 20px" }} onClick={() => playQ()}>🔊 Play again</button>
+          <div style={{ fontSize: 14.5, color: T.muted, flex: 1, minWidth: 160 }}>{prompt}</div>
+          <div style={{ fontSize: 13, color: streak >= 3 ? T.amber : T.muted, fontWeight: 700 }}>{streak > 0 ? `🔥 ${streak}` : ""}</div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: cols, gap: 8 }}>
+          {options.map((opt) => (
+            <button key={opt} className="ans" onClick={() => answer(opt)}
+              style={{
+                padding: "13px 6px", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer",
+                border: `1.5px solid ${result && opt === q?.answer ? T.green : T.line}`,
+                background: result && opt === q?.answer ? "rgba(139,184,113,0.18)" : T.raised, color: T.cream,
+              }}>
+              {opt}
+            </button>
+          ))}
+        </div>
+        <Feedback result={result} correctText={q ? q.answer : ""} />
+        <MasteryBar hist={hist} />
+      </div>
+      <p style={{ fontSize: 12.5, color: T.faint, marginTop: 10 }}>
+        Everything is played with the guitar voice in a random register, so you're learning the sound, not a fixed pitch. Correct answers replay the sound — let it sink in.
+      </p>
+    </div>
+  );
+}
+
 /* ---------------- Play-Along chord charts ---------------- */
 function PlayAlong({ save, bump }) {
   const [keyPc, setKeyPc] = useState(0);
@@ -1255,6 +1385,21 @@ function Progress({ save }) {
         })}
       </div>
 
+      <div className="card" style={{ marginBottom: 18 }}>
+        <div style={{ fontWeight: 700, marginBottom: 10 }}>Ear training</div>
+        {EAR_LEVELS.map((lv, i) => {
+          const m = masteryOf((save.earHist || {})[lv.id]);
+          const locked = i + 1 > (save.earUnlocked || 1);
+          return (
+            <div key={lv.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: `1px solid ${T.line}` }}>
+              <div style={{ width: 20, textAlign: "center" }}>{(save.earDone || {})[lv.id] ? "★" : locked ? "🔒" : "•"}</div>
+              <div style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{lv.name} <span style={{ color: T.faint, fontWeight: 400, fontSize: 12 }}>{lv.desc}</span></div>
+              <div style={{ fontSize: 12.5, color: (save.earDone || {})[lv.id] ? T.green : T.muted }}>{locked ? "" : `${m.correct}/${NEED}`}</div>
+            </div>
+          );
+        })}
+      </div>
+
       <div className="card">
         <div style={{ fontWeight: 700, marginBottom: 10 }}>Chord tiers</div>
         {CHORD_TIERS.map((t, i) => {
@@ -1279,9 +1424,9 @@ const btnGhost = { padding: "8px 14px", borderRadius: 9, fontSize: 13.5, fontWei
 
 /* ---------------- App shell ---------------- */
 const DEFAULT_SAVE = {
-  noteUnlocked: 1, chordUnlocked: 1,
-  noteHist: {}, chordHist: {},
-  noteDone: {}, chordDone: {},
+  noteUnlocked: 1, chordUnlocked: 1, earUnlocked: 1,
+  noteHist: {}, chordHist: {}, earHist: {},
+  noteDone: {}, chordDone: {}, earDone: {},
   posStats: {},
   practice: {},
   totals: { answers: 0, correct: 0, bestStreak: 0 },
@@ -1328,9 +1473,9 @@ function App() {
   const record = useCallback((kind, id, ok, s, f, onDone) => {
     setSave((prev) => {
       const next = JSON.parse(JSON.stringify(prev));
-      const histKey = kind === "note" ? "noteHist" : "chordHist";
-      const doneKey = kind === "note" ? "noteDone" : "chordDone";
-      const unlockKey = kind === "note" ? "noteUnlocked" : "chordUnlocked";
+      const histKey = kind === "note" ? "noteHist" : kind === "ear" ? "earHist" : "chordHist";
+      const doneKey = kind === "note" ? "noteDone" : kind === "ear" ? "earDone" : "chordDone";
+      const unlockKey = kind === "note" ? "noteUnlocked" : kind === "ear" ? "earUnlocked" : "chordUnlocked";
       const h = next[histKey][id] || [];
       h.push(ok ? 1 : 0);
       next[histKey][id] = h.slice(-40);
@@ -1346,7 +1491,7 @@ function App() {
       const m = masteryOf(next[histKey][id]);
       if (m.done && !next[doneKey][id]) {
         next[doneKey][id] = true;
-        const list = kind === "note" ? NOTE_LEVELS : CHORD_TIERS;
+        const list = kind === "note" ? NOTE_LEVELS : kind === "ear" ? EAR_LEVELS : CHORD_TIERS;
         const idx = list.findIndex((x) => x.id === id);
         if (idx >= 0 && idx + 2 > next[unlockKey] && idx + 1 < list.length) {
           next[unlockKey] = idx + 2;
@@ -1372,7 +1517,7 @@ function App() {
   };
 
   const tabs = [
-    ["notes", "Notes"], ["chords", "Chords"], ["scales", "Scales"], ["library", "Library"], ["progress", "Progress"],
+    ["notes", "Notes"], ["chords", "Chords"], ["ear", "Ear"], ["scales", "Scales"], ["library", "Library"], ["progress", "Progress"],
   ];
 
   return (
@@ -1408,7 +1553,7 @@ function App() {
           {tabs.map(([id, label]) => (
             <button key={id} className="chip" onClick={() => setTab(id)}
               style={{
-                flex: 1, padding: "10px 2px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 700,
+                flex: 1, padding: "10px 1px", borderRadius: 8, border: "none", fontSize: 12, fontWeight: 700,
                 background: tab === id ? T.amber : "transparent", color: tab === id ? "#2A1C0B" : T.muted,
               }}>
               {label}
@@ -1440,6 +1585,8 @@ function App() {
               <PlayAlong save={save} bump={bumpPractice} />
             )}
           </>
+        ) : tab === "ear" ? (
+          <EarTrainer save={save} record={record} onLevelDone={onLevelDone} />
         ) : tab === "scales" ? (
           <ScaleExplorer />
         ) : tab === "library" ? (
