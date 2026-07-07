@@ -465,7 +465,7 @@ function ChordDiagram({ frets, size = 150, label, rootPc = null }) {
       {base === 1 ? (
         <rect x={left - 2} y={top - 5} width={right - left + 4} height={6} rx={2} fill={T.cream} />
       ) : (
-        <text x={left - 8} y={top + rowH * 0.66} fontSize="13" fill={T.muted} textAnchor="end" fontFamily="inherit">{base}fr</text>
+        <text x={left - 3} y={top + rowH * 0.66} fontSize="11" fill={T.muted} textAnchor="end" fontFamily="inherit">{base}fr</text>
       )}
       {/* grid */}
       {Array.from({ length: 6 }, (_, i) => (
@@ -714,9 +714,10 @@ function bestTriad(rootPc, quality, setIdx, win) {
   for (let inv = 0; inv < 3; inv++) {
     const base = triadVoicing(rootPc, quality, inv, setIdx);
     for (const off of [-12, 0, 12]) {
-      const fr = base.map((f) => (f < 0 ? f : f + off));
-      const act = fr.filter((f) => f >= 0);
-      if (Math.min(...act) < 0 || Math.max(...act) > 15) continue;
+      const act = setIdx.map((s) => base[s] + off);
+      if (Math.min(...act) < 0 || Math.max(...act) > 15) continue; // every string must stay on the neck
+      const fr = [-1, -1, -1, -1, -1, -1];
+      setIdx.forEach((s, i) => (fr[s] = act[i]));
       const mean = act.reduce((a, b) => a + b, 0) / act.length;
       const score = Math.abs(mean - center);
       if (!best || score < best.score) best = { frets: fr, inv, score };
@@ -1059,7 +1060,7 @@ function ScaleExplorer() {
       .sort((a, b) => a.fr - b.fr)
       .filter((d) => { const k = Math.round(d.fr * 10); if (seen.has(k)) return false; seen.add(k); return true; })
       .slice(0, 17)
-      .forEach((d, i) => pluck(d.fr, i * 0.23, { gain: 0.33 }));
+      .forEach((d, i) => pluck(d.fr, i * 0.23, { gain: 0.38, dur: 0.9, damp: 0.985 }));
   };
 
   const chip = (active) => ({
