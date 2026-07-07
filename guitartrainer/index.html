@@ -344,11 +344,14 @@ function click(at, accent) {
 
 /* ---- Practice: warm-ups & song repertoire checklist ---- */
 const WARMUP_ITEMS = [
-  { id: "w1", t: "Chromatic two-finger warm-up", m: "all 12 finger pairs · tool below" },
-  { id: "w2", t: "CAGED Major forms", m: "Scales tab · all 5 positions" },
-  { id: "w3", t: "CAGED Minor forms", m: "Natural Minor · all 5 positions" },
-  { id: "w4", t: "CAGED Pentatonic forms", m: "Major & Minor Pentatonic" },
-  { id: "w5", t: "CAGED Blues forms", m: "Blues scale · all 5 positions" },
+  { id: "w1", t: "Chromatic two-finger warm-up", m: "all 12 finger pairs · tool above" },
+  { id: "w2", t: "CAGED Major forms", m: "5 positions", drill: "cmaj" },
+  { id: "w3", t: "CAGED Minor forms", m: "5 positions", drill: "cmin" },
+  { id: "w4", t: "CAGED Major Pentatonic", m: "5 positions", drill: "cmajp" },
+  { id: "w5", t: "CAGED Minor Pentatonic", m: "5 positions", drill: "cminp" },
+  { id: "w6", t: "CAGED Blues forms", m: "5 positions", drill: "cblues" },
+  { id: "w7", t: "3:2 Major Pentatonic", m: "2 patterns", drill: "32maj" },
+  { id: "w8", t: "3:2 Minor Pentatonic", m: "2 patterns", drill: "32min" },
 ];
 const SONGS = [
   { t: "Can't Judge a Book", m: "backbeat · 115" },
@@ -438,14 +441,14 @@ const T = {
 };
 
 /* ---------------- Fretboard (horizontal, the signature element) ---------------- */
-function Fretboard({ maxFret = 12, marker, tapped, onTap, disabled, dots }) {
-  const FRETS = 12;
+function Fretboard({ maxFret = 12, frets = 12, marker, tapped, onTap, disabled, dots }) {
+  const FRETS = frets;
   const W = 980, H = 258;
   const nutX = 64, endX = W - 12;
   const fw = (endX - nutX) / FRETS;
   const yOf = (s) => 226 - s * 39; // s=0 low E bottom
   const fretCenter = (f) => (f === 0 ? nutX - 30 : nutX + (f - 0.5) * fw);
-  const inlays = [3, 5, 7, 9];
+  const inlays = [3, 5, 7, 9, 15, 17, 19].filter((f) => f <= FRETS);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", display: "block", touchAction: "manipulation" }} role="img" aria-label="Guitar fretboard">
       <defs>
@@ -489,7 +492,7 @@ function Fretboard({ maxFret = 12, marker, tapped, onTap, disabled, dots }) {
         </text>
       ))}
       {/* fret numbers */}
-      {[3, 5, 7, 9, 12].map((f) => (
+      {[3, 5, 7, 9, 12, 15, 17, 19].filter((f) => f <= FRETS).map((f) => (
         <text key={f} x={nutX + (f - 0.5) * fw} y={H - 0} fill={T.faint} fontSize="13" textAnchor="middle" fontFamily="inherit">{f}</text>
       ))}
       {/* scale / interval dots */}
@@ -1455,24 +1458,14 @@ function PlayAlong({ save, bump }) {
   );
 }
 
-/* ---------------- Chromatic warm-up: metronome + pattern timer ---------------- */
-function ChromaticWarmup() {
-  const PAIRS = ["1–2", "1–3", "1–4", "2–3", "2–4", "3–4", "2–1", "3–1", "4–1", "3–2", "4–2", "4–3"];
-  const [bpm, setBpm] = useState(60);
-  const [secs, setSecs] = useState(30);
-  const [mode, setMode] = useState("seq");
+/* ---------------- Drill clock: shared metronome + rotating timer ---------------- */
+function useDrillClock(bpm, secs, onAdvance) {
   const [running, setRunning] = useState(false);
-  const [idx, setIdx] = useState(0);
-  const [remaining, setRemaining] = useState(30);
+  const [remaining, setRemaining] = useState(secs);
   const bpmRef = useRef(bpm); useEffect(() => { bpmRef.current = bpm; }, [bpm]);
   const secsRef = useRef(secs); useEffect(() => { secsRef.current = secs; if (!running) setRemaining(secs); }, [secs, running]);
-  const modeRef = useRef(mode); useEffect(() => { modeRef.current = mode; }, [mode]);
-  const beatRef = useRef(0);
-  const nextRef = useRef(0);
-  const schedRef = useRef(null);
-  const deadlineRef = useRef(0);
-  const tickRef = useRef(null);
-
+  const advRef = useRef(onAdvance); useEffect(() => { advRef.current = onAdvance; });
+  const beatRef = useRef(0), nextRef = useRef(0), schedRef = useRef(null), deadlineRef = useRef(0), tickRef = useRef(null);
   const scheduler = () => {
     const ctx = audioCtx();
     if (!ctx) return;
@@ -1482,16 +1475,6 @@ function ChromaticWarmup() {
       beatRef.current++;
     }
     schedRef.current = setTimeout(scheduler, 30);
-  };
-  const advance = () => {
-    setIdx((prev) => {
-      if (modeRef.current === "seq") return (prev + 1) % PAIRS.length;
-      let n;
-      do { n = rand(PAIRS.length); } while (n === prev);
-      return n;
-    });
-    pluck(1318.5, 0, { gain: 0.4, dur: 0.5 });
-    pluck(1760, 0.13, { gain: 0.4, dur: 0.6 });
   };
   const start = () => {
     const ctx = audioCtx();
@@ -1505,25 +1488,64 @@ function ChromaticWarmup() {
     tickRef.current = setInterval(() => {
       const rem = (deadlineRef.current - Date.now()) / 1000;
       if (rem <= 0) {
-        advance();
+        advRef.current();
+        pluck(1318.5, 0, { gain: 0.4, dur: 0.5 });
+        pluck(1760, 0.13, { gain: 0.4, dur: 0.6 });
         deadlineRef.current = Date.now() + secsRef.current * 1000;
         setRemaining(secsRef.current);
       } else setRemaining(rem);
     }, 150);
   };
-  const stop = () => {
-    setRunning(false);
-    clearTimeout(schedRef.current);
-    clearInterval(tickRef.current);
-  };
+  const stop = () => { setRunning(false); clearTimeout(schedRef.current); clearInterval(tickRef.current); };
   useEffect(() => () => { clearTimeout(schedRef.current); clearInterval(tickRef.current); }, []);
+  return { running, remaining, start, stop };
+}
+const drillChip = (active) => ({
+  flexShrink: 0, padding: "7px 12px", borderRadius: 999, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+  border: `1.5px solid ${active ? T.amber : T.line}`,
+  background: active ? "rgba(233,161,59,0.16)" : T.surface, color: T.cream,
+});
+function TimerBar({ remaining, secs }) {
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: T.muted, marginBottom: 4 }}>
+        <span>next pattern in</span><span style={{ fontWeight: 800, color: T.cream }}>{Math.ceil(remaining)}s</span>
+      </div>
+      <div style={{ height: 10, borderRadius: 6, background: T.raised, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: (remaining / secs) * 100 + "%", background: `linear-gradient(90deg, ${T.amberDeep}, ${T.amber})`, transition: "width .15s linear" }} />
+      </div>
+    </>
+  );
+}
+function DrillControls({ bpm, setBpm, secs, setSecs, extra }) {
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+      <button className="chip" style={drillChip(false)} onClick={() => setBpm(Math.max(40, bpm - 5))}>−</button>
+      <span style={{ fontSize: 13.5, fontWeight: 800, minWidth: 64, textAlign: "center" }}>{bpm} bpm</span>
+      <button className="chip" style={drillChip(false)} onClick={() => setBpm(Math.min(180, bpm + 5))}>+</button>
+      <span style={{ width: 10 }} />
+      {[20, 30, 45, 60].map((s) => (
+        <button key={s} className="chip" style={drillChip(secs === s)} onClick={() => setSecs(s)}>{s}s</button>
+      ))}
+      {extra}
+    </div>
+  );
+}
 
-  const chip = (active) => ({
-    flexShrink: 0, padding: "7px 12px", borderRadius: 999, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
-    border: `1.5px solid ${active ? T.amber : T.line}`,
-    background: active ? "rgba(233,161,59,0.16)" : T.surface, color: T.cream,
+/* ---------------- Chromatic warm-up ---------------- */
+function ChromaticWarmup() {
+  const PAIRS = ["1–2", "1–3", "1–4", "2–3", "2–4", "3–4", "2–1", "3–1", "4–1", "3–2", "4–2", "4–3"];
+  const [bpm, setBpm] = useState(60);
+  const [secs, setSecs] = useState(30);
+  const [mode, setMode] = useState("seq");
+  const modeRef = useRef(mode); useEffect(() => { modeRef.current = mode; }, [mode]);
+  const [idx, setIdx] = useState(0);
+  const advance = () => setIdx((prev) => {
+    if (modeRef.current === "seq") return (prev + 1) % PAIRS.length;
+    let n; do { n = rand(PAIRS.length); } while (n === prev);
+    return n;
   });
-  const pct = (remaining / secs) * 100;
+  const { running, remaining, start, stop } = useDrillClock(bpm, secs, advance);
 
   return (
     <div className="card" style={{ marginBottom: 14 }}>
@@ -1537,12 +1559,7 @@ function ChromaticWarmup() {
           <div style={{ fontSize: 11.5, color: T.faint, marginTop: 4 }}>{mode === "seq" ? `pattern ${idx + 1} of ${PAIRS.length}` : "random pattern"}</div>
         </div>
         <div style={{ flex: 1, minWidth: 180 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: T.muted, marginBottom: 4 }}>
-            <span>next pattern in</span><span style={{ fontWeight: 800, color: T.cream }}>{Math.ceil(remaining)}s</span>
-          </div>
-          <div style={{ height: 10, borderRadius: 6, background: T.raised, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: pct + "%", background: `linear-gradient(90deg, ${T.amberDeep}, ${T.amber})`, transition: "width .15s linear" }} />
-          </div>
+          <TimerBar remaining={remaining} secs={secs} />
           <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
             <button className="chip" style={running ? btnGhost : btnAmber} onClick={running ? stop : start}>
               {running ? "■ Stop" : "▶ Start warm-up"}
@@ -1551,30 +1568,166 @@ function ChromaticWarmup() {
           </div>
         </div>
       </div>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-        <button className="chip" style={chip(false)} onClick={() => setBpm(Math.max(40, bpm - 5))}>−</button>
-        <span style={{ fontSize: 13.5, fontWeight: 800, minWidth: 64, textAlign: "center" }}>{bpm} bpm</span>
-        <button className="chip" style={chip(false)} onClick={() => setBpm(Math.min(180, bpm + 5))}>+</button>
-        <span style={{ width: 10 }} />
-        {[20, 30, 45, 60].map((s) => (
-          <button key={s} className="chip" style={chip(secs === s)} onClick={() => setSecs(s)}>{s}s</button>
-        ))}
-        <span style={{ width: 10 }} />
-        {[["seq", "Sequential"], ["rand", "Random"]].map(([m, label]) => (
-          <button key={m} className="chip" style={chip(mode === m)} onClick={() => setMode(m)}>{label}</button>
-        ))}
-      </div>
+      <DrillControls bpm={bpm} setBpm={setBpm} secs={secs} setSecs={setSecs}
+        extra={<>
+          <span style={{ width: 10 }} />
+          {[["seq", "Sequential"], ["rand", "Random"]].map(([m, label]) => (
+            <button key={m} className="chip" style={drillChip(mode === m)} onClick={() => setMode(m)}>{label}</button>
+          ))}
+        </>}
+      />
     </div>
   );
 }
 
-/* ---------------- Practice tab: warm-up tool + checklists ---------------- */
-function CheckRow({ checked, title, meta, onToggle }) {
+/* ---------------- CAGED & 3:2 scale-form drill ---------------- */
+const CAGED_ORDER = ["C", "A", "G", "E", "D"];
+/* 3:2 patterns: per-string fret offsets relative to the root's low-E fret */
+const P32_MIN = [
+  [[-2, 0], [-2, 0, 2], [0, 2], [0, 2, 4], [3, 5], [3, 5, 7]],
+  [[3, 5, 7], [5, 7], [5, 7, 9], [7, 9], [8, 10, 12], [10, 12]],
+];
+const P32_MAJ = [
+  [[-5, -3], [-5, -3, -1], [-3, -1], [-3, -1, 1], [0, 2], [0, 2, 4]],
+  [[0, 2, 4], [2, 4], [2, 4, 6], [4, 6], [5, 7, 9], [7, 9]],
+];
+const DRILL_FORMS = [
+  { id: "cmaj", name: "CAGED Major", type: "caged", scale: "maj" },
+  { id: "cmin", name: "CAGED Minor", type: "caged", scale: "nmin" },
+  { id: "cmajp", name: "CAGED Maj Pent", type: "caged", scale: "majp" },
+  { id: "cminp", name: "CAGED Min Pent", type: "caged", scale: "minp" },
+  { id: "cblues", name: "CAGED Blues", type: "caged", scale: "blues" },
+  { id: "32maj", name: "3:2 Major Pent", type: "32", patterns: P32_MAJ },
+  { id: "32min", name: "3:2 Minor Pent", type: "32", patterns: P32_MIN },
+];
+function shapeWindow(rootPc, shape) {
+  const f6 = (rootPc - OPEN_PC[0] + 12) % 12;
+  const [so, eo] = SHAPE_WINDOWS[shape];
+  let start = (f6 + so + 12) % 12;
+  const span = eo - so;
+  if (start + span > 12) start -= 12;
+  if (start < 0) start = 0;
+  return [start, Math.min(12, start + span)];
+}
+function ScaleFormDrill({ formId, setFormId }) {
+  const form = DRILL_FORMS.find((f) => f.id === formId);
+  const [rootPc, setRootPc] = useState(9);
+  const [bpm, setBpm] = useState(70);
+  const [secs, setSecs] = useState(30);
+  const [mode, setMode] = useState("seq");
+  const modeRef = useRef(mode); useEffect(() => { modeRef.current = mode; }, [mode]);
+  const [pos, setPos] = useState(0);
+  const nPos = form.type === "caged" ? 5 : 2;
+  useEffect(() => { setPos(0); }, [formId]);
+  const advance = () => setPos((p) => {
+    const n = form.type === "caged" ? 5 : 2;
+    if (modeRef.current === "seq" || n <= 2) return (p + 1) % n;
+    let x; do { x = rand(n); } while (x === p);
+    return x;
+  });
+  const { running, remaining, start, stop } = useDrillClock(bpm, secs, advance);
+
+  const { dots, numFrets, posLabel } = useMemo(() => {
+    const mkDot = (s, f) => {
+      const iv = (OPEN_PC[s] + f - rootPc + 1200) % 12;
+      const ct = iv === 0 || iv === 3 || iv === 4 || iv === 7;
+      return { s, f, iv, color: ct ? IV_COLORS[iv].color : "#6B5B47", text: ct ? IV_COLORS[iv].text : T.cream, label: DEGREE_LABEL[iv] };
+    };
+    if (form.type === "caged") {
+      const shape = CAGED_ORDER[pos % 5];
+      const ivs = SCALES.find((s) => s.id === form.scale).ivs;
+      const win = shapeWindow(rootPc, shape);
+      const out = [];
+      for (let s = 0; s < 6; s++)
+        for (let f = win[0]; f <= win[1]; f++) {
+          const iv = (OPEN_PC[s] + f - rootPc + 1200) % 12;
+          if (ivs.includes(iv)) out.push(mkDot(s, f));
+        }
+      return { dots: out, numFrets: 12, posLabel: `${shape} shape · ${(pos % 5) + 1} of 5 · frets ${win[0]}–${win[1]}` };
+    }
+    const f6 = (rootPc - OPEN_PC[0] + 12) % 12;
+    const pat = form.patterns[pos % 2];
+    let best = null;
+    for (const o of [-12, 0, 12]) {
+      const all = pat.flatMap((str) => str.map((x) => f6 + x + o));
+      const mn = Math.min(...all), mx = Math.max(...all);
+      if (mn < 0) continue;
+      if (!best || mx < best.mx) best = { o, mx };
+    }
+    const o = best ? best.o : 0;
+    const out = [];
+    let mx = 12;
+    pat.forEach((strOffsets, s) => {
+      strOffsets.forEach((x) => {
+        const f = f6 + x + o;
+        mx = Math.max(mx, f);
+        out.push(mkDot(s, f));
+      });
+    });
+    return { dots: out, numFrets: Math.min(20, mx), posLabel: `Pattern ${(pos % 2) + 1} of 2` };
+  }, [form, rootPc, pos]);
+
+  const playRun = () => {
+    const seen = new Set();
+    const uniq = dots
+      .map((d) => ({ ...d, fr: freqAt(d.s, d.f) }))
+      .sort((a, b) => a.fr - b.fr)
+      .filter((d) => { const k = Math.round(d.fr * 10); if (seen.has(k)) return false; seen.add(k); return true; });
+    const si = uniq.findIndex((d) => d.label === "R");
+    (si >= 0 ? uniq.slice(si) : uniq).slice(0, 17).forEach((d, i) => pluck(d.fr, i * 0.35, { gain: 0.38, dur: 1.0, damp: 0.985 }));
+  };
+
   return (
-    <button onClick={onToggle}
+    <div className="card" style={{ marginBottom: 14 }}>
+      <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Scale Form Drill</div>
+      <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 10 }}>
+        The board shows one position at a time; when the chime rings, the next one appears — keep playing through the change.
+      </div>
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
+        {DRILL_FORMS.map((f) => (
+          <button key={f.id} className="chip" style={drillChip(formId === f.id)} onClick={() => setFormId(f.id)}>{f.name}</button>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 10 }}>
+        {NOTES.map((n, i) => (
+          <button key={n} className="chip" style={drillChip(rootPc === i)} onClick={() => setRootPc(i)}>{n}</button>
+        ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+        <div>
+          <span style={{ fontWeight: 800, fontSize: 16 }}>{NOTES[rootPc]} {form.name}</span>
+          <span style={{ color: T.amber, fontWeight: 700, fontSize: 14 }}> · {posLabel}</span>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="chip" style={running ? btnGhost : btnAmber} onClick={running ? stop : start}>{running ? "■ Stop" : "▶ Start drill"}</button>
+          <button className="chip" style={btnGhost} onClick={advance}>Skip ▸</button>
+          <button className="chip" style={btnGhost} onClick={playRun}>♪ Hear it</button>
+        </div>
+      </div>
+      <TimerBar remaining={remaining} secs={secs} />
+      <div style={{ marginTop: 10 }}>
+        <Fretboard frets={numFrets} maxFret={numFrets} dots={dots} onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
+      </div>
+      <IntervalLegend seventh={false} gray />
+      <DrillControls bpm={bpm} setBpm={setBpm} secs={secs} setSecs={setSecs}
+        extra={form.type === "caged" ? <>
+          <span style={{ width: 10 }} />
+          {[["seq", "Sequential"], ["rand", "Random"]].map(([m, label]) => (
+            <button key={m} className="chip" style={drillChip(mode === m)} onClick={() => setMode(m)}>{label}</button>
+          ))}
+        </> : null}
+      />
+    </div>
+  );
+}
+
+/* ---------------- Practice tab: warm-up tool + drills + checklists ---------------- */
+function CheckRow({ checked, title, meta, onToggle, onDrill }) {
+  return (
+    <div onClick={onToggle}
       style={{
-        display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left", cursor: "pointer",
-        background: "transparent", border: "none", borderBottom: `1px solid ${T.line}`, padding: "9px 2px", color: T.cream,
+        display: "flex", alignItems: "center", gap: 12, width: "100%", cursor: "pointer",
+        borderBottom: `1px solid ${T.line}`, padding: "9px 2px", color: T.cream,
       }}>
       <span style={{
         width: 22, height: 22, borderRadius: 6, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -1583,22 +1736,37 @@ function CheckRow({ checked, title, meta, onToggle }) {
       }}>{checked ? "✓" : ""}</span>
       <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: checked ? T.green : T.cream }}>{title}</span>
       {meta && <span style={{ fontSize: 12, color: T.faint }}>{meta}</span>}
-    </button>
+      {onDrill && (
+        <button className="chip" onClick={(e) => { e.stopPropagation(); onDrill(); }}
+          style={{ ...btnGhost, fontSize: 11.5, padding: "4px 10px", flexShrink: 0 }}>▶ Drill</button>
+      )}
+    </div>
   );
 }
 function PracticeTab({ save, toggle, resetWarm }) {
   const cl = save.checklist || { warm: {}, songs: {} };
   const songCount = Object.keys(cl.songs || {}).length;
+  const [formId, setFormId] = useState("cminp");
+  const drillRef = useRef(null);
+  const goDrill = (id) => {
+    setFormId(id);
+    if (drillRef.current) drillRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   return (
     <div>
       <ChromaticWarmup />
+      <div ref={drillRef}>
+        <ScaleFormDrill formId={formId} setFormId={setFormId} />
+      </div>
       <div className="card" style={{ marginBottom: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
           <div style={{ fontWeight: 800, fontSize: 16 }}>Warm-ups</div>
           <button className="chip" style={{ ...btnGhost, fontSize: 12, padding: "5px 10px" }} onClick={resetWarm}>↺ Reset for today</button>
         </div>
         {WARMUP_ITEMS.map((w) => (
-          <CheckRow key={w.id} checked={!!cl.warm[w.id]} title={w.t} meta={w.m} onToggle={() => toggle("warm", w.id)} />
+          <CheckRow key={w.id} checked={!!cl.warm[w.id]} title={w.t} meta={w.m}
+            onToggle={() => toggle("warm", w.id)}
+            onDrill={w.drill ? () => goDrill(w.drill) : undefined} />
         ))}
       </div>
       <div className="card">
