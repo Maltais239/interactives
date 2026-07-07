@@ -1055,12 +1055,13 @@ function ScaleExplorer() {
 
   const playScale = () => {
     const seen = new Set();
-    dots
+    const seq = dots
       .map((d) => ({ ...d, fr: freqAt(d.s, d.f) }))
       .sort((a, b) => a.fr - b.fr)
-      .filter((d) => { const k = Math.round(d.fr * 10); if (seen.has(k)) return false; seen.add(k); return true; })
-      .slice(0, 17)
-      .forEach((d, i) => pluck(d.fr, i * 0.23, { gain: 0.38, dur: 0.9, damp: 0.985 }));
+      .filter((d) => { const k = Math.round(d.fr * 10); if (seen.has(k)) return false; seen.add(k); return true; });
+    const start = seq.findIndex((d) => d.label === "R");
+    const run = (start >= 0 ? seq.slice(start) : seq).slice(0, 17);
+    run.forEach((d, i) => pluck(d.fr, i * 0.35, { gain: 0.38, dur: 1.0, damp: 0.985 }));
   };
 
   const chip = (active) => ({
@@ -1117,6 +1118,7 @@ function EarTrainer({ save, record, onLevelDone }) {
   const [q, setQ] = useState(null);
   const [result, setResult] = useState(null);
   const [streak, setStreak] = useState(0);
+  const [study, setStudy] = useState(false);
   const timer = useRef(null);
 
   const playQ = useCallback((qq) => {
@@ -1199,6 +1201,32 @@ function EarTrainer({ save, record, onLevelDone }) {
           <div style={{ fontSize: 14.5, color: T.muted, flex: 1, minWidth: 160 }}>{prompt}</div>
           <div style={{ fontSize: 13, color: streak >= 3 ? T.amber : T.muted, fontWeight: 700 }}>{streak > 0 ? `🔥 ${streak}` : ""}</div>
         </div>
+        {level.kind === "chord" && (
+          <div style={{ marginBottom: 12 }}>
+            <button className="chip" style={{ ...btnGhost, fontSize: 12.5, padding: "6px 12px" }} onClick={() => setStudy(!study)}>
+              🎧 {study ? "Hide the colors" : "Study the colors"}
+            </button>
+            {study && (
+              <>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                  {level.set.map((qual) => (
+                    <button key={qual} className="chip"
+                      onClick={() => {
+                        const root = freqAt(1 + rand(2), rand(8));
+                        CHORD_QUALITIES[qual].forEach((v, i) => pluck(root * Math.pow(2, v / 12), i * 0.05, { gain: 0.3 }));
+                      }}
+                      style={{ padding: "7px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 700, border: `1.5px solid ${T.line}`, background: T.surface, color: T.cream, cursor: "pointer" }}>
+                      ▶ {qual}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ fontSize: 12, color: T.faint, marginTop: 6 }}>
+                  Each tap plays that color on a random root, so you can compare colors without it giving away the question.
+                </div>
+              </>
+            )}
+          </div>
+        )}
         <div style={{ display: "grid", gridTemplateColumns: cols, gap: 8 }}>
           {options.map((opt) => (
             <button key={opt} className="ans" onClick={() => answer(opt)}
