@@ -746,6 +746,8 @@ const EAR_LEVELS = [
   { id: "e5", name: "Chord Colors II", kind: "chord", set: ["Major", "Minor", "Dominant 7", "Minor 7"], desc: "Add the sevenths" },
   { id: "e6", name: "Chord Colors III", kind: "chord", set: ["Major", "Minor", "Dominant 7", "Minor 7", "Major 6", "Minor 6", "Diminished 7", "7♭9"], desc: "Django's full palette" },
   { id: "e7", name: "Progressions", kind: "prog", set: ["pop", "rock", "jazz", "doo", "blues"], desc: "Name the changes in a random key" },
+  { id: "e8", name: "Harmonic Intervals I", kind: "harmonic", set: [3, 4, 5, 7, 9, 12], desc: "Both notes at once — 3rds, 4th, 5th, 6th, octave" },
+  { id: "e9", name: "Harmonic Intervals II", kind: "harmonic", set: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], desc: "All twelve, sounded together — the graduate course" },
 ];
 
 /* ---------------- Django progression drills ---------------- */
@@ -1122,6 +1124,9 @@ function EarTrainer({ save, record, onLevelDone }) {
     if (level.kind === "interval") {
       pluck(t.root, 0, { gain: 0.42 });
       pluck(t.root * Math.pow(2, t.iv / 12), 0.8, { gain: 0.42 });
+    } else if (level.kind === "harmonic") {
+      pluck(t.root, 0, { gain: 0.38 });
+      pluck(t.root * Math.pow(2, t.iv / 12), 0.02, { gain: 0.38 });
     } else if (level.kind === "chord") {
       CHORD_QUALITIES[t.quality].forEach((v, i) => pluck(t.root * Math.pow(2, v / 12), i * 0.05, { gain: 0.3 }));
     } else {
@@ -1132,7 +1137,7 @@ function EarTrainer({ save, record, onLevelDone }) {
   const newQuestion = useCallback(() => {
     setResult(null);
     let nq;
-    if (level.kind === "interval") {
+    if (level.kind === "interval" || level.kind === "harmonic") {
       let iv;
       do { iv = level.set[rand(level.set.length)]; } while (q && iv === q.iv && level.set.length > 1);
       nq = { iv, root: freqAt(1 + rand(3), rand(8)), answer: INTERVALS.find((x) => x.iv === iv).name };
@@ -1160,7 +1165,7 @@ function EarTrainer({ save, record, onLevelDone }) {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   const options =
-    level.kind === "interval" ? level.set.map((iv) => INTERVALS.find((x) => x.iv === iv).name)
+    level.kind === "interval" || level.kind === "harmonic" ? level.set.map((iv) => INTERVALS.find((x) => x.iv === iv).name)
     : level.kind === "chord" ? level.set
     : level.set.map((pid) => PLAY_PROGRESSIONS.find((p) => p.id === pid).name);
 
@@ -1177,10 +1182,11 @@ function EarTrainer({ save, record, onLevelDone }) {
 
   const prompt =
     level.kind === "interval" ? "Two notes, low then high — what's the interval?"
+    : level.kind === "harmonic" ? "Two notes sounded together — what's the interval?"
     : level.kind === "chord" ? "One chord — what's its color?"
     : "Listen to the changes — which progression is it?";
   const hist = save.earHist[levelId] || [];
-  const cols = level.kind === "interval" ? "repeat(auto-fill, minmax(105px, 1fr))" : level.kind === "chord" ? "1fr 1fr" : "1fr 1fr";
+  const cols = level.kind === "interval" || level.kind === "harmonic" ? "repeat(auto-fill, minmax(105px, 1fr))" : level.kind === "chord" ? "1fr 1fr" : "1fr 1fr";
 
   return (
     <div>
