@@ -1738,12 +1738,24 @@ function ScaleFormDrill({ formId, setFormId }) {
     }
     const f6 = (rootPc - OPEN_PC[0] + 12) % 12;
     const pat = form.patterns[pos % 2];
+    /* Prefer the lowest placement; dropping a few off-the-nut notes beats
+       shoving the whole pattern up an octave. Full patterns win only when
+       they sit comfortably low (max fret <= 17). */
     let best = null;
     for (const o of [-12, 0, 12]) {
-      const all = pat.flatMap((str) => str.map((x) => f6 + x + o));
-      const mn = Math.min(...all), mx = Math.max(...all);
-      if (mn < 0) continue;
-      if (!best || mx < best.mx) best = { o, mx };
+      let kept = 0, dropped = 0, hi = 0;
+      pat.forEach((str) => str.forEach((x) => {
+        const f = f6 + x + o;
+        if (f < 0 || f > 19) dropped++;
+        else { kept++; hi = Math.max(hi, f); }
+      }));
+      if (kept < 9) continue;
+      const cand = { o, hi, dropped };
+      const isFullLow = (c) => c.dropped === 0 && c.hi <= 17;
+      if (!best) { best = cand; continue; }
+      if (isFullLow(cand) !== isFullLow(best)) { if (isFullLow(cand)) best = cand; continue; }
+      if (cand.hi !== best.hi) { if (cand.hi < best.hi) best = cand; continue; }
+      if (cand.dropped < best.dropped) best = cand;
     }
     const o = best ? best.o : 0;
     const out = [];
@@ -1751,11 +1763,13 @@ function ScaleFormDrill({ formId, setFormId }) {
     pat.forEach((strOffsets, s) => {
       strOffsets.forEach((x) => {
         const f = f6 + x + o;
+        if (f < 0 || f > 19) return;
         mx = Math.max(mx, f);
         out.push(mkDot(s, f));
       });
     });
-    return { dots: out, numFrets: Math.min(20, mx), posLabel: `Pattern ${(pos % 2) + 1} of 2` };
+    const partial = out.length < 15;
+    return { dots: out, numFrets: Math.min(20, mx), posLabel: `Pattern ${(pos % 2) + 1} of 2${partial ? " · low partial" : ""}` };
   }, [form, rootPc, pos]);
 
   const playRun = () => {
