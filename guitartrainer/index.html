@@ -621,7 +621,7 @@ function IntervalLegend({ seventh = true, gray = false, extended = false }) {
   const items = [["R", "#D6453C", "Root"], ["3", "#3E7CC4", "3rd"], ["5", "#EFC94C", "5th"]];
   if (seventh || extended) items.push(["7", "#6FA05C", "7th"]);
   if (extended) items.push(["6", "#A47CC7", "6th"], ["♭9", "#D77BA8", "♭9"]);
-  if (gray) items.push(["·", "#6B5B47", "other scale tones"]);
+  if (gray) items.push(["·", "#E4D6B8", "other scale tones"]);
   return (
     <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", marginTop: 12, fontSize: 12.5, color: T.muted }}>
       {items.map(([l, c, name]) => (
@@ -1120,6 +1120,7 @@ function ScaleExplorer() {
   const [rootPc, setRootPc] = useState(0);
   const [scaleId, setScaleId] = useState("maj");
   const [shape, setShape] = useState("All");
+  const [focus, setFocus] = useState(false);
   const scale = SCALES.find((s) => s.id === scaleId);
 
   const win = useMemo(() => {
@@ -1142,8 +1143,8 @@ function ScaleExplorer() {
         const chordTone = iv === 0 || iv === 3 || iv === 4 || iv === 7;
         out.push({
           s, f,
-          color: chordTone ? IV_COLORS[iv].color : "#6B5B47",
-          text: chordTone ? IV_COLORS[iv].text : T.cream,
+          color: chordTone ? IV_COLORS[iv].color : "#E4D6B8",
+          text: chordTone ? IV_COLORS[iv].text : "#4A3524",
           label: DEGREE_LABEL[iv],
         });
       }
@@ -1169,6 +1170,7 @@ function ScaleExplorer() {
 
   return (
     <div>
+      {!focus && (<>
       <div style={{ fontSize: 13, color: T.faint, marginBottom: 10 }}>
         Pick a root, a scale, and a CAGED position. Chord tones wear their colors — everything else is the connective tissue.
       </div>
@@ -1189,6 +1191,7 @@ function ScaleExplorer() {
           </button>
         ))}
       </div>
+      </>)}
       <div className="card">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
           <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif" }}>
@@ -1196,14 +1199,19 @@ function ScaleExplorer() {
             {shape !== "All" && <span style={{ color: T.amber }}> · {shape} shape</span>}
             {shape !== "All" && <span style={{ color: T.faint, fontWeight: 400, fontSize: 13 }}> (frets {win[0]}–{win[1]})</span>}
           </div>
-          <button className="chip" onClick={playScale} style={btnAmber}>▶ Play scale</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="chip" onClick={playScale} style={btnAmber}>▶ Play scale</button>
+            <button className="chip" onClick={() => setFocus(!focus)} style={btnGhost}>{focus ? "⛶ Exit" : "⛶ Focus"}</button>
+          </div>
         </div>
         <Fretboard maxFret={12} dots={dots} onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
-        <IntervalLegend seventh={false} gray />
+        {!focus && <IntervalLegend seventh={false} gray />}
       </div>
+      {!focus && (
       <p style={{ fontSize: 12.5, color: T.faint, marginTop: 10 }}>
         Tap any position to hear it. Notice how the red roots and the chord shape from the Library sit inside each scale box — that's the whole CAGED idea.
       </p>
+      )}
     </div>
   );
 }
@@ -1617,6 +1625,7 @@ function ScaleFormDrill({ formId, setFormId }) {
   const [mode, setMode] = useState("seq");
   const modeRef = useRef(mode); useEffect(() => { modeRef.current = mode; }, [mode]);
   const [pos, setPos] = useState(0);
+  const [focus, setFocus] = useState(false);
   const nPos = form.type === "caged" ? 5 : 2;
   useEffect(() => { setPos(0); }, [formId]);
   const advance = () => setPos((p) => {
@@ -1631,7 +1640,7 @@ function ScaleFormDrill({ formId, setFormId }) {
     const mkDot = (s, f) => {
       const iv = (OPEN_PC[s] + f - rootPc + 1200) % 12;
       const ct = iv === 0 || iv === 3 || iv === 4 || iv === 7;
-      return { s, f, iv, color: ct ? IV_COLORS[iv].color : "#6B5B47", text: ct ? IV_COLORS[iv].text : T.cream, label: DEGREE_LABEL[iv] };
+      return { s, f, iv, color: ct ? IV_COLORS[iv].color : "#E4D6B8", text: ct ? IV_COLORS[iv].text : "#4A3524", label: DEGREE_LABEL[iv] };
     };
     if (form.type === "caged") {
       const shape = CAGED_ORDER[pos % 5];
@@ -1680,6 +1689,7 @@ function ScaleFormDrill({ formId, setFormId }) {
   return (
     <div className="card" style={{ marginBottom: 14 }}>
       <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Scale Form Drill</div>
+      {!focus && (<>
       <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 10 }}>
         The board shows one position at a time; when the chime rings, the next one appears — keep playing through the change.
       </div>
@@ -1693,6 +1703,7 @@ function ScaleFormDrill({ formId, setFormId }) {
           <button key={n} className="chip" style={drillChip(rootPc === i)} onClick={() => setRootPc(i)}>{n}</button>
         ))}
       </div>
+      </>)}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
         <div>
           <span style={{ fontWeight: 800, fontSize: 16 }}>{NOTES[rootPc]} {form.name}</span>
@@ -1702,12 +1713,14 @@ function ScaleFormDrill({ formId, setFormId }) {
           <button className="chip" style={running ? btnGhost : btnAmber} onClick={running ? stop : start}>{running ? "■ Stop" : "▶ Start drill"}</button>
           <button className="chip" style={btnGhost} onClick={advance}>Skip ▸</button>
           <button className="chip" style={btnGhost} onClick={playRun}>♪ Hear it</button>
+          <button className="chip" style={btnGhost} onClick={() => setFocus(!focus)}>{focus ? "⛶ Exit" : "⛶ Focus"}</button>
         </div>
       </div>
       <TimerBar remaining={remaining} secs={secs} />
       <div style={{ marginTop: 10 }}>
         <Fretboard frets={numFrets} maxFret={numFrets} dots={dots} onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
       </div>
+      {!focus && (<>
       <IntervalLegend seventh={false} gray />
       <DrillControls bpm={bpm} setBpm={setBpm} secs={secs} setSecs={setSecs}
         extra={form.type === "caged" ? <>
@@ -1717,6 +1730,7 @@ function ScaleFormDrill({ formId, setFormId }) {
           ))}
         </> : null}
       />
+      </>)}
     </div>
   );
 }
@@ -2013,16 +2027,20 @@ function App() {
         @keyframes slideup { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
         button:focus-visible { outline: 2px solid ${T.amber}; outline-offset: 2px; }
         @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+        @media (orientation: landscape) and (max-height: 520px) {
+          .app-header, .app-rule { display: none !important; }
+          .app-wrap { padding-top: 8px !important; }
+        }
       `}</style>
 
-      <div style={{ maxWidth: 940, margin: "0 auto", padding: "18px 14px 60px" }}>
-        <header style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4 }}>
+      <div className="app-wrap" style={{ maxWidth: 940, margin: "0 auto", padding: "18px 14px 60px" }}>
+        <header className="app-header" style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4 }}>
           <h1 style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: 34, margin: 0, letterSpacing: "-0.5px" }}>
             Fret<span style={{ color: T.amber }}>work</span>
           </h1>
           <span style={{ fontSize: 12.5, color: T.faint, letterSpacing: "0.12em", textTransform: "uppercase" }}>note & chord trainer</span>
         </header>
-        <div style={{ height: 3, borderRadius: 2, background: `linear-gradient(90deg, ${T.amber}, transparent 70%)`, marginBottom: 16 }} />
+        <div className="app-rule" style={{ height: 3, borderRadius: 2, background: `linear-gradient(90deg, ${T.amber}, transparent 70%)`, marginBottom: 16 }} />
 
         <nav style={{ display: "flex", gap: 4, marginBottom: 18, background: T.surface, border: `1px solid ${T.line}`, borderRadius: 12, padding: 5, overflowX: "auto" }}>
           {tabs.map(([id, label]) => (
