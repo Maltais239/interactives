@@ -80,6 +80,45 @@ const SCALES = [
 ];
 /* Fret windows for each CAGED scale position, offset from the root's low-E fret */
 const SHAPE_WINDOWS = { E: [-1, 2], D: [1, 5], C: [4, 7], A: [6, 9], G: [8, 12] };
+/* Semitone offsets of open strings above low E */
+const OPEN_SEMIS = [0, 5, 10, 15, 19, 24];
+/* Build a position window guaranteed to contain a complete, gap-free scale box:
+   start from the shape anchor, expand minimally until every string holds >=2 scale
+   tones and no scale degree is skipped between the box's lowest and highest pitch. */
+function positionWindow(rootPc, ivs, shape) {
+  const f6 = (rootPc - OPEN_PC[0] + 12) % 12;
+  const [so, eo] = SHAPE_WINDOWS[shape];
+  let a = (f6 + so + 12) % 12;
+  const span = eo - so;
+  if (a + span > 12) a -= 12;
+  if (a < 0) a = 0;
+  let b = a + span;
+  const inScale = (s, f) => ivs.includes((OPEN_PC[s] + f - rootPc + 1200) % 12);
+  const complete = (lo, hi) => {
+    const pitches = [];
+    for (let s = 0; s < 6; s++) {
+      let cnt = 0;
+      for (let f = Math.max(0, lo); f <= hi; f++) if (inScale(s, f)) { cnt++; pitches.push(OPEN_SEMIS[s] + f); }
+      if (cnt < 2) return false;
+    }
+    const uniq = [...new Set(pitches)].sort((x, y) => x - y);
+    for (let i = 0; i + 1 < uniq.length; i++)
+      for (let p = uniq[i] + 1; p < uniq[i + 1]; p++)
+        if (ivs.includes((((4 + p) % 12) - rootPc + 12) % 12)) return false;
+    return true;
+  };
+  const cands = [];
+  for (let da = 0; da <= 2; da++) for (let db = 0; db <= 3; db++) cands.push([da, db]);
+  cands.sort((x, y) => x[0] + x[1] - (y[0] + y[1]) || x[0] - y[0]);
+  for (const [da, db] of cands) {
+    const lo = Math.max(0, a - da), hi = Math.min(15, b + db);
+    if (complete(lo, hi)) { a = lo; b = hi; break; }
+  }
+  const colHas = (f) => f >= 0 && [0, 1, 2, 3, 4, 5].some((s) => inScale(s, f));
+  while (a < b && !colHas(a)) a++;
+  while (b > a && !colHas(b)) b--;
+  return [a, Math.min(15, b)];
+}
 
 const NOTE_LEVELS = [
   { id: 1, name: "First Position", desc: "Frets 0–3, natural notes", maxFret: 3, naturals: true },
@@ -1125,14 +1164,8 @@ function ScaleExplorer() {
 
   const win = useMemo(() => {
     if (shape === "All") return [0, 12];
-    const f6 = (rootPc - OPEN_PC[0] + 12) % 12;
-    const [so, eo] = SHAPE_WINDOWS[shape];
-    let start = (f6 + so + 12) % 12;
-    const span = eo - so;
-    if (start + span > 12) start -= 12;
-    if (start < 0) start = 0;
-    return [start, Math.min(12, start + span)];
-  }, [shape, rootPc]);
+    return positionWindow(rootPc, scale.ivs, shape);
+  }, [shape, rootPc, scale]);
 
   const dots = useMemo(() => {
     const out = [];
@@ -1204,7 +1237,7 @@ function ScaleExplorer() {
             <button className="chip" onClick={() => setFocus(!focus)} style={btnGhost}>{focus ? "⛶ Exit" : "⛶ Focus"}</button>
           </div>
         </div>
-        <Fretboard maxFret={12} dots={dots} onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
+        <Fretboard frets={Math.max(12, win[1])} maxFret={Math.max(12, win[1])} dots={dots} onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
         {!focus && <IntervalLegend seventh={false} gray />}
       </div>
       {!focus && (
@@ -1608,15 +1641,6 @@ const DRILL_FORMS = [
   { id: "32maj", name: "3:2 Major Pent", type: "32", patterns: P32_MAJ },
   { id: "32min", name: "3:2 Minor Pent", type: "32", patterns: P32_MIN },
 ];
-function shapeWindow(rootPc, shape) {
-  const f6 = (rootPc - OPEN_PC[0] + 12) % 12;
-  const [so, eo] = SHAPE_WINDOWS[shape];
-  let start = (f6 + so + 12) % 12;
-  const span = eo - so;
-  if (start + span > 12) start -= 12;
-  if (start < 0) start = 0;
-  return [start, Math.min(12, start + span)];
-}
 function ScaleFormDrill({ formId, setFormId }) {
   const form = DRILL_FORMS.find((f) => f.id === formId);
   const [rootPc, setRootPc] = useState(9);
@@ -1645,14 +1669,14 @@ function ScaleFormDrill({ formId, setFormId }) {
     if (form.type === "caged") {
       const shape = CAGED_ORDER[pos % 5];
       const ivs = SCALES.find((s) => s.id === form.scale).ivs;
-      const win = shapeWindow(rootPc, shape);
+      const win = positionWindow(rootPc, ivs, shape);
       const out = [];
       for (let s = 0; s < 6; s++)
         for (let f = win[0]; f <= win[1]; f++) {
           const iv = (OPEN_PC[s] + f - rootPc + 1200) % 12;
           if (ivs.includes(iv)) out.push(mkDot(s, f));
         }
-      return { dots: out, numFrets: 12, posLabel: `${shape} shape · ${(pos % 5) + 1} of 5 · frets ${win[0]}–${win[1]}` };
+      return { dots: out, numFrets: Math.max(12, win[1]), posLabel: `${shape} shape · ${(pos % 5) + 1} of 5 · frets ${win[0]}–${win[1]}` };
     }
     const f6 = (rootPc - OPEN_PC[0] + 12) % 12;
     const pat = form.patterns[pos % 2];
