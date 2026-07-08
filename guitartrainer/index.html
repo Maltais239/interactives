@@ -85,7 +85,7 @@ const OPEN_SEMIS = [0, 5, 10, 15, 19, 24];
 /* Build a position window guaranteed to contain a complete, gap-free scale box:
    start from the shape anchor, expand minimally until every string holds >=2 scale
    tones and no scale degree is skipped between the box's lowest and highest pitch. */
-function positionWindow(rootPc, ivs, shape) {
+function positionWindow(rootPc, ivs, shape, minPer = 2) {
   const f6 = (rootPc - OPEN_PC[0] + 12) % 12;
   const [so, eo] = SHAPE_WINDOWS[shape];
   let a = (f6 + so + 12) % 12;
@@ -99,7 +99,7 @@ function positionWindow(rootPc, ivs, shape) {
     for (let s = 0; s < 6; s++) {
       let cnt = 0;
       for (let f = Math.max(0, lo); f <= hi; f++) if (inScale(s, f)) { cnt++; pitches.push(OPEN_SEMIS[s] + f); }
-      if (cnt < 2) return false;
+      if (cnt < minPer) return false;
     }
     const uniq = [...new Set(pitches)].sort((x, y) => x - y);
     for (let i = 0; i + 1 < uniq.length; i++)
@@ -391,6 +391,7 @@ const WARMUP_ITEMS = [
   { id: "w6", t: "CAGED Blues forms", m: "5 positions", drill: "cblues" },
   { id: "w7", t: "3:2 Major Pentatonic", m: "2 patterns", drill: "32maj" },
   { id: "w8", t: "3:2 Minor Pentatonic", m: "2 patterns", drill: "32min" },
+  { id: "w9", t: "CAGED Arpeggios", m: "Maj · Min · Dom7", drill: "amaj" },
 ];
 const SONGS = [
   { t: "Can't Judge a Book", m: "backbeat · 115" },
@@ -1546,11 +1547,11 @@ const drillChip = (active) => ({
   border: `1.5px solid ${active ? T.amber : T.line}`,
   background: active ? "rgba(233,161,59,0.16)" : T.surface, color: T.cream,
 });
-function TimerBar({ remaining, secs }) {
+function TimerBar({ remaining, secs, label = "next pattern in" }) {
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: T.muted, marginBottom: 4 }}>
-        <span>next pattern in</span><span style={{ fontWeight: 800, color: T.cream }}>{Math.ceil(remaining)}s</span>
+        <span>{label}</span><span style={{ fontWeight: 800, color: T.cream }}>{Math.ceil(remaining)}s</span>
       </div>
       <div style={{ height: 10, borderRadius: 6, background: T.raised, overflow: "hidden" }}>
         <div style={{ height: "100%", width: (remaining / secs) * 100 + "%", background: `linear-gradient(90deg, ${T.amberDeep}, ${T.amber})`, transition: "width .15s linear" }} />
@@ -1558,7 +1559,7 @@ function TimerBar({ remaining, secs }) {
     </>
   );
 }
-function DrillControls({ bpm, setBpm, secs, setSecs, extra }) {
+function DrillControls({ bpm, setBpm, secs, setSecs, rounds, setRounds, extra }) {
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
       <button className="chip" style={drillChip(false)} onClick={() => setBpm(Math.max(40, bpm - 5))}>−</button>
@@ -1568,6 +1569,15 @@ function DrillControls({ bpm, setBpm, secs, setSecs, extra }) {
       {[20, 30, 45, 60].map((s) => (
         <button key={s} className="chip" style={drillChip(secs === s)} onClick={() => setSecs(s)}>{s}s</button>
       ))}
+      {setRounds && (
+        <>
+          <span style={{ width: 10 }} />
+          <span style={{ fontSize: 11.5, color: T.faint }}>rounds</span>
+          {[[0, "∞"], [4, "4"], [6, "6"], [8, "8"], [12, "12"]].map(([v, l]) => (
+            <button key={v} className="chip" style={drillChip(rounds === v)} onClick={() => setRounds(v)}>{l}</button>
+          ))}
+        </>
+      )}
       {extra}
     </div>
   );
@@ -1581,12 +1591,29 @@ function ChromaticWarmup() {
   const [mode, setMode] = useState("seq");
   const modeRef = useRef(mode); useEffect(() => { modeRef.current = mode; }, [mode]);
   const [idx, setIdx] = useState(0);
-  const advance = () => setIdx((prev) => {
+  const [rounds, setRounds] = useState(0);
+  const [roundNum, setRoundNum] = useState(0);
+  const [sessionDone, setSessionDone] = useState(false);
+  const stopRef = useRef(() => {});
+  const nextPattern = () => setIdx((prev) => {
     if (modeRef.current === "seq") return (prev + 1) % PAIRS.length;
     let n; do { n = rand(PAIRS.length); } while (n === prev);
     return n;
   });
+  const advance = () => {
+    const nr = roundNum + 1;
+    setRoundNum(nr);
+    if (rounds > 0 && nr >= rounds) {
+      setSessionDone(true);
+      [0, 4, 7, 12].forEach((iv, i) => pluck(261.63 * Math.pow(2, iv / 12), 0.3 + i * 0.12, { gain: 0.32, dur: 1.4 }));
+      stopRef.current();
+      return;
+    }
+    nextPattern();
+  };
   const { running, remaining, start, stop } = useDrillClock(bpm, secs, advance);
+  stopRef.current = stop;
+  const begin = () => { setRoundNum(0); setSessionDone(false); start(); };
 
   return (
     <div className="card" style={{ marginBottom: 14 }}>
@@ -1600,16 +1627,17 @@ function ChromaticWarmup() {
           <div style={{ fontSize: 11.5, color: T.faint, marginTop: 4 }}>{mode === "seq" ? `pattern ${idx + 1} of ${PAIRS.length}` : "random pattern"}</div>
         </div>
         <div style={{ flex: 1, minWidth: 180 }}>
-          <TimerBar remaining={remaining} secs={secs} />
+          <TimerBar remaining={remaining} secs={secs} label={rounds > 0 ? `round ${Math.min(roundNum + 1, rounds)} of ${rounds} · next in` : "next pattern in"} />
+          {sessionDone && <div style={{ color: T.green, fontWeight: 800, fontSize: 13, marginTop: 6 }}>Session complete — nice work 🎸</div>}
           <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
-            <button className="chip" style={running ? btnGhost : btnAmber} onClick={running ? stop : start}>
+            <button className="chip" style={running ? btnGhost : btnAmber} onClick={running ? stop : begin}>
               {running ? "■ Stop" : "▶ Start warm-up"}
             </button>
-            <button className="chip" style={btnGhost} onClick={advance}>Skip ▸</button>
+            <button className="chip" style={btnGhost} onClick={nextPattern}>Skip ▸</button>
           </div>
         </div>
       </div>
-      <DrillControls bpm={bpm} setBpm={setBpm} secs={secs} setSecs={setSecs}
+      <DrillControls bpm={bpm} setBpm={setBpm} secs={secs} setSecs={setSecs} rounds={rounds} setRounds={setRounds}
         extra={<>
           <span style={{ width: 10 }} />
           {[["seq", "Sequential"], ["rand", "Random"]].map(([m, label]) => (
@@ -1640,6 +1668,9 @@ const DRILL_FORMS = [
   { id: "cblues", name: "CAGED Blues", type: "caged", scale: "blues" },
   { id: "32maj", name: "3:2 Major Pent", type: "32", patterns: P32_MAJ },
   { id: "32min", name: "3:2 Minor Pent", type: "32", patterns: P32_MIN },
+  { id: "amaj", name: "Arp: Major", type: "caged", ivs: [0, 4, 7], arp: true },
+  { id: "amin", name: "Arp: Minor", type: "caged", ivs: [0, 3, 7], arp: true },
+  { id: "adom", name: "Arp: Dom 7", type: "caged", ivs: [0, 4, 7, 10], arp: true },
 ];
 function ScaleFormDrill({ formId, setFormId }) {
   const form = DRILL_FORMS.find((f) => f.id === formId);
@@ -1647,29 +1678,56 @@ function ScaleFormDrill({ formId, setFormId }) {
   const [bpm, setBpm] = useState(70);
   const [secs, setSecs] = useState(30);
   const [mode, setMode] = useState("seq");
-  const modeRef = useRef(mode); useEffect(() => { modeRef.current = mode; }, [mode]);
   const [pos, setPos] = useState(0);
   const [focus, setFocus] = useState(false);
+  const [rounds, setRounds] = useState(0);
+  const [roundNum, setRoundNum] = useState(0);
+  const [sessionDone, setSessionDone] = useState(false);
   const nPos = form.type === "caged" ? 5 : 2;
-  useEffect(() => { setPos(0); }, [formId]);
-  const advance = () => setPos((p) => {
-    const n = form.type === "caged" ? 5 : 2;
-    if (modeRef.current === "seq" || n <= 2) return (p + 1) % n;
-    let x; do { x = rand(n); } while (x === p);
-    return x;
-  });
+  const skipResetRef = useRef(false);
+  useEffect(() => { if (skipResetRef.current) { skipResetRef.current = false; return; } setPos(0); }, [formId]);
+  const stopRef = useRef(() => {});
+  const nextItem = () => {
+    if (mode === "mix") {
+      let nf;
+      do { nf = DRILL_FORMS[rand(DRILL_FORMS.length)]; } while (nf.id === formId && DRILL_FORMS.length > 1);
+      skipResetRef.current = true;
+      setFormId(nf.id);
+      setPos(rand(nf.type === "caged" ? 5 : 2));
+      return;
+    }
+    setPos((p) => {
+      const n = form.type === "caged" ? 5 : 2;
+      if (mode === "seq" || n <= 2) return (p + 1) % n;
+      let x; do { x = rand(n); } while (x === p);
+      return x;
+    });
+  };
+  const advance = () => {
+    const nr = roundNum + 1;
+    setRoundNum(nr);
+    if (rounds > 0 && nr >= rounds) {
+      setSessionDone(true);
+      [0, 4, 7, 12].forEach((iv, i) => pluck(261.63 * Math.pow(2, iv / 12), 0.3 + i * 0.12, { gain: 0.32, dur: 1.4 }));
+      stopRef.current();
+      return;
+    }
+    nextItem();
+  };
   const { running, remaining, start, stop } = useDrillClock(bpm, secs, advance);
+  stopRef.current = stop;
+  const begin = () => { setRoundNum(0); setSessionDone(false); start(); };
 
   const { dots, numFrets, posLabel } = useMemo(() => {
     const mkDot = (s, f) => {
       const iv = (OPEN_PC[s] + f - rootPc + 1200) % 12;
-      const ct = iv === 0 || iv === 3 || iv === 4 || iv === 7;
+      const ct = iv === 0 || iv === 3 || iv === 4 || iv === 7 || (form.arp && (iv === 10 || iv === 11));
       return { s, f, iv, color: ct ? IV_COLORS[iv].color : "#E4D6B8", text: ct ? IV_COLORS[iv].text : "#4A3524", label: DEGREE_LABEL[iv] };
     };
     if (form.type === "caged") {
       const shape = CAGED_ORDER[pos % 5];
-      const ivs = SCALES.find((s) => s.id === form.scale).ivs;
-      const win = positionWindow(rootPc, ivs, shape);
+      const ivs = form.ivs || SCALES.find((s) => s.id === form.scale).ivs;
+      const win = positionWindow(rootPc, ivs, shape, form.arp ? 1 : 2);
       const out = [];
       for (let s = 0; s < 6; s++)
         for (let f = win[0]; f <= win[1]; f++) {
@@ -1715,7 +1773,7 @@ function ScaleFormDrill({ formId, setFormId }) {
       <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Scale Form Drill</div>
       {!focus && (<>
       <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 10 }}>
-        The board shows one position at a time; when the chime rings, the next one appears — keep playing through the change.
+        The board shows one position at a time; when the chime rings, the next one appears — keep playing through the change. Mix mode hops between forms and positions in your key; set rounds to time-box the whole session.
       </div>
       <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
         {DRILL_FORMS.map((f) => (
@@ -1734,25 +1792,26 @@ function ScaleFormDrill({ formId, setFormId }) {
           <span style={{ color: T.amber, fontWeight: 700, fontSize: 14 }}> · {posLabel}</span>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="chip" style={running ? btnGhost : btnAmber} onClick={running ? stop : start}>{running ? "■ Stop" : "▶ Start drill"}</button>
-          <button className="chip" style={btnGhost} onClick={advance}>Skip ▸</button>
+          <button className="chip" style={running ? btnGhost : btnAmber} onClick={running ? stop : begin}>{running ? "■ Stop" : "▶ Start drill"}</button>
+          <button className="chip" style={btnGhost} onClick={nextItem}>Skip ▸</button>
           <button className="chip" style={btnGhost} onClick={playRun}>♪ Hear it</button>
           <button className="chip" style={btnGhost} onClick={() => setFocus(!focus)}>{focus ? "⛶ Exit" : "⛶ Focus"}</button>
         </div>
       </div>
-      <TimerBar remaining={remaining} secs={secs} />
+      <TimerBar remaining={remaining} secs={secs} label={rounds > 0 ? `round ${Math.min(roundNum + 1, rounds)} of ${rounds} · next in` : "next pattern in"} />
+      {sessionDone && <div style={{ color: T.green, fontWeight: 800, fontSize: 13, marginTop: 6 }}>Session complete — nice work 🎸</div>}
       <div style={{ marginTop: 10 }}>
         <Fretboard frets={numFrets} maxFret={numFrets} dots={dots} onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
       </div>
       {!focus && (<>
       <IntervalLegend seventh={false} gray />
-      <DrillControls bpm={bpm} setBpm={setBpm} secs={secs} setSecs={setSecs}
-        extra={form.type === "caged" ? <>
+      <DrillControls bpm={bpm} setBpm={setBpm} secs={secs} setSecs={setSecs} rounds={rounds} setRounds={setRounds}
+        extra={<>
           <span style={{ width: 10 }} />
-          {[["seq", "Sequential"], ["rand", "Random"]].map(([m, label]) => (
+          {[["seq", "Sequential"], ["rand", "Random"], ["mix", "Mix"]].map(([m, label]) => (
             <button key={m} className="chip" style={drillChip(mode === m)} onClick={() => setMode(m)}>{label}</button>
           ))}
-        </> : null}
+        </>}
       />
       </>)}
     </div>
