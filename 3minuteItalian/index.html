@@ -551,7 +551,15 @@ const fmtNum = v => v.toLocaleString('en-US');
 // ── Scenario conversations (uses lesson 1–10 + Other Sources vocab) ──────────
 // Each step: npc line (+ English), your task, the correct reply, and wrong
 // options with a short "why not" hint.
-const SENT_BANDS = [[1,9],[10,18],[19,27],[28,36],[37,45]]; // lesson bands for sentence rhythm
+const SENT_BANDS = [
+  {lo:1,   hi:9,    label:'Lessons 1–9'},
+  {lo:10,  hi:18,   label:'Lessons 10–18'},
+  {lo:19,  hi:27,   label:'Lessons 19–27'},
+  {lo:28,  hi:36,   label:'Lessons 28–36'},
+  {lo:37,  hi:45,   label:'Lessons 37–45'},
+  {lo:2001,hi:2001, label:'🌐 Essential phrases'},
+  {lo:2002,hi:2002, label:'🌐 Greetings & courtesies'},
+]; // lesson bands for sentence rhythm
 
 const SCENARIO_BANDS = [
   {band:1, label:'Lessons 1–9',   hint:'Greetings, opinions, ordering basics'},
@@ -924,7 +932,29 @@ const PHRASES=[
   ['Scusi, il conto per favore.','Excuse me, the bill please.',14],
   ['La cena è alle otto.','Dinner is at eight.',15],
   ['Sono le due del pomeriggio.',"It's two in the afternoon.",15],
-  ['Sono le quattro.',"It's four o'clock.",15]
+  ['Sono le quattro.',"It's four o'clock.",15],
+  ['Salve! Vorrei un caffè, per favore.','Hello! I would like a coffee, please.',2001],
+  ["Scusi, dov'è il ristorante?",'Excuse me, where is the restaurant?',2001],
+  ["Scusi, dov'è l'hotel?",'Excuse me, where is the hotel?',2001],
+  ['Permesso? Prego!','May I get through? Go ahead!',2001],
+  ['Posso? Certo, prego.','May I? Of course, go ahead.',2001],
+  ['Grazie! Prego.',"Thank you! You're welcome.",2001],
+  ['Grazie, arrivederci!','Thanks, goodbye!',2001],
+  ['Buona giornata! Altrettanto!','Have a good day! Likewise!',2001],
+  ['Scusi, posso pagare?','Excuse me, can I pay?',2001],
+  ['Vorrei quello, per favore.','I would like that one, please.',2001],
+  ['Piacere! Mi chiamo Anna.','Nice to meet you! My name is Anna.',2002],
+  ['Come ti chiami? Mi chiamo Marco.',"What's your name? My name is Marco.",2002],
+  ['Ciao! Come va? Tutto bene, grazie!',"Hi! How's it going? All good, thanks!",2002],
+  ['Tutto bene? Sì, e tu?','Everything okay? Yes, and you?',2002],
+  ['Grazie! Di niente.','Thank you! Not at all.',2002],
+  ["Scusa! Non c'è problema.",'Sorry! No problem.',2002],
+  ['Mi dispiace! Va bene, figurati.',"I'm sorry! It's fine, don't mention it.",2002],
+  ['Benvenuta! Grazie, è bello qui.',"Welcome! Thanks, it's lovely here.",2002],
+  ['A più tardi! Ci vediamo!','See you later! See you!',2002],
+  ['Buona serata! Altrettanto, a presto!','Have a good evening! Likewise, see you soon!',2002],
+  ['Come si chiama? Piacere, sono Maria.',"What's your name? Pleased to meet you, I'm Maria.",2002],
+  ['Va bene, certo!','Okay, of course!',2002]
 ];
 const STORAGE_KEY = 'tmItalian_v1';
 const MAX_LESSON  = 50; // raise this as new lessons come out
@@ -1464,8 +1494,8 @@ function renderPractice() {
       <div class="muted small" style="margin-bottom:10px;">Hear whole sentences from a lesson band — first at full speed, then slow if you want. Train your ear for the music of Italian.</div>
       <div class="toolbar" style="gap:8px;flex-wrap:wrap;">
         ${SENT_BANDS.map(b=>{
-          const n=PHRASES.filter(p=>p[2]>=b[0]&&p[2]<=b[1]).length;
-          return n>=4?`<button class="btn sent-band-btn" data-lo="${b[0]}" data-hi="${b[1]}">Lessons ${b[0]}–${b[1]} · ${n} sentences</button>`:'';
+          const n=PHRASES.filter(p=>p[2]>=b.lo&&p[2]<=b.hi).length;
+          return n>=4?`<button class="btn sent-band-btn" data-lo="${b.lo}" data-hi="${b.hi}">${esc(b.label)} · ${n}</button>`:'';
         }).join('')}
       </div>
     </div>`;
@@ -1926,7 +1956,8 @@ function startSentPractice(lo, hi){
     .map(p=>({sp:p[0],en:p[1],lesson:p[2]}))
     .filter(p=>p.lesson>=lo && p.lesson<=hi));
   if(!list.length) return;
-  state.sent={active:true,label:`Lessons ${lo}–${hi}`,list,idx:0,revealed:false};
+  const band=SENT_BANDS.find(b=>b.lo===lo&&b.hi===hi);
+  state.sent={active:true,label:band?band.label:`Lessons ${lo}–${hi}`,lo,hi,list,idx:0,revealed:false};
   renderPractice();
   setTimeout(()=>speakIt(list[0].sp), 400);
 }
@@ -1950,7 +1981,7 @@ function renderSentPractice(){
       </div>
     </div>`;
     document.getElementById('sentAgainBtn')?.addEventListener('click',()=>{
-      const m=st.label.match(/(\d+)–(\d+)/); startSentPractice(+m[1],+m[2]);
+      startSentPractice(st.lo, st.hi);
     });
     document.getElementById('sentExitBtn')?.addEventListener('click',()=>{ st.active=false; renderPractice(); });
     return;
