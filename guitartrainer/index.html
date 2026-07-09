@@ -8,16 +8,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-<style>
-  html, body { margin: 0; padding: 0; background: #211812; }
-</style>
+<style> html, body { margin: 0; padding: 0; background: #211812; } </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel" data-presets="react">
 
-/* Storage adapter: works in the Claude canvas (window.storage),
-   a normal browser / GitHub Pages (localStorage), or falls back to memory. */
+/* Storage adapter */
 const MEM = {};
 const Store = {
   async get(key) {
@@ -90,7 +87,7 @@ function positionWindow(rootPc, ivs, shape, minPer = 2) {
   const [so, eo] = SHAPE_WINDOWS[shape];
   let a = (f6 + so + 12) % 12;
   const span = eo - so;
-  if (a + span > 12) a -= 12;
+  if (a + span > 15) a -= 12;
   if (a < 0) a = 0;
   let b = a + span;
   const inScale = (s, f) => ivs.includes((OPEN_PC[s] + f - rootPc + 1200) % 12);
@@ -111,13 +108,13 @@ function positionWindow(rootPc, ivs, shape, minPer = 2) {
   for (let da = 0; da <= 2; da++) for (let db = 0; db <= 3; db++) cands.push([da, db]);
   cands.sort((x, y) => x[0] + x[1] - (y[0] + y[1]) || x[0] - y[0]);
   for (const [da, db] of cands) {
-    const lo = Math.max(0, a - da), hi = Math.min(15, b + db);
+    const lo = Math.max(0, a - da), hi = Math.min(16, b + db);
     if (complete(lo, hi)) { a = lo; b = hi; break; }
   }
   const colHas = (f) => f >= 0 && [0, 1, 2, 3, 4, 5].some((s) => inScale(s, f));
   while (a < b && !colHas(a)) a++;
   while (b > a && !colHas(b)) b--;
-  return [a, Math.min(15, b)];
+  return [a, Math.min(16, b)];
 }
 
 const NOTE_LEVELS = [
@@ -910,6 +907,9 @@ const EAR_LEVELS = [
   { id: "e7", name: "Progressions", kind: "prog", set: ["pop", "rock", "jazz", "doo", "blues"], desc: "Name the changes in a random key" },
   { id: "e8", name: "Harmonic Intervals I", kind: "harmonic", set: [3, 4, 5, 7, 9, 12], desc: "Both notes at once — 3rds, 4th, 5th, 6th, octave" },
   { id: "e9", name: "Harmonic Intervals II", kind: "harmonic", set: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], desc: "All twelve, sounded together — the graduate course" },
+  { id: "e10", name: "Descending I", kind: "descend", set: [4, 5, 7, 12], desc: "High note down to the root — 3rd, 4th, 5th, octave" },
+  { id: "e11", name: "Descending II", kind: "descend", set: [2, 3, 4, 5, 7, 9, 12], desc: "Add 2nds, minor 3rd and major 6th, descending" },
+  { id: "e12", name: "Descending III", kind: "descend", set: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], desc: "All twelve intervals, top down" },
 ];
 
 /* Voice-leading-aware pick: minimize movement from the previous chord's grip */
@@ -1309,6 +1309,9 @@ function EarTrainer({ save, record, onLevelDone }) {
     if (level.kind === "interval") {
       pluck(t.root, 0, { gain: 0.42 });
       pluck(t.root * Math.pow(2, t.iv / 12), 0.8, { gain: 0.42 });
+    } else if (level.kind === "descend") {
+      pluck(t.root * Math.pow(2, t.iv / 12), 0, { gain: 0.42 });
+      pluck(t.root, 0.8, { gain: 0.42 });
     } else if (level.kind === "harmonic") {
       pluck(t.root, 0, { gain: 0.38 });
       pluck(t.root * Math.pow(2, t.iv / 12), 0.02, { gain: 0.38 });
@@ -1322,7 +1325,7 @@ function EarTrainer({ save, record, onLevelDone }) {
   const newQuestion = useCallback(() => {
     setResult(null);
     let nq;
-    if (level.kind === "interval" || level.kind === "harmonic") {
+    if (level.kind === "interval" || level.kind === "harmonic" || level.kind === "descend") {
       let iv;
       do { iv = level.set[rand(level.set.length)]; } while (q && iv === q.iv && level.set.length > 1);
       nq = { iv, root: freqAt(1 + rand(3), rand(8)), answer: INTERVALS.find((x) => x.iv === iv).name };
@@ -1350,7 +1353,7 @@ function EarTrainer({ save, record, onLevelDone }) {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   const options =
-    level.kind === "interval" || level.kind === "harmonic" ? level.set.map((iv) => INTERVALS.find((x) => x.iv === iv).name)
+    level.kind === "interval" || level.kind === "harmonic" || level.kind === "descend" ? level.set.map((iv) => INTERVALS.find((x) => x.iv === iv).name)
     : level.kind === "chord" ? level.set
     : level.set.map((pid) => PLAY_PROGRESSIONS.find((p) => p.id === pid).name);
 
@@ -1367,11 +1370,12 @@ function EarTrainer({ save, record, onLevelDone }) {
 
   const prompt =
     level.kind === "interval" ? "Two notes, low then high — what's the interval?"
+    : level.kind === "descend" ? "Two notes, high then low — what's the interval?"
     : level.kind === "harmonic" ? "Two notes sounded together — what's the interval?"
     : level.kind === "chord" ? "One chord — what's its color?"
     : "Listen to the changes — which progression is it?";
   const hist = save.earHist[levelId] || [];
-  const cols = level.kind === "interval" || level.kind === "harmonic" ? "repeat(auto-fill, minmax(105px, 1fr))" : level.kind === "chord" ? "1fr 1fr" : "1fr 1fr";
+  const cols = level.kind === "interval" || level.kind === "harmonic" || level.kind === "descend" ? "repeat(auto-fill, minmax(105px, 1fr))" : level.kind === "chord" ? "1fr 1fr" : "1fr 1fr";
 
   return (
     <div>
@@ -1380,6 +1384,7 @@ function EarTrainer({ save, record, onLevelDone }) {
       <div className="card">
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
           <button className="chip" style={{ ...btnAmber, fontSize: 15, padding: "12px 20px" }} onClick={() => playQ()}>🔊 Play again</button>
+          <button className="chip" style={{ ...btnGhost, fontSize: 14, padding: "12px 16px" }} onClick={() => { clearTimeout(timer.current); newQuestion(); }}>Skip ▸</button>
           <div style={{ fontSize: 14.5, color: T.muted, flex: 1, minWidth: 160 }}>{prompt}</div>
           <div style={{ fontSize: 13, color: streak >= 3 ? T.amber : T.muted, fontWeight: 700 }}>{streak > 0 ? `🔥 ${streak}` : ""}</div>
         </div>
