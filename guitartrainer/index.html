@@ -720,6 +720,7 @@ function NoteTrainer({ save, record, onLevelDone }) {
   const [q, setQ] = useState(null);
   const [result, setResult] = useState(null);
   const [streak, setStreak] = useState(0);
+  const [focus, setFocus] = useState(false);
   const timer = useRef(null);
 
   const newQuestion = useCallback(() => {
@@ -762,7 +763,7 @@ function NoteTrainer({ save, record, onLevelDone }) {
 
   return (
     <div>
-      <LevelChips items={NOTE_LEVELS} current={levelId} unlocked={save.noteUnlocked} doneMap={save.noteDone} onPick={setLevelId} />
+      {!focus && <LevelChips items={NOTE_LEVELS} current={levelId} unlocked={save.noteUnlocked} doneMap={save.noteDone} onPick={setLevelId} />}
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         {[["name", "Name the note"], ["find", "Find the note"]].map(([m, label]) => (
           <button key={m} className="chip" onClick={() => setMode(m)}
@@ -770,6 +771,10 @@ function NoteTrainer({ save, record, onLevelDone }) {
             {label}
           </button>
         ))}
+        <button className="chip" onClick={() => setFocus(!focus)}
+          style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: `1.5px solid ${focus ? T.amber : T.line}`, background: focus ? "rgba(233,161,59,0.16)" : T.surface, color: T.cream }}>
+          {focus ? "⛶ Exit" : "⛶ Focus"}
+        </button>
         <div style={{ marginLeft: "auto", alignSelf: "center", fontSize: 13, color: streak >= 3 ? T.amber : T.muted, fontWeight: 700 }}>
           {streak > 0 ? `🔥 ${streak} streak` : ""}
         </div>
@@ -807,11 +812,13 @@ function NoteTrainer({ save, record, onLevelDone }) {
             <Feedback result={result} correctText={`fret ${q.f}`} />
           </>
         )}
-        <MasteryBar hist={hist} />
+        {!focus && <MasteryBar hist={hist} />}
       </div>
+      {!focus && (
       <p style={{ fontSize: 12.5, color: T.faint, marginTop: 10 }}>
         Get {NEED} of your last {WINDOW} right to complete the level and unlock the next fret range. Correct answers play the note — listen as you learn.
       </p>
+      )}
     </div>
   );
 }
@@ -820,6 +827,7 @@ function NoteTrainer({ save, record, onLevelDone }) {
 const ROMAN = { I: [0, "maj"], ii: [2, "min"], iii: [4, "min"], IV: [5, "maj"], V: [7, "maj"], vi: [9, "min"] };
 const TRIAD_SETS = { "1–3": [3, 4, 5], "2–4": [2, 3, 4], "3–5": [1, 2, 3] };
 const INV_NAMES = ["Root pos", "1st inv", "2nd inv"];
+const OPEN_CHORDS = Object.fromEntries(CHORD_TIERS[0].chords.map((c) => [c.name, c.frets]));
 const PLAY_PROGRESSIONS = [
   { id: "pop", name: "I – V – vi – IV", hint: "The pop anthem", seq: ["I", "V", "vi", "IV"] },
   { id: "rock", name: "I – IV – V", hint: "Rock, folk & blues backbone", seq: ["I", "IV", "V"] },
@@ -887,6 +895,25 @@ const EAR_LEVELS = [
   { id: "e8", name: "Harmonic Intervals I", kind: "harmonic", set: [3, 4, 5, 7, 9, 12], desc: "Both notes at once — 3rds, 4th, 5th, 6th, octave" },
   { id: "e9", name: "Harmonic Intervals II", kind: "harmonic", set: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], desc: "All twelve, sounded together — the graduate course" },
 ];
+
+/* Voice-leading-aware pick: minimize movement from the previous chord's grip */
+function bestTriadNear(rootPc, quality, setIdx, win, prevMean) {
+  const center = (win[0] + win[1]) / 2;
+  let best = null;
+  for (let inv = 0; inv < 3; inv++) {
+    const base = triadVoicing(rootPc, quality, inv, setIdx);
+    for (const off of [-12, 0, 12]) {
+      const act = setIdx.map((s) => base[s] + off);
+      if (Math.min(...act) < 0 || Math.max(...act) > 15) continue;
+      const fr = [-1, -1, -1, -1, -1, -1];
+      setIdx.forEach((s, i) => (fr[s] = act[i]));
+      const mean = act.reduce((a, b) => a + b, 0) / act.length;
+      const score = prevMean == null ? Math.abs(mean - center) : Math.abs(mean - prevMean) + 0.35 * Math.abs(mean - center);
+      if (!best || score < best.score) best = { frets: fr, inv, mean, score };
+    }
+  }
+  return best;
+}
 
 /* ---------------- Django progression drills ---------------- */
 function ProgressionDrills() {
@@ -1401,29 +1428,52 @@ function PlayAlong({ save, bump }) {
 
   const prog = PLAY_PROGRESSIONS.find((p) => p.id === progId);
   const win = pos === "Open" ? [0, 4] : pos === "Middle" ? [4, 8] : [8, 12];
-  const chart = useMemo(
-    () =>
-      prog.seq.map((rn) => {
-        const [off, qual] = ROMAN[rn];
-        const rpc = (keyPc + off) % 12;
-        const best = bestTriad(rpc, qual, TRIAD_SETS[setName], win);
-        return { rn, name: NOTES[rpc] + (qual === "min" ? "m" : ""), ...best };
-      }),
-    [prog, keyPc, setName, pos]
-  );
+  const chart = useMemo(() => {
+    let prevMean = null;
+    return prog.seq.map((rn) => {
+      const [off, qual] = ROMAN[rn];
+      const rpc = (keyPc + off) % 12;
+      const name = NOTES[rpc] + (qual === "min" ? "m" : "");
+      if (pos === "Open" && OPEN_CHORDS[name]) {
+        const frets = OPEN_CHORDS[name];
+        const act = frets.filter((f) => f > 0);
+        prevMean = act.length ? act.reduce((a, b) => a + b, 0) / act.length : 1;
+        return { rn, name, frets, open: true };
+      }
+      const best = bestTriadNear(rpc, qual, TRIAD_SETS[setName], win, prevMean);
+      prevMean = best.mean;
+      return { rn, name, ...best };
+    });
+  }, [prog, keyPc, setName, pos]);
 
   const stop = () => { timers.current.forEach(clearTimeout); timers.current = []; setLive(-1); };
   useEffect(() => { stop(); }, [keyPc, setName, pos, progId, bpm]);
-  const play = () => {
-    stop();
+  const [loop, setLoop] = useState(false);
+  const loopRef = useRef(false); useEffect(() => { loopRef.current = loop; }, [loop]);
+  const [jam, setJam] = useState(null);
+  const jamDots = useMemo(() => {
+    if (!jam) return [];
+    const ivs = SCALES.find((s) => s.id === jam).ivs;
+    const out = [];
+    for (let s = 0; s < 6; s++)
+      for (let f = 0; f <= 12; f++) {
+        const iv = (OPEN_PC[s] + f - keyPc + 1200) % 12;
+        if (!ivs.includes(iv)) continue;
+        const ct = iv === 0 || iv === 3 || iv === 4 || iv === 7;
+        out.push({ s, f, color: ct ? IV_COLORS[iv].color : "#E4D6B8", text: ct ? IV_COLORS[iv].text : "#4A3524", label: DEGREE_LABEL[iv] });
+      }
+    return out;
+  }, [jam, keyPc]);
+  const playPass = () => {
     const dur = 240 / bpm;
     chart.forEach((c, i) => {
       strum(c.frets, false, i * dur);
       strum(c.frets, false, i * dur + dur / 2);
       timers.current.push(setTimeout(() => setLive(i), i * dur * 1000));
     });
-    timers.current.push(setTimeout(() => setLive(-1), chart.length * dur * 1000));
+    timers.current.push(setTimeout(() => { if (loopRef.current) playPass(); else setLive(-1); }, chart.length * dur * 1000));
   };
+  const play = () => { stop(); playPass(); };
 
   const chip = (active) => ({
     flexShrink: 0, padding: "7px 12px", borderRadius: 999, fontSize: 13, fontWeight: 700, cursor: "pointer",
@@ -1468,8 +1518,9 @@ function PlayAlong({ save, bump }) {
             </div>
             <div style={{ fontSize: 12.5, color: T.faint }}>{prog.hint}</div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button className="chip" style={btnAmber} onClick={play}>▶ Play</button>
+            <button className="chip" style={loop ? { ...btnGhost, borderColor: T.amber, color: T.amber } : btnGhost} onClick={() => setLoop(!loop)}>⟳ Loop</button>
             <button className="chip" style={btnGhost} onClick={stop}>■ Stop</button>
           </div>
         </div>
@@ -1482,9 +1533,26 @@ function PlayAlong({ save, bump }) {
               }}>
               <div style={{ fontSize: 13, fontWeight: 800 }}>{c.name} <span style={{ color: T.faint, fontWeight: 400, fontSize: 10.5 }}>{c.rn}</span></div>
               <ChordDiagram frets={c.frets} size={86} label={c.name} rootPc={rootPcOf(c.name)} />
-              <div style={{ fontSize: 10.5, color: T.amber, paddingBottom: 3 }}>{INV_NAMES[c.inv]}</div>
+              <div style={{ fontSize: 10.5, color: T.amber, paddingBottom: 3 }}>{c.open ? "open chord" : INV_NAMES[c.inv]}</div>
             </div>
           ))}
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+            <span style={{ fontSize: 12.5, color: T.muted, fontWeight: 700 }}>Jam scale:</span>
+            <button className="chip" style={chip(jam === null)} onClick={() => setJam(null)}>Hide</button>
+            {[["majp", "Major Pent"], ["minp", "Minor Pent"], ["maj", "Major"], ["blues", "Blues"]].map(([id, label]) => (
+              <button key={id} className="chip" style={chip(jam === id)} onClick={() => setJam(id)}>{label}</button>
+            ))}
+          </div>
+          {jam && (
+            <>
+              <Fretboard frets={12} maxFret={12} dots={jamDots} onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
+              <div style={{ fontSize: 11.5, color: T.faint, marginTop: 4 }}>
+                {NOTES[keyPc]} {SCALES.find((s) => s.id === jam).name} across the neck — turn on Loop and improvise over the changes.
+              </div>
+            </>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
           <button className="chip" style={btnGhost} onClick={() => bump(progId)}>☑ Mark practiced</button>
@@ -1566,7 +1634,7 @@ function DrillControls({ bpm, setBpm, secs, setSecs, rounds, setRounds, extra })
       <span style={{ fontSize: 13.5, fontWeight: 800, minWidth: 64, textAlign: "center" }}>{bpm} bpm</span>
       <button className="chip" style={drillChip(false)} onClick={() => setBpm(Math.min(180, bpm + 5))}>+</button>
       <span style={{ width: 10 }} />
-      {[20, 30, 45, 60].map((s) => (
+      {[10, 20, 30, 45, 60].map((s) => (
         <button key={s} className="chip" style={drillChip(secs === s)} onClick={() => setSecs(s)}>{s}s</button>
       ))}
       {setRounds && (
@@ -1676,47 +1744,35 @@ function ScaleFormDrill({ formId, setFormId }) {
   const form = DRILL_FORMS.find((f) => f.id === formId);
   const [rootPc, setRootPc] = useState(9);
   const [bpm, setBpm] = useState(70);
-  const [secs, setSecs] = useState(30);
-  const [mode, setMode] = useState("seq");
+  const [secs, setSecs] = useState(10);
   const [pos, setPos] = useState(0);
   const [focus, setFocus] = useState(false);
-  const [rounds, setRounds] = useState(0);
-  const [roundNum, setRoundNum] = useState(0);
   const [sessionDone, setSessionDone] = useState(false);
   const nPos = form.type === "caged" ? 5 : 2;
   const skipResetRef = useRef(false);
   useEffect(() => { if (skipResetRef.current) { skipResetRef.current = false; return; } setPos(0); }, [formId]);
   const stopRef = useRef(() => {});
-  const nextItem = () => {
-    if (mode === "mix") {
-      let nf;
-      do { nf = DRILL_FORMS[rand(DRILL_FORMS.length)]; } while (nf.id === formId && DRILL_FORMS.length > 1);
-      skipResetRef.current = true;
-      setFormId(nf.id);
-      setPos(rand(nf.type === "caged" ? 5 : 2));
-      return;
-    }
-    setPos((p) => {
-      const n = form.type === "caged" ? 5 : 2;
-      if (mode === "seq" || n <= 2) return (p + 1) % n;
-      let x; do { x = rand(n); } while (x === p);
-      return x;
-    });
-  };
+  /* One continuous circuit: every position of a form, then the next form. */
   const advance = () => {
-    const nr = roundNum + 1;
-    setRoundNum(nr);
-    if (rounds > 0 && nr >= rounds) {
+    const n = form.type === "caged" ? 5 : 2;
+    if (pos + 1 < n) { setPos(pos + 1); return; }
+    const fi = DRILL_FORMS.findIndex((f) => f.id === formId);
+    if (fi + 1 >= DRILL_FORMS.length) {
       setSessionDone(true);
       [0, 4, 7, 12].forEach((iv, i) => pluck(261.63 * Math.pow(2, iv / 12), 0.3 + i * 0.12, { gain: 0.32, dur: 1.4 }));
       stopRef.current();
+      skipResetRef.current = true;
+      setFormId(DRILL_FORMS[0].id);
+      setPos(0);
       return;
     }
-    nextItem();
+    skipResetRef.current = true;
+    setFormId(DRILL_FORMS[fi + 1].id);
+    setPos(0);
   };
   const { running, remaining, start, stop } = useDrillClock(bpm, secs, advance);
   stopRef.current = stop;
-  const begin = () => { setRoundNum(0); setSessionDone(false); start(); };
+  const begin = () => { setSessionDone(false); start(); };
 
   const { dots, numFrets, posLabel } = useMemo(() => {
     const mkDot = (s, f) => {
@@ -1787,7 +1843,7 @@ function ScaleFormDrill({ formId, setFormId }) {
       <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Scale Form Drill</div>
       {!focus && (<>
       <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 10 }}>
-        The board shows one position at a time; when the chime rings, the next one appears — keep playing through the change. Mix mode hops between forms and positions in your key; set rounds to time-box the whole session.
+        The board shows one position at a time; at the chime the next appears. After a form’s last position it rolls into the next form automatically — one continuous circuit through every scale and arpeggio. Switch keys anytime.
       </div>
       <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
         {DRILL_FORMS.map((f) => (
@@ -1807,26 +1863,19 @@ function ScaleFormDrill({ formId, setFormId }) {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="chip" style={running ? btnGhost : btnAmber} onClick={running ? stop : begin}>{running ? "■ Stop" : "▶ Start drill"}</button>
-          <button className="chip" style={btnGhost} onClick={nextItem}>Skip ▸</button>
+          <button className="chip" style={btnGhost} onClick={advance}>Skip ▸</button>
           <button className="chip" style={btnGhost} onClick={playRun}>♪ Hear it</button>
           <button className="chip" style={btnGhost} onClick={() => setFocus(!focus)}>{focus ? "⛶ Exit" : "⛶ Focus"}</button>
         </div>
       </div>
-      <TimerBar remaining={remaining} secs={secs} label={rounds > 0 ? `round ${Math.min(roundNum + 1, rounds)} of ${rounds} · next in` : "next pattern in"} />
-      {sessionDone && <div style={{ color: T.green, fontWeight: 800, fontSize: 13, marginTop: 6 }}>Session complete — nice work 🎸</div>}
+      <TimerBar remaining={remaining} secs={secs} />
+      {sessionDone && <div style={{ color: T.green, fontWeight: 800, fontSize: 13, marginTop: 6 }}>Circuit complete — every form, every position 🎸</div>}
       <div style={{ marginTop: 10 }}>
         <Fretboard frets={numFrets} maxFret={numFrets} dots={dots} onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
       </div>
       {!focus && (<>
       <IntervalLegend seventh={false} gray />
-      <DrillControls bpm={bpm} setBpm={setBpm} secs={secs} setSecs={setSecs} rounds={rounds} setRounds={setRounds}
-        extra={<>
-          <span style={{ width: 10 }} />
-          {[["seq", "Sequential"], ["rand", "Random"], ["mix", "Mix"]].map(([m, label]) => (
-            <button key={m} className="chip" style={drillChip(mode === m)} onClick={() => setMode(m)}>{label}</button>
-          ))}
-        </>}
-      />
+      <DrillControls bpm={bpm} setBpm={setBpm} secs={secs} setSecs={setSecs} />
       </>)}
     </div>
   );
@@ -2103,7 +2152,7 @@ function App() {
   };
 
   const tabs = [
-    ["notes", "Notes"], ["chords", "Chords"], ["ear", "Ear"], ["scales", "Scales"], ["practice", "Practice"], ["library", "Library"], ["progress", "Progress"],
+    ["notes", "Notes"], ["chords", "Chords"], ["ear", "Ear"], ["practice", "Practice"], ["library", "Library"], ["progress", "Progress"],
   ];
 
   return (
@@ -2177,8 +2226,6 @@ function App() {
           </>
         ) : tab === "ear" ? (
           <EarTrainer save={save} record={record} onLevelDone={onLevelDone} />
-        ) : tab === "scales" ? (
-          <ScaleExplorer />
         ) : tab === "practice" ? (
           <PracticeTab save={save} toggle={toggleCheck} resetWarm={resetWarm} />
         ) : tab === "library" ? (
