@@ -478,7 +478,7 @@ const T = {
 };
 
 /* ---------------- Fretboard (horizontal, the signature element) ---------------- */
-function Fretboard({ maxFret = 12, frets = 12, marker, tapped, onTap, disabled, dots }) {
+function Fretboard({ maxFret = 12, frets = 12, marker, tapped, onTap, disabled, dots, activePair = [] }) {
   const FRETS = frets;
   const W = 980, H = 258;
   const nutX = 64, endX = W - 12;
@@ -540,6 +540,20 @@ function Fretboard({ maxFret = 12, frets = 12, marker, tapped, onTap, disabled, 
             <text x={fretCenter(d.f)} y={yOf(d.s) + 4.5} textAnchor="middle" fontSize="12" fontWeight="800" fill={d.text} fontFamily="inherit">{d.label}</text>
           </g>
         ))}
+      {/* current broken-interval pair: both notes stay highlighted for two beats */}
+      {activePair.length > 0 && (
+        <g pointerEvents="none">
+          {activePair.map((d, i) => (
+            <g key={"pair" + i}>
+              <circle cx={fretCenter(d.f)} cy={yOf(d.s)} r={21} fill="rgba(233,161,59,0.18)" stroke={T.cream} strokeWidth="3" />
+              <circle cx={fretCenter(d.f)} cy={yOf(d.s)} r={17} fill="none" stroke={T.amber} strokeWidth="3">
+                <animate attributeName="r" values="16;19;16" dur="0.6s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="1;0.65;1" dur="0.6s" repeatCount="indefinite" />
+              </circle>
+            </g>
+          ))}
+        </g>
+      )}
       {/* question marker */}
       {marker && (
         <g>
@@ -1881,6 +1895,56 @@ function ScaleFormDrill({ formId, setFormId }) {
     return { dots: out, numFrets: Math.min(20, mx), posLabel: `Pattern ${(pos % 2) + 1} of 2${partial ? " · low partial" : ""}` };
   }, [form, rootPc, pos]);
 
+  const [seq, setSeq] = useState("scale"); // scale | thirds | fourths | fifths
+  const seqStep = { scale: 0, thirds: 2, fourths: 3, fifths: 4 }[seq];
+  const [pairIndex, setPairIndex] = useState(0);
+  const [beatInBar, setBeatInBar] = useState(0);
+  const pairClockRef = useRef(null);
+
+  const sequencePairs = useMemo(() => {
+    if (!seqStep || (form.scale !== "maj" && form.scale !== "nmin")) return [];
+    const seen = new Set();
+    const uniq = dots
+      .map((d) => ({ ...d, pitch: OPEN_SEMIS[d.s] + d.f }))
+      .sort((a, b) => a.pitch - b.pitch)
+      .filter((d) => {
+        if (seen.has(d.pitch)) return false;
+        seen.add(d.pitch);
+        return true;
+      });
+    const rootIndex = uniq.findIndex((d) => d.iv === 0);
+    const run = rootIndex >= 0 ? uniq.slice(rootIndex) : uniq;
+    const pairs = [];
+    for (let i = 0; i + seqStep < run.length; i++) {
+      pairs.push([run[i], run[i + seqStep]]);
+    }
+    return pairs;
+  }, [dots, seqStep, form.scale]);
+
+  useEffect(() => {
+    setPairIndex(0);
+    setBeatInBar(0);
+  }, [seq, formId, rootPc, pos]);
+
+  useEffect(() => {
+    clearInterval(pairClockRef.current);
+    if (!running || !seqStep || sequencePairs.length === 0) return;
+    const beatMs = 60000 / bpm;
+    const started = Date.now();
+    setBeatInBar(0);
+    setPairIndex(0);
+    pairClockRef.current = setInterval(() => {
+      const elapsedBeats = Math.floor((Date.now() - started) / beatMs);
+      const beat = elapsedBeats % 4;
+      setBeatInBar(beat);
+      setPairIndex(Math.floor(elapsedBeats / 2) % sequencePairs.length);
+    }, Math.max(30, Math.min(100, beatMs / 5)));
+    return () => clearInterval(pairClockRef.current);
+  }, [running, bpm, seqStep, sequencePairs.length]);
+
+  const activePair = seqStep > 0 && sequencePairs.length
+    ? sequencePairs[pairIndex % sequencePairs.length]
+    : [];
   const playRun = () => {
     const seen = new Set();
     const uniq = dots
@@ -1908,6 +1972,14 @@ function ScaleFormDrill({ formId, setFormId }) {
           <button key={n} className="chip" style={drillChip(rootPc === i)} onClick={() => setRootPc(i)}>{n}</button>
         ))}
       </div>
+      {(form.scale === "maj" || form.scale === "nmin") && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
+          <span style={{ fontSize: 12, color: T.faint }}>sequence view:</span>
+          {[["scale", "None"], ["thirds", "Broken 3rds"], ["fourths", "Broken 4ths"], ["fifths", "Broken 5ths"]].map(([m, label]) => (
+            <button key={m} className="chip" style={drillChip(seq === m)} onClick={() => setSeq(m)}>{label}</button>
+          ))}
+        </div>
+      )}
       </>)}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
         <div>
@@ -1924,8 +1996,39 @@ function ScaleFormDrill({ formId, setFormId }) {
       <TimerBar remaining={remaining} secs={secs} />
       {sessionDone && <div style={{ color: T.green, fontWeight: 800, fontSize: 13, marginTop: 6 }}>Circuit complete — every form, every position 🎸</div>}
       <div style={{ marginTop: 10 }}>
-        <Fretboard frets={numFrets} maxFret={numFrets} dots={dots} onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
+        <Fretboard frets={numFrets} maxFret={numFrets} dots={dots} activePair={activePair} onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
       </div>
+      {seqStep > 0 && (form.scale === "maj" || form.scale === "nmin") && activePair.length === 2 && (
+        <div style={{ marginTop: 10, background: T.raised, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 12px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 11.5, color: T.faint, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 800 }}>
+                {seq === "thirds" ? "Broken 3rds" : seq === "fourths" ? "Broken 4ths" : "Broken 5ths"}
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: T.cream, marginTop: 2 }}>
+                {activePair[0].label} <span style={{ color: T.amber }}>+</span> {activePair[1].label}
+                <span style={{ fontSize: 13, color: T.muted, fontWeight: 600, marginLeft: 10 }}>
+                  {noteAt(activePair[0].s, activePair[0].f)} + {noteAt(activePair[1].s, activePair[1].f)}
+                </span>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              {[0, 1, 2, 3].map((b) => (
+                <span key={b} style={{
+                  width: 30, height: 30, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  background: beatInBar === b && running ? T.amber : T.surface,
+                  color: beatInBar === b && running ? "#2A1C0B" : T.muted,
+                  border: `1.5px solid ${beatInBar === b && running ? T.amber : T.line}`,
+                  fontWeight: 800, fontSize: 13,
+                }}>{b + 1}</span>
+              ))}
+            </div>
+          </div>
+          <div style={{ fontSize: 11.5, color: T.faint, marginTop: 7 }}>
+            Both notes stay lit for two beats: beats 1–2 show one interval shape, then beats 3–4 show the next.
+          </div>
+        </div>
+      )}
       {!focus && (<>
       <IntervalLegend seventh={false} gray />
       <DrillControls bpm={bpm} setBpm={setBpm} secs={secs} setSecs={setSecs} />
@@ -1975,6 +2078,215 @@ function cropperPairs(keyPc, loS, hiS) {
     frets[loS] = hf; frets[hiS] = mf;
     return { frets, label: d.label, dom: !!d.dom, mPc: (keyPc + d.mIv) % 12, hPc: (keyPc + d.hIv) % 12, mf, hf };
   });
+}
+
+/* ---------------- Rhythm Trainer (standard notation) ---------------- */
+/* Cells are one- or two-beat rhythm figures rendered as real notation on a
+   percussion line: noteheads, stems, beams, flags, rests, dots, counts. */
+const RHYTHM_CELLS = {
+  q:    { beats: 1, events: [0], count: (b) => `${b}` },
+  h:    { beats: 2, events: [0], count: (b) => `${b} (${b + 1})` },
+  ee:   { beats: 1, events: [0, 0.5], count: (b) => `${b} &` },
+  ssss: { beats: 1, events: [0, 0.25, 0.5, 0.75], count: (b) => `${b} e & a` },
+  ess:  { beats: 1, events: [0, 0.5, 0.75], count: (b) => `${b} & a` },
+  sse:  { beats: 1, events: [0, 0.25, 0.5], count: (b) => `${b} e &` },
+  re:   { beats: 1, events: [0.5], count: (b) => `(${b}) &` },
+  qr:   { beats: 1, events: [], count: (b) => `(${b})` },
+  t:    { beats: 1, events: [0, 1 / 3, 2 / 3], count: (b) => `${b}-trip-let` },
+  dqe:  { beats: 2, events: [0, 1.5], count: (b) => `${b}‥(${b + 1})&` },
+};
+const RHYTHM_EXERCISES = [
+  { name: "Quarter pulse", cells: ["q", "q", "q", "q"], hint: "One strum per click — the anchor" },
+  { name: "Half notes", cells: ["h", "h"], hint: "Hold two full beats; count through the space" },
+  { name: "Even eighths", cells: ["ee", "ee", "ee", "ee"], hint: "Down-up, perfectly even" },
+  { name: "Quarters & eighths", cells: ["q", "ee", "q", "ee"], hint: "Switch densities without rushing" },
+  { name: "Rests count too", cells: ["q", "qr", "ee", "q"], hint: "Silence has a beat — feel the empty 2" },
+  { name: "Offbeat eighths", cells: ["re", "re", "re", "re"], hint: "Only the &s — reggae skank territory" },
+  { name: "Sixteenth bursts", cells: ["ssss", "q", "ssss", "q"], hint: "1 e & a — keep it a burst, not a blur" },
+  { name: "Gallop", cells: ["ess", "ess", "q", "q"], hint: "Eighth + two sixteenths — the driving figure" },
+  { name: "Reverse gallop", cells: ["sse", "sse", "q", "q"], hint: "Two sixteenths + eighth — flip the gallop" },
+  { name: "Triplets", cells: ["t", "t", "t", "t"], hint: "Three per beat — say trip-l-et" },
+  { name: "Dotted quarter", cells: ["dqe", "ee", "q"], hint: "The push — land on the & of 2" },
+  { name: "Syncopa", cells: ["ee", "re", "ee", "q"], hint: "The missing downbeat of 2 is the hook" },
+];
+function RhythmStaff({ cells, hotBeat }) {
+  const TOP = 12, LINE = 44, CNT = 70;
+  const W1 = 116, PAD = 10;
+  const totalBeats = cells.reduce((a, c) => a + RHYTHM_CELLS[c].beats, 0);
+  const width = PAD * 2 + totalBeats * W1;
+  const els = [];
+  let x = PAD, beat = 0;
+  const head = (cx, open = false, key) => (
+    <ellipse key={key} cx={cx} cy={LINE} rx={6} ry={4.6} fill={open ? "none" : T.cream} stroke={T.cream} strokeWidth={open ? 2 : 1} transform={`rotate(-18 ${cx} ${LINE})`} />
+  );
+  const stem = (cx, key) => <line key={key} x1={cx + 5.6} y1={LINE - 2} x2={cx + 5.6} y2={TOP + 4} stroke={T.cream} strokeWidth="1.6" />;
+  const flag = (cx, key) => <path key={key} d={`M ${cx + 5.6} ${TOP + 4} q 9 3 7 14 q -1 -7 -7 -8 Z`} fill={T.cream} />;
+  const dot = (cx, key) => <circle key={key} cx={cx + 11} cy={LINE - 3} r={2.2} fill={T.cream} />;
+  const beam = (x1, x2, level, key) => (
+    <rect key={key} x={x1 + 5.6} y={TOP + 4 + level * 6} width={x2 - x1} height={3.4} fill={T.cream} />
+  );
+  const eighthRest = (cx, key) => (
+    <g key={key}>
+      <circle cx={cx - 1} cy={LINE - 13} r={2.8} fill={T.muted} />
+      <path d={`M ${cx - 1} ${LINE - 11} Q ${cx + 5} ${LINE - 10} ${cx + 6} ${LINE - 14} L ${cx + 1} ${LINE + 3}`} stroke={T.muted} strokeWidth="1.8" fill="none" />
+    </g>
+  );
+  const quarterRest = (cx, key) => (
+    <path key={key} d={`M ${cx} ${LINE - 16} L ${cx + 6} ${LINE - 8} L ${cx + 1} ${LINE - 2} Q ${cx + 9} ${LINE + 2} ${cx + 4} ${LINE + 9} Q ${cx - 1} ${LINE + 3} ${cx + 3} ${LINE}` } stroke={T.muted} strokeWidth="2.4" fill="none" />
+  );
+  cells.forEach((type, ci) => {
+    const cell = RHYTHM_CELLS[type];
+    const w = cell.beats * W1;
+    const hot = hotBeat >= beat && hotBeat < beat + cell.beats;
+    const xs = cell.events.map((o) => x + 14 + (o / cell.beats) * (w - 36));
+    if (hot) els.push(<rect key={"h" + ci} x={x + 2} y={TOP - 6} width={w - 6} height={CNT - TOP} rx={8} fill={T.amber} opacity="0.14" />);
+    if (type === "q") { els.push(head(xs[0], false, ci + "n0"), stem(xs[0], ci + "s0")); }
+    else if (type === "h") { els.push(head(xs[0], true, ci + "n0"), stem(xs[0], ci + "s0")); }
+    else if (type === "ee") { els.push(head(xs[0], false, ci + "n0"), head(xs[1], false, ci + "n1"), stem(xs[0], ci + "s0"), stem(xs[1], ci + "s1"), beam(xs[0], xs[1], 0, ci + "b0")); }
+    else if (type === "ssss") {
+      xs.forEach((cx, k) => els.push(head(cx, false, ci + "n" + k), stem(cx, ci + "s" + k)));
+      els.push(beam(xs[0], xs[3], 0, ci + "b0"), beam(xs[0], xs[3], 1, ci + "b1"));
+    } else if (type === "ess") {
+      xs.forEach((cx, k) => els.push(head(cx, false, ci + "n" + k), stem(cx, ci + "s" + k)));
+      els.push(beam(xs[0], xs[2], 0, ci + "b0"), beam(xs[1], xs[2], 1, ci + "b1"));
+    } else if (type === "sse") {
+      xs.forEach((cx, k) => els.push(head(cx, false, ci + "n" + k), stem(cx, ci + "s" + k)));
+      els.push(beam(xs[0], xs[2], 0, ci + "b0"), beam(xs[0], xs[1], 1, ci + "b1"));
+    } else if (type === "re") {
+      els.push(eighthRest(x + 16, ci + "r0"), head(xs[0], false, ci + "n0"), stem(xs[0], ci + "s0"), flag(xs[0], ci + "f0"));
+    } else if (type === "qr") {
+      els.push(quarterRest(x + w / 2 - 4, ci + "r0"));
+    } else if (type === "t") {
+      xs.forEach((cx, k) => els.push(head(cx, false, ci + "n" + k), stem(cx, ci + "s" + k)));
+      els.push(beam(xs[0], xs[2], 0, ci + "b0"));
+      els.push(<text key={ci + "t3"} x={(xs[0] + xs[2]) / 2 + 5} y={TOP - 0} fontSize="11" fontStyle="italic" fontWeight="700" fill={T.muted} textAnchor="middle">3</text>);
+    } else if (type === "dqe") {
+      els.push(head(xs[0], false, ci + "n0"), stem(xs[0], ci + "s0"), dot(xs[0], ci + "d0"));
+      els.push(head(xs[1], false, ci + "n1"), stem(xs[1], ci + "s1"), flag(xs[1], ci + "f1"));
+    }
+    els.push(
+      <text key={ci + "c"} x={x + w / 2} y={CNT} fontSize="11.5" fontWeight="700" fill={hot ? T.amber : T.muted} textAnchor="middle" fontFamily="inherit">
+        {cell.count(beat + 1)}
+      </text>
+    );
+    if (ci < cells.length - 1) els.push(<line key={ci + "div"} x1={x + w} y1={TOP} x2={x + w} y2={LINE + 8} stroke={T.line} strokeWidth="1" opacity="0.4" />);
+    x += w; beat += cell.beats;
+  });
+  return (
+    <svg viewBox={`0 0 ${width} 78`} style={{ width: "100%", maxWidth: 560, display: "block", margin: "0 auto" }}>
+      <line x1={PAD - 4} y1={LINE} x2={width - PAD + 4} y2={LINE} stroke={T.muted} strokeWidth="1.4" opacity="0.7" />
+      <line x1={PAD - 4} y1={TOP} x2={PAD - 4} y2={LINE + 8} stroke={T.cream} strokeWidth="3" />
+      <line x1={width - PAD + 4} y1={TOP} x2={width - PAD + 4} y2={LINE + 8} stroke={T.cream} strokeWidth="3" />
+      {els}
+    </svg>
+  );
+}
+function RhythmTrainer() {
+  const [exIdx, setExIdx] = useState(0);
+  const [bpm, setBpm] = useState(70);
+  const [barsPer, setBarsPer] = useState(4);
+  const [running, setRunning] = useState(false);
+  const [hotBeat, setHotBeat] = useState(-1);
+  const [sessionDone, setSessionDone] = useState(false);
+  const bpmRef = useRef(bpm); useEffect(() => { bpmRef.current = bpm; }, [bpm]);
+  const exRef = useRef(exIdx); useEffect(() => { exRef.current = exIdx; }, [exIdx]);
+  const barsRef = useRef(barsPer); useEffect(() => { barsRef.current = barsPer; }, [barsPer]);
+  const nextRef = useRef(0); const barCountRef = useRef(0); const schedRef = useRef(null); const uiRef = useRef([]);
+
+  const voiceBar = (at) => {
+    const ex = RHYTHM_EXERCISES[exRef.current];
+    const spb = 60 / bpmRef.current;
+    let beat = 0;
+    // metronome quarters
+    for (let b = 0; b < 4; b++) click(at + b * spb, b === 0);
+    // pattern notes
+    ex.cells.forEach((type) => {
+      const cell = RHYTHM_CELLS[type];
+      cell.events.forEach((o, k) => pluck(523.25, at + (beat + o) * spb, { gain: o === 0 && beat === 0 ? 0.36 : 0.3, dur: 0.35, damp: 0.93 }));
+      beat += cell.beats;
+    });
+    // UI beat highlight
+    const ctx = audioCtx();
+    for (let b = 0; b < 4; b++) uiRef.current.push(setTimeout(() => setHotBeat(b), Math.max(0, (at + b * spb - ctx.currentTime) * 1000)));
+  };
+  const scheduler = () => {
+    const ctx = audioCtx(); if (!ctx) return;
+    const spb = 60 / bpmRef.current;
+    while (nextRef.current < ctx.currentTime + 0.2) {
+      voiceBar(nextRef.current);
+      const barEnd = nextRef.current + 4 * spb;
+      barCountRef.current++;
+      if (barCountRef.current >= barsRef.current) {
+        barCountRef.current = 0;
+        const isLast = exRef.current + 1 >= RHYTHM_EXERCISES.length;
+        const delay = Math.max(0, (barEnd - ctx.currentTime) * 1000);
+        if (isLast) {
+          [0, 4, 7, 12].forEach((iv, i) => pluck(261.63 * Math.pow(2, iv / 12), barEnd - ctx.currentTime + 0.1 + i * 0.12, { gain: 0.32, dur: 1.4 }));
+          uiRef.current.push(setTimeout(() => { setSessionDone(true); stop(); setExIdx(0); }, delay));
+          nextRef.current = barEnd;
+          return; // stop scheduling further bars
+        }
+        pluck(1318.5, barEnd - ctx.currentTime, { gain: 0.35, dur: 0.5 });
+        uiRef.current.push(setTimeout(() => setExIdx((e) => e + 1), delay));
+      }
+      nextRef.current = barEnd;
+    }
+    schedRef.current = setTimeout(scheduler, 30);
+  };
+  const start = () => {
+    const ctx = audioCtx(); if (!ctx) return;
+    setRunning(true); setSessionDone(false);
+    barCountRef.current = 0;
+    nextRef.current = ctx.currentTime + 0.15;
+    scheduler();
+  };
+  const stop = () => {
+    setRunning(false);
+    clearTimeout(schedRef.current);
+    uiRef.current.forEach(clearTimeout); uiRef.current = [];
+    setHotBeat(-1);
+  };
+  useEffect(() => () => { clearTimeout(schedRef.current); uiRef.current.forEach(clearTimeout); }, []);
+
+  const ex = RHYTHM_EXERCISES[exIdx];
+  return (
+    <div className="card" style={{ marginBottom: 14 }}>
+      <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Rhythm Reading</div>
+      <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 10 }}>
+        Read the bar, count it out loud, then clap or strum it against the click. Each rhythm repeats for your set number of bars, then rolls to the next — a full reading circuit.
+      </div>
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
+        {RHYTHM_EXERCISES.map((e, i) => (
+          <button key={e.name} className="chip" style={drillChip(exIdx === i)} onClick={() => { setExIdx(i); barCountRef.current = 0; }}>{e.name}</button>
+        ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
+        <div>
+          <span style={{ fontWeight: 800, fontSize: 16, fontFamily: "'Fraunces', Georgia, serif", color: T.amber }}>{ex.name}</span>
+          <span style={{ color: T.faint, fontSize: 13 }}> · {exIdx + 1} of {RHYTHM_EXERCISES.length}</span>
+          <div style={{ fontSize: 12.5, color: T.muted }}>{ex.hint}</div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button className="chip" style={running ? btnGhost : btnAmber} onClick={running ? stop : start}>{running ? "■ Stop" : "▶ Start"}</button>
+          <button className="chip" style={btnGhost} onClick={() => { setExIdx((exIdx + 1) % RHYTHM_EXERCISES.length); barCountRef.current = 0; }}>Skip ▸</button>
+        </div>
+      </div>
+      {sessionDone && <div style={{ color: T.green, fontWeight: 800, fontSize: 13, marginBottom: 6 }}>Reading circuit complete — every figure 🎸</div>}
+      <div style={{ background: T.raised, border: `1px solid ${T.line}`, borderRadius: 12, padding: "12px 8px 6px" }}>
+        <RhythmStaff cells={ex.cells} hotBeat={hotBeat} />
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+        <button className="chip" style={drillChip(false)} onClick={() => setBpm(Math.max(40, bpm - 5))}>−</button>
+        <span style={{ fontSize: 13.5, fontWeight: 800, minWidth: 64, textAlign: "center" }}>{bpm} bpm</span>
+        <button className="chip" style={drillChip(false)} onClick={() => setBpm(Math.min(180, bpm + 5))}>+</button>
+        <span style={{ width: 10 }} />
+        <span style={{ fontSize: 11.5, color: T.faint }}>bars each</span>
+        {[2, 4, 8].map((n) => (
+          <button key={n} className="chip" style={drillChip(barsPer === n)} onClick={() => setBarsPer(n)}>{n}</button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 /* ---------------- Diatonic Triad Drill ---------------- */
@@ -2289,6 +2601,7 @@ function PracticeTab({ save, toggle, resetWarm }) {
   return (
     <div>
       <ChromaticWarmup />
+      <RhythmTrainer />
       <div ref={drillRef}>
         <ScaleFormDrill formId={formId} setFormId={setFormId} />
       </div>
