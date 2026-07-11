@@ -1895,8 +1895,8 @@ function ScaleFormDrill({ formId, setFormId }) {
     return { dots: out, numFrets: Math.min(20, mx), posLabel: `Pattern ${(pos % 2) + 1} of 2${partial ? " · low partial" : ""}` };
   }, [form, rootPc, pos]);
 
-  const [seq, setSeq] = useState("scale"); // scale | thirds | fourths | fifths
-  const seqStep = { scale: 0, thirds: 2, fourths: 3, fifths: 4 }[seq];
+  const [seq, setSeq] = useState("scale"); // scale | thirds | fourths | fifths | sixths
+  const seqStep = { scale: 0, thirds: 2, fourths: 3, fifths: 4, sixths: 5 }[seq];
   const [pairIndex, setPairIndex] = useState(0);
   const [beatInBar, setBeatInBar] = useState(0);
   const pairClockRef = useRef(null);
@@ -1914,11 +1914,15 @@ function ScaleFormDrill({ formId, setFormId }) {
       });
     const rootIndex = uniq.findIndex((d) => d.iv === 0);
     const run = rootIndex >= 0 ? uniq.slice(rootIndex) : uniq;
-    const pairs = [];
+    const ascending = [];
     for (let i = 0; i + seqStep < run.length; i++) {
-      pairs.push([run[i], run[i + seqStep]]);
+      ascending.push([run[i], run[i + seqStep]]);
     }
-    return pairs;
+    if (ascending.length <= 1) return ascending;
+    // Turn around at the top instead of jumping back to the root.
+    // Do not repeat the top pair or bottom pair at the direction changes.
+    const descending = ascending.slice(1, -1).reverse();
+    return [...ascending, ...descending];
   }, [dots, seqStep, form.scale]);
 
   useEffect(() => {
@@ -1975,7 +1979,7 @@ function ScaleFormDrill({ formId, setFormId }) {
       {(form.scale === "maj" || form.scale === "nmin") && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
           <span style={{ fontSize: 12, color: T.faint }}>sequence view:</span>
-          {[["scale", "None"], ["thirds", "Broken 3rds"], ["fourths", "Broken 4ths"], ["fifths", "Broken 5ths"]].map(([m, label]) => (
+          {[["scale", "None"], ["thirds", "Broken 3rds"], ["fourths", "Broken 4ths"], ["fifths", "Broken 5ths"], ["sixths", "Broken 6ths"]].map(([m, label]) => (
             <button key={m} className="chip" style={drillChip(seq === m)} onClick={() => setSeq(m)}>{label}</button>
           ))}
         </div>
@@ -2003,7 +2007,7 @@ function ScaleFormDrill({ formId, setFormId }) {
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <div>
               <div style={{ fontSize: 11.5, color: T.faint, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 800 }}>
-                {seq === "thirds" ? "Broken 3rds" : seq === "fourths" ? "Broken 4ths" : "Broken 5ths"}
+                {seq === "thirds" ? "Broken 3rds" : seq === "fourths" ? "Broken 4ths" : seq === "fifths" ? "Broken 5ths" : "Broken 6ths"}
               </div>
               <div style={{ fontSize: 20, fontWeight: 800, color: T.cream, marginTop: 2 }}>
                 {activePair[0].label} <span style={{ color: T.amber }}>+</span> {activePair[1].label}
@@ -2025,7 +2029,7 @@ function ScaleFormDrill({ formId, setFormId }) {
             </div>
           </div>
           <div style={{ fontSize: 11.5, color: T.faint, marginTop: 7 }}>
-            Both notes stay lit for two beats: beats 1–2 show one interval shape, then beats 3–4 show the next.
+            Both notes stay lit for two beats. The sequence climbs to the highest complete pair, then reverses naturally and comes back down.
           </div>
         </div>
       )}
