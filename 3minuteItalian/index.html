@@ -337,7 +337,7 @@ body{margin:0;font-family:'Nunito',ui-sans-serif,system-ui,sans-serif;background
 </main>
 <script>
 // ── Vocab Data ────────────────────────────────────────────────────────────────
-// Format: [lessonId, [[spanish, english], ...coreWords], {packLabel: [[sp, en], ...]}? ]
+// Format: [lessonId, [[Italian, English], ...coreWords], {packLabel: [[sp, en], ...]}? ]
 // To add more vocab: append [sp, en] pairs to existing entries, or add a new entry.
 // To add a new lesson with no expansion packs: [12, [['sp','en'], ...]]
 // To add a new lesson with a pack:            [12, [['sp','en']], {'Pack name': [['sp','en'],...]}]
@@ -420,13 +420,6 @@ const RAW = [
   [45, [['aspettare','to wait'],['aspettato','waited'],['abbiamo aspettato','we have waited'],['Hai ordinato?','Have you ordered? (informal)'],['Hai prenotato?','Have you reserved?'],['ha finito','he/she has finished'],['Avete ordinato?','Have you all ordered?'],['Hanno ordinato?','Have they ordered?'],['un tavolo per stasera','a table for tonight'],['tutto','everything']]],
 ];
 
-// ── Coffee Break Italian (separate course track) ──────────────────────────────
-// Episodes 1-6 vocab sourced from coffeebreaklanguages.com blog posts (Season 1).
-// Same shape as RAW: [episodeId, [[sp, en], ...], {packLabel: [[sp, en], ...]}?]
-const RAW_CBE = [
-  // Coffee Break Italian episodes go here. Same shape as RAW.
-  // Example: [1, [['ciao','hello'],['come stai?','how are you?']]],
-];
 
 // ── Other Sources (videos, articles, misc — separate track) ────────────────────
 // Same shape as RAW: [seriesId, [[sp, en], ...], {packLabel:[[sp, en], ...]}?, {title, shortLabel}?]
@@ -835,10 +828,10 @@ const SCENARIOS = [
 ];
 
 // ── Conjugation groups ────────────────────────────────────────────────────────
-// Format: [groupLabel, [[spanish form, english meaning], ...]]
+// Format: [groupLabel, [[Italian form, English meaning], ...]]
 const VERBS=[
   ['essere — to be (identity / permanent)',[['sono','I am (essere)'],['sei','you are (essere)'],['è','he / she / it is (essere)'],['siamo','we are (essere)'],['siete','you all are (essere)'],['sono','they are (essere)']]],
-  ['stare — to be (state / location, also feel)',[['sto','I am / I feel (stare)'],['stai','you are (stare)'],['sta','he / she is (stare)'],['stiamo','we are (stare)'],['state','you all are (stare)'],['stanno','they are (stare)']]],
+  ['stare — to stay / feel (as in Come stai?)',[['sto','I am / I feel (stare)'],['stai','you are (stare)'],['sta','he / she is (stare)'],['stiamo','we are (stare)'],['state','you all are (stare)'],['stanno','they are (stare)']]],
   ['avere — to have (also auxiliary for past tense)',[['ho','I have / I have (ho mangiato = I have eaten)'],['hai','you have (informal)'],['ha','he / she has / you have (formal)'],['abbiamo','we have'],['avete','you all have'],['hanno','they have']]],
   ['andare — to go',[['vado','I go'],['vai','you go'],['va','he / she goes / you go (formal)'],['andiamo','we go'],['andate','you all go'],['vanno','they go']]],
   ['volere — to want',[['voglio','I want'],['vuoi','you want (informal)'],['vuole','he/she wants / you want (formal)'],['vogliamo','we want'],['volete','you all want'],['vogliono','they want'],['vorrei','I would like (polite)']]],
@@ -849,7 +842,7 @@ const VERBS=[
 ];
 
 // ── Practice phrases ──────────────────────────────────────────────────────────
-// Format: [spanish, english]  — SRS is applied just like vocab words
+// Format: [Italian, English]  — SRS is applied just like vocab words
 const PHRASES=[
   ['Vorrei un tavolo per due persone, per favore.','I would like a table for two people, please.',7],
   ["Quant'è il conto, per favore?",'How much is the bill, please?',10],
@@ -1021,7 +1014,7 @@ const INTERVALS   = [0,1,3,7,14,30,60];
 const uid      = () => Math.random().toString(36).slice(2,11);
 const todayISO = () => new Date().toISOString();
 const addDays  = (d,n) => { const r=new Date(d); r.setDate(r.getDate()+n); return r.toISOString(); };
-const norm     = t => String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[¿?¡!.,;:()"']/g,'').replace(/\s+/g,' ').trim();
+const norm     = t => String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[?!.,;:()"']/g,'').replace(/\s+/g,' ').trim();
 // normLoose also removes any (parenthetical) content — so "good night" matches
 // the stored answer "good night (going to bed)". Used only for typed-answer checking.
 const normLoose = t => norm(String(t||'').replace(/\([^)]*\)/g,' '));
@@ -1032,13 +1025,11 @@ const esc      = t => String(t??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').r
 // ── Word factory ──────────────────────────────────────────────────────────────
 // pack=null means core lesson word; pack='Pack name' means expansion word
 const makeWord = (lessonId,sp,en,pack=null) =>
-  ({id:uid(),lessonId,spanish:sp,english:en,pack,attempts:0,correct:0,level:0,dueAt:todayISO(),lastReviewedAt:'',mastered:false});
+  ({id:uid(),lessonId,italian:sp,english:en,pack,attempts:0,correct:0,level:0,dueAt:todayISO(),lastReviewedAt:'',mastered:false});
 
-// ── Build seeded lessons from RAW + RAW_CBE ──────────────────────────────────
-// Each lesson carries a `course` field: '3MS' (Three Minute Italian),
-// 'CBE' (Coffee Break Italian), or 'OTHER' (video/article notes).
-// 3MS uses 1–MAX_LESSON; CBE uses 1001+; OTHER uses 2001+ so they never collide.
-const CBE_ID_OFFSET = 1000;
+// ── Build seeded lessons from RAW + RAW_OTHER ────────────────────────────────
+// Each lesson carries a `course` field: '3MS' (Three Minute Italian)
+// or 'OTHER' (video/article notes). OTHER uses 2001+ so ids never collide.
 const OTHER_ID_OFFSET = 2000;
 function buildSeeded() {
   const out = [];
@@ -1055,17 +1046,6 @@ function buildSeeded() {
   // Fill empty 3MS lessons up to MAX_LESSON so the grid stays a tidy progression
   const has3MS = new Set(out.map(l=>l.id));
   for(let i=1;i<=MAX_LESSON;i++) if(!has3MS.has(i)) out.push({id:i,course:'3MS',title:`Lesson ${i}`,shortLabel:String(i),vocab:[]});
-  // Coffee Break Italian episodes — separate id namespace (1001, 1002, …)
-  for(const [ep, core, packs={}] of RAW_CBE){
-    const id = CBE_ID_OFFSET + ep;
-    out.push({
-      id, course:'CBE', title:`Episode ${ep}`, shortLabel:`E${ep}`,
-      vocab: [
-        ...core.map(([sp,en]) => makeWord(id,sp,en,null)),
-        ...Object.entries(packs).flatMap(([label,words]) => words.map(([sp,en]) => makeWord(id,sp,en,label)))
-      ]
-    });
-  }
   // Other Sources — separate id namespace (2001, 2002, …)
   for(const [ep, core, packs={}, meta={}] of RAW_OTHER){
     const id = OTHER_ID_OFFSET + ep;
@@ -1080,8 +1060,8 @@ function buildSeeded() {
       ]
     });
   }
-  // Sort: 3MS first by id, then OTHER, then CBE
-  const courseOrder = {'3MS':0, 'OTHER':1, 'CBE':2};
+  // Sort: 3MS first by id, then Other Sources
+  const courseOrder = {'3MS':0, 'OTHER':1};
   return out.sort((a,b)=> (a.course===b.course ? a.id-b.id : (courseOrder[a.course]||9) - (courseOrder[b.course]||9)));
 }
 
@@ -1093,9 +1073,14 @@ function mergeSeeded(seeded, saved) {
   return seeded.map(sl => {
     const sv = savedMap.get(sl.id);
     if(!sv) return sl;
-    const seedLookup = new Map(sl.vocab.map(w=>[`${norm(w.spanish)}|${norm(w.english)}`,w]));
-    const merged = sv.vocab.map(w => {
-      const seed = seedLookup.get(`${norm(w.spanish)}|${norm(w.english)}`);
+    const seedLookup = new Map(sl.vocab.map(w=>[`${norm(w.italian)}|${norm(w.english)}`,w]));
+    const merged = sv.vocab.map(savedWord => {
+      // Older builds stored the Italian text under the inherited `spanish` key.
+      // Read it once, then save only the corrected `italian` key going forward.
+      const italian = savedWord.italian ?? savedWord.spanish ?? '';
+      const w = {...savedWord, italian};
+      delete w.spanish;
+      const seed = seedLookup.get(`${norm(w.italian)}|${norm(w.english)}`);
       // pack is structural (defined by code) — always take seed value if available so that
       // re-seeding (e.g. splitting 'Numbers' into 'Numbers 0–20' / '21–99' / '100+') migrates correctly.
       // id must always be valid: backfill from the seed word, or mint a fresh one, so that
@@ -1103,8 +1088,8 @@ function mergeSeeded(seeded, saved) {
       const id = (w.id!=null && w.id!=='') ? w.id : (seed?.id ?? uid());
       return {...w, id, pack: seed?.pack ?? w.pack ?? null};
     });
-    const seen = new Set(merged.map(w=>`${norm(w.spanish)}|${norm(w.english)}`));
-    sl.vocab.filter(w=>!seen.has(`${norm(w.spanish)}|${norm(w.english)}`)).forEach(w=>merged.push(w));
+    const seen = new Set(merged.map(w=>`${norm(w.italian)}|${norm(w.english)}`));
+    sl.vocab.filter(w=>!seen.has(`${norm(w.italian)}|${norm(w.english)}`)).forEach(w=>merged.push(w));
     // saved values for selection state, but structural fields (course, title, shortLabel) come from seed
     return {...sv, ...sl, vocab:merged};
   });
@@ -1220,13 +1205,13 @@ function logSession(id, rating) {
 // ── Review card builder ───────────────────────────────────────────────────────
 function sampleChoices(correct,pool,field,n=4) {
   const choices=[correct], seen=new Set([norm(correct)]);
-  for(const w of shuffle([...pool])) { const v=field==='spanish'?w.spanish:w.english; if(v&&!seen.has(norm(v))){seen.add(norm(v));choices.push(v);if(choices.length>=n)break;} }
+  for(const w of shuffle([...pool])) { const v=field==='italian'?w.italian:w.english; if(v&&!seen.has(norm(v))){seen.add(norm(v));choices.push(v);if(choices.length>=n)break;} }
   return shuffle(choices);
 }
 
 function buildCard(word,i,pool) {
   const p   = pool.length>=4?pool:allWords();
-  const dir = i%2===0?'es-en':'en-es';
+  const dir = i%2===0?'it-en':'en-it';
   // cloze = gap-fill in a real sentence context (~1 in 5 cards when phrases available)
   const hasPhrases = typeof PHRASES !== 'undefined' && PHRASES.length > 0;
   // Equal distribution — each type ~20%
@@ -1238,8 +1223,8 @@ function buildCard(word,i,pool) {
   if(state.listenFirst && !['listen','dictation'].includes(ex)) ex = Math.random()<0.5?'listen':'dictation';
   // Word context — a real phrase containing this word, shown on Italian→English cards.
   let ctx=null;
-  if(dir==='es-en' && (ex==='typed'||ex==='mcq') && hasPhrases){
-    const spc=word.spanish.toLowerCase().replace(/[¿?¡!.,;:]/g,'').trim();
+  if(dir==='it-en' && (ex==='typed'||ex==='mcq') && hasPhrases){
+    const spc=word.italian.toLowerCase().replace(/[?!.,;:]/g,'').trim();
     if(spc && spc.length>1){
       const spcEsc=spc.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
       const cb="(?:^|[^a-zàèéìíòóùú0-9])", cbe="(?:$|[^a-zàèéìíòóùú0-9])";
@@ -1249,15 +1234,15 @@ function buildCard(word,i,pool) {
     }
   }
   if(ex==='cloze'){
-    // Find a phrase containing this Spanish word as a WHOLE word (not a substring in another word).
+    // Find a phrase containing this Italian word as a WHOLE word (not a substring in another word).
     // This prevents partial blanks like "me__" matching "mesa", or blanking "es" inside "peres".
-    const sp = word.spanish.toLowerCase().replace(/[¿?¡!.,;:]/g,'').trim();
+    const sp = word.italian.toLowerCase().replace(/[?!.,;:]/g,'').trim();
     // Build a regex that matches the word surrounded by non-letter boundaries.
-    // We use a custom boundary instead of \b because \b is ASCII-only and breaks on Spanish accents.
-    // Allowed chars in a Spanish "word" for boundary purposes: letters, digits, accents, ñ.
+    // We use a custom boundary instead of \b because \b is ASCII-only and breaks on Italian accents.
+    // Allowed chars in a Italian "word" for boundary purposes: letters, digits, accents, ñ.
     const spEsc = sp.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-    const boundary = "(?:^|[^a-záéíóúñü0-9])";
-    const boundaryEnd = "(?:$|[^a-záéíóúñü0-9])";
+    const boundary = "(?:^|[^a-zàèéìíòóùú0-9])";
+    const boundaryEnd = "(?:$|[^a-zàèéìíòóùú0-9])";
     const wholeRe = new RegExp(boundary + "(" + spEsc + ")" + boundaryEnd, 'i');
     const matching = PHRASES.filter(([psp])=>wholeRe.test(psp.toLowerCase()));
     if(matching.length){
@@ -1268,23 +1253,23 @@ function buildCard(word,i,pool) {
       if(blanked !== psp && sp){
         return {...word,ex:'cloze',promptLabel:'Fill in the blank',
           taskText:'Type the missing Italian word.',
-          prompt:blanked, answer:sp||word.spanish, speak:psp, ph:'Type the missing word…',
+          prompt:blanked, answer:sp||word.italian, speak:psp, ph:'Type the missing word…',
           hint:`Sentence: "${pen}"`};
       }
     }
     // Fallback to mcq
-    return dir==='es-en'
-      ? {...word,ex:'mcq',promptLabel:'Multiple choice: Italian → English',taskText:'Choose the correct English meaning.',prompt:word.spanish,answer:word.english||'',speak:word.spanish,choices:sampleChoices(word.english,p,'english')}
-      : {...word,ex:'mcq',promptLabel:'Multiple choice: English → Italian',taskText:'Choose the correct Italian word.',prompt:word.english,answer:word.spanish||'',speak:word.spanish,choices:sampleChoices(word.spanish,p,'spanish')};
+    return dir==='it-en'
+      ? {...word,ex:'mcq',promptLabel:'Multiple choice: Italian → English',taskText:'Choose the correct English meaning.',prompt:word.italian,answer:word.english||'',speak:word.italian,choices:sampleChoices(word.english,p,'english')}
+      : {...word,ex:'mcq',promptLabel:'Multiple choice: English → Italian',taskText:'Choose the correct Italian word.',prompt:word.english,answer:word.italian||'',speak:word.italian,choices:sampleChoices(word.italian,p,'italian')};
   }
-  if(ex==='listen')    return {...word,ex,promptLabel:'Listening recognition',taskText:'Tap Play Italian, then choose the English meaning.',prompt:'Listen to the Italian word.',answer:word.english||'',speak:word.spanish,choices:sampleChoices(word.english,p,'english')};
-  if(ex==='dictation') return {...word,ex,promptLabel:'Dictation',taskText:'Tap Play Italian, then type what you hear.',prompt:word.english||'',answer:word.spanish||'',speak:word.spanish,ph:'Type the Italian you hear.'};
-  if(ex==='mcq') return dir==='es-en'
-    ? {...word,ex,promptLabel:'Multiple choice: Italian → English',taskText:'Choose the correct English meaning.',prompt:word.spanish,answer:word.english||'',speak:word.spanish,choices:sampleChoices(word.english,p,'english'),context:ctx}
-    : {...word,ex,promptLabel:'Multiple choice: English → Italian',taskText:'Choose the correct Italian word.',prompt:word.english,answer:word.spanish||'',speak:word.spanish,choices:sampleChoices(word.spanish,p,'spanish')};
-  return dir==='es-en'
-    ? {...word,ex:'typed',promptLabel:'Typed recall: Italian → English',taskText:'Type the English meaning.',prompt:word.spanish,answer:word.english||'',speak:word.spanish,ph:'Type the English meaning.',context:ctx}
-    : {...word,ex:'typed',promptLabel:'Typed recall: English → Italian',taskText:'Type the Italian answer.',prompt:word.english,answer:word.spanish||'',speak:word.spanish,ph:'Type the Italian answer.'};
+  if(ex==='listen')    return {...word,ex,promptLabel:'Listening recognition',taskText:'Tap Play Italian, then choose the English meaning.',prompt:'Listen to the Italian word.',answer:word.english||'',speak:word.italian,choices:sampleChoices(word.english,p,'english')};
+  if(ex==='dictation') return {...word,ex,promptLabel:'Dictation',taskText:'Tap Play Italian, then type what you hear.',prompt:word.english||'',answer:word.italian||'',speak:word.italian,ph:'Type the Italian you hear.'};
+  if(ex==='mcq') return dir==='it-en'
+    ? {...word,ex,promptLabel:'Multiple choice: Italian → English',taskText:'Choose the correct English meaning.',prompt:word.italian,answer:word.english||'',speak:word.italian,choices:sampleChoices(word.english,p,'english'),context:ctx}
+    : {...word,ex,promptLabel:'Multiple choice: English → Italian',taskText:'Choose the correct Italian word.',prompt:word.english,answer:word.italian||'',speak:word.italian,choices:sampleChoices(word.italian,p,'italian')};
+  return dir==='it-en'
+    ? {...word,ex:'typed',promptLabel:'Typed recall: Italian → English',taskText:'Type the English meaning.',prompt:word.italian,answer:word.english||'',speak:word.italian,ph:'Type the English meaning.',context:ctx}
+    : {...word,ex:'typed',promptLabel:'Typed recall: English → Italian',taskText:'Type the Italian answer.',prompt:word.english,answer:word.italian||'',speak:word.italian,ph:'Type the Italian answer.'};
 }
 
 
@@ -1317,7 +1302,7 @@ function buildPhraseCards() {
       srsType: 'phrase',
       phraseIdx: p.idx,
       id: 'phrase_' + p.idx,
-      spanish: p.sp,
+      italian: p.sp,
       english: p.en,
       lessonId: p.lesson,
       lessonTitle: 'Lesson ' + p.lesson + ' sentence',
@@ -1333,7 +1318,7 @@ function buildPhraseCards() {
 
 function buildMatchCard(words) {
   if(!words || words.length < 4) return null;
-  const pairs = words.slice(0, 4).map((w, i) => ({pairId: i, sp: w.spanish, en: w.english, wordId: w.id}));
+  const pairs = words.slice(0, 4).map((w, i) => ({pairId: i, sp: w.italian, en: w.english, wordId: w.id}));
   const chips = [
     ...pairs.map(p => ({type:'sp', text: p.sp, pairId: p.pairId, wordId: p.wordId})),
     ...pairs.map(p => ({type:'en', text: p.en, pairId: p.pairId, wordId: p.wordId})),
@@ -1377,9 +1362,9 @@ function buildQueue() {
       const sharesRoot = (a, b) => { const ra=engRoots(a), rb=engRoots(b); return ra.some(x => rb.includes(x)); };
       for(let j = final.length - 1; j >= 0 && recent.length < 4; j--) {
         const c = final[j];
-        if(c.ex !== 'match' && c.ex !== 'phrase' && c.spanish && c.english) {
-          const dup = recent.some(r => r.id === c.id || r.spanish === c.spanish || sharesRoot(r.english, c.english));
-          if(!dup) recent.push({spanish: c.spanish, english: c.english, id: c.id});
+        if(c.ex !== 'match' && c.ex !== 'phrase' && c.italian && c.english) {
+          const dup = recent.some(r => r.id === c.id || r.italian === c.italian || sharesRoot(r.english, c.english));
+          if(!dup) recent.push({italian: c.italian, english: c.english, id: c.id});
         }
       }
       if(recent.length === 4) {
@@ -1434,7 +1419,7 @@ function switchSections() {
 function renderPractice() {
   const packs=allPacks(), words=selectedWords(), due=words.filter(isDue).length, mastered=words.filter(w=>getStatus(w)==='mastered').length;
 
-  // ── Lesson tiles, grouped by course (3MS + CBE) ───────────────────────────
+  // ── Lesson tiles, grouped by source ─────────────────────────────────────
   const renderTile = l => {
     const core=coreWords(l.id), hasWords=core.length>0;
     const isSel=selLessons().includes(l.id);
@@ -1451,9 +1436,7 @@ function renderPractice() {
     state.lessons.filter(l => (l.course||'3MS') === course).map(renderTile).join('');
 
   const lessons3MS = tilesByCourse('3MS');
-  const lessonsCBE = tilesByCourse('CBE');
   const lessonsOTHER = tilesByCourse('OTHER');
-  const cbeIds = state.lessons.filter(l=>l.course==='CBE'&&coreWords(l.id).length).map(l=>l.id);
   const tmsIds = state.lessons.filter(l=>(l.course||'3MS')==='3MS'&&coreWords(l.id).length).map(l=>l.id);
 
   const lessonSections = `
@@ -1468,13 +1451,6 @@ function renderPractice() {
         <div style="flex:1;height:2px;background:#bae6fd;border-radius:2px;"></div>
       </div>
       <div class="lesson-grid">${lessonsOTHER}</div>
-    ` : ''}
-    ${lessonsCBE ? `
-      <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px;">
-        <span style="font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:#7030c8;background:var(--purples);padding:3px 9px;border-radius:999px;">☕ Coffee Break Italian</span>
-        <div style="flex:1;height:2px;background:var(--purples);border-radius:2px;"></div>
-      </div>
-      <div class="lesson-grid">${lessonsCBE}</div>
     ` : ''}`;
 
   const packChips = packs.length ? packs.map(s=>{
@@ -1488,14 +1464,13 @@ function renderPractice() {
   const setup = `
     <div class="card">
       <h2>Choose your mission</h2>
-      <div class="muted small">Tap lessons and packs to select. Mix and match from both courses.</div>
+      <div class="muted small">Tap lessons and packs to select.</div>
       <div class="grid cols-2" style="margin-top:16px;">
         <div>
           <div class="toolbar" style="justify-content:space-between;margin-bottom:6px;">
             <h3>Lessons</h3>
             <div class="toolbar">
               <button class="btn" id="allTMS">All 3MS</button>
-              ${lessonsCBE?'<button class="btn" id="allCBE">All CBE</button>':''}
               <button class="btn" id="clrL">Clear</button>
             </div>
           </div>
@@ -1589,14 +1564,9 @@ function renderPractice() {
       });
     });
     document.getElementById('allTMS')?.addEventListener('click',()=>{
-      // Add all 3MS lessons that have words, keep existing CBE selections.
-      const keep = selLessons().filter(id => { const l=getLesson(id); return l && l.course==='CBE'; });
+      // Add all 3MS lessons while keeping any selected Other Sources.
+      const keep = selLessons().filter(id => { const l=getLesson(id); return l && l.course==='OTHER'; });
       state.selLessons = [...new Set([...keep, ...tmsIds])].sort((a,b)=>a-b);
-      saveState(); renderPractice();
-    });
-    document.getElementById('allCBE')?.addEventListener('click',()=>{
-      const keep = selLessons().filter(id => { const l=getLesson(id); return l && (l.course||'3MS')==='3MS'; });
-      state.selLessons = [...new Set([...keep, ...cbeIds])].sort((a,b)=>a-b);
       saveState(); renderPractice();
     });
     document.getElementById('clrL')?.addEventListener('click',()=>{ state.selLessons=[]; saveState(); renderPractice(); });
@@ -1639,11 +1609,11 @@ function renderPractice() {
 function buildNumQueue(gi) {
   const g = NUM_GROUPS[gi];
   const allNums = NUM_GROUPS.flatMap(g2=>g2.pairs);
-  const pool = allNums.map(([sp,en])=>({spanish:sp,english:en}));
+  const pool = allNums.map(([sp,en])=>({italian:sp,english:en}));
   // Look up real word objects from lesson 7 Numbers pack so SRS updates
   const numLesson = getLesson(7);
   const realWords = numLesson ? numLesson.vocab.filter(w=>w.pack&&w.pack.startsWith('Numbers')) : [];
-  const findReal = sp => realWords.find(w=>norm(w.spanish)===norm(sp));
+  const findReal = sp => realWords.find(w=>norm(w.italian)===norm(sp));
   const types = ['typed','typed','mcq','listen','dictation'];
   return shuffle(g.pairs.map(([sp,en],i) => {
     const real = findReal(sp);
@@ -1651,18 +1621,18 @@ function buildNumQueue(gi) {
     // Use real word if found (so reviewWord() updates SRS), else fake id
     const word = real
       ? {...real, lessonTitle:'Numbers'}
-      : {id:'num_'+gi+'_'+i, spanish:sp, english:en, lessonTitle:'Numbers'};
+      : {id:'num_'+gi+'_'+i, italian:sp, english:en, lessonTitle:'Numbers'};
     if(ex==='listen')    return {...word,ex,promptLabel:'Listening',taskText:'Tap Play, choose the English meaning.',
-      prompt:'Listen to the number.',answer:word.english||en,speak:word.spanish||sp,choices:sampleChoices(word.english||en,pool,'english')};
+      prompt:'Listen to the number.',answer:word.english||en,speak:word.italian||sp,choices:sampleChoices(word.english||en,pool,'english')};
     if(ex==='dictation') return {...word,ex,promptLabel:'Dictation',taskText:'Tap Play, type what you hear.',
-      prompt:word.english||en,answer:word.spanish||sp,speak:word.spanish||sp,ph:'Type the Italian number…'};
+      prompt:word.english||en,answer:word.italian||sp,speak:word.italian||sp,ph:'Type the Italian number…'};
     if(ex==='mcq')       return {...word,ex,promptLabel:'Multiple choice',taskText:'Choose the correct English.',
-      prompt:word.spanish||sp,answer:word.english||en,speak:word.spanish||sp,choices:sampleChoices(word.english||en,pool,'english')};
+      prompt:word.italian||sp,answer:word.english||en,speak:word.italian||sp,choices:sampleChoices(word.english||en,pool,'english')};
     return i%2===0
       ? {...word,ex:'typed',promptLabel:'Typed recall: Italian → English',taskText:'Type the English.',
-          prompt:word.spanish||sp,answer:word.english||en,speak:word.spanish||sp,ph:'Type the English number…'}
+          prompt:word.italian||sp,answer:word.english||en,speak:word.italian||sp,ph:'Type the English number…'}
       : {...word,ex:'typed',promptLabel:'Typed recall: English → Italian',taskText:'Type the Italian.',
-          prompt:word.english||en,answer:word.spanish||sp,speak:word.spanish||sp,ph:'Type the Italian number…'};
+          prompt:word.english||en,answer:word.italian||sp,speak:word.italian||sp,ph:'Type the Italian number…'};
   }));
 }
 
@@ -2343,18 +2313,18 @@ function renderVerbs() {
       </table>
     </div>`).join('');
 
-  // ── ser vs estar callout ───────────────────────────────────────────────────
+  // ── essere vs stare callout ────────────────────────────────────────────────
   const callout = `<div class="card" style="margin-top:12px;background:#fff8df;border-color:#f0d060;">
-    <h3 style="margin-bottom:6px;">⚡ ser vs estar — when to use which</h3>
+    <h3 style="margin-bottom:6px;">⚡ essere vs stare — when to use which</h3>
     <div class="small" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
-      <div><strong>ser</strong> (permanent / identity)<br>
-        • <em>Es</em> fantástico. — It's fantastic.<br>
-        • <em>Son</em> las tres. — It's three o'clock.<br>
-        • <em>Soy</em> de Canadá. — I'm from Canada.</div>
-      <div><strong>estar</strong> (state / location / feeling)<br>
-        • <em>Está</em> aquí. — It's here.<br>
-        • <em>Estoy</em> ocupado. — I'm busy.<br>
-        • <em>Están</em> en el hotel. — They're at the hotel.</div>
+      <div><strong>essere</strong> (identity / description / location)<br>
+        • <em>È</em> fantastico. — It's fantastic.<br>
+        • <em>Sono</em> le tre. — It's three o'clock.<br>
+        • L'hotel <em>è</em> qui. — The hotel is here.</div>
+      <div><strong>stare</strong> (feeling / condition / staying)<br>
+        • <em>Sto</em> bene. — I'm well.<br>
+        • <em>Sto</em> male. — I'm not well.<br>
+        • <em>Stiamo</em> in hotel. — We're staying at a hotel.</div>
     </div>
   </div>`;
 
@@ -2430,20 +2400,20 @@ function renderPhrases() {
         </div>
         <button class="btn primary" id="pRestartBtn">Go again</button></div>`;
     }
-    const dir=pr.idx%2===0?'es-en':'en-es';
-    const prompt=dir==='es-en'?PHRASES[i][0]:PHRASES[i][1];
-    const answer=dir==='es-en'?PHRASES[i][1]:PHRASES[i][0];
+    const dir=pr.idx%2===0?'it-en':'en-it';
+    const prompt=dir==='it-en'?PHRASES[i][0]:PHRASES[i][1];
+    const answer=dir==='it-en'?PHRASES[i][1]:PHRASES[i][0];
     const sp=PHRASES[i][0];
     // Before reveal: show prompt + optional typing area + Reveal button
     // After reveal: show answer + 3 self-rate buttons
     return `<div class="card review-card anim-pop" style="margin-bottom:16px;">
       <div class="toolbar" style="justify-content:center;margin-bottom:12px;">
-        <span class="pill blue">${dir==='es-en'?'Italian → English':'English → Italian'}</span>
+        <span class="pill blue">${dir==='it-en'?'Italian → English':'English → Italian'}</span>
         <span class="pill yellow">Phrase ${pr.idx+1} of ${pr.queue.length}</span>
       </div>
       <div class="prompt" style="font-size:clamp(1rem,2.8vw,1.5rem);margin-bottom:12px;">${esc(prompt)}</div>
       ${!pr.reveal?`
-        <div class="muted small" style="margin-bottom:10px;font-style:italic;">Think of the ${dir==='es-en'?'English meaning':'Italian translation'}, then reveal.</div>
+        <div class="muted small" style="margin-bottom:10px;font-style:italic;">Think of the ${dir==='it-en'?'English meaning':'Italian translation'}, then reveal.</div>
         <div class="speak-row"><button class="speak-btn" id="pSpeakBtn">🔊 Play Italian</button></div>
         <div class="action-row" style="margin-top:14px;">
           <button class="btn primary" id="pRevealBtn">👁 Reveal answer</button>
@@ -2536,9 +2506,9 @@ const buildState = {
 };
 
 
-// ── Translation Challenges (English → build Spanish) ─────────────────────────
+// ── Translation Challenges (English → build Italian) ─────────────────────────
 // Schema: {en, tokens, topic, lvl}
-//   tokens : [[spanish, category], ...]   chip text + role for colouring
+//   tokens : [[Italian, category], ...]   chip text + role for colouring
 //   topic  : one of TOPIC_META keys below — used for filtering & distractor pool
 //   lvl    : 1 ★ easy, 2 ★★ medium, 3 ★★★ harder
 // Categories: q=question, c=conjugated verb, i=infinitive / past-participle,
@@ -2732,7 +2702,7 @@ function buildChallengeTokens(ch) {
   // legacy fallback
   const tokens = [];
   if(ch.q)               tokens.push({sp:ch.q, cat:'q'});
-  if(ch.neg && ch.c)     tokens.push({sp:'no', cat:'neg'});
+  if(ch.neg && ch.c)     tokens.push({sp:'non', cat:'neg'});
   if(ch.c)               tokens.push({sp:ch.c, cat:'c'});
   if(ch.i)               tokens.push({sp:ch.i, cat:'i'});
   if(ch.e)               tokens.push({sp:ch.e, cat:'e'});
@@ -2827,7 +2797,7 @@ function nextChallenge() {
 
 
 // ── Curated valid sentence templates ─────────────────────────────────────────
-// Each template: [question_sp, question_en, carrier_sp, carrier_en, infinitive_sp, infinitive_en]
+// Each template: [question_it, question_en, carrier_it, carrier_en, infinitive_it, infinitive_en]
 // Only semantically valid combinations included.
 const TEMPLATES = [
   // Dove? — location questions
@@ -2906,17 +2876,17 @@ function generateSentence(neg=null) {
   const tmpl = TEMPLATES[0|Math.random()*TEMPLATES.length];
   const [qSp, qEn, cSp0, cEn0, iSp, iEn] = tmpl;
   const isNeg = neg !== null ? neg : Math.random() > 0.8;
-  const cSp = isNeg ? 'no ' + cSp0 : cSp0;
-  const cEn = isNeg ? '[no] ' + cEn0 : cEn0;
+  const cSp = isNeg ? 'non ' + cSp0 : cSp0;
+  const cEn = isNeg ? '[not] ' + cEn0 : cEn0;
   const useExtra = Math.random() > 0.45;
   const e = useExtra ? STRUCT.extras[0|Math.random()*STRUCT.extras.length] : null;
   const parts = [
-    {sp:qSp.replace(/[¿?]/g,'').trim(), en:qEn, cat:'q'},
+    {sp:qSp.replace(/[?]/g,'').trim(), en:qEn, cat:'q'},
     {sp:cSp, en:cEn, cat:'c'},
     {sp:iSp, en:iEn, cat:'i'},
   ];
   if(e) parts.push({sp:e.sp, en:e.en, cat:'e'});
-  const sp = '¿' + parts.map(p=>p.sp).join(' ') + '?';
+  const sp = parts.map(p=>p.sp).join(' ') + '?';
   const en = qEn + ' ' + cEn + ' ' + iSp + (e?' '+e.en:'') + '?';
   return {sp, en, parts, speak:sp};
 }
@@ -2926,22 +2896,22 @@ function renderBuild() {
   const bs = buildState;
   const slots = ['q','c','i','e'];
   const slotMeta = {
-    q:{label:'Question word',hint:'¿Dónde? ¿Qué?…',color:'#6d28d9',cat:'questions'},
-    c:{label:'Carrier verb',hint:'puedo, quiere…',color:'#1d4ed8',cat:'carriers'},
-    i:{label:'Infinitive',hint:'comer, ir…',color:'#166534',cat:'infinitives'},
-    e:{label:'Extra (optional)',hint:'hoy, aquí…',color:'#92400e',cat:'extras',optional:true},
+    q:{label:'Question word',hint:'Dove? Cosa?…',color:'#6d28d9',cat:'questions'},
+    c:{label:'Carrier verb',hint:'posso, vuole…',color:'#1d4ed8',cat:'carriers'},
+    i:{label:'Infinitive',hint:'mangiare, andare…',color:'#166534',cat:'infinitives'},
+    e:{label:'Extra (optional)',hint:'oggi, qui…',color:'#92400e',cat:'extras',optional:true},
   };
 
   // ── Build the assembled sentence string ───────────────────────────────────
   const parts = [];
-  if(bs.q) parts.push(bs.q.sp.replace(/[¿?]/g,'').trim());
-  if(bs.neg && bs.c) parts.push('no ' + bs.c.sp);
+  if(bs.q) parts.push(bs.q.sp.replace(/[?]/g,'').trim());
+  if(bs.neg && bs.c) parts.push('non ' + bs.c.sp);
   else if(bs.c) parts.push(bs.c.sp);
   if(bs.i) parts.push(bs.i.sp);
   if(bs.e) parts.push(bs.e.sp);
-  const sentence = parts.length ? (bs.q ? '¿' : '') + parts.join(' ') + (bs.q ? '?' : '.') : '';
+  const sentence = parts.length ? parts.join(' ') + (bs.q ? '?' : '.') : '';
   const engParts = [];
-  if(bs.q) engParts.push(bs.q.en.replace(/[¿?]/g,'').trim());
+  if(bs.q) engParts.push(bs.q.en.replace(/[?]/g,'').trim());
   if(bs.neg) engParts.push('not');
   if(bs.c) engParts.push(bs.c.en);
   if(bs.i) engParts.push(bs.i.en);
@@ -2950,16 +2920,16 @@ function renderBuild() {
 
   // ── Example sentences for inspiration ─────────────────────────────────────
   const examples = [
-    {sp:'¿Dónde puedo comer aquí?',en:'Where can I eat here?'},
-    {sp:'¿Qué quiere beber esta noche?',en:'What do you want to drink tonight?'},
-    {sp:'¿A qué hora va a pagar?',en:'At what time are you going to pay?'},
-    {sp:'¿Cuándo debo ir al restaurante?',en:'When should I go to the restaurant?'},
-    {sp:'¿Cómo puedo encontrar el hotel?',en:'How can I find the hotel?'},
-    {sp:'¿Dónde voy a quedarse mañana?',en:'Where am I going to stay tomorrow?'},
-    {sp:'¿Qué quiero pedir hoy?',en:'What do I want to order today?'},
-    {sp:'¿Cuánto debo gastar aquí?',en:'How much should I spend here?'},
-    {sp:'No quiero pagar más tarde.',en:'I don\'t want to pay later.'},
-    {sp:'No puede comer en el hotel.',en:'You can\'t eat at the hotel.'},
+    {sp:'Dove posso mangiare qui?',en:'Where can I eat here?'},
+    {sp:'Cosa vuole bere stasera?',en:'What do you want to drink tonight?'},
+    {sp:'A che ora va a pagare?',en:'At what time are you going to pay?'},
+    {sp:'Quando devo andare al ristorante?',en:'When should I go to the restaurant?'},
+    {sp:"Come posso trovare l'hotel?",en:'How can I find the hotel?'},
+    {sp:'Dove posso restare domani?',en:'Where can I stay tomorrow?'},
+    {sp:'Cosa voglio ordinare oggi?',en:'What do I want to order today?'},
+    {sp:'Quanto devo spendere qui?',en:'How much should I spend here?'},
+    {sp:'Non voglio pagare più tardi.',en:'I don\'t want to pay later.'},
+    {sp:'Non può mangiare in hotel.',en:'You can\'t eat at the hotel.'},
   ];
 
   // ── Render HTML ───────────────────────────────────────────────────────────
@@ -3216,7 +3186,7 @@ function renderBuild() {
         <button class="speak-btn" id="gSpeakBtn">🔊 Listen again</button>
         ${bs2.genRevealed
           ? `<button class="btn primary" id="gNextBtn">Next sentence →</button>
-             <button class="btn" id="gNegBtn">${gs.parts[1]?.sp.startsWith('no ')?'➕ Positive':'➖ Negative'}</button>`
+             <button class="btn" id="gNegBtn">${gs.parts[1]?.sp.startsWith('non ')?'➕ Positive':'➖ Negative'}</button>`
           : `<button class="btn primary" id="gRevealBtn">👁 Show me</button>`}
       </div>
     </div>
@@ -3257,7 +3227,7 @@ function renderBuild() {
       const targetSlot = chip.dataset.slot;
       const sp = chip.dataset.sp;
       bs[targetSlot] = {sp, en: chip.dataset.en};
-      // Speak the Spanish word so learners hear pronunciation
+      // Speak the Italian word so learners hear pronunciation
       if('speechSynthesis' in window && sp){
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(sp),{lang:'it-IT'}));
@@ -3281,7 +3251,7 @@ function renderBuild() {
   // Shuffle
   d.querySelector('#shuffleBtn')?.addEventListener('click', () => {
     // Pick a random curated TEMPLATE — guarantees a valid combination.
-    // (Old behaviour picked each slot independently, which produced nonsense like "¿Quién? debo comenzar".)
+    // (Old behaviour picked each slot independently, which produced nonsense like "Chi? devo cominciare".)
     const [qSp, qEn, cSp, cEn, iSp, iEn] = TEMPLATES[0|Math.random()*TEMPLATES.length];
     bs.q = {sp:qSp, en:qEn};
     bs.c = {sp:cSp, en:cEn};
@@ -3431,15 +3401,15 @@ function renderBuild() {
   d.querySelector('#gNegBtn')?.addEventListener('click',()=>{
     if(!bs3.genSentence) return;
     const gs2 = bs3.genSentence;
-    const isNeg = gs2.parts[1]?.sp.startsWith('no ');
+    const isNeg = gs2.parts[1]?.sp.startsWith('non ');
     // Flip the carrier part in place
     const newParts = gs2.parts.map(p => {
       if(p.cat !== 'c') return p;
       return isNeg
-        ? {...p, sp: p.sp.replace(/^no\s+/,'')}   // remove "no "
-        : {...p, sp: 'no ' + p.sp};               // add "no "
+        ? {...p, sp: p.sp.replace(/^non\s+/,'')} // remove "non "
+        : {...p, sp: 'non ' + p.sp};              // add "non "
     });
-    const sp = '¿' + newParts.map(p=>p.sp).join(' ') + '?';
+    const sp = newParts.map(p=>p.sp).join(' ') + '?';
     const en = newParts.map(p=>p.en).join(' ') + '?';
     bs3.genSentence = {...gs2, parts:newParts, sp, en, speak:sp};
     renderBuild();
@@ -3450,7 +3420,7 @@ function renderBuild() {
 function renderStats() {
   const words=allWords(), attempts=words.reduce((s,w)=>s+w.attempts,0), correct=words.reduce((s,w)=>s+w.correct,0);
   const mastered=words.filter(w=>getStatus(w)==='mastered').length;
-  const lRows=state.lessons.map(l=>{ const ws=coreWords(l.id),tot=ws.length,m=ws.filter(w=>getStatus(w)==='mastered').length; const prefix=l.course==='CBE'?'☕ ':''; return tot?{t:prefix+l.title,tot,m,pct:Math.round(m/tot*100)}:null; }).filter(Boolean);
+  const lRows=state.lessons.map(l=>{ const ws=coreWords(l.id),tot=ws.length,m=ws.filter(w=>getStatus(w)==='mastered').length; return tot?{t:l.title,tot,m,pct:Math.round(m/tot*100)}:null; }).filter(Boolean);
   const pRows=allPacks().map(s=>{ const ws=packWords(s),tot=ws.length,m=ws.filter(w=>getStatus(w)==='mastered').length; return {t:`${s.label} (L${s.lessonId})`,tot,m,pct:Math.round(m/tot*100)}; });
   const statRow=(t,m,tot,pct)=>`<div class="stat-row">
     <div class="stat-name">${esc(t)}</div>
