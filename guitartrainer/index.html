@@ -535,7 +535,7 @@ function Fretboard({ maxFret = 12, frets = 12, marker, tapped, onTap, disabled, 
       {/* scale / interval dots */}
       {dots &&
         dots.map((d, i) => (
-          <g key={"sd" + i}>
+          <g key={"sd" + i} opacity={d.dim ? 0.28 : 1}>
             <circle cx={fretCenter(d.f)} cy={yOf(d.s)} r={13.5} fill={d.color} stroke="rgba(0,0,0,0.4)" strokeWidth="1.5" />
             <text x={fretCenter(d.f)} y={yOf(d.s) + 4.5} textAnchor="middle" fontSize="12" fontWeight="800" fill={d.text} fontFamily="inherit">{d.label}</text>
           </g>
@@ -2085,20 +2085,26 @@ function cropperPairs(keyPc, loS, hiS) {
 }
 
 /* ---------------- Rhythm Trainer (standard notation) ---------------- */
-/* Cells are one- or two-beat rhythm figures rendered as real notation on a
-   percussion line: noteheads, stems, beams, flags, rests, dots, counts. */
+/* Cells are one- or two-beat rhythm figures on a percussion line. Everything —
+   noteheads, rests, counts, gridlines — is placed off ONE absolute beat grid,
+   so the count syllable always sits directly under the note it names.
+   labels: [offsetInCell, kind, isRest]; kind "n" prints the beat number. */
 const RHYTHM_CELLS = {
-  q:    { beats: 1, events: [0], count: (b) => `${b}` },
-  h:    { beats: 2, events: [0], count: (b) => `${b} (${b + 1})` },
-  ee:   { beats: 1, events: [0, 0.5], count: (b) => `${b} &` },
-  ssss: { beats: 1, events: [0, 0.25, 0.5, 0.75], count: (b) => `${b} e & a` },
-  ess:  { beats: 1, events: [0, 0.5, 0.75], count: (b) => `${b} & a` },
-  sse:  { beats: 1, events: [0, 0.25, 0.5], count: (b) => `${b} e &` },
-  re:   { beats: 1, events: [0.5], count: (b) => `(${b}) &` },
-  qr:   { beats: 1, events: [], count: (b) => `(${b})` },
-  t:    { beats: 1, events: [0, 1 / 3, 2 / 3], count: (b) => `${b}-trip-let` },
-  dqe:  { beats: 2, events: [0, 1.5], count: (b) => `${b}‥(${b + 1})&` },
+  q:    { beats: 1, events: [0],                  labels: [[0, "n"]] },
+  h:    { beats: 2, events: [0],                  labels: [[0, "n"], [1, "n", true]] },
+  ee:   { beats: 1, events: [0, 0.5],             labels: [[0, "n"], [0.5, "&"]] },
+  ssss: { beats: 1, events: [0, 0.25, 0.5, 0.75], labels: [[0, "n"], [0.25, "e"], [0.5, "&"], [0.75, "a"]], sixt: true },
+  ess:  { beats: 1, events: [0, 0.5, 0.75],       labels: [[0, "n"], [0.5, "&"], [0.75, "a"]], sixt: true },
+  sse:  { beats: 1, events: [0, 0.25, 0.5],       labels: [[0, "n"], [0.25, "e"], [0.5, "&"]], sixt: true },
+  re:   { beats: 1, events: [0.5],                labels: [[0, "n", true], [0.5, "&"]] },
+  qr:   { beats: 1, events: [],                   labels: [[0, "n", true]] },
+  t:    { beats: 1, events: [0, 1 / 3, 2 / 3],    labels: [[0, "n"], [1 / 3, "trip"], [2 / 3, "let"]], trip: true },
+  dqe:  { beats: 2, events: [0, 1.5],             labels: [[0, "n"], [1, "n", true], [1.5, "&"]] },
 };
+/* Swing: eighth-note offbeats slide to the last third of the beat.
+   Cells built from sixteenths or triplets are left straight — swinging them is
+   meaningless (and the notes would collide). */
+const swingOff = (o, cell) => (cell.sixt || cell.trip || o % 1 !== 0.5 ? o : Math.floor(o) + 2 / 3);
 const RHYTHM_EXERCISES = [
   { name: "Quarter pulse", cells: ["q", "q", "q", "q"], hint: "One strum per click — the anchor" },
   { name: "Half notes", cells: ["h", "h"], hint: "Hold two full beats; count through the space" },
@@ -2112,22 +2118,27 @@ const RHYTHM_EXERCISES = [
   { name: "Triplets", cells: ["t", "t", "t", "t"], hint: "Three per beat — say trip-l-et" },
   { name: "Dotted quarter", cells: ["dqe", "ee", "q"], hint: "The push — land on the & of 2" },
   { name: "Syncopa", cells: ["ee", "re", "ee", "q"], hint: "The missing downbeat of 2 is the hook" },
+  { name: "Shuffle", cells: ["ee", "ee", "ee", "ee"], hint: "Same eighths, swung — long-short, the blues engine", feel: "swing" },
+  { name: "Charleston", cells: ["dqe", "qr", "qr"], hint: "Beat 1 and the & of 2, then let it ring — swing it", feel: "swing" },
+  { name: "Shuffle & rest", cells: ["ee", "qr", "ee", "re"], hint: "Swung, with holes — comp like a jazz guitarist", feel: "swing" },
 ];
-function RhythmStaff({ cells, hotBeat }) {
-  const TOP = 12, LINE = 44, CNT = 70;
-  const W1 = 116, PAD = 10;
+function RhythmStaff({ cells, hotBeat, swing }) {
+  const TOP = 14, LINE = 48, CNT = 74, PAD = 10, W1 = 112;
   const totalBeats = cells.reduce((a, c) => a + RHYTHM_CELLS[c].beats, 0);
   const width = PAD * 2 + totalBeats * W1;
+  const L = PAD + 18, R = width - PAD - 14;       // note field
+  const xAt = (b) => L + (b / totalBeats) * (R - L); // ONE grid: absolute beat → x
+  const unit = (R - L) / totalBeats;
   const els = [];
-  let x = PAD, beat = 0;
-  const head = (cx, open = false, key) => (
+
+  const head = (cx, open, key) => (
     <ellipse key={key} cx={cx} cy={LINE} rx={6} ry={4.6} fill={open ? "none" : T.cream} stroke={T.cream} strokeWidth={open ? 2 : 1} transform={`rotate(-18 ${cx} ${LINE})`} />
   );
   const stem = (cx, key) => <line key={key} x1={cx + 5.6} y1={LINE - 2} x2={cx + 5.6} y2={TOP + 4} stroke={T.cream} strokeWidth="1.6" />;
   const flag = (cx, key) => <path key={key} d={`M ${cx + 5.6} ${TOP + 4} q 9 3 7 14 q -1 -7 -7 -8 Z`} fill={T.cream} />;
   const dot = (cx, key) => <circle key={key} cx={cx + 11} cy={LINE - 3} r={2.2} fill={T.cream} />;
   const beam = (x1, x2, level, key) => (
-    <rect key={key} x={x1 + 5.6} y={TOP + 4 + level * 6} width={x2 - x1} height={3.4} fill={T.cream} />
+    <rect key={key} x={x1 + 5.6} y={TOP + 4 + level * 6} width={Math.max(4, x2 - x1)} height={3.4} fill={T.cream} />
   );
   const eighthRest = (cx, key) => (
     <g key={key}>
@@ -2136,17 +2147,22 @@ function RhythmStaff({ cells, hotBeat }) {
     </g>
   );
   const quarterRest = (cx, key) => (
-    <path key={key} d={`M ${cx} ${LINE - 16} L ${cx + 6} ${LINE - 8} L ${cx + 1} ${LINE - 2} Q ${cx + 9} ${LINE + 2} ${cx + 4} ${LINE + 9} Q ${cx - 1} ${LINE + 3} ${cx + 3} ${LINE}` } stroke={T.muted} strokeWidth="2.4" fill="none" />
+    <path key={key} d={`M ${cx} ${LINE - 16} L ${cx + 6} ${LINE - 8} L ${cx + 1} ${LINE - 2} Q ${cx + 9} ${LINE + 2} ${cx + 4} ${LINE + 9} Q ${cx - 1} ${LINE + 3} ${cx + 3} ${LINE}`} stroke={T.muted} strokeWidth="2.4" fill="none" />
   );
+
+  /* beat grid — the reference the counts and noteheads both hang from */
+  for (let b = 0; b < totalBeats; b++) {
+    els.push(<line key={"g" + b} x1={xAt(b)} y1={TOP - 2} x2={xAt(b)} y2={CNT - 12} stroke={T.line} strokeWidth="1" opacity={b === 0 ? 0 : 0.35} strokeDasharray="2 4" />);
+    if (hotBeat === b) els.push(<rect key={"hb" + b} x={xAt(b) - 12} y={TOP - 8} width={unit} height={CNT - TOP + 4} rx={7} fill={T.amber} opacity="0.13" />);
+  }
+
+  let beat = 0;
   cells.forEach((type, ci) => {
     const cell = RHYTHM_CELLS[type];
-    const w = cell.beats * W1;
-    const hot = hotBeat >= beat && hotBeat < beat + cell.beats;
-    const xs = cell.events.map((o) => x + 14 + (o / cell.beats) * (w - 36));
-    if (hot) els.push(<rect key={"h" + ci} x={x + 2} y={TOP - 6} width={w - 6} height={CNT - TOP} rx={8} fill={T.amber} opacity="0.14" />);
-    if (type === "q") { els.push(head(xs[0], false, ci + "n0"), stem(xs[0], ci + "s0")); }
-    else if (type === "h") { els.push(head(xs[0], true, ci + "n0"), stem(xs[0], ci + "s0")); }
-    else if (type === "ee") { els.push(head(xs[0], false, ci + "n0"), head(xs[1], false, ci + "n1"), stem(xs[0], ci + "s0"), stem(xs[1], ci + "s1"), beam(xs[0], xs[1], 0, ci + "b0")); }
+    const xs = cell.events.map((o) => xAt(beat + o));
+    if (type === "q") els.push(head(xs[0], false, ci + "n0"), stem(xs[0], ci + "s0"));
+    else if (type === "h") els.push(head(xs[0], true, ci + "n0"), stem(xs[0], ci + "s0"));
+    else if (type === "ee") els.push(head(xs[0], false, ci + "n0"), head(xs[1], false, ci + "n1"), stem(xs[0], ci + "s0"), stem(xs[1], ci + "s1"), beam(xs[0], xs[1], 0, ci + "b0"));
     else if (type === "ssss") {
       xs.forEach((cx, k) => els.push(head(cx, false, ci + "n" + k), stem(cx, ci + "s" + k)));
       els.push(beam(xs[0], xs[3], 0, ci + "b0"), beam(xs[0], xs[3], 1, ci + "b1"));
@@ -2157,31 +2173,43 @@ function RhythmStaff({ cells, hotBeat }) {
       xs.forEach((cx, k) => els.push(head(cx, false, ci + "n" + k), stem(cx, ci + "s" + k)));
       els.push(beam(xs[0], xs[2], 0, ci + "b0"), beam(xs[0], xs[1], 1, ci + "b1"));
     } else if (type === "re") {
-      els.push(eighthRest(x + 16, ci + "r0"), head(xs[0], false, ci + "n0"), stem(xs[0], ci + "s0"), flag(xs[0], ci + "f0"));
+      els.push(eighthRest(xAt(beat) + 2, ci + "r0"), head(xs[0], false, ci + "n0"), stem(xs[0], ci + "s0"), flag(xs[0], ci + "f0"));
     } else if (type === "qr") {
-      els.push(quarterRest(x + w / 2 - 4, ci + "r0"));
+      els.push(quarterRest(xAt(beat) + unit / 2 - 4, ci + "r0"));
     } else if (type === "t") {
       xs.forEach((cx, k) => els.push(head(cx, false, ci + "n" + k), stem(cx, ci + "s" + k)));
       els.push(beam(xs[0], xs[2], 0, ci + "b0"));
-      els.push(<text key={ci + "t3"} x={(xs[0] + xs[2]) / 2 + 5} y={TOP - 0} fontSize="11" fontStyle="italic" fontWeight="700" fill={T.muted} textAnchor="middle">3</text>);
+      els.push(<text key={ci + "t3"} x={(xs[0] + xs[2]) / 2 + 5} y={TOP - 1} fontSize="11" fontStyle="italic" fontWeight="700" fill={T.muted} textAnchor="middle">3</text>);
     } else if (type === "dqe") {
       els.push(head(xs[0], false, ci + "n0"), stem(xs[0], ci + "s0"), dot(xs[0], ci + "d0"));
       els.push(head(xs[1], false, ci + "n1"), stem(xs[1], ci + "s1"), flag(xs[1], ci + "f1"));
     }
-    els.push(
-      <text key={ci + "c"} x={x + w / 2} y={CNT} fontSize="11.5" fontWeight="700" fill={hot ? T.amber : T.muted} textAnchor="middle" fontFamily="inherit">
-        {cell.count(beat + 1)}
-      </text>
-    );
-    if (ci < cells.length - 1) els.push(<line key={ci + "div"} x1={x + w} y1={TOP} x2={x + w} y2={LINE + 8} stroke={T.line} strokeWidth="1" opacity="0.4" />);
-    x += w; beat += cell.beats;
+    /* counts — one per label, anchored to the same x as its note */
+    cell.labels.forEach(([o, kind, rest], li) => {
+      const abs = beat + o;
+      const txt = kind === "n" ? String(Math.floor(abs) + 1) : kind;
+      const hot = Math.floor(abs) === hotBeat;
+      els.push(
+        <text key={ci + "c" + li} x={xAt(abs)} y={CNT} fontSize={kind === "trip" || kind === "let" ? 9.5 : 11.5}
+          fontWeight="700" fill={rest ? T.faint : hot ? T.amber : T.muted} textAnchor="middle" fontFamily="inherit" opacity={rest ? 0.75 : 1}>
+          {rest ? `(${txt})` : txt}
+        </text>
+      );
+    });
+    beat += cell.beats;
   });
+
   return (
-    <svg viewBox={`0 0 ${width} 78`} style={{ width: "100%", maxWidth: 560, display: "block", margin: "0 auto" }}>
+    <svg viewBox={`0 0 ${width} 84`} style={{ width: "100%", maxWidth: 560, display: "block", margin: "0 auto" }}>
       <line x1={PAD - 4} y1={LINE} x2={width - PAD + 4} y2={LINE} stroke={T.muted} strokeWidth="1.4" opacity="0.7" />
       <line x1={PAD - 4} y1={TOP} x2={PAD - 4} y2={LINE + 8} stroke={T.cream} strokeWidth="3" />
       <line x1={width - PAD + 4} y1={TOP} x2={width - PAD + 4} y2={LINE + 8} stroke={T.cream} strokeWidth="3" />
       {els}
+      {swing && (
+        <text x={width - PAD - 6} y={TOP - 3} fontSize="10.5" fontWeight="700" fill={T.amber} textAnchor="end" fontFamily="inherit">
+          swing ♪♪ = long–short
+        </text>
+      )}
     </svg>
   );
 }
@@ -2189,27 +2217,31 @@ function RhythmTrainer() {
   const [exIdx, setExIdx] = useState(0);
   const [bpm, setBpm] = useState(70);
   const [barsPer, setBarsPer] = useState(4);
+  const [swing, setSwing] = useState(false);
   const [running, setRunning] = useState(false);
   const [hotBeat, setHotBeat] = useState(-1);
   const [sessionDone, setSessionDone] = useState(false);
   const bpmRef = useRef(bpm); useEffect(() => { bpmRef.current = bpm; }, [bpm]);
   const exRef = useRef(exIdx); useEffect(() => { exRef.current = exIdx; }, [exIdx]);
   const barsRef = useRef(barsPer); useEffect(() => { barsRef.current = barsPer; }, [barsPer]);
+  const swingRef = useRef(swing); useEffect(() => { swingRef.current = swing; }, [swing]);
+  /* an exercise that wants a feel sets it as the circuit rolls in */
+  useEffect(() => { const f = RHYTHM_EXERCISES[exIdx].feel; if (f) setSwing(f === "swing"); }, [exIdx]);
   const nextRef = useRef(0); const barCountRef = useRef(0); const schedRef = useRef(null); const uiRef = useRef([]);
 
   const voiceBar = (at) => {
     const ex = RHYTHM_EXERCISES[exRef.current];
     const spb = 60 / bpmRef.current;
     let beat = 0;
-    // metronome quarters
     for (let b = 0; b < 4; b++) click(at + b * spb, b === 0);
-    // pattern notes
     ex.cells.forEach((type) => {
       const cell = RHYTHM_CELLS[type];
-      cell.events.forEach((o, k) => pluck(523.25, at + (beat + o) * spb, { gain: o === 0 && beat === 0 ? 0.36 : 0.3, dur: 0.35, damp: 0.93 }));
+      cell.events.forEach((o) => {
+        const off = swingRef.current ? swingOff(o, cell) : o;
+        pluck(523.25, at + (beat + off) * spb, { gain: off === 0 && beat === 0 ? 0.36 : 0.3, dur: 0.35, damp: 0.93 });
+      });
       beat += cell.beats;
     });
-    // UI beat highlight
     const ctx = audioCtx();
     for (let b = 0; b < 4; b++) uiRef.current.push(setTimeout(() => setHotBeat(b), Math.max(0, (at + b * spb - ctx.currentTime) * 1000)));
   };
@@ -2228,7 +2260,7 @@ function RhythmTrainer() {
           [0, 4, 7, 12].forEach((iv, i) => pluck(261.63 * Math.pow(2, iv / 12), barEnd - ctx.currentTime + 0.1 + i * 0.12, { gain: 0.32, dur: 1.4 }));
           uiRef.current.push(setTimeout(() => { setSessionDone(true); stop(); setExIdx(0); }, delay));
           nextRef.current = barEnd;
-          return; // stop scheduling further bars
+          return;
         }
         pluck(1318.5, barEnd - ctx.currentTime, { gain: 0.35, dur: 0.5 });
         uiRef.current.push(setTimeout(() => setExIdx((e) => e + 1), delay));
@@ -2253,6 +2285,7 @@ function RhythmTrainer() {
   useEffect(() => () => { clearTimeout(schedRef.current); uiRef.current.forEach(clearTimeout); }, []);
 
   const ex = RHYTHM_EXERCISES[exIdx];
+  const swingable = !ex.cells.every((c) => RHYTHM_CELLS[c].sixt || RHYTHM_CELLS[c].trip || RHYTHM_CELLS[c].events.every((o) => o % 1 !== 0.5));
   return (
     <div className="card" style={{ marginBottom: 14 }}>
       <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Rhythm Reading</div>
@@ -2277,7 +2310,7 @@ function RhythmTrainer() {
       </div>
       {sessionDone && <div style={{ color: T.green, fontWeight: 800, fontSize: 13, marginBottom: 6 }}>Reading circuit complete — every figure 🎸</div>}
       <div style={{ background: T.raised, border: `1px solid ${T.line}`, borderRadius: 12, padding: "12px 8px 6px" }}>
-        <RhythmStaff cells={ex.cells} hotBeat={hotBeat} />
+        <RhythmStaff cells={ex.cells} hotBeat={hotBeat} swing={swing && swingable} />
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
         <button className="chip" style={drillChip(false)} onClick={() => setBpm(Math.max(40, bpm - 5))}>−</button>
@@ -2288,6 +2321,14 @@ function RhythmTrainer() {
         {[2, 4, 8].map((n) => (
           <button key={n} className="chip" style={drillChip(barsPer === n)} onClick={() => setBarsPer(n)}>{n}</button>
         ))}
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+        <span style={{ fontSize: 11.5, color: T.faint }}>feel</span>
+        <button className="chip" style={drillChip(!swing)} onClick={() => setSwing(false)}>Straight</button>
+        <button className="chip" style={drillChip(swing)} onClick={() => setSwing(true)}>Swing</button>
+        <span style={{ fontSize: 11.5, color: swing && !swingable ? T.amber : T.faint }}>
+          {swing ? (swingable ? "offbeats land late — long-short, ⅔ of the beat" : "this figure has no eighth offbeats — plays straight") : "eighths split the beat evenly"}
+        </span>
       </div>
     </div>
   );
@@ -2372,134 +2413,192 @@ function DiatonicTriadDrill() {
   );
 }
 
-/* ---------------- 6ths Licks (Cropper / Motown & Country) ---------------- */
-const CROPPER_LICKS = [
-  { name: "The Climb", seq: [{ p: 0, slide: true }, { p: 1 }, { p: 2 }], hint: "Slide into R/3 and walk up — pure Soul Man energy" },
-  { name: "The Fall", seq: [{ p: 2, slide: true }, { p: 1 }, { p: 0 }], hint: "Top down, land on the root pair — Killin' Floor style" },
-  { name: "Gospel Turn", seq: [{ p: 0 }, { p: 1 }, { p: 2 }, { p: 1 }, { p: 0 }], hint: "Up and back down — church on the & counts" },
-  { name: "Dominant Funk", seq: [{ p: 2 }, { p: 3, slide: true }, { p: 2 }, { p: 0 }], hint: "The 5/♭7 pair adds the Midnight Hour grease" },
-  { name: "Country Bounce", seq: [{ p: 0 }, { p: 0 }, { p: 1 }, { p: 1 }, { p: 2 }], hint: "Double each step going up — chicken-pickin' friendly" },
+/* ---------------- 6ths in Context (I–IV–V across the string sets) ---------------- */
+/* 6ths aren't licks you memorise — they're a map. Over each chord you play that
+   chord's own R/3, 2/4, 3/5 (and 5/♭7 for dominant grit). The real skill is
+   choosing WHICH string set keeps your hand still as the changes move: a song in
+   E sits on the 2&4 set for the I, then hops to the top set for the IV and V. */
+const SIXTH_PROGS = [
+  { id: "145", name: "I – IV – V", seq: [0, 5, 7], hint: "The backbone — one bar each" },
+  { id: "1454", name: "I – IV – V – IV", seq: [0, 5, 7, 5], hint: "The soul/country vamp" },
+  { id: "1541", name: "I – V – IV – I", seq: [0, 7, 5, 0], hint: "Descending — the fall home" },
+  { id: "blues", name: "12-bar blues", seq: [0, 0, 0, 0, 5, 5, 0, 0, 7, 5, 0, 7], hint: "Where the 6ths live across a whole blues", dom: true },
 ];
-function SixthsDrill() {
-  const [keyPc, setKeyPc] = useState(9); // A, the classic soul key
-  const [pairSet, setPairSet] = useState("1 & 3");
-  const [lickIdx, setLickIdx] = useState(0);
-  const [bpm, setBpm] = useState(80);
-  const [secs, setSecs] = useState(30);
-  const [focus, setFocus] = useState(false);
-  const [sessionDone, setSessionDone] = useState(false);
-  const stopRef = useRef(() => {});
-  const advance = () => {
-    if (lickIdx + 1 >= CROPPER_LICKS.length) {
-      setSessionDone(true);
-      [0, 4, 7, 12].forEach((iv, i) => pluck(261.63 * Math.pow(2, iv / 12), 0.3 + i * 0.12, { gain: 0.32, dur: 1.4 }));
-      stopRef.current();
-      setLickIdx(0);
-      return;
+const ROMAN_OF_OFF = { 0: "I", 5: "IV", 7: "V" };
+/* All 6th pairs for one chord, on one string set, at one octave */
+function sixthLayout(rootPc, setName, oct) {
+  const [loS, hiS] = CROPPER_PAIR_SETS[setName];
+  const pairs = cropperPairs(rootPc, loS, hiS).map((p) => {
+    const mf = p.mf + oct, hf = p.hf + oct;
+    const frets = [-1, -1, -1, -1, -1, -1];
+    frets[loS] = hf; frets[hiS] = mf;
+    return { ...p, mf, hf, frets };
+  });
+  /* the hand's zone is set by the three core pairs; the dominant 5/♭7 is colour
+     that sits above it, so it shouldn't drag the position choice around */
+  const core = pairs.slice(0, 3).flatMap((p) => [p.mf, p.hf]);
+  const all = pairs.flatMap((p) => [p.mf, p.hf]);
+  const lo = Math.min(...core), hi = Math.max(...core);
+  return { setName, loS, hiS, pairs, lo, hi, top: Math.max(...all), bottom: Math.min(...all),
+    mean: core.reduce((a, b) => a + b, 0) / core.length };
+}
+/* Pick the set + octave that keeps the hand closest to where it already is */
+function chooseSixthLayout(rootPc, prevMean, pinned) {
+  const sets = pinned ? [pinned] : Object.keys(CROPPER_PAIR_SETS);
+  let best = null;
+  for (const sn of sets) {
+    for (const oct of [-12, 0, 12]) {
+      const L = sixthLayout(rootPc, sn, oct);
+      if (L.bottom < 0 || L.top > 15) continue;
+      const score = (prevMean == null ? Math.abs(L.mean - 6) : Math.abs(L.mean - prevMean) + 0.3 * Math.abs(L.mean - 6));
+      if (!best || score < best.score) best = { ...L, score };
     }
-    setLickIdx(lickIdx + 1);
-  };
-  const { running, remaining, start, stop } = useDrillClock(bpm, secs, advance);
-  stopRef.current = stop;
-  const begin = () => { setSessionDone(false); start(); };
+  }
+  return best || sixthLayout(rootPc, sets[0], 0);
+}
+function SixthsMap() {
+  const [keyPc, setKeyPc] = useState(4);          // E — the classic 6ths key
+  const [progId, setProgId] = useState("145");
+  const [pin, setPin] = useState(null);           // null = auto sets
+  const [bpm, setBpm] = useState(80);
+  const [cur, setCur] = useState(0);
+  const [hotPair, setHotPair] = useState(-1);
+  const [loop, setLoop] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const loopRef = useRef(false); useEffect(() => { loopRef.current = loop; }, [loop]);
+  const timers = useRef([]);
+  const prog = SIXTH_PROGS.find((p) => p.id === progId);
 
-  const [loS, hiS] = CROPPER_PAIR_SETS[pairSet];
-  const pairs = useMemo(() => cropperPairs(keyPc, loS, hiS), [keyPc, loS, hiS]);
-  const lick = CROPPER_LICKS[lickIdx];
-
-  const playPair = (pr, at = 0, ghost = false) => {
-    const g = ghost ? 0.16 : 0.34;
-    pluck(freqAt(loS, pr.hf), at, { gain: g, dur: ghost ? 0.22 : 1.3, damp: ghost ? 0.9 : 0.994 });
-    pluck(freqAt(hiS, pr.mf), at + 0.015, { gain: g, dur: ghost ? 0.22 : 1.3, damp: ghost ? 0.9 : 0.994 });
-  };
-  const playLick = () => {
-    let t = 0.05;
-    lick.seq.forEach((st) => {
-      const pr = pairs[st.p];
-      if (st.slide && pr.mf > 1 && pr.hf > 1) {
-        playPair({ ...pr, mf: pr.mf - 1, hf: pr.hf - 1 }, t, true);
-        t += 0.09;
-      }
-      playPair(pr, t);
-      t += 0.42;
+  const chart = useMemo(() => {
+    let prevMean = null;
+    return prog.seq.map((off) => {
+      const rpc = (keyPc + off) % 12;
+      const L = chooseSixthLayout(rpc, prevMean, pin);
+      prevMean = L.mean;
+      return { off, rpc, rn: ROMAN_OF_OFF[off], name: NOTES[rpc], ...L };
     });
-  };
+  }, [prog, keyPc, pin]);
 
-  const dots = useMemo(() => pairs.flatMap((pr) => {
-    const mIv = (pr.mPc - keyPc + 12) % 12, hIv = (pr.hPc - keyPc + 12) % 12;
+  const stop = () => { timers.current.forEach(clearTimeout); timers.current = []; setPlaying(false); setHotPair(-1); };
+  useEffect(() => { stop(); setCur(0); }, [keyPc, progId, pin]);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+
+  const playPair = (L, pr, at = 0) => {
+    pluck(freqAt(L.loS, pr.hf), at, { gain: 0.34, dur: 1.3, damp: 0.994 });
+    pluck(freqAt(L.hiS, pr.mf), at + 0.015, { gain: 0.34, dur: 1.3, damp: 0.994 });
+  };
+  /* the move: R/3 → 2/4 → 3/5 → back down (dominant blues lands on 5/♭7) */
+  const move = prog.dom ? [0, 1, 2, 3] : [0, 1, 2, 1];
+  const pass = () => {
+    const ctx = audioCtx(); if (!ctx) return;
+    const spb = 60 / bpm;
+    const t0 = ctx.currentTime + 0.1;
+    chart.forEach((L, i) => {
+      for (let b = 0; b < 4; b++) {
+        const at = (i * 4 + b) * spb;
+        click(t0 + at, b === 0);
+        playPair(L, L.pairs[move[b]], 0.1 + at);
+        timers.current.push(setTimeout(() => { setCur(i); setHotPair(move[b]); }, (0.1 + at) * 1000));
+      }
+    });
+    const total = chart.length * 4 * spb * 1000 + 100;
+    timers.current.push(setTimeout(() => { if (loopRef.current) pass(); else { setPlaying(false); setHotPair(-1); } }, total));
+  };
+  const play = () => { stop(); setPlaying(true); setTimeout(pass, 10); };
+
+  const L = chart[Math.min(cur, chart.length - 1)];
+  const dots = useMemo(() => L.pairs.flatMap((pr, i) => {
+    const mIv = (pr.mPc - L.rpc + 12) % 12, hIv = (pr.hPc - L.rpc + 12) % 12;
+    const dim = hotPair >= 0 && hotPair !== i;
     const mk = (s, f, iv) => {
       const info = IV_COLORS[iv];
-      return { s, f, color: info ? info.color : "#E4D6B8", text: info ? info.text : "#4A3524", label: DEGREE_LABEL[iv] };
+      return { s, f, color: info ? info.color : "#E4D6B8", text: info ? info.text : "#4A3524", label: DEGREE_LABEL[iv], dim };
     };
-    return [mk(hiS, pr.mf, mIv), mk(loS, pr.hf, hIv)];
-  }), [pairs, keyPc, loS, hiS]);
-  const numFrets = Math.max(12, ...pairs.map((p) => Math.max(p.mf, p.hf)));
+    return [mk(L.hiS, pr.mf, mIv), mk(L.loS, pr.hf, hIv)];
+  }), [L, hotPair]);
+  const numFrets = Math.min(15, Math.max(12, L.top + 1));
 
   return (
     <div className="card" style={{ marginBottom: 14 }}>
-      <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>6ths Licks · Cropper Style</div>
-      {!focus && (
-        <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 10 }}>
-          Motown & country 6ths anchored to the I chord: melody over harmony a 6th below — R/3, 2/4, 3/5, and the dominant 5/♭7. Skip and mute the middle string; hybrid picking works best. Slide into the pairs. Each chime brings the next lick.
-        </div>
-      )}
-      {!focus && (
-        <>
-          <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
-            {NOTES.map((n, i) => (
-              <button key={n} className="chip" style={drillChip(keyPc === i)} onClick={() => setKeyPc(i)}>{n}</button>
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-            {Object.keys(CROPPER_PAIR_SETS).map((pn) => (
-              <button key={pn} className="chip" style={drillChip(pairSet === pn)} onClick={() => setPairSet(pn)}>Strings {pn}</button>
-            ))}
-            <span style={{ width: 10 }} />
-            {CROPPER_LICKS.map((l, i) => (
-              <button key={l.name} className="chip" style={drillChip(lickIdx === i)} onClick={() => setLickIdx(i)}>{l.name}</button>
-            ))}
-          </div>
-        </>
-      )}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-        <div>
-          <span style={{ fontWeight: 800, fontSize: 16, fontFamily: "'Fraunces', Georgia, serif", color: T.amber }}>{lick.name}</span>
-          <span style={{ color: T.faint, fontSize: 13 }}> · {NOTES[keyPc]} · lick {lickIdx + 1} of {CROPPER_LICKS.length}</span>
-          <div style={{ fontSize: 12.5, color: T.muted }}>{lick.hint} — {lick.seq.map((s) => pairs[s.p].label.replace(/ /g, "")).join(" → ")}</div>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="chip" style={running ? btnGhost : btnAmber} onClick={running ? stop : begin}>{running ? "■ Stop" : "▶ Start drill"}</button>
-          <button className="chip" style={btnGhost} onClick={advance}>Skip ▸</button>
-          <button className="chip" style={btnGhost} onClick={playLick}>♪ Play lick</button>
-          <button className="chip" style={btnGhost} onClick={() => setFocus(!focus)}>{focus ? "⛶ Exit" : "⛶ Focus"}</button>
-        </div>
+      <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>6ths in Context · I–IV–V</div>
+      <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 10 }}>
+        Over every chord, the 6ths come from that chord's own scale: R/3, 2/4, 3/5 — plus 5/♭7 for dominant grit. The real skill is picking the string set that keeps your hand still through the changes. In E, the I sits low on the 2&amp;4 set and the IV and V hop up to the top set. Skip and mute the middle string; hybrid picking works best.
       </div>
-      <TimerBar remaining={remaining} secs={secs} />
-      {sessionDone && <div style={{ color: T.green, fontWeight: 800, fontSize: 13, marginTop: 6 }}>All five licks — play it, Steve 🎸</div>}
-      <div style={{ marginTop: 10 }}>
-        <Fretboard frets={numFrets} maxFret={numFrets} dots={dots} onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
+        {NOTES.map((n, i) => (
+          <button key={n} className="chip" style={drillChip(keyPc === i)} onClick={() => setKeyPc(i)}>{n}</button>
+        ))}
       </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
-        {pairs.map((pr, i) => (
-          <button key={i} className="ans" onClick={() => playPair(pr)}
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
+        {SIXTH_PROGS.map((p) => (
+          <button key={p.id} className="chip" style={drillChip(progId === p.id)} onClick={() => setProgId(p.id)}>{p.name}</button>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+        <span style={{ fontSize: 11.5, color: T.faint }}>string sets</span>
+        <button className="chip" style={drillChip(pin === null)} onClick={() => setPin(null)}>Auto (least movement)</button>
+        {Object.keys(CROPPER_PAIR_SETS).map((sn) => (
+          <button key={sn} className="chip" style={drillChip(pin === sn)} onClick={() => setPin(sn)}>Pin {sn}</button>
+        ))}
+      </div>
+
+      {/* the map: one card per change, showing which set it lives on */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 10 }}>
+        {chart.map((c, i) => (
+          <button key={i} className="ans" onClick={() => { setCur(i); setHotPair(-1); }}
             style={{
-              padding: "10px 14px", borderRadius: 10, cursor: "pointer", textAlign: "center",
-              background: T.raised, color: T.cream, border: `1.5px solid ${lick.seq.some((s) => s.p === i) ? T.amber : T.line}`,
+              padding: "8px 12px", borderRadius: 10, cursor: "pointer", textAlign: "center", minWidth: 92,
+              background: cur === i ? "rgba(233,161,59,0.16)" : T.raised, color: T.cream,
+              border: `2px solid ${cur === i ? T.amber : T.line}`,
             }}>
-            <div style={{ fontWeight: 800, fontSize: 14 }}>{pr.label}</div>
-            <div style={{ fontSize: 12, color: T.muted }}>{NOTES[pr.mPc]} over {NOTES[pr.hPc]}</div>
-            <div style={{ fontSize: 10.5, color: T.faint }}>frets {pr.mf} & {pr.hf}{pr.dom ? " · dom" : ""}</div>
+            <div style={{ fontWeight: 800, fontSize: 15 }}>{c.name}{prog.dom ? "7" : ""} <span style={{ color: T.faint, fontWeight: 400, fontSize: 11 }}>{c.rn}</span></div>
+            <div style={{ fontSize: 11, color: T.amber, fontWeight: 700 }}>strings {c.setName}</div>
+            <div style={{ fontSize: 10.5, color: T.faint }}>frets {c.lo}–{c.hi}</div>
           </button>
         ))}
       </div>
-      {!focus && (
-        <DrillControls bpm={bpm} setBpm={setBpm} secs={secs} setSecs={setSecs} />
-      )}
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+        <div>
+          <span style={{ fontWeight: 800, fontSize: 16, fontFamily: "'Fraunces', Georgia, serif", color: T.amber }}>{L.name} {L.rn}</span>
+          <span style={{ color: T.faint, fontSize: 13 }}> · strings {L.setName} · frets {L.lo}–{L.hi}</span>
+          <div style={{ fontSize: 12.5, color: T.muted }}>{prog.hint} — the move: {move.map((m) => L.pairs[m].label.replace(/ /g, "")).join(" → ")}</div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button className="chip" style={playing ? btnGhost : btnAmber} onClick={playing ? stop : play}>{playing ? "■ Stop" : "▶ Play changes"}</button>
+          <button className="chip" style={loop ? { ...btnGhost, borderColor: T.amber, color: T.amber } : btnGhost} onClick={() => setLoop(!loop)}>⟳ Loop</button>
+        </div>
+      </div>
+
+      <Fretboard frets={numFrets} maxFret={numFrets} dots={dots}
+        activePair={hotPair >= 0 ? [{ s: L.hiS, f: L.pairs[hotPair].mf }, { s: L.loS, f: L.pairs[hotPair].hf }] : []}
+        onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
+        {L.pairs.map((pr, i) => (
+          <button key={i} className="ans" onClick={() => { setHotPair(i); playPair(L, pr); }}
+            style={{
+              padding: "10px 14px", borderRadius: 10, cursor: "pointer", textAlign: "center",
+              background: hotPair === i ? "rgba(233,161,59,0.16)" : T.raised, color: T.cream,
+              border: `1.5px solid ${hotPair === i ? T.amber : move.includes(i) ? "rgba(233,161,59,0.45)" : T.line}`,
+            }}>
+            <div style={{ fontWeight: 800, fontSize: 14 }}>{pr.label}</div>
+            <div style={{ fontSize: 12, color: T.muted }}>{NOTES[pr.mPc]} over {NOTES[pr.hPc]}</div>
+            <div style={{ fontSize: 10.5, color: T.faint }}>frets {pr.mf} &amp; {pr.hf}{pr.dom ? " · dom" : ""}</div>
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+        <button className="chip" style={drillChip(false)} onClick={() => setBpm(Math.max(50, bpm - 5))}>−</button>
+        <span style={{ fontSize: 13.5, fontWeight: 800, minWidth: 64, textAlign: "center" }}>{bpm} bpm</span>
+        <button className="chip" style={drillChip(false)} onClick={() => setBpm(Math.min(160, bpm + 5))}>+</button>
+      </div>
     </div>
   );
 }
 
-/* ---------------- Diatonic Progression Drill (voice-led chart) ---------------- */
+/* ---------------- Progression Drill (voice-led chart: triads + dominants) ---------------- */
 const DIATONIC_PROGS = [
   { id: "pop", name: "I – V – vi – IV", seq: ["I", "V", "vi", "IV"] },
   { id: "jazz", name: "ii – V – I", seq: ["ii", "V", "I"] },
@@ -2508,31 +2607,105 @@ const DIATONIC_PROGS = [
   { id: "canon", name: "Canon", seq: ["I", "V", "vi", "iii", "IV", "I", "IV", "V"] },
   { id: "andalu", name: "i – VII – VI – V", seq: ["vi", "V", "IV", "V"] },
 ];
+/* --- Sevenths: four-note drop-2 grips, the shapes on every jazz/blues chart --- */
+const SEVENTH_SETS = { "1–4": [2, 3, 4, 5], "2–5": [1, 2, 3, 4], "3–6": [0, 1, 2, 3] };
+const SEVENTH_TONES = { dom7: [0, 4, 7, 10], min7: [0, 3, 7, 10], maj7: [0, 4, 7, 11], m7b5: [0, 3, 6, 10], dim7: [0, 3, 6, 9] };
+const QUAL_SUFFIX = { dom7: "7", min7: "m7", maj7: "maj7", m7b5: "m7♭5", dim7: "°7" };
+const INV7_NAMES = ["Root pos", "1st inv", "2nd inv", "3rd inv"];
+/* Close voicing a-b-c-d → drop the 2nd note from the top an octave: c-a-b-d.
+   Strings are filled low→high with strictly ascending pitch, which is exactly
+   what makes drop-2 grabbable with four fingers. */
+function drop2Voicing(rootPc, quality, inv, setIdx) {
+  const tones = SEVENTH_TONES[quality];
+  const close = [0, 1, 2, 3].map((k) => (rootPc + tones[(inv + k) % 4]) % 12);
+  const order = [close[2], close[0], close[1], close[3]];
+  const frets = [-1, -1, -1, -1, -1, -1];
+  let prevPitch = -99;
+  for (let i = 0; i < 4; i++) {
+    const s = setIdx[i];
+    let f = ((order[i] - OPEN_PC[s]) % 12 + 12) % 12;
+    while (OPEN_SEMIS[s] + f <= prevPitch) f += 12;
+    frets[s] = f; prevPitch = OPEN_SEMIS[s] + f;
+  }
+  return frets;
+}
+/* Voice-leading-aware pick across the four inversions */
+function bestSeventhNear(rootPc, quality, setIdx, prevMean) {
+  let best = null;
+  for (let rot = 0; rot < 4; rot++) {
+    const base = drop2Voicing(rootPc, quality, rot, setIdx);
+    for (const off of [0, 12]) {
+      const act = setIdx.map((s) => base[s] + off);
+      if (Math.min(...act) < 0 || Math.max(...act) > 15) continue;
+      if (Math.max(...act) - Math.min(...act) > 5) continue; // has to fit the hand
+      const fr = [-1, -1, -1, -1, -1, -1];
+      setIdx.forEach((s, i) => (fr[s] = act[i]));
+      /* drop-2 rotates the bass, so name the inversion from the note actually in
+         the bass rather than from the rotation index */
+      const bassIv = (OPEN_PC[setIdx[0]] + act[0] - rootPc + 1200) % 12;
+      const inv = Math.max(0, SEVENTH_TONES[quality].indexOf(bassIv));
+      const mean = act.reduce((a, b) => a + b, 0) / act.length;
+      const score = prevMean == null ? Math.abs(mean - 5) : Math.abs(mean - prevMean) + 0.35 * Math.abs(mean - 5);
+      if (!best || score < best.score) best = { frets: fr, inv, mean, score };
+    }
+  }
+  return best;
+}
+const DOM_PROGS = [
+  { id: "blues7", name: "I7 – IV7 – V7", hint: "Every chord a dominant — the blues sound",
+    seq: [[0, "dom7", "I7"], [5, "dom7", "IV7"], [7, "dom7", "V7"]] },
+  { id: "12bar", name: "12-Bar (quick change)", hint: "The whole form, voice-led in one hand position",
+    seq: [[0, "dom7", "I7"], [5, "dom7", "IV7"], [0, "dom7", "I7"], [0, "dom7", "I7"], [5, "dom7", "IV7"], [5, "dom7", "IV7"], [0, "dom7", "I7"], [0, "dom7", "I7"], [7, "dom7", "V7"], [5, "dom7", "IV7"], [0, "dom7", "I7"], [7, "dom7", "V7"]] },
+  { id: "251", name: "ii7 – V7 – Imaj7", hint: "The jazz cadence — the V7 is the engine",
+    seq: [[2, "min7", "ii7"], [7, "dom7", "V7"], [0, "maj7", "Imaj7"]] },
+  { id: "turn", name: "I – VI7 – ii7 – V7", hint: "Rhythm-changes turnaround — VI7 is a borrowed dominant",
+    seq: [[0, "maj7", "Imaj7"], [9, "dom7", "VI7"], [2, "min7", "ii7"], [7, "dom7", "V7"]] },
+  { id: "sec", name: "I – V7/V – V7 – I", hint: "Secondary dominant: II7 tonicises the V before it lands",
+    seq: [[0, "maj7", "Imaj7"], [2, "dom7", "V7/V"], [7, "dom7", "V7"], [0, "maj7", "Imaj7"]] },
+  { id: "cycle", name: "Backcycle III7–VI7–II7–V7–I", hint: "Dominants in a chain of fifths — every chord pulls to the next",
+    seq: [[4, "dom7", "III7"], [9, "dom7", "VI7"], [2, "dom7", "II7"], [7, "dom7", "V7"], [0, "maj7", "Imaj7"]] },
+  { id: "min251", name: "iiø – V7 – i7", hint: "The minor cadence — half-diminished into the dominant",
+    seq: [[2, "m7b5", "iiø"], [7, "dom7", "V7"], [0, "min7", "i7"]] },
+];
+
 function ProgressionDrillChart() {
+  const [family, setFamily] = useState("triads");
   const [keyPc, setKeyPc] = useState(0);
   const [setName, setSetName] = useState("1–3");
+  const [setName7, setSetName7] = useState("1–4");
   const [progId, setProgId] = useState("pop");
+  const [progId7, setProgId7] = useState("blues7");
   const [bpm, setBpm] = useState(90);
   const [loop, setLoop] = useState(false);
   const [live, setLive] = useState(-1);
   const loopRef = useRef(false); useEffect(() => { loopRef.current = loop; }, [loop]);
   const timers = useRef([]);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
-  const prog = DIATONIC_PROGS.find((p) => p.id === progId);
+  const seventh = family === "sevenths";
+  const prog = seventh ? DOM_PROGS.find((p) => p.id === progId7) : DIATONIC_PROGS.find((p) => p.id === progId);
 
   const chart = useMemo(() => {
     let prevMean = null;
+    if (seventh) {
+      const setIdx = SEVENTH_SETS[setName7];
+      return prog.seq.map(([off, q, rn]) => {
+        const rpc = (keyPc + off) % 12;
+        const best = bestSeventhNear(rpc, q, setIdx, prevMean) || bestSeventhNear(rpc, q, setIdx, null);
+        if (best) prevMean = best.mean;
+        return { rn, name: NOTES[rpc] + QUAL_SUFFIX[q], rootPc: rpc, ...(best || { frets: [-1, -1, -1, -1, -1, -1], inv: 0 }) };
+      });
+    }
     return prog.seq.map((rn) => {
       const [off, q] = ROMAN[rn];
       const rpc = (keyPc + off) % 12;
       const best = bestTriadNear(rpc, q, TRIAD_SETS[setName], [0, 12], prevMean);
       prevMean = best.mean;
-      return { rn, name: NOTES[rpc] + (q === "min" ? "m" : ""), ...best };
+      return { rn, name: NOTES[rpc] + (q === "min" ? "m" : ""), rootPc: rpc, ...best };
     });
-  }, [prog, keyPc, setName]);
+  }, [prog, keyPc, setName, setName7, seventh]);
 
   const stop = () => { timers.current.forEach(clearTimeout); timers.current = []; setLive(-1); };
-  useEffect(() => { stop(); }, [keyPc, setName, progId, bpm]);
+  useEffect(() => { stop(); }, [keyPc, setName, setName7, progId, progId7, bpm, family]);
   const pass = () => {
     const dur = 240 / bpm;
     chart.forEach((c, i) => {
@@ -2546,13 +2719,22 @@ function ProgressionDrillChart() {
 
   return (
     <div className="card" style={{ marginBottom: 14 }}>
-      <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Progression Drill</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+        <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif" }}>Progression Drill</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button className="chip" style={drillChip(!seventh)} onClick={() => setFamily("triads")}>Triads</button>
+          <button className="chip" style={drillChip(seventh)} onClick={() => setFamily("sevenths")}>Dominants &amp; 7ths</button>
+        </div>
+      </div>
       <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 10 }}>
-        Diatonic progressions voiced with the closest inversions — minimal hand movement, smooth voice leading. Loop it and comp along.
+        {seventh
+          ? "Four-note drop-2 grips — the shapes on every blues and jazz chart. Each chord is voiced in whichever inversion sits closest to the last, so the whole progression stays under one hand. The ♭7 is the tension: watch it resolve down a half-step into the next chord's 3rd."
+          : "Diatonic progressions voiced with the closest inversions — minimal hand movement, smooth voice leading. Loop it and comp along."}
       </div>
       <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
-        {DIATONIC_PROGS.map((p) => (
-          <button key={p.id} className="chip" style={drillChip(progId === p.id)} onClick={() => setProgId(p.id)}>{p.name}</button>
+        {(seventh ? DOM_PROGS : DIATONIC_PROGS).map((p) => (
+          <button key={p.id} className="chip" style={drillChip(prog.id === p.id)}
+            onClick={() => (seventh ? setProgId7(p.id) : setProgId(p.id))}>{p.name}</button>
         ))}
       </div>
       <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
@@ -2561,12 +2743,16 @@ function ProgressionDrillChart() {
         ))}
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-        {Object.keys(TRIAD_SETS).map((sn) => (
-          <button key={sn} className="chip" style={drillChip(setName === sn)} onClick={() => setSetName(sn)}>Strings {sn}</button>
+        {Object.keys(seventh ? SEVENTH_SETS : TRIAD_SETS).map((sn) => (
+          <button key={sn} className="chip" style={drillChip((seventh ? setName7 : setName) === sn)}
+            onClick={() => (seventh ? setSetName7(sn) : setSetName(sn))}>Strings {sn}</button>
         ))}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-        <span style={{ fontWeight: 800, fontSize: 16 }}>{prog.name} <span style={{ color: T.faint, fontWeight: 400, fontSize: 13 }}>in {NOTES[keyPc]} · strings {setName}</span></span>
+        <div>
+          <span style={{ fontWeight: 800, fontSize: 16 }}>{prog.name} <span style={{ color: T.faint, fontWeight: 400, fontSize: 13 }}>in {NOTES[keyPc]} · strings {seventh ? setName7 : setName}</span></span>
+          {prog.hint && <div style={{ fontSize: 12.5, color: T.muted }}>{prog.hint}</div>}
+        </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="chip" style={btnAmber} onClick={play}>▶ Play</button>
           <button className="chip" style={loop ? { ...btnGhost, borderColor: T.amber, color: T.amber } : btnGhost} onClick={() => setLoop(!loop)}>⟳ Loop</button>
@@ -2578,8 +2764,8 @@ function ProgressionDrillChart() {
           <div key={i} onClick={() => strum(c.frets)}
             style={{ cursor: "pointer", textAlign: "center", background: T.raised, borderRadius: 10, padding: "4px 6px", border: `2px solid ${live === i ? T.amber : T.line}`, transition: "border-color .15s" }}>
             <div style={{ fontSize: 13, fontWeight: 800 }}>{c.name} <span style={{ color: T.faint, fontWeight: 400, fontSize: 10.5 }}>{c.rn}</span></div>
-            <ChordDiagram frets={c.frets} size={86} label={c.name} rootPc={rootPcOf(c.name)} />
-            <div style={{ fontSize: 10.5, color: T.amber, paddingBottom: 3 }}>{INV_NAMES[c.inv]}</div>
+            <ChordDiagram frets={c.frets} size={86} label={c.name} rootPc={c.rootPc} />
+            <div style={{ fontSize: 10.5, color: T.amber, paddingBottom: 3 }}>{(seventh ? INV7_NAMES : INV_NAMES)[c.inv]}</div>
           </div>
         ))}
       </div>
@@ -2610,7 +2796,7 @@ function PracticeTab({ save, toggle, resetWarm }) {
         <ScaleFormDrill formId={formId} setFormId={setFormId} />
       </div>
       <DiatonicTriadDrill />
-      <SixthsDrill />
+      <SixthsMap />
       <ProgressionDrillChart />
       <div className="card" style={{ marginBottom: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
