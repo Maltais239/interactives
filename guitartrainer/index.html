@@ -2090,36 +2090,53 @@ function cropperPairs(keyPc, loS, hiS) {
    so the count syllable always sits directly under the note it names.
    labels: [offsetInCell, kind, isRest]; kind "n" prints the beat number. */
 const RHYTHM_CELLS = {
+  w:    { beats: 4, events: [0],                  labels: [[0, "n"], [1, "n", true], [2, "n", true], [3, "n", true]] },
+  hd:   { beats: 3, events: [0],                  labels: [[0, "n"], [1, "n", true], [2, "n", true]] },
   q:    { beats: 1, events: [0],                  labels: [[0, "n"]] },
   h:    { beats: 2, events: [0],                  labels: [[0, "n"], [1, "n", true]] },
   ee:   { beats: 1, events: [0, 0.5],             labels: [[0, "n"], [0.5, "&"]] },
   ssss: { beats: 1, events: [0, 0.25, 0.5, 0.75], labels: [[0, "n"], [0.25, "e"], [0.5, "&"], [0.75, "a"]], sixt: true },
   ess:  { beats: 1, events: [0, 0.5, 0.75],       labels: [[0, "n"], [0.5, "&"], [0.75, "a"]], sixt: true },
   sse:  { beats: 1, events: [0, 0.25, 0.5],       labels: [[0, "n"], [0.25, "e"], [0.5, "&"]], sixt: true },
+  ses:  { beats: 1, events: [0, 0.25, 0.75],      labels: [[0, "n"], [0.25, "e"], [0.75, "a"]], sixt: true },
+  des:  { beats: 1, events: [0, 0.75],            labels: [[0, "n"], [0.75, "a"]], sixt: true },
+  sde:  { beats: 1, events: [0, 0.25],            labels: [[0, "n"], [0.25, "e"]], sixt: true },
+  rsss: { beats: 1, events: [0.25, 0.5, 0.75],    labels: [[0, "n", true], [0.25, "e"], [0.5, "&"], [0.75, "a"]], sixt: true },
   re:   { beats: 1, events: [0.5],                labels: [[0, "n", true], [0.5, "&"]] },
   qr:   { beats: 1, events: [],                   labels: [[0, "n", true]] },
   t:    { beats: 1, events: [0, 1 / 3, 2 / 3],    labels: [[0, "n"], [1 / 3, "trip"], [2 / 3, "let"]], trip: true },
+  shf:  { beats: 1, events: [0, 2 / 3],           labels: [[0, "n"], [2 / 3, "let"]], trip: true },
   dqe:  { beats: 2, events: [0, 1.5],             labels: [[0, "n"], [1, "n", true], [1.5, "&"]] },
+  ede:  { beats: 2, events: [0, 0.5, 1.5],        labels: [[0, "n"], [0.5, "&"], [1, "n", true], [1.5, "&"]] },
 };
 /* Swing: eighth-note offbeats slide to the last third of the beat.
    Cells built from sixteenths or triplets are left straight — swinging them is
    meaningless (and the notes would collide). */
 const swingOff = (o, cell) => (cell.sixt || cell.trip || o % 1 !== 0.5 ? o : Math.floor(o) + 2 / 3);
 const RHYTHM_EXERCISES = [
+  { name: "Whole note", cells: ["w"], hint: "One strike, four beats — count the silence, don't guess it" },
   { name: "Quarter pulse", cells: ["q", "q", "q", "q"], hint: "One strum per click — the anchor" },
   { name: "Half notes", cells: ["h", "h"], hint: "Hold two full beats; count through the space" },
+  { name: "Dotted half", cells: ["hd", "q"], hint: "Three beats held, then a quarter — the waltz-into-4 feel" },
   { name: "Even eighths", cells: ["ee", "ee", "ee", "ee"], hint: "Down-up, perfectly even" },
   { name: "Quarters & eighths", cells: ["q", "ee", "q", "ee"], hint: "Switch densities without rushing" },
   { name: "Rests count too", cells: ["q", "qr", "ee", "q"], hint: "Silence has a beat — feel the empty 2" },
   { name: "Offbeat eighths", cells: ["re", "re", "re", "re"], hint: "Only the &s — reggae skank territory" },
+  { name: "Syncopa", cells: ["ee", "re", "ee", "q"], hint: "The missing downbeat of 2 is the hook" },
+  { name: "Anticipation", cells: ["ede", "ede"], hint: "Eighth–quarter–eighth: the note lands early and hangs over the beat" },
+  { name: "Dotted quarter", cells: ["dqe", "ee", "q"], hint: "The push — land on the & of 2" },
   { name: "Sixteenth bursts", cells: ["ssss", "q", "ssss", "q"], hint: "1 e & a — keep it a burst, not a blur" },
   { name: "Gallop", cells: ["ess", "ess", "q", "q"], hint: "Eighth + two sixteenths — the driving figure" },
   { name: "Reverse gallop", cells: ["sse", "sse", "q", "q"], hint: "Two sixteenths + eighth — flip the gallop" },
+  { name: "Dotted 8th–16th", cells: ["des", "des", "q", "q"], hint: "Long–short inside one beat — the march, the strut" },
+  { name: "Scotch snap", cells: ["sde", "sde", "q", "q"], hint: "Short–long — flip it; the 'e' is the kick" },
+  { name: "16th syncopation", cells: ["ses", "ses", "q", "q"], hint: "16th–8th–16th — the inner push, the funk of it" },
+  { name: "Funk 16ths", cells: ["rsss", "ssss", "rsss", "q"], hint: "Leave the downbeat empty — come in on the 'e'" },
   { name: "Triplets", cells: ["t", "t", "t", "t"], hint: "Three per beat — say trip-l-et" },
-  { name: "Dotted quarter", cells: ["dqe", "ee", "q"], hint: "The push — land on the & of 2" },
-  { name: "Syncopa", cells: ["ee", "re", "ee", "q"], hint: "The missing downbeat of 2 is the hook" },
+  { name: "Written shuffle", cells: ["shf", "shf", "shf", "shf"], hint: "Quarter + eighth inside the triplet — the shuffle, spelled out" },
   { name: "Shuffle", cells: ["ee", "ee", "ee", "ee"], hint: "Same eighths, swung — long-short, the blues engine", feel: "swing" },
   { name: "Charleston", cells: ["dqe", "qr", "qr"], hint: "Beat 1 and the & of 2, then let it ring — swing it", feel: "swing" },
+  { name: "Comping push", cells: ["ede", "ee", "re"], hint: "Swung anticipation into an offbeat stab — jazz guitar comping", feel: "swing" },
   { name: "Shuffle & rest", cells: ["ee", "qr", "ee", "re"], hint: "Swung, with holes — comp like a jazz guitarist", feel: "swing" },
 ];
 function RhythmStaff({ cells, hotBeat, swing }) {
@@ -2149,6 +2166,18 @@ function RhythmStaff({ cells, hotBeat, swing }) {
   const quarterRest = (cx, key) => (
     <path key={key} d={`M ${cx} ${LINE - 16} L ${cx + 6} ${LINE - 8} L ${cx + 1} ${LINE - 2} Q ${cx + 9} ${LINE + 2} ${cx + 4} ${LINE + 9} Q ${cx - 1} ${LINE + 3} ${cx + 3} ${LINE}`} stroke={T.muted} strokeWidth="2.4" fill="none" />
   );
+  const sixteenthRest = (cx, key) => (
+    <g key={key}>
+      <circle cx={cx - 1} cy={LINE - 13} r={2.6} fill={T.muted} />
+      <circle cx={cx + 1.5} cy={LINE - 6} r={2.6} fill={T.muted} />
+      <path d={`M ${cx + 6} ${LINE - 15} L ${cx + 2} ${LINE + 4}`} stroke={T.muted} strokeWidth="1.7" fill="none" />
+    </g>
+  );
+  /* partial beam — the stub that marks a lone 16th inside a beamed group.
+     dir +1 points right (stub belongs to the note), -1 points left. */
+  const stub = (cx, level, dir, key) => (
+    <rect key={key} x={dir > 0 ? cx + 5.6 : cx + 5.6 - 9} y={TOP + 4 + level * 6} width={9} height={3.4} fill={T.cream} />
+  );
 
   /* beat grid — the reference the counts and noteheads both hang from */
   for (let b = 0; b < totalBeats; b++) {
@@ -2162,6 +2191,8 @@ function RhythmStaff({ cells, hotBeat, swing }) {
     const xs = cell.events.map((o) => xAt(beat + o));
     if (type === "q") els.push(head(xs[0], false, ci + "n0"), stem(xs[0], ci + "s0"));
     else if (type === "h") els.push(head(xs[0], true, ci + "n0"), stem(xs[0], ci + "s0"));
+    else if (type === "w") els.push(head(xs[0], true, ci + "n0"));
+    else if (type === "hd") els.push(head(xs[0], true, ci + "n0"), stem(xs[0], ci + "s0"), dot(xs[0], ci + "d0"));
     else if (type === "ee") els.push(head(xs[0], false, ci + "n0"), head(xs[1], false, ci + "n1"), stem(xs[0], ci + "s0"), stem(xs[1], ci + "s1"), beam(xs[0], xs[1], 0, ci + "b0"));
     else if (type === "ssss") {
       xs.forEach((cx, k) => els.push(head(cx, false, ci + "n" + k), stem(cx, ci + "s" + k)));
@@ -2176,6 +2207,34 @@ function RhythmStaff({ cells, hotBeat, swing }) {
       els.push(eighthRest(xAt(beat) + 2, ci + "r0"), head(xs[0], false, ci + "n0"), stem(xs[0], ci + "s0"), flag(xs[0], ci + "f0"));
     } else if (type === "qr") {
       els.push(quarterRest(xAt(beat) + unit / 2 - 4, ci + "r0"));
+    } else if (type === "ses") {
+      /* 16th–8th–16th: full beam across, secondary stubs on the outer 16ths */
+      xs.forEach((cx, k) => els.push(head(cx, false, ci + "n" + k), stem(cx, ci + "s" + k)));
+      els.push(beam(xs[0], xs[2], 0, ci + "b0"), stub(xs[0], 1, 1, ci + "p0"), stub(xs[2], 1, -1, ci + "p2"));
+    } else if (type === "des") {
+      /* dotted 8th + 16th — long, short */
+      els.push(head(xs[0], false, ci + "n0"), stem(xs[0], ci + "s0"), dot(xs[0], ci + "d0"));
+      els.push(head(xs[1], false, ci + "n1"), stem(xs[1], ci + "s1"));
+      els.push(beam(xs[0], xs[1], 0, ci + "b0"), stub(xs[1], 1, -1, ci + "p1"));
+    } else if (type === "sde") {
+      /* 16th + dotted 8th — the Scotch snap, short then long */
+      els.push(head(xs[0], false, ci + "n0"), stem(xs[0], ci + "s0"));
+      els.push(head(xs[1], false, ci + "n1"), stem(xs[1], ci + "s1"), dot(xs[1], ci + "d1"));
+      els.push(beam(xs[0], xs[1], 0, ci + "b0"), stub(xs[0], 1, 1, ci + "p0"));
+    } else if (type === "rsss") {
+      els.push(sixteenthRest(xAt(beat) + 1, ci + "r0"));
+      xs.forEach((cx, k) => els.push(head(cx, false, ci + "n" + k), stem(cx, ci + "s" + k)));
+      els.push(beam(xs[0], xs[2], 0, ci + "b0"), beam(xs[0], xs[2], 1, ci + "b1"));
+    } else if (type === "shf") {
+      /* the written-out shuffle: quarter + eighth under a triplet bracket */
+      els.push(head(xs[0], false, ci + "n0"), stem(xs[0], ci + "s0"));
+      els.push(head(xs[1], false, ci + "n1"), stem(xs[1], ci + "s1"), flag(xs[1], ci + "f1"));
+      els.push(<text key={ci + "t3"} x={(xs[0] + xs[1]) / 2 + 5} y={TOP - 1} fontSize="11" fontStyle="italic" fontWeight="700" fill={T.muted} textAnchor="middle">3</text>);
+    } else if (type === "ede") {
+      /* 8th – quarter – 8th: the anticipation, note held across the beat */
+      els.push(head(xs[0], false, ci + "n0"), stem(xs[0], ci + "s0"), flag(xs[0], ci + "f0"));
+      els.push(head(xs[1], false, ci + "n1"), stem(xs[1], ci + "s1"));
+      els.push(head(xs[2], false, ci + "n2"), stem(xs[2], ci + "s2"), flag(xs[2], ci + "f2"));
     } else if (type === "t") {
       xs.forEach((cx, k) => els.push(head(cx, false, ci + "n" + k), stem(cx, ci + "s" + k)));
       els.push(beam(xs[0], xs[2], 0, ci + "b0"));
@@ -2230,19 +2289,23 @@ function RhythmTrainer() {
   const nextRef = useRef(0); const barCountRef = useRef(0); const schedRef = useRef(null); const uiRef = useRef([]);
 
   const voiceBar = (at) => {
+    const ctx = audioCtx(); if (!ctx) return;
     const ex = RHYTHM_EXERCISES[exRef.current];
     const spb = 60 / bpmRef.current;
     let beat = 0;
     for (let b = 0; b < 4; b++) click(at + b * spb, b === 0);
+    /* click() takes an ABSOLUTE ctx time; pluck() takes a RELATIVE delay.
+       Convert once here — handing pluck an absolute stamp schedules the note
+       ~`at` seconds too late and it drifts further every bar. */
+    const rel = (t) => Math.max(0, at - ctx.currentTime + t);
     ex.cells.forEach((type) => {
       const cell = RHYTHM_CELLS[type];
       cell.events.forEach((o) => {
         const off = swingRef.current ? swingOff(o, cell) : o;
-        pluck(523.25, at + (beat + off) * spb, { gain: off === 0 && beat === 0 ? 0.36 : 0.3, dur: 0.35, damp: 0.93 });
+        pluck(523.25, rel((beat + off) * spb), { gain: beat === 0 && off === 0 ? 0.36 : 0.3, dur: 0.35, damp: 0.93 });
       });
       beat += cell.beats;
     });
-    const ctx = audioCtx();
     for (let b = 0; b < 4; b++) uiRef.current.push(setTimeout(() => setHotBeat(b), Math.max(0, (at + b * spb - ctx.currentTime) * 1000)));
   };
   const scheduler = () => {
