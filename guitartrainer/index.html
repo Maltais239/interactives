@@ -2749,8 +2749,11 @@ const QUAL_SUFFIX = { dom7: "7", min7: "m7", maj7: "maj7", m7b5: "m7♭5", dim7:
 const INV7_NAMES = ["Root pos", "1st inv", "2nd inv", "3rd inv"];
 /* Close voicing a-b-c-d → drop the 2nd note from the top an octave: c-a-b-d.
    Strings are filled low→high with strictly ascending pitch, which is exactly
-   what makes drop-2 grabbable with four fingers. */
-function drop2Voicing(rootPc, quality, inv, setIdx) {
+   what makes drop-2 grabbable with four fingers. `oct` seats the BASS an octave
+   up before filling — some inversions are only compact from the higher bass
+   (e.g. 3rd-in-bass C7 on 3–6 lives at 12-13-10-12, unreachable by shifting
+   the low-bass sprawl up 12). */
+function drop2Voicing(rootPc, quality, inv, setIdx, oct = 0) {
   const tones = SEVENTH_TONES[quality];
   const close = [0, 1, 2, 3].map((k) => (rootPc + tones[(inv + k) % 4]) % 12);
   const order = [close[2], close[0], close[1], close[3]];
@@ -2759,6 +2762,7 @@ function drop2Voicing(rootPc, quality, inv, setIdx) {
   for (let i = 0; i < 4; i++) {
     const s = setIdx[i];
     let f = ((order[i] - OPEN_PC[s]) % 12 + 12) % 12;
+    if (i === 0) f += 12 * oct;
     while (OPEN_SEMIS[s] + f <= prevPitch) f += 12;
     frets[s] = f; prevPitch = OPEN_SEMIS[s] + f;
   }
@@ -2768,9 +2772,9 @@ function drop2Voicing(rootPc, quality, inv, setIdx) {
 function bestSeventhNear(rootPc, quality, setIdx, prevMean) {
   let best = null;
   for (let rot = 0; rot < 4; rot++) {
-    const base = drop2Voicing(rootPc, quality, rot, setIdx);
-    for (const off of [0, 12]) {
-      const act = setIdx.map((s) => base[s] + off);
+    for (const oct of [0, 1]) {
+      const base = drop2Voicing(rootPc, quality, rot, setIdx, oct);
+      const act = setIdx.map((s) => base[s]);
       if (Math.min(...act) < 0 || Math.max(...act) > 15) continue;
       if (Math.max(...act) - Math.min(...act) > 5) continue; // has to fit the hand
       const fr = [-1, -1, -1, -1, -1, -1];
