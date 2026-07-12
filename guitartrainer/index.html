@@ -366,16 +366,60 @@ function strum(frets, arpeggio = false, at = 0) {
   }
 }
 function thud() { pluck(87, 0, { gain: 0.2, dur: 0.35, damp: 0.9 }); }
+/* Woodblock metronome. A beep is a bare oscillator; a woodblock is three things:
+   a hard noise transient (the "t"), a pitched body that blips down and dies in
+   ~60ms (the "ok"), and a hollow bandpass resonance so it reads as struck wood
+   rather than as a tone. `at` is an ABSOLUTE AudioContext time. */
 function click(at, accent) {
   const ctx = audioCtx();
   if (!ctx) return;
+  const f0 = accent ? 1480 : 1120;
+
   const o = ctx.createOscillator();
+  o.type = "triangle";
+  o.frequency.setValueAtTime(f0 * 1.4, at);
+  o.frequency.exponentialRampToValueAtTime(f0, at + 0.012);
   const g = ctx.createGain();
-  o.frequency.value = accent ? 1568 : 1046;
-  g.gain.setValueAtTime(accent ? 0.5 : 0.32, at);
-  g.gain.exponentialRampToValueAtTime(0.001, at + 0.05);
-  o.connect(g); g.connect(MASTER);
-  o.start(at); o.stop(at + 0.06);
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(accent ? 0.5 : 0.3, at + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0008, at + (accent ? 0.08 : 0.062));
+  const body = ctx.createBiquadFilter();
+  body.type = "bandpass"; body.frequency.value = f0 * 1.6; body.Q.value = 2.4;
+  o.connect(g); g.connect(body); body.connect(MASTER);
+  o.start(at); o.stop(at + 0.13);
+
+  const sr = ctx.sampleRate;
+  const len = Math.max(2, Math.floor(sr * 0.008));
+  const buf = ctx.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const nf = ctx.createBiquadFilter();
+  nf.type = "bandpass"; nf.frequency.value = f0 * 2.1; nf.Q.value = 1.1;
+  const ng = ctx.createGain();
+  ng.gain.value = accent ? 0.26 : 0.17;
+  src.connect(nf); nf.connect(ng); ng.connect(MASTER);
+  src.start(at);
+}
+
+/* A smaller, drier woodblock — same family as the metronome, a minor 6th up and
+   half the level, so a voiced rhythm sits under the click instead of fighting it. */
+function tap(at) {
+  const ctx = audioCtx();
+  if (!ctx) return;
+  const o = ctx.createOscillator();
+  o.type = "triangle";
+  o.frequency.setValueAtTime(2400, at);
+  o.frequency.exponentialRampToValueAtTime(1850, at + 0.01);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(0.16, at + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0006, at + 0.045);
+  const bp = ctx.createBiquadFilter();
+  bp.type = "bandpass"; bp.frequency.value = 2600; bp.Q.value = 2.2;
+  o.connect(g); g.connect(bp); bp.connect(MASTER);
+  o.start(at); o.stop(at + 0.08);
 }
 
 /* ---- Practice: warm-ups & song repertoire checklist ---- */
@@ -1641,9 +1685,17 @@ function useDrillClock(bpm, secs, onAdvance) {
   const secsRef = useRef(secs); useEffect(() => { secsRef.current = secs; if (!running) setRemaining(secs); }, [secs, running]);
   const advRef = useRef(onAdvance); useEffect(() => { advRef.current = onAdvance; });
   const beatRef = useRef(0), nextRef = useRef(0), schedRef = useRef(null), deadlineRef = useRef(0), tickRef = useRef(null);
+  /* runRef is the kill-switch. The scheduler chain re-arms itself, so a stray
+     second chain (e.g. from a double-tapped Start) would survive clearTimeout —
+     schedRef only remembers the newest chain. Every iteration checks runRef, so
+     stop() kills ALL chains, however many exist. */
+  const runRef = useRef(false);
   const scheduler = () => {
+    if (!runRef.current) return;
     const ctx = audioCtx();
     if (!ctx) return;
+    /* if the tab was throttled in the background, don't machine-gun the backlog */
+    if (nextRef.current < ctx.currentTime - 0.25) { nextRef.current = ctx.currentTime + 0.05; beatRef.current = 0; }
     while (nextRef.current < ctx.currentTime + 0.12) {
       click(nextRef.current, beatRef.current % 4 === 0);
       nextRef.current += 60 / bpmRef.current;
@@ -1652,27 +1704,30 @@ function useDrillClock(bpm, secs, onAdvance) {
     schedRef.current = setTimeout(scheduler, 30);
   };
   const start = () => {
+    if (runRef.current) return;          // already running — never spawn a second chain
     const ctx = audioCtx();
     if (!ctx) return;
+    runRef.current = true;
     setRunning(true);
     beatRef.current = 0;
     nextRef.current = ctx.currentTime + 0.1;
     scheduler();
     deadlineRef.current = Date.now() + secsRef.current * 1000;
     setRemaining(secsRef.current);
+    clearInterval(tickRef.current);
     tickRef.current = setInterval(() => {
       const rem = (deadlineRef.current - Date.now()) / 1000;
       if (rem <= 0) {
         advRef.current();
-        pluck(1318.5, 0, { gain: 0.4, dur: 0.5 });
-        pluck(1760, 0.13, { gain: 0.4, dur: 0.6 });
+        const c = audioCtx();
+        if (c) { tap(c.currentTime + 0.01); tap(c.currentTime + 0.12); }  // woodblock double-knock
         deadlineRef.current = Date.now() + secsRef.current * 1000;
         setRemaining(secsRef.current);
       } else setRemaining(rem);
     }, 150);
   };
-  const stop = () => { setRunning(false); clearTimeout(schedRef.current); clearInterval(tickRef.current); };
-  useEffect(() => () => { clearTimeout(schedRef.current); clearInterval(tickRef.current); }, []);
+  const stop = () => { runRef.current = false; setRunning(false); clearTimeout(schedRef.current); clearInterval(tickRef.current); };
+  useEffect(() => () => { runRef.current = false; clearTimeout(schedRef.current); clearInterval(tickRef.current); }, []);
   return { running, remaining, start, stop };
 }
 const drillChip = (active) => ({
@@ -2090,7 +2145,6 @@ function cropperPairs(keyPc, loS, hiS) {
    so the count syllable always sits directly under the note it names.
    labels: [offsetInCell, kind, isRest]; kind "n" prints the beat number. */
 const RHYTHM_CELLS = {
-  w:    { beats: 4, events: [0],                  labels: [[0, "n"], [1, "n", true], [2, "n", true], [3, "n", true]] },
   hd:   { beats: 3, events: [0],                  labels: [[0, "n"], [1, "n", true], [2, "n", true]] },
   q:    { beats: 1, events: [0],                  labels: [[0, "n"]] },
   h:    { beats: 2, events: [0],                  labels: [[0, "n"], [1, "n", true]] },
@@ -2114,7 +2168,6 @@ const RHYTHM_CELLS = {
    meaningless (and the notes would collide). */
 const swingOff = (o, cell) => (cell.sixt || cell.trip || o % 1 !== 0.5 ? o : Math.floor(o) + 2 / 3);
 const RHYTHM_EXERCISES = [
-  { name: "Whole note", cells: ["w"], hint: "One strike, four beats — count the silence, don't guess it" },
   { name: "Quarter pulse", cells: ["q", "q", "q", "q"], hint: "One strum per click — the anchor" },
   { name: "Half notes", cells: ["h", "h"], hint: "Hold two full beats; count through the space" },
   { name: "Dotted half", cells: ["hd", "q"], hint: "Three beats held, then a quarter — the waltz-into-4 feel" },
@@ -2191,7 +2244,6 @@ function RhythmStaff({ cells, hotBeat, swing }) {
     const xs = cell.events.map((o) => xAt(beat + o));
     if (type === "q") els.push(head(xs[0], false, ci + "n0"), stem(xs[0], ci + "s0"));
     else if (type === "h") els.push(head(xs[0], true, ci + "n0"), stem(xs[0], ci + "s0"));
-    else if (type === "w") els.push(head(xs[0], true, ci + "n0"));
     else if (type === "hd") els.push(head(xs[0], true, ci + "n0"), stem(xs[0], ci + "s0"), dot(xs[0], ci + "d0"));
     else if (type === "ee") els.push(head(xs[0], false, ci + "n0"), head(xs[1], false, ci + "n1"), stem(xs[0], ci + "s0"), stem(xs[1], ci + "s1"), beam(xs[0], xs[1], 0, ci + "b0"));
     else if (type === "ssss") {
@@ -2284,33 +2336,43 @@ function RhythmTrainer() {
   const exRef = useRef(exIdx); useEffect(() => { exRef.current = exIdx; }, [exIdx]);
   const barsRef = useRef(barsPer); useEffect(() => { barsRef.current = barsPer; }, [barsPer]);
   const swingRef = useRef(swing); useEffect(() => { swingRef.current = swing; }, [swing]);
+  const [voiceIt, setVoiceIt] = useState(false);
+  const voiceRef = useRef(voiceIt); useEffect(() => { voiceRef.current = voiceIt; }, [voiceIt]);
   /* an exercise that wants a feel sets it as the circuit rolls in */
   useEffect(() => { const f = RHYTHM_EXERCISES[exIdx].feel; if (f) setSwing(f === "swing"); }, [exIdx]);
   const nextRef = useRef(0); const barCountRef = useRef(0); const schedRef = useRef(null); const uiRef = useRef([]);
+  const runRef = useRef(false);   // transport kill-switch — see scheduler
 
+  /* Metronome ONLY — four woodblocks a bar. The figure on the staff is yours to
+     clap or strum; playing it back for you defeats the point of reading it.
+     The optional tap voice (off by default) is a smaller, softer woodblock, for
+     checking yourself on a figure you can't crack. All times ABSOLUTE. */
   const voiceBar = (at) => {
     const ctx = audioCtx(); if (!ctx) return;
     const ex = RHYTHM_EXERCISES[exRef.current];
     const spb = 60 / bpmRef.current;
-    let beat = 0;
     for (let b = 0; b < 4; b++) click(at + b * spb, b === 0);
-    /* click() takes an ABSOLUTE ctx time; pluck() takes a RELATIVE delay.
-       Convert once here — handing pluck an absolute stamp schedules the note
-       ~`at` seconds too late and it drifts further every bar. */
-    const rel = (t) => Math.max(0, at - ctx.currentTime + t);
-    ex.cells.forEach((type) => {
-      const cell = RHYTHM_CELLS[type];
-      cell.events.forEach((o) => {
-        const off = swingRef.current ? swingOff(o, cell) : o;
-        pluck(523.25, rel((beat + off) * spb), { gain: beat === 0 && off === 0 ? 0.36 : 0.3, dur: 0.35, damp: 0.93 });
+    if (voiceRef.current) {
+      let beat = 0;
+      ex.cells.forEach((type) => {
+        const cell = RHYTHM_CELLS[type];
+        cell.events.forEach((o) => {
+          const off = swingRef.current ? swingOff(o, cell) : o;
+          if (beat === 0 && off === 0) return;   // downbeat already has the accent
+          tap(at + (beat + off) * spb);
+        });
+        beat += cell.beats;
       });
-      beat += cell.beats;
-    });
+    }
     for (let b = 0; b < 4; b++) uiRef.current.push(setTimeout(() => setHotBeat(b), Math.max(0, (at + b * spb - ctx.currentTime) * 1000)));
   };
   const scheduler = () => {
+    if (!runRef.current) return;   // kill-switch: orphan chains self-terminate
     const ctx = audioCtx(); if (!ctx) return;
     const spb = 60 / bpmRef.current;
+    /* background-tab throttling can leave nextRef far in the past; snap forward
+       instead of instantly voicing every missed bar as a burst */
+    if (nextRef.current < ctx.currentTime - 0.25) nextRef.current = ctx.currentTime + 0.05;
     while (nextRef.current < ctx.currentTime + 0.2) {
       voiceBar(nextRef.current);
       const barEnd = nextRef.current + 4 * spb;
@@ -2325,27 +2387,29 @@ function RhythmTrainer() {
           nextRef.current = barEnd;
           return;
         }
-        pluck(1318.5, barEnd - ctx.currentTime, { gain: 0.35, dur: 0.5 });
-        uiRef.current.push(setTimeout(() => setExIdx((e) => e + 1), delay));
+        uiRef.current.push(setTimeout(() => setExIdx((e) => e + 1), delay));   // staff changes; next accent marks the new figure
       }
       nextRef.current = barEnd;
     }
     schedRef.current = setTimeout(scheduler, 30);
   };
   const start = () => {
+    if (runRef.current) return;    // already running — never spawn a second chain
     const ctx = audioCtx(); if (!ctx) return;
+    runRef.current = true;
     setRunning(true); setSessionDone(false);
     barCountRef.current = 0;
     nextRef.current = ctx.currentTime + 0.15;
     scheduler();
   };
   const stop = () => {
+    runRef.current = false;
     setRunning(false);
     clearTimeout(schedRef.current);
     uiRef.current.forEach(clearTimeout); uiRef.current = [];
     setHotBeat(-1);
   };
-  useEffect(() => () => { clearTimeout(schedRef.current); uiRef.current.forEach(clearTimeout); }, []);
+  useEffect(() => () => { runRef.current = false; clearTimeout(schedRef.current); uiRef.current.forEach(clearTimeout); }, []);
 
   const ex = RHYTHM_EXERCISES[exIdx];
   const swingable = !ex.cells.every((c) => RHYTHM_CELLS[c].sixt || RHYTHM_CELLS[c].trip || RHYTHM_CELLS[c].events.every((o) => o % 1 !== 0.5));
@@ -2391,6 +2455,14 @@ function RhythmTrainer() {
         <button className="chip" style={drillChip(swing)} onClick={() => setSwing(true)}>Swing</button>
         <span style={{ fontSize: 11.5, color: swing && !swingable ? T.amber : T.faint }}>
           {swing ? (swingable ? "offbeats land late — long-short, ⅔ of the beat" : "this figure has no eighth offbeats — plays straight") : "eighths split the beat evenly"}
+        </span>
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+        <span style={{ fontSize: 11.5, color: T.faint }}>sound</span>
+        <button className="chip" style={drillChip(!voiceIt)} onClick={() => setVoiceIt(false)}>Click only</button>
+        <button className="chip" style={drillChip(voiceIt)} onClick={() => setVoiceIt(true)}>Tap the figure</button>
+        <span style={{ fontSize: 11.5, color: T.faint }}>
+          {voiceIt ? "a soft block taps the rhythm with you — for checking, not leaning on" : "just the woodblock — you play the figure"}
         </span>
       </div>
     </div>
