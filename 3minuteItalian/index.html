@@ -4890,6 +4890,99 @@ const mergeGloss = (a,b) => {
 const shuffle  = a => { for(let i=a.length-1;i>0;i--){const j=0|Math.random()*(i+1);[a[i],a[j]]=[a[j],a[i]]}return a; };
 const esc      = t => String(t??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 
+// ── Grading English answers on meaning, not wording ───────────────────────────
+// An Italian → English card tests comprehension, not your English prose. "I want" and
+// "I would like" are the same understanding. "Please do" and "Go ahead" are the same reply.
+// Exact-string grading punishes the wrong thing, so English answers are canonicalised first:
+// contractions expanded, articles and politeness dropped, everyday equivalents folded together.
+// This will never be perfect — which is why a failed check offers self-assessment rather than
+// a verdict. The matcher's job is to get the obvious cases right so you're rarely asked.
+const EN_CONTRACTIONS = [
+  // NB: norm() has already stripped apostrophes, so match the bare forms.
+  // "ill" and "id" are deliberately absent — "ill" is a real word (malato).
+  [/\bim\b/g,'i am'], [/\bive\b/g,'i have'], [/\bweve\b/g,'we have'],
+  [/\byoure\b/g,'you are'], [/\bits\b/g,'it is'], [/\bthats\b/g,'that is'],
+  [/\bwhats\b/g,'what is'], [/\bhows\b/g,'how is'], [/\btheres\b/g,'there is'],
+  [/\bdont\b/g,'do not'], [/\bdoesnt\b/g,'does not'], [/\bisnt\b/g,'is not'],
+  [/\barent\b/g,'are not'], [/\bcant\b/g,'cannot'], [/\bwont\b/g,'will not'],
+  [/\bhavent\b/g,'have not'], [/\bhasnt\b/g,'has not'], [/\blets\b/g,'let us'],
+];
+// First entry in each group is the canonical form; the rest fold into it.
+const EN_EQUIV = [
+  ['i would like','i want','i will have','i would love','i would like to have','id like','id love','ill have','ill take','i will take'],
+  ['may i','can i','could i','am i allowed to'],
+  ['go ahead','please do','after you','be my guest','go right ahead'],
+  ['of course','sure','certainly','naturally'],
+  ['excuse me','pardon me','pardon'],
+  ['you are welcome','not at all','do not mention it','no problem','my pleasure','it is nothing'],
+  ['get through','pass','come through','get by','get past'],
+  ['hello','hi','hey'],
+  ['goodbye','bye'],
+  ['thank you','thanks'],
+  ['how is it going','how are you','how are things','how goes it'],
+  ['everything is fine','everything is good','all is well','all good'],
+  ['right away','immediately','straight away','at once'],
+  ['maybe','perhaps','possibly'],
+  ['okay','ok','alright','all right'],
+  ['nice to meet you','pleased to meet you','a pleasure','pleasure to meet you'],
+  ['see you later','see you soon','see you afterwards','catch you later'],
+  ['the bill','the check'],
+  ['i do not know','no idea'],
+  ['one moment','just a moment','a moment'],
+];
+// Longest alternatives first, so "i would like" folds before the shorter "like" ever could.
+const EN_RULES = EN_EQUIV
+  .flatMap(([canon, ...alts]) => alts.map(alt => ({alt, canon})))
+  .sort((a,b) => b.alt.length - a.alt.length)
+  .map(r => ({re: new RegExp('\\b' + r.alt.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\b','g'), canon: r.canon}));
+// Words that carry no meaning for grading purposes.
+const EN_FILLER = new Set(['a','an','the','please','just','some','kindly','oh','well','so']);
+
+function canonEn(s) {
+  let x = normLoose(s);                                   // lowercase, no accents, no (parentheticals)
+  for(const [re,to] of EN_CONTRACTIONS) x = x.replace(re,to);
+  for(const {re,canon} of EN_RULES)     x = x.replace(re,canon);
+  return x.split(/\s+/).filter(w => w && !EN_FILLER.has(w)).join(' ');
+}
+
+// Levenshtein similarity, 0–1. Catches typos and small word-order wobbles.
+function similar(a,b) {
+  if(a === b) return 1;
+  if(!a.length || !b.length) return 0;
+  let prev = Array.from({length:b.length+1}, (_,i)=>i);
+  for(let i=1;i<=a.length;i++){
+    const cur=[i];
+    for(let j=1;j<=b.length;j++)
+      cur[j] = Math.min(prev[j]+1, cur[j-1]+1, prev[j-1] + (a[i-1]===b[j-1]?0:1));
+    prev = cur;
+  }
+  return 1 - prev[b.length] / Math.max(a.length, b.length);
+}
+
+const sortTokens = s => s.split(' ').filter(Boolean).sort().join(' ');
+
+// lang: 'it' → you're producing Italian, so spelling counts (accents excepted).
+//       'en' → you're showing you understood, so meaning counts.
+function answerMatches(typed, answer, lang='it') {
+  if(!String(typed||'').trim()) return false;
+  const variants = splitAns(answer);
+  if(variants.map(norm).includes(norm(typed))) return true;
+  if(variants.map(normLoose).includes(normLoose(typed))) return true;
+  if(lang !== 'en') return false;
+
+  const ct = canonEn(typed);
+  if(!ct) return false;
+  for(const v of variants) {
+    const cv = canonEn(v);
+    if(!cv) continue;
+    if(ct === cv) return true;                       // same meaning
+    if(sortTokens(ct) === sortTokens(cv)) return true;  // same words, different order
+    if(similar(ct, cv) >= 0.87) return true;         // typo / near-miss
+  }
+  // Some glosses list several meanings ("hello / hi"); accept the lot typed together.
+  return canonEn(variants.join(' ')) === ct;
+}
+
 // ── Word factory ──────────────────────────────────────────────────────────────
 // pack=null means core lesson word; pack='Pack name' means expansion word
 const makeWord = (lessonId,sp,en,pack=null) =>
@@ -5164,7 +5257,7 @@ function buildCard(word,i,pool) {
       const replaceRe = new RegExp("(" + boundary + ")(" + spEsc + ")(" + boundaryEnd + ")", 'i');
       const blanked = psp.replace(replaceRe, (_, a, _b, c) => a + '_____' + c);
       if(blanked !== psp && sp){
-        return {...word,ex:'cloze',promptLabel:'Fill in the blank',
+        return {...word,ex:'cloze',answerLang:'it',promptLabel:'Fill in the blank',
           taskText:'Type the missing Italian word.',
           prompt:blanked, answer:sp||word.italian, speak:psp, ph:'Type the missing word…',
           hint:`Sentence: "${pen}"`};
@@ -5176,13 +5269,13 @@ function buildCard(word,i,pool) {
       : {...word,ex:'mcq',promptLabel:'Multiple choice: English → Italian',taskText:'Choose the correct Italian word.',prompt:word.english,answer:word.italian||'',speak:word.italian,choices:sampleChoices(word.italian,p,'italian',4,word)};
   }
   if(ex==='listen')    return {...word,ex,promptLabel:'Listening recognition',taskText:'Tap Play Italian, then choose the English meaning.',prompt:'Listen to the Italian word.',answer:word.english||'',speak:word.italian,choices:sampleChoices(word.english,p,'english',4,word)};
-  if(ex==='dictation') return {...word,ex,promptLabel:'Dictation',taskText:'Tap Play Italian, then type what you hear.',prompt:word.english||'',answer:word.italian||'',speak:word.italian,ph:'Type the Italian you hear.'};
+  if(ex==='dictation') return {...word,ex,answerLang:'it',promptLabel:'Dictation',taskText:'Tap Play Italian, then type what you hear.',prompt:word.english||'',answer:word.italian||'',speak:word.italian,ph:'Type the Italian you hear.'};
   if(ex==='mcq') return dir==='it-en'
     ? {...word,ex,promptLabel:'Multiple choice: Italian → English',taskText:'Choose the correct English meaning.',prompt:word.italian,answer:word.english||'',speak:word.italian,choices:sampleChoices(word.english,p,'english',4,word),context:ctx}
     : {...word,ex,promptLabel:'Multiple choice: English → Italian',taskText:'Choose the correct Italian word.',prompt:word.english,answer:word.italian||'',speak:word.italian,choices:sampleChoices(word.italian,p,'italian',4,word)};
   return dir==='it-en'
-    ? {...word,ex:'typed',promptLabel:'Typed recall: Italian → English',taskText:'Type the English meaning.',prompt:word.italian,answer:word.english||'',speak:word.italian,ph:'Type the English meaning.',context:ctx}
-    : {...word,ex:'typed',promptLabel:'Typed recall: English → Italian',taskText:'Type the Italian answer.',prompt:word.english,answer:word.italian||'',speak:word.italian,ph:'Type the Italian answer.'};
+    ? {...word,ex:'typed',answerLang:'en',promptLabel:'Typed recall: Italian → English',taskText:'Type the English meaning.',prompt:word.italian,answer:word.english||'',speak:word.italian,ph:'Type the English meaning.',context:ctx}
+    : {...word,ex:'typed',answerLang:'it',promptLabel:'Typed recall: English → Italian',taskText:'Type the Italian answer.',prompt:word.english,answer:word.italian||'',speak:word.italian,ph:'Type the Italian answer.'};
 }
 
 
@@ -5267,6 +5360,7 @@ function buildPhraseCards() {
       english: p.en,
       lessonId: p.lesson,
       lessonTitle: 'Lesson ' + p.lesson + ' sentence',
+      answerLang: dir === 'it-en' ? 'en' : 'it',
       promptLabel: dir === 'it-en' ? 'Sentence: Italian → English' : 'Sentence: English → Italian',
       taskText: dir === 'it-en' ? 'Type the English meaning.' : 'Type the Italian sentence.',
       prompt: dir === 'it-en' ? p.sp : p.en,
@@ -5407,7 +5501,7 @@ function buildWeakQueue() {
 }
 
 const curCard  = () => state.rev.queue[state.rev.idx]||null;
-const nextCard = () => { state.rev.idx++; state.rev.reveal=false; state.rev.typed=''; state.rev.lastResult=''; renderReview(); requestAnimationFrame(()=>{ const r=document.getElementById('reviewArea'); if(r&&window.innerWidth<680) r.scrollIntoView({behavior:'smooth',block:'start'}); }); };
+const nextCard = () => { state.rev.idx++; state.rev.reveal=false; state.rev.selfRate=false; state.rev.typed=''; state.rev.lastResult=''; renderReview(); requestAnimationFrame(()=>{ const r=document.getElementById('reviewArea'); if(r&&window.innerWidth<680) r.scrollIntoView({behavior:'smooth',block:'start'}); }); };
 
 // ── Render ────────────────────────────────────────────────────────────────────
 // ── Praise messages ──────────────────────────────────────────────────────────
@@ -6204,14 +6298,25 @@ function renderReview() {
   const inputHTML=isInput?`<div class="ans-wrap"><input id="ans" placeholder="${esc(card.ph||'Type your answer…')}" value="${esc(rev.typed)}" autocomplete="off" autocorrect="off" spellcheck="false"/></div>`:'';
   const hintHTML=card.hint?`<div class="cloze-hint">💡 ${esc(card.hint)}</div>`:'';
   const choicesHTML=isChoice?`<div class="choices">${card.choices.map(c=>`<button class="choice" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>`:'';
-  const actionHTML=isInput
+  const actionHTML = rev.reveal ? '' : (isInput
     ?`<div class="action-row"><button class="btn primary" id="checkBtn">Check ✓</button><button class="btn big2" id="revealBtn">Show answer</button><button class="btn big2" id="skipBtn">Skip</button></div>`
-    :`<div class="action-row"><button class="btn big2" id="skipBtn">Skip</button></div>`;
-  const feedbackHTML=rev.reveal
-    ?`<div class="feedback-bar wrong-fb anim-pop">✗ ${esc(rev.lastResult)}</div>
-       <div class="answer-reveal anim-pop"><div class="reveal-label">Correct answer</div><div class="reveal-text">${esc(card.answer)}</div></div>
-       <div class="action-row"><button class="btn primary" id="nextBtn">Continue →</button></div>`
-    :'';
+    :`<div class="action-row"><button class="btn big2" id="skipBtn">Skip</button></div>`);
+  // When a typed answer isn't matched, the app doesn't get the final word — you do.
+  // The matcher is good, not omniscient: only you know whether you understood.
+  const selfRateHTML = `
+    <div class="answer-reveal anim-pop"><div class="reveal-label">Correct answer</div><div class="reveal-text">${esc(card.answer)}</div></div>
+    <div class="muted small" style="margin:12px 0 8px;text-align:center;font-weight:700;">How did you do?</div>
+    <div class="action-row">
+      <button class="btn primary" id="rateGot">✓ Got it</button>
+      <button class="btn big2" id="rateAlmost" style="background:var(--golds);border-color:#e6b800;border-bottom-color:#c9a000;color:#7a5800;">~ Close enough</button>
+      <button class="btn danger big2" id="rateNope">✗ Not yet</button>
+    </div>`;
+  const feedbackHTML = !rev.reveal ? ''
+    : rev.selfRate
+      ? `<div class="feedback-bar wrong-fb anim-pop">🤔 ${esc(rev.lastResult)}</div>${selfRateHTML}`
+      : `<div class="feedback-bar wrong-fb anim-pop">✗ ${esc(rev.lastResult)}</div>
+         <div class="answer-reveal anim-pop"><div class="reveal-label">Correct answer</div><div class="reveal-text">${esc(card.answer)}</div></div>
+         <div class="action-row"><button class="btn primary" id="nextBtn">Continue →</button></div>`;
 
   const isLong=card.prompt.length>35;
   // For cloze: render the blank visually
@@ -6247,22 +6352,37 @@ function renderReview() {
 
   document.getElementById('ctxSpeakBtn')?.addEventListener('click',()=>speakIt(card.context));
 
+  // Grade a typed card once, whichever way it ends up being decided.
+  const gradeTyped = rating => {
+    if(card.srsType==='phrase') reviewPhrase(card.phraseIdx, rating==='good'?'got':rating==='hard'?'almost':'nope');
+    else reviewWord(card.id, rating);
+    logSession(card.id, rating==='again'?'again':'good');
+    if(rating!=='again') rev.correct++;
+  };
+
   document.getElementById('checkBtn')?.addEventListener('click',()=>{
     const t=(document.getElementById('ans')?.value||'').trim(); rev.typed=t; rev.total++;
-    const variants=splitAns(card.answer);
-    const ok=variants.map(norm).includes(norm(t)) || variants.map(normLoose).includes(normLoose(t));
-    if(ok){
-      rev.correct++;
-      if(card.srsType==='phrase') reviewPhrase(card.phraseIdx,'good'); else reviewWord(card.id,'good');
-      logSession(card.id,'good');
-      rev.showPraise=randPraise(); rev.typed=''; rev.reveal=false;
+    if(answerMatches(t, card.answer, card.answerLang||'it')){
+      gradeTyped('good');
+      rev.showPraise=randPraise(); rev.typed=''; rev.reveal=false; rev.selfRate=false;
       renderReview();
       setTimeout(()=>{ rev.showPraise=null; nextCard(); },900);
+    } else if(t){
+      // You typed something and the matcher couldn't confirm it. That may be its failure,
+      // not yours — hand the judgement over instead of just marking you wrong.
+      rev.reveal=true; rev.selfRate=true;
+      rev.lastResult="That's not one I can confirm — compare it yourself.";
+      renderReview();
     } else {
-      if(t){ if(card.srsType==='phrase') reviewPhrase(card.phraseIdx,'again'); else reviewWord(card.id,'again'); logSession(card.id,'again'); }
-      rev.reveal=true; rev.lastResult=t?'Not an exact match — check the answer below.':'No answer entered.'; renderReview();
+      gradeTyped('again');
+      rev.reveal=true; rev.selfRate=false; rev.lastResult='No answer entered.';
+      renderReview();
     }
   });
+
+  document.getElementById('rateGot')?.addEventListener('click',   ()=>{ gradeTyped('good'); nextCard(); });
+  document.getElementById('rateAlmost')?.addEventListener('click',()=>{ gradeTyped('hard'); nextCard(); });
+  document.getElementById('rateNope')?.addEventListener('click',  ()=>{ gradeTyped('again'); nextCard(); });
 
   document.querySelectorAll('.choice').forEach(b=>b.addEventListener('click',()=>{
     if(b.dataset.clicked) return; b.dataset.clicked='1';
@@ -6279,7 +6399,7 @@ function renderReview() {
     }
   }));
 
-  document.getElementById('revealBtn')?.addEventListener('click',()=>{ rev.total++; if(card.srsType==='phrase') reviewPhrase(card.phraseIdx,'again'); else reviewWord(card.id,'again'); logSession(card.id,'again'); rev.reveal=true; rev.lastResult='Answer revealed — review and continue.'; renderReview(); });
+  document.getElementById('revealBtn')?.addEventListener('click',()=>{ rev.total++; gradeTyped('again'); rev.reveal=true; rev.selfRate=false; rev.lastResult='Answer revealed — review and continue.'; renderReview(); });
   document.getElementById('skipBtn')?.addEventListener('click',()=>{ rev.total++; if(card.srsType==='phrase'){ if(card.phraseIdx!=null) reviewPhrase(card.phraseIdx,'again'); } else { reviewWord(card.id,'again'); } logSession(card.id,'again'); nextCard(); });
   document.getElementById('nextBtn')?.addEventListener('click',nextCard);
 }
