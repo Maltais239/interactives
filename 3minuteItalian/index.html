@@ -4432,6 +4432,8 @@ const SENT_BANDS = [
   {lo:2001,hi:2001, label:'🌐 Essential phrases'},
   {lo:2002,hi:2002, label:'🌐 Greetings & courtesies'},
   {lo:2003,hi:2003, label:'🌐 Just learning!'},
+  {lo:2004,hi:2004, label:'🌐 Conversation builders'},
+  {lo:2005,hi:2005, label:'🌐 Restaurants & social'},
 ]; // lesson bands for sentence rhythm
 
 const SCENARIO_BANDS = [
@@ -5236,7 +5238,12 @@ function buildPhraseCards() {
   PHRASES.forEach((p, idx) => {
     if(!p || p.length < 2) return;
     const sp = p[0], en = p[1], lesson = p[2];
-    if(lesson && sel.has(lesson)) eligible.push({sp, en, lesson, idx, safe: isProducible(sp)});
+    if(!lesson || !sel.has(lesson)) return;
+    // Same rule as vocab: an Other Sources sentence you've never seen gets shown to you
+    // (Italian → English) before it's ever demanded of you.
+    const seen  = (state.phraseProgress[idx]?.attempts || 0) > 0;
+    const fresh = isOtherLesson(lesson) && !seen;
+    eligible.push({sp, en, lesson, idx, fresh, safe: isProducible(sp)});
   });
   if(!eligible.length) return [];
   const phraseDue = i => {
@@ -5250,7 +5257,7 @@ function buildPhraseCards() {
   const picks = shuffle([...pool]).slice(0, Math.min(cap, pool.length));
   return picks.map((p, i) => {
     // Alternate direction — but never ask for production of a sentence with untaught words.
-    const dir = (!p.safe || i % 2 === 0) ? 'it-en' : 'en-it';
+    const dir = (!p.safe || p.fresh || i % 2 === 0) ? 'it-en' : 'en-it';
     return {
       ex: 'phrase',
       srsType: 'phrase',
@@ -5270,8 +5277,8 @@ function buildPhraseCards() {
   });
 }
 
-function buildMatchCard(words) {
-  if(!words || words.length < 4) return null;
+function buildMatchCard(words, opts = {}) {
+  if(!words || words.length < 2) return null;
   const pairs = words.slice(0, 4).map((w, i) => ({pairId: i, sp: w.italian, en: w.english, wordId: w.id}));
   const chips = [
     ...pairs.map(p => ({type:'sp', text: p.sp, pairId: p.pairId, wordId: p.wordId})),
@@ -5283,17 +5290,71 @@ function buildMatchCard(words) {
     id: 'match_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
     chips: shuffle(chips),
     pairs,
-    promptLabel: 'Match the pairs',
-    lessonTitle: '4-pair quick review',
-    taskText: 'Tap an Italian word, then its English meaning.',
+    warmup: !!opts.warmup,
+    promptLabel: opts.warmup ? '🌱 Meet the words' : 'Match the pairs',
+    lessonTitle: opts.warmup ? 'New vocabulary' : `${pairs.length}-pair quick review`,
+    taskText: opts.warmup
+      ? 'These are new. Both sides are here — pair them up and read them.'
+      : 'Tap an Italian word, then its English meaning.',
   };
+}
+
+// ── Warm-up: meet the words before being tested on them ──────────────────────
+// The podcast introduces the words in lessons 1–45, so those go straight into the mix.
+// Nothing introduces the expansion packs or the Other Sources lists — so the first time
+// a word from those turns up, it arrives with its meaning attached (matching), then as
+// recognition (multiple choice, listening). No typing, no dictation, no cloze: you can't
+// recall what you've never been shown.
+const isOtherLesson = id => (getLesson(id)?.course || '3MS') === 'OTHER';
+const needsIntro    = w  => w.attempts === 0 && (!!w.pack || isOtherLesson(w.lessonId));
+
+function buildWarmup(fresh, pool) {
+  if(!fresh.length) return [];
+  const cards = [];
+
+  // 1. Matching — Italian and English side by side. This IS the introduction.
+  let rest = shuffle([...fresh]);
+  while(rest.length >= 2) {
+    const take = (rest.length === 5 || rest.length === 6) ? 3 : Math.min(4, rest.length);
+    const m = buildMatchCard(rest.slice(0, take), {warmup: true});
+    if(m) cards.push(m);
+    rest = rest.slice(take);
+  }
+
+  // 2. Recognition — pick the meaning from options. Still supported, but now from memory.
+  const p = pool.length >= 4 ? pool : allWords();
+  shuffle([...fresh]).forEach((w, i) => {
+    const kind = i % 3;
+    const base = {...w, warmup: true};
+    if(kind === 0) cards.push({...base, ex:'mcq',
+      promptLabel:'🌱 New: Italian → English', taskText:'You just met this one. Which meaning is it?',
+      prompt:w.italian, answer:w.english||'', speak:w.italian,
+      choices:sampleChoices(w.english, p, 'english', 4, w)});
+    else if(kind === 1) cards.push({...base, ex:'listen',
+      promptLabel:'🌱 New: listening', taskText:'Tap Play, then choose the English meaning.',
+      prompt:'Listen to the Italian word.', answer:w.english||'', speak:w.italian,
+      choices:sampleChoices(w.english, p, 'english', 4, w)});
+    else cards.push({...base, ex:'mcq',
+      promptLabel:'🌱 New: English → Italian', taskText:'Which Italian word is it?',
+      prompt:w.english, answer:w.italian||'', speak:w.italian,
+      choices:sampleChoices(w.italian, p, 'italian', 4, w)});
+  });
+
+  return cards;
 }
 
 function buildQueue() {
   const words = selectedWords();
   if(!words.length){ state.rev.queue=[]; state.rev.idx=0; return false; }
   const due = words.filter(isDue), srcW = due.length?due:words;
-  const wordCards = shuffle(srcW.map((w,i)=>buildCard(w,i,srcW)));
+
+  // Split off anything you've never met from a source that never introduced it.
+  const fresh = srcW.filter(needsIntro);
+  const known = srcW.filter(w => !needsIntro(w));
+  const warmup = buildWarmup(fresh, words);
+
+  // Fresh words are already covered by the warm-up, so the graded queue is the rest.
+  const wordCards = shuffle(known.map((w,i)=>buildCard(w,i,words)));
 
   // Mix in lesson-sentence cards from selected lessons.
   const phraseCards = buildPhraseCards();
@@ -5328,7 +5389,7 @@ function buildQueue() {
     }
   });
 
-  state.rev = {queue: final, idx:0, correct:0, total:0, reveal:false, typed:'', lastResult:'', slog:null};
+  state.rev = {queue: [...warmup, ...final], idx:0, correct:0, total:0, reveal:false, typed:'', lastResult:'', slog:null, warmupCount: warmup.length};
   state.match = null;
   return true;
 }
@@ -6070,7 +6131,8 @@ function renderReview() {
   if(card.ex === 'match'){
     if(!state.match) state.match = {selected:null, matched:new Set(), wrong:null};
     const m = state.match;
-    const allDone = m.matched.size === 4;
+    const nPairs  = card.pairs.length;
+    const allDone = m.matched.size === nPairs;
     const chipsHTML = card.chips.map((chip, i) => {
       let cls = 'match-chip ' + (chip.type === 'sp' ? 'it' : 'en');
       if(m.matched.has(chip.pairId)) cls += ' matched';
@@ -6080,8 +6142,8 @@ function renderReview() {
     }).join('');
     host.innerHTML = `<div class="card review-card anim-pop">
       <div class="ex-label">
-        <span class="pill purple">${esc(card.promptLabel)}</span>
-        <span class="pill green">${m.matched.size}/4 matched</span>
+        <span class="pill ${card.warmup ? 'green' : 'purple'}">${esc(card.promptLabel)}</span>
+        <span class="pill green">${m.matched.size}/${nPairs} matched</span>
       </div>
       <div class="task-hint">${esc(card.taskText)}</div>
       <div class="match-grid">${chipsHTML}</div>
@@ -6136,6 +6198,7 @@ function renderReview() {
   const isInput=['typed','dictation','cloze','phrase'].includes(card.ex);
   const isChoice=['mcq','listen'].includes(card.ex);
   const exColors={typed:'blue',mcq:'purple',listen:'yellow',dictation:'blue',cloze:'green',phrase:'purple'};
+  const pillClass = card.warmup ? 'green' : (exColors[card.ex]||'blue');
 
   const speakHTML=card.speak?`<div class="speak-row"><button class="speak-btn" id="speakBtn">🔊 Play Italian</button></div>`:'';
   const inputHTML=isInput?`<div class="ans-wrap"><input id="ans" placeholder="${esc(card.ph||'Type your answer…')}" value="${esc(rev.typed)}" autocomplete="off" autocorrect="off" spellcheck="false"/></div>`:'';
@@ -6157,7 +6220,7 @@ function renderReview() {
     : `<div class="prompt${isLong?' long':''}">${esc(card.prompt)}</div>`;
   host.innerHTML=`<div class="card review-card anim-pop">
     <div class="ex-label">
-      <span class="pill ${exColors[card.ex]||'blue'}">${esc(card.promptLabel)}</span>
+      <span class="pill ${pillClass}">${esc(card.promptLabel)}</span>
       <span class="pill gray">${esc(card.lessonTitle)}</span>
     </div>
     <div class="task-hint">${esc(card.taskText)}</div>
