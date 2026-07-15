@@ -701,8 +701,19 @@ function Fretboard({ maxFret = 12, frets = 12, marker, tapped, onTap, disabled, 
       {dots &&
         dots.map((d, i) => (
           <g key={"sd" + i} opacity={d.dim ? 0.28 : 1}>
-            <circle cx={fretCenter(d.f)} cy={yOf(d.s)} r={13.5} fill={d.color} stroke="rgba(0,0,0,0.4)" strokeWidth="1.5" />
-            <text x={fretCenter(d.f)} y={yOf(d.s) + 4.5} textAnchor="middle" fontSize="12" fontWeight="800" fill={d.text} fontFamily="inherit">{d.label}</text>
+            {d.bend ? (
+              /* a bend target: hollow, dashed — you arrive here, you don't fret it */
+              <>
+                <circle cx={fretCenter(d.f)} cy={yOf(d.s)} r={13.5} fill="rgba(0,0,0,0.25)"
+                  stroke={d.color} strokeWidth="2" strokeDasharray="3.5 3" />
+                <text x={fretCenter(d.f)} y={yOf(d.s) + 4.5} textAnchor="middle" fontSize="12" fontWeight="800" fill={d.color} fontFamily="inherit">{d.label}</text>
+              </>
+            ) : (
+              <>
+                <circle cx={fretCenter(d.f)} cy={yOf(d.s)} r={13.5} fill={d.color} stroke="rgba(0,0,0,0.4)" strokeWidth="1.5" />
+                <text x={fretCenter(d.f)} y={yOf(d.s) + 4.5} textAnchor="middle" fontSize="12" fontWeight="800" fill={d.text} fontFamily="inherit">{d.label}</text>
+              </>
+            )}
           </g>
         ))}
       {/* current broken-interval pair: both notes stay highlighted for two beats */}
@@ -1969,6 +1980,28 @@ const P32_MAJ = [
   [[-5, -3], [-5, -3, -1], [-3, -1], [-3, -1, 1], [0, 2], [0, 2, 4]],
   [[0, 2, 4], [2, 4], [2, 4, 6], [4, 6], [5, 7, 9], [7, 9]],
 ];
+/* ---- The B.B. box ----------------------------------------------------------
+   Minor pentatonic with the ♭7 swapped out for the major 6th: R ♭3 4 5 6.
+   (In E: E G A B C# instead of E G A B D.) That one substitution is what makes
+   it hover between major and minor. Six notes, top three strings, and the root
+   sits on the B string under the INDEX finger — that's the anchor King used.
+   Offsets below are relative to f6, the root's fret on the low E string;
+   the root on the B string lands at f6-7. Strings are indexed 0=low E … 5=high E. */
+const BB_BOX = [
+  [], [], [],
+  [-8, -6],        // G string: 5th, 6th
+  [-7, -5, -4],    // B string: ROOT (index) · 2nd · ♭3   ← the contested pair
+  [-7, -5],        // high E:   4th, 5th
+];
+/* The major 3rd is not a note you fret cold — it's where the bends LAND. Both
+   contested notes aim at it from below: the 2 pushed a whole step, the ♭3 a
+   half. Drawn hollow, on the B string a fret above the ♭3. */
+const BB_BENDS = [{ s: 4, x: -3, iv: 4 }];
+const BOX_VARIANTS = [
+  { id: "full", name: "Full · 1 2 ♭3 4 5 6", drop: [] },
+  { id: "minor", name: "No 2 · bluesy", drop: [2] },
+  { id: "major", name: "No ♭3 · sweet", drop: [3] },
+];
 const DRILL_PREFS = { formId: "cmaj", rootPc: 0, bpm: 70, secs: 10 };
 const DRILL_FORMS = [
   { id: "cmaj", name: "CAGED Major", type: "caged", scale: "maj" },
@@ -1976,6 +2009,7 @@ const DRILL_FORMS = [
   { id: "cmajp", name: "CAGED Maj Pent", type: "caged", scale: "majp" },
   { id: "cminp", name: "CAGED Min Pent", type: "caged", scale: "minp" },
   { id: "cblues", name: "CAGED Blues", type: "caged", scale: "blues" },
+  { id: "bbbox", name: "B.B. Box", type: "box", box: BB_BOX },
   { id: "32maj", name: "3:2 Major Pent", type: "32", patterns: P32_MAJ },
   { id: "32min", name: "3:2 Minor Pent", type: "32", patterns: P32_MIN },
   { id: "amaj", name: "Arp: Major", type: "caged", ivs: [0, 4, 7], arp: true },
@@ -1990,6 +2024,7 @@ function ScaleFormDrill({ formId, setFormId }) {
   useEffect(() => { DRILL_PREFS.rootPc = rootPc; DRILL_PREFS.bpm = bpm; DRILL_PREFS.secs = secs; }, [rootPc, bpm, secs]);
   const [pos, setPos] = useState(0);
   const [focus, setFocus] = useState(false);
+  const [boxVar, setBoxVar] = useState("full");
   const [sessionDone, setSessionDone] = useState(false);
   const nPos = form.type === "caged" ? 5 : 2;
   const skipResetRef = useRef(false);
@@ -2020,9 +2055,42 @@ function ScaleFormDrill({ formId, setFormId }) {
   const { dots, numFrets, posLabel } = useMemo(() => {
     const mkDot = (s, f) => {
       const iv = (OPEN_PC[s] + f - rootPc + 1200) % 12;
-      const ct = iv === 0 || iv === 3 || iv === 4 || iv === 7 || (form.arp && (iv === 10 || iv === 11));
+      const ct = iv === 0 || iv === 3 || iv === 4 || iv === 7
+        || (form.arp && (iv === 10 || iv === 11))
+        || (form.type === "box" && iv === 9);   // the major 6th IS the B.B. box
       return { s, f, iv, color: ct ? IV_COLORS[iv].color : "#E4D6B8", text: ct ? IV_COLORS[iv].text : "#4A3524", label: DEGREE_LABEL[iv] };
     };
+    if (form.type === "box") {
+      const f6 = (rootPc - OPEN_PC[0] + 12) % 12;
+      /* the box is small enough to sit in more than one octave — collect the
+         playable ones and let the drill walk them low-to-high */
+      const octs = [];
+      for (let o = -12; o <= 24; o += 12) {
+        const frets = form.box.flatMap((str) => str.map((x) => f6 + x + o));
+        if (frets.length && frets.every((f) => f >= 0 && f <= 20)) octs.push(o);
+      }
+      if (!octs.length) octs.push(12);
+      const o = octs[pos % octs.length];
+      const drop = (BOX_VARIANTS.find((v) => v.id === boxVar) || BOX_VARIANTS[0]).drop;
+      const out = [];
+      let lo = 99, hi = 0;
+      form.box.forEach((offs, s) => offs.forEach((x) => {
+        const f = f6 + x + o;
+        const iv = (OPEN_PC[s] + f - rootPc + 1200) % 12;
+        if (drop.includes(iv)) return;          // this variant leaves that note out
+        out.push(mkDot(s, f));
+        lo = Math.min(lo, f); hi = Math.max(hi, f);
+      }));
+      /* where the bends land — hollow, never counted as part of the shape */
+      BB_BENDS.forEach(({ s, x }) => {
+        const f = f6 + x + o;
+        if (f < 0 || f > 20) return;
+        const d = mkDot(s, f);
+        out.push({ ...d, bend: true, color: IV_COLORS[4].color });
+      });
+      const which = octs.length > 1 ? ` · ${(pos % octs.length) + 1} of ${octs.length}` : "";
+      return { dots: out, numFrets: Math.max(12, Math.min(20, hi + 2)), posLabel: `B.B. box · root on the B string${which} · frets ${lo}–${hi}` };
+    }
     if (form.type === "caged") {
       const shape = CAGED_ORDER[pos % 5];
       const ivs = form.ivs || SCALES.find((s) => s.id === form.scale).ivs;
@@ -2160,6 +2228,20 @@ function ScaleFormDrill({ formId, setFormId }) {
           ))}
         </div>
       )}
+      {form.type === "box" && (<>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
+          <span style={{ fontSize: 12, color: T.faint }}>flavour:</span>
+          {BOX_VARIANTS.map((v) => (
+            <button key={v.id} className="chip" style={drillChip(boxVar === v.id)} onClick={() => setBoxVar(v.id)}>{v.name}</button>
+          ))}
+        </div>
+        <div style={{ fontSize: 12.5, color: T.cream, background: T.raised, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 11px", marginBottom: 10, lineHeight: 1.55 }}>
+          <b style={{ color: T.amber }}>The B.B. box.</b> Six notes — <b>1 2 ♭3 4 5 6</b> — on the top three strings, <b>index finger on the root</b> (B string) and it stays there. No ♭7: the <b style={{ color: IV_COLORS[9].color }}>6th</b> takes its place, which is why it hangs between major and minor.
+          <div style={{ marginTop: 6, color: T.muted }}>
+            Teachers argue over one fret on one string. Drop the <b>2</b> and it's bluesy; drop the <b style={{ color: IV_COLORS[3].color }}>♭3</b> and it's sweet. Both notes exist to be <b>bent into the <span style={{ color: IV_COLORS[4].color }}>major 3rd</span></b> — the dashed dot. The 2 goes up a whole step, the ♭3 a half. That arrival is the sound.
+          </div>
+        </div>
+      </>)}
       </>)}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
         <div>
