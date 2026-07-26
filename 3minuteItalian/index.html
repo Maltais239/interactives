@@ -5335,7 +5335,7 @@ function buildPhraseCards() {
     // Same rule as vocab: an Other Sources sentence you've never seen gets shown to you
     // (Italian → English) before it's ever demanded of you.
     const seen  = (state.phraseProgress[idx]?.attempts || 0) > 0;
-    const fresh = isOtherLesson(lesson) && !seen;
+    const fresh = (isOtherLesson(lesson) || isUnheardCore(lesson)) && !seen;
     eligible.push({sp, en, lesson, idx, fresh, safe: isProducible(sp)});
   });
   if(!eligible.length) return [];
@@ -5400,7 +5400,14 @@ function buildMatchCard(words, opts = {}) {
 // recognition (multiple choice, listening). No typing, no dictation, no cloze: you can't
 // recall what you've never been shown.
 const isOtherLesson = id => (getLesson(id)?.course || '3MS') === 'OTHER';
-const needsIntro    = w  => w.attempts === 0 && (!!w.pack || isOtherLesson(w.lessonId));
+// The podcast introduces the early lessons, so those skip the warm-up. But it only goes up
+// to ~lesson 19 for now — from here on the lessons arrive unheard, so their core words are
+// genuinely new and get the same "meet the words" intro as packs and Other Sources.
+// Keyed on lesson number, not on "did you hear it": once a word has any practice history it
+// stops re-introducing, so if you later catch up on the podcast it self-corrects.
+const PODCAST_THROUGH = 19;
+const isUnheardCore = id => (getLesson(id)?.course || '3MS') === '3MS' && id > PODCAST_THROUGH && id < 2000;
+const needsIntro    = w  => w.attempts === 0 && (!!w.pack || isOtherLesson(w.lessonId) || isUnheardCore(w.lessonId));
 
 function buildWarmup(fresh, pool) {
   if(!fresh.length) return [];
