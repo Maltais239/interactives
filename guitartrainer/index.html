@@ -37,6 +37,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
    - Chord trainer: open → 7ths → barre → CAGED → inversions
    - Chord library with strum & arpeggio playback
    - Progress tracking with fretboard heatmap (persistent)
+   - Scale drill trimmed to the core CAGED, B.B.-box, 3:2 and arpeggio forms
    ============================================================ */
 
 /* ---------------- Music data ---------------- */
@@ -74,7 +75,6 @@ const SCALES = [
   { id: "minp", name: "Minor Pentatonic", ivs: [0, 3, 5, 7, 10] },
   { id: "blues", name: "Blues", ivs: [0, 3, 5, 6, 7, 10] },
   { id: "nmin", name: "Natural Minor", ivs: [0, 2, 3, 5, 7, 8, 10] },
-  { id: "comp", name: "Composite Blues", ivs: [0, 2, 3, 4, 5, 7, 9, 10] },
 ];
 /* Fret windows for each CAGED scale position, offset from the root's low-E fret */
 const SHAPE_WINDOWS = { E: [-1, 2], D: [1, 5], C: [4, 7], A: [6, 9], G: [8, 12] };
@@ -770,11 +770,13 @@ function Fretboard({ maxFret = 12, frets = 12, marker, tapped, onTap, disabled, 
 }
 
 /* ---------------- Chord diagram (vertical, classic chart) ---------------- */
-function ChordDiagram({ frets, size = 150, label, rootPc = null }) {
+function ChordDiagram({ frets, size = 150, label, rootPc = null, noteNames = null }) {
   const ivInfo = (s, f) => {
-    if (rootPc == null) return { label: "", color: T.amber, text: "#2A1C0B" };
-    const iv = (OPEN_PC[s] + f - rootPc + 1200) % 12;
-    return IV_COLORS[iv] || { label: DEGREE_LABEL[iv], color: T.faint, text: T.cream };
+    const pc = (OPEN_PC[s] + f) % 12;
+    if (rootPc == null) return { label: noteNames?.[pc] || "", color: T.amber, text: "#2A1C0B" };
+    const iv = (pc - rootPc + 1200) % 12;
+    const base = IV_COLORS[iv] || { label: DEGREE_LABEL[iv], color: T.faint, text: T.cream };
+    return { ...base, label: noteNames?.[pc] || base.label };
   };
   const fretted = frets.filter((f) => f > 0);
   const maxF = Math.max(0, ...fretted);
@@ -1403,6 +1405,7 @@ function ChordLibrary() {
           )}
         </div>
       ))}
+      <SixthsChordReference />
     </div>
   );
 }
@@ -1645,167 +1648,369 @@ function EarTrainer({ save, record, onLevelDone }) {
   );
 }
 
-/* ---------------- Play-Along chord charts ---------------- */
-function PlayAlong({ save, bump }) {
-  const [keyPc, setKeyPc] = useState(0);
-  const [setName, setSetName] = useState("1–3");
-  const [pos, setPos] = useState("Open");
-  const [progId, setProgId] = useState("pop");
-  const [bpm, setBpm] = useState(90);
-  const [live, setLive] = useState(-1);
-  const timers = useRef([]);
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
-
-  const prog = PLAY_PROGRESSIONS.find((p) => p.id === progId);
-  const win = pos === "Open" ? [0, 4] : pos === "Middle" ? [4, 8] : [8, 12];
-  const chart = useMemo(() => {
-    let prevMean = null;
-    return prog.seq.map((rn) => {
-      const [off, qual] = ROMAN[rn];
-      const rpc = (keyPc + off) % 12;
-      const name = NOTES[rpc] + (qual === "min" ? "m" : "");
-      if (pos === "Open" && OPEN_CHORDS[name]) {
-        const frets = OPEN_CHORDS[name];
-        const act = frets.filter((f) => f > 0);
-        prevMean = act.length ? act.reduce((a, b) => a + b, 0) / act.length : 1;
-        return { rn, name, frets, open: true };
-      }
-      if (pos === "Open" && LOW_BARRES[name]) {
-        const frets = LOW_BARRES[name];
-        const act = frets.filter((f) => f > 0);
-        prevMean = act.length ? act.reduce((a, b) => a + b, 0) / act.length : 1;
-        return { rn, name, frets, open: true };
-      }
-      if (pos === "Open" && LOW_BARRES[name]) {
-        const frets = LOW_BARRES[name];
-        const act = frets.filter((f) => f > 0);
-        prevMean = act.reduce((a, b) => a + b, 0) / act.length;
-        return { rn, name, frets, barre: true };
-      }
-      const best = bestTriadNear(rpc, qual, TRIAD_SETS[setName], win, prevMean);
-      prevMean = best.mean;
-      return { rn, name, ...best };
-    });
-  }, [prog, keyPc, setName, pos]);
-
-  const stop = () => { timers.current.forEach(clearTimeout); timers.current = []; setLive(-1); };
-  useEffect(() => { stop(); }, [keyPc, setName, pos, progId, bpm]);
-  const [loop, setLoop] = useState(false);
-  const loopRef = useRef(false); useEffect(() => { loopRef.current = loop; }, [loop]);
-  const [jam, setJam] = useState(null);
-  const jamDots = useMemo(() => {
-    if (!jam) return [];
-    const ivs = SCALES.find((s) => s.id === jam).ivs;
-    const out = [];
-    for (let s = 0; s < 6; s++)
-      for (let f = 0; f <= 12; f++) {
-        const iv = (OPEN_PC[s] + f - keyPc + 1200) % 12;
-        if (!ivs.includes(iv)) continue;
-        const ct = iv === 0 || iv === 3 || iv === 4 || iv === 7;
-        out.push({ s, f, color: ct ? IV_COLORS[iv].color : "#E4D6B8", text: ct ? IV_COLORS[iv].text : "#4A3524", label: DEGREE_LABEL[iv] });
-      }
-    return out;
-  }, [jam, keyPc]);
-  const playPass = () => {
-    const dur = 240 / bpm;
-    chart.forEach((c, i) => {
-      strum(c.frets, false, i * dur);
-      strum(c.frets, false, i * dur + dur / 2);
-      timers.current.push(setTimeout(() => setLive(i), i * dur * 1000));
-    });
-    timers.current.push(setTimeout(() => { if (loopRef.current) playPass(); else setLive(-1); }, chart.length * dur * 1000));
-  };
-  const play = () => { stop(); playPass(); };
-
-  const chip = (active) => ({
-    flexShrink: 0, padding: "7px 12px", borderRadius: 999, fontSize: 13, fontWeight: 700, cursor: "pointer",
-    border: `1.5px solid ${active ? T.amber : T.line}`,
-    background: active ? "rgba(233,161,59,0.16)" : T.surface, color: T.cream,
+/* ---------------- CAGED progression practice ---------------- */
+const CAGED_FORM_ORDER = ["E", "A", "D", "G", "C"];
+const CAGED_ROOTS = [
+  { name: "C", pc: 0 }, { name: "Db", pc: 1 }, { name: "D", pc: 2 }, { name: "Eb", pc: 3 },
+  { name: "E", pc: 4 }, { name: "F", pc: 5 }, { name: "F#", pc: 6 }, { name: "G", pc: 7 },
+  { name: "Ab", pc: 8 }, { name: "A", pc: 9 }, { name: "Bb", pc: 10 }, { name: "B", pc: 11 },
+];
+/* Open forms from the Lesson 4/5 CAGED chart. Moving a form raises every
+   sounded note — including the notes that were open strings — by the same fret amount. */
+const CAGED_CHORD_FORMS = {
+  Major: {
+    E: [0, 2, 2, 1, 0, 0], A: [-1, 0, 2, 2, 2, 0], D: [-1, -1, 0, 2, 3, 2],
+    G: [3, 2, 0, 0, 0, 3], C: [-1, 3, 2, 0, 1, 0],
+  },
+  Minor: {
+    E: [0, 2, 2, 0, 0, 0], A: [-1, 0, 2, 2, 1, 0], D: [-1, -1, 0, 2, 3, 1],
+    G: [3, 1, 0, 0, -1, -1], C: [-1, 3, 1, 0, 1, -1],
+  },
+  "7": {
+    E: [0, 2, 0, 1, 0, 0], A: [-1, 0, 2, 0, 2, 0], D: [-1, -1, 0, 2, 1, 2],
+    G: [3, 2, 0, 0, 0, 1], C: [-1, 3, 2, 3, 1, 0],
+  },
+  Min7: {
+    E: [0, 2, 0, 0, 0, 0], A: [-1, 0, 2, 0, 1, 0], D: [-1, -1, 0, 2, 1, 1],
+    G: [3, 1, 3, 0, -1, -1], C: [-1, 3, 1, 3, 1, -1],
+  },
+  Maj7: {
+    E: [0, 2, 1, 1, 0, 0], A: [-1, 0, 2, 1, 2, 0], D: [-1, -1, 0, 2, 2, 2],
+    G: [3, -1, 0, 0, 0, 2], C: [-1, 3, 2, 0, 0, 0],
+  },
+  "Power 5": {
+    E: [0, 2, 2, -1, -1, -1], A: [-1, 0, 2, 2, -1, -1], D: [-1, -1, 0, 2, 3, -1],
+    G: [-1, -1, -1, 0, 3, 3], C: [-1, 3, -1, 0, 1, -1],
+  },
+};
+const CAGED_BASE_ROOT_PC = { E: 4, A: 9, D: 2, G: 7, C: 0 };
+const CAGED_CHORD_TYPES = {
+  Major: { suffix: " major", intervals: [0, 4, 7], letters: [0, 2, 4] },
+  Minor: { suffix: " minor", intervals: [0, 3, 7], letters: [0, 2, 4] },
+  "7": { suffix: "7", intervals: [0, 4, 7, 10], letters: [0, 2, 4, 6] },
+  Min7: { suffix: "m7", intervals: [0, 3, 7, 10], letters: [0, 2, 4, 6] },
+  Maj7: { suffix: "maj7", intervals: [0, 4, 7, 11], letters: [0, 2, 4, 6] },
+  "Power 5": { suffix: "5", intervals: [0, 7], letters: [0, 4] },
+};
+const NOTE_LETTERS = ["C", "D", "E", "F", "G", "A", "B"];
+const NATURAL_NOTE_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+const prettyNote = (n) => n.replace(/#/g, "♯").replace(/b/g, "♭");
+function accidentalFor(diff) {
+  if (diff === 0) return "";
+  if (diff === 1) return "#";
+  if (diff === 11) return "b";
+  if (diff === 2) return "##";
+  if (diff === 10) return "bb";
+  return "";
+}
+function spellCagedChord(rootName, type) {
+  const m = rootName.match(/^([A-G])([#b]?)$/);
+  const rootLetter = m[1];
+  const rootPc = rootPcOf(rootName);
+  const rootLetterIdx = NOTE_LETTERS.indexOf(rootLetter);
+  const def = CAGED_CHORD_TYPES[type];
+  return def.intervals.map((iv, i) => {
+    const letter = NOTE_LETTERS[(rootLetterIdx + def.letters[i]) % 7];
+    const targetPc = (rootPc + iv) % 12;
+    const diff = (targetPc - NATURAL_NOTE_PC[letter] + 12) % 12;
+    return letter + accidentalFor(diff);
   });
-  const reps = (save.practice || {})[progId] || 0;
+}
+function spellProgressionRoot(keyName, semitoneOffset, letterOffset) {
+  const m = keyName.match(/^([A-G])([#b]?)$/);
+  const keyLetterIdx = NOTE_LETTERS.indexOf(m[1]);
+  const letter = NOTE_LETTERS[(keyLetterIdx + letterOffset) % 7];
+  const targetPc = (rootPcOf(keyName) + semitoneOffset) % 12;
+  const diff = (targetPc - NATURAL_NOTE_PC[letter] + 12) % 12;
+  return letter + accidentalFor(diff);
+}
+function cagedChordVoicing(rootPc, type, form) {
+  const shift = (rootPc - CAGED_BASE_ROOT_PC[form] + 12) % 12;
+  return CAGED_CHORD_FORMS[type][form].map((f) => (f < 0 ? -1 : f + shift));
+}
+const CAGED_PROGRESSIONS = [
+  {
+    id: "145", name: "I – IV – V7", hint: "Major-key workhorse",
+    chords: [
+      { rn: "I", off: 0, letter: 0, type: "Major" },
+      { rn: "IV", off: 5, letter: 3, type: "Major" },
+      { rn: "V7", off: 7, letter: 4, type: "7" },
+    ],
+  },
+  {
+    id: "251", name: "ii – V7 – Imaj7", hint: "Jazz, soul and standards",
+    chords: [
+      { rn: "ii", off: 2, letter: 1, type: "Min7" },
+      { rn: "V7", off: 7, letter: 4, type: "7" },
+      { rn: "Imaj7", off: 0, letter: 0, type: "Maj7" },
+    ],
+  },
+  {
+    id: "164", name: "I – vi – IV", hint: "Pop and singer-songwriter",
+    chords: [
+      { rn: "I", off: 0, letter: 0, type: "Major" },
+      { rn: "vi", off: 9, letter: 5, type: "Minor" },
+      { rn: "IV", off: 5, letter: 3, type: "Major" },
+    ],
+  },
+  {
+    id: "minor145", name: "i – iv – V7", hint: "Minor-key cadence",
+    chords: [
+      { rn: "i", off: 0, letter: 0, type: "Minor" },
+      { rn: "iv", off: 5, letter: 3, type: "Minor" },
+      { rn: "V7", off: 7, letter: 4, type: "7" },
+    ],
+  },
+  {
+    id: "power", name: "I5 – ♭VII5 – IV5", hint: "Rock power-chord movement",
+    chords: [
+      { rn: "I5", off: 0, letter: 0, type: "Power 5" },
+      { rn: "♭VII5", off: 10, letter: 6, type: "Power 5" },
+      { rn: "IV5", off: 5, letter: 3, type: "Power 5" },
+    ],
+  },
+];
+const CAGED_NECK_AREAS = [
+  { id: "low", name: "Low · 0–5", lo: 0, hi: 5 },
+  { id: "mid", name: "Middle · 4–9", lo: 4, hi: 9 },
+  { id: "upper", name: "Upper · 7–12", lo: 7, hi: 12 },
+  { id: "high", name: "High · 10–15", lo: 10, hi: 15 },
+];
+function cagedVoicingCandidate(rootPc, type, form) {
+  const frets = cagedChordVoicing(rootPc, type, form);
+  const played = frets.filter((f) => f >= 0);
+  const min = Math.min(...played);
+  const max = Math.max(...played);
+  const center = played.reduce((a, b) => a + b, 0) / played.length;
+  return { form, frets, min, max, center };
+}
+function progressionVoicingSets(chords, area) {
+  const lists = chords.map((ch) => CAGED_FORM_ORDER.map((form) => cagedVoicingCandidate(ch.pc, ch.type, form)));
+  const combos = [];
+  const build = (depth, chosen) => {
+    if (depth === lists.length) {
+      const forms = chosen.map((c) => c.form);
+      const all = chosen.flatMap((c) => c.frets.filter((f) => f >= 0));
+      const globalMin = Math.min(...all), globalMax = Math.max(...all);
+      const span = globalMax - globalMin;
+      const movement = chosen.slice(1).reduce((sum, c, i) => sum + Math.abs(c.center - chosen[i].center), 0);
+      const outside = chosen.reduce((sum, c) => sum + Math.max(0, area.lo - c.min) + Math.max(0, c.max - area.hi), 0);
+      const areaCenter = (area.lo + area.hi) / 2;
+      const centering = chosen.reduce((sum, c) => sum + Math.abs(c.center - areaCenter), 0);
+      const repeats = chosen.length - new Set(forms).size;
+      const score = span * 2.4 + movement * 1.5 + outside * 9 + centering * 0.45 + repeats * 35;
+      combos.push({ items: chosen, score, signature: forms.join("-") });
+      return;
+    }
+    lists[depth].forEach((c) => build(depth + 1, [...chosen, c]));
+  };
+  build(0, []);
+  const distinct = combos.filter((c) => new Set(c.items.map((x) => x.form)).size === c.items.length);
+  const pool = distinct.length ? distinct : combos;
+  pool.sort((a, b) => a.score - b.score);
+  const seen = new Set();
+  return pool.filter((c) => {
+    if (seen.has(c.signature)) return false;
+    seen.add(c.signature);
+    return true;
+  }).slice(0, 10);
+}
+function CagedPairDrill() {
+  const [progressionId, setProgressionId] = useState("251");
+  const [keyIndex, setKeyIndex] = useState(0);
+  const [areaId, setAreaId] = useState("mid");
+  const [voicingIndex, setVoicingIndex] = useState(0);
+  const [bpm, setBpm] = useState(65);
+  const [running, setRunning] = useState(false);
+  const [beat, setBeat] = useState(0);
+  const progression = CAGED_PROGRESSIONS.find((p) => p.id === progressionId);
+  const key = CAGED_ROOTS[keyIndex];
+  const area = CAGED_NECK_AREAS.find((a) => a.id === areaId);
+  const chords = useMemo(() => progression.chords.map((ch) => {
+    const rootName = spellProgressionRoot(key.name, ch.off, ch.letter);
+    return {
+      ...ch,
+      rootName,
+      pc: (key.pc + ch.off) % 12,
+      notes: spellCagedChord(rootName, ch.type),
+    };
+  }), [progression, key.name, key.pc]);
+  const voicingSets = useMemo(() => progressionVoicingSets(chords, area), [chords, area]);
+  const voicings = voicingSets.length ? voicingSets[voicingIndex % voicingSets.length].items : [];
+  const totalBeats = Math.max(4, chords.length * 4);
+  const active = Math.min(chords.length - 1, Math.floor(beat / 4));
+
+  useEffect(() => {
+    if (!running) return;
+    setBeat(0);
+    const ctx = audioCtx();
+    if (ctx) click(ctx.currentTime + 0.03, true);
+    const id = setInterval(() => {
+      setBeat((b) => {
+        const nb = (b + 1) % totalBeats;
+        const c = audioCtx();
+        if (c) click(c.currentTime + 0.02, nb % 4 === 0);
+        return nb;
+      });
+    }, 60000 / bpm);
+    return () => clearInterval(id);
+  }, [running, bpm, totalBeats, progressionId, keyIndex, areaId, voicingIndex]);
+
+  const resetDrill = () => { setBeat(0); setRunning(false); };
+  const chip = (on) => ({
+    flexShrink: 0, padding: "7px 11px", borderRadius: 999, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+    border: `1.5px solid ${on ? T.amber : T.line}`,
+    background: on ? "rgba(233,161,59,0.16)" : T.surface, color: T.cream,
+  });
+  const selectStyle = {
+    background: T.raised, color: T.cream, border: `1.5px solid ${T.line}`, borderRadius: 9,
+    padding: "8px 28px 8px 10px", fontFamily: "inherit", fontSize: 13.5, fontWeight: 700,
+  };
+  const noteMap = (notes) => Object.fromEntries(notes.map((n) => [rootPcOf(n), prettyNote(n)]));
+  const chordCard = (which, chord, voicing) => (
+    <div style={{
+      flex: "1 1 205px", textAlign: "center", borderRadius: 14, padding: "12px 8px 8px",
+      background: T.raised, border: `3px solid ${active === which ? T.amber : T.line}`,
+      opacity: running && active !== which ? 0.52 : 1, transition: "all .15s ease",
+    }}>
+      <div style={{ fontSize: 12, color: T.faint, fontWeight: 800 }}>{chord.rn}</div>
+      <div style={{ fontSize: 18, fontWeight: 800, fontFamily: "'Fraunces', Georgia, serif" }}>
+        {prettyNote(chord.rootName)}{CAGED_CHORD_TYPES[chord.type].suffix}
+      </div>
+      <div style={{ fontSize: 12.5, color: T.amber, fontWeight: 800, marginTop: 2 }}>{voicing.form} form</div>
+      <div style={{ fontSize: 12.5, color: T.muted, marginTop: 3 }}>{chord.notes.map(prettyNote).join(" · ")}</div>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <ChordDiagram frets={voicing.frets} size={150}
+          label={`${chord.rootName}${CAGED_CHORD_TYPES[chord.type].suffix}, ${voicing.form} form`}
+          rootPc={chord.pc} noteNames={noteMap(chord.notes)} />
+      </div>
+    </div>
+  );
+  const anySevenths = chords.some((c) => c.type === "7" || c.type === "Min7" || c.type === "Maj7");
 
   return (
-    <div>
-      <div style={{ fontSize: 13, color: T.faint, marginBottom: 10 }}>
-        Pick a progression, key, string set, and neck position — Fretwork chooses the closest inversion for every chord so your hand stays put. Strum along, then log a rep.
+    <div className="card" style={{ marginBottom: 14 }}>
+      <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>CAGED Progression Practice</div>
+      <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 12 }}>
+        Practise a real progression without chasing one shape up the neck. The app chooses different CAGED forms that keep the chords in the same area.
       </div>
-      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
-        {PLAY_PROGRESSIONS.map((p) => (
-          <button key={p.id} className="chip" style={chip(progId === p.id)} onClick={() => setProgId(p.id)}>{p.name}</button>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
-        {NOTES.map((n, i) => (
-          <button key={n} className="chip" style={chip(keyPc === i)} onClick={() => setKeyPc(i)}>{n}</button>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-        {Object.keys(TRIAD_SETS).map((sn) => (
-          <button key={sn} className="chip" style={chip(setName === sn)} onClick={() => setSetName(sn)}>Strings {sn}</button>
-        ))}
-        <span style={{ width: 8 }} />
-        {["Open", "Middle", "Upper"].map((p) => (
-          <button key={p} className="chip" style={chip(pos === p)} onClick={() => setPos(p)}>{p}</button>
-        ))}
-        <span style={{ width: 8 }} />
-        {[60, 90, 120].map((b) => (
-          <button key={b} className="chip" style={chip(bpm === b)} onClick={() => setBpm(b)}>{b} bpm</button>
+
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 9 }}>
+        {CAGED_PROGRESSIONS.map((p) => (
+          <button key={p.id} className="chip" style={chip(progressionId === p.id)} onClick={() => {
+            setProgressionId(p.id); setVoicingIndex(0); resetDrill();
+          }}>{p.name}</button>
         ))}
       </div>
-      <div className="card">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8, flexWrap: "wrap" }}>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif" }}>
-              {prog.name} in {NOTES[keyPc]} <span style={{ color: T.faint, fontWeight: 400, fontSize: 13 }}>· {pos} position, strings {setName}</span>
-            </div>
-            <div style={{ fontSize: 12.5, color: T.faint }}>{prog.hint}</div>
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button className="chip" style={btnAmber} onClick={play}>▶ Play</button>
-            <button className="chip" style={loop ? { ...btnGhost, borderColor: T.amber, color: T.amber } : btnGhost} onClick={() => setLoop(!loop)}>⟳ Loop</button>
-            <button className="chip" style={btnGhost} onClick={stop}>■ Stop</button>
-          </div>
+      <div style={{ fontSize: 12, color: T.faint, marginBottom: 10 }}>{progression.hint}</div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+        <label style={{ fontSize: 12, color: T.faint, fontWeight: 700 }}>Key&nbsp;
+          <select value={keyIndex} onChange={(e) => { setKeyIndex(Number(e.target.value)); setVoicingIndex(0); resetDrill(); }} style={selectStyle}>
+            {CAGED_ROOTS.map((r, i) => <option key={r.name} value={i}>{prettyNote(r.name)}</option>)}
+          </select>
+        </label>
+        <span style={{ fontSize: 12, color: T.faint, fontWeight: 700, marginLeft: 4 }}>Neck area</span>
+        {CAGED_NECK_AREAS.map((a) => (
+          <button key={a.id} className="chip" style={chip(areaId === a.id)} onClick={() => {
+            setAreaId(a.id); setVoicingIndex(0); resetDrill();
+          }}>{a.name}</button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {chords.map((ch, i) => voicings[i] ? <React.Fragment key={`${ch.rn}-${ch.rootName}`}>{chordCard(i, ch, voicings[i])}</React.Fragment> : null)}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
+        {[0, 1, 2, 3].map((b) => (
+          <span key={b} style={{
+            width: 30, height: 30, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center",
+            background: running && beat % 4 === b ? T.amber : T.surface,
+            color: running && beat % 4 === b ? "#2A1C0B" : T.muted,
+            border: `1.5px solid ${running && beat % 4 === b ? T.amber : T.line}`, fontWeight: 800,
+          }}>{b + 1}</span>
+        ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "center", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 12 }}>
+        <button className="chip" style={running ? btnGhost : btnAmber} onClick={() => setRunning((r) => !r)}>{running ? "■ Stop" : "▶ Start"}</button>
+        <button className="chip" style={btnGhost} onClick={() => { setKeyIndex((k) => (k + 1) % 12); setVoicingIndex(0); resetDrill(); }}>Next key +1</button>
+        <button className="chip" style={btnGhost} disabled={voicingSets.length < 2}
+          onClick={() => { setVoicingIndex((v) => (v + 1) % Math.max(1, voicingSets.length)); resetDrill(); }}>
+          Alternate voicings ▸
+        </button>
+        <button className="chip" style={chip(false)} onClick={() => setBpm(Math.max(40, bpm - 5))}>−</button>
+        <span style={{ minWidth: 66, textAlign: "center", fontSize: 13, fontWeight: 800 }}>{bpm} bpm</span>
+        <button className="chip" style={chip(false)} onClick={() => setBpm(Math.min(160, bpm + 5))}>+</button>
+      </div>
+      <div style={{ textAlign: "center", fontSize: 11.5, color: T.faint, marginTop: 7 }}>
+        Voicing set {voicingSets.length ? (voicingIndex % voicingSets.length) + 1 : 0} of {voicingSets.length}
+        {voicings.length ? ` · forms ${voicings.map((v) => v.form).join(" → ")}` : ""}
+      </div>
+      <div style={{ marginTop: 10 }}><IntervalLegend seventh={anySevenths} /></div>
+    </div>
+  );
+}
+
+/* ---------------- One compact 6ths reference ---------------- */
+const SIXTH_REFERENCE_CHORDS = {
+  A: { pc: 9,  frets: [-1, -1, 7, 6, 5, 5] },
+  E: { pc: 4,  frets: [-1, -1, 2, 1, 0, 0] },
+  G: { pc: 7,  frets: [-1, -1, 5, 4, 3, 3] },
+  D: { pc: 2,  frets: [-1, -1, 0, 2, 3, 2] },
+};
+function FourStringDiagram({ dots, maxFret = 14 }) {
+  const W = 760, H = 132, left = 58, right = 748, top = 18, bottom = 108;
+  const fw = (right - left) / maxFret;
+  const strings = [5, 4, 3, 2]; // e B G D, top to bottom
+  const y = (s) => top + strings.indexOf(s) * ((bottom - top) / 3);
+  const x = (f) => (f === 0 ? left - 22 : left + (f - 0.5) * fw);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", display: "block" }} role="img" aria-label="Four-string guitar diagram">
+      <rect x={left} y={top - 8} width={right - left} height={bottom - top + 16} rx={5} fill={T.wood} />
+      <rect x={left - 4} y={top - 8} width={7} height={bottom - top + 16} rx={2} fill={T.inlay} />
+      {Array.from({ length: maxFret }, (_, i) => i + 1).map((f) => <line key={f} x1={left + f * fw} x2={left + f * fw} y1={top - 8} y2={bottom + 8} stroke={T.fretWire} strokeWidth="2" opacity="0.8" />)}
+      {[3, 5, 7, 9, 12].filter((f) => f <= maxFret).map((f) => <circle key={f} cx={left + (f - 0.5) * fw} cy={(top + bottom) / 2} r={5.5} fill={T.inlay} opacity="0.45" />)}
+      {strings.map((s, i) => <React.Fragment key={s}><text x={18} y={y(s) + 5} fill={T.muted} fontSize="14" fontWeight="700">{["e", "B", "G", "D"][i]}</text><line x1={left - 4} x2={right} y1={y(s)} y2={y(s)} stroke="#C7B594" strokeWidth={1.5 + i * 0.35} /></React.Fragment>)}
+      {dots.map((d, i) => <g key={i}><circle cx={x(d.f)} cy={y(d.s)} r={12.5} fill={d.color} stroke="rgba(0,0,0,.45)" strokeWidth="1.5" /><text x={x(d.f)} y={y(d.s) + 4.3} textAnchor="middle" fontSize="11.5" fontWeight="800" fill={d.text}>{d.label}</text></g>)}
+      {[3, 5, 7, 9, 12].filter((f) => f <= maxFret).map((f) => <text key={"n" + f} x={left + (f - 0.5) * fw} y={H - 2} fill={T.faint} fontSize="11" textAnchor="middle">{f}</text>)}
+    </svg>
+  );
+}
+function SixthsChordReference() {
+  const [name, setName] = useState("A");
+  const item = SIXTH_REFERENCE_CHORDS[name];
+  const degreeStyle = (iv) => IV_COLORS[iv] || { color: "#E4D6B8", text: "#4A3524" };
+  const chordDots = item.frets.flatMap((f, s) => {
+    if (s < 2 || f < 0) return [];
+    const iv = (OPEN_PC[s] + f - item.pc + 1200) % 12;
+    const st = degreeStyle(iv);
+    return [{ s, f, label: DEGREE_LABEL[iv], color: st.color, text: st.text }];
+  });
+  const pairDots = cropperPairs(item.pc, 3, 5).slice(0, 3).flatMap((p) => {
+    const vals = [
+      { s: 5, f: p.mf, iv: (OPEN_PC[5] + p.mf - item.pc + 1200) % 12 },
+      { s: 3, f: p.hf, iv: (OPEN_PC[3] + p.hf - item.pc + 1200) % 12 },
+    ];
+    return vals.map((d) => { const st = degreeStyle(d.iv); return { ...d, label: DEGREE_LABEL[d.iv], color: st.color, text: st.text }; });
+  });
+  const chip = (on) => ({
+    padding: "6px 11px", borderRadius: 999, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+    border: `1.5px solid ${on ? T.amber : T.line}`, background: on ? "rgba(233,161,59,0.16)" : T.surface, color: T.cream,
+  });
+  return (
+    <div className="card" style={{ marginTop: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 16 }}>Sixths from a chord</div>
+          <div style={{ fontSize: 12.5, color: T.faint }}>One reminder diagram: a top-four-string voicing and its three nearby pairs of sixths.</div>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-          {chart.map((c, i) => (
-            <div key={i} onClick={() => strum(c.frets)}
-              style={{
-                cursor: "pointer", textAlign: "center", background: T.raised, borderRadius: 10, padding: "4px 6px",
-                border: `2px solid ${live === i ? T.amber : T.line}`, transition: "border-color .15s",
-              }}>
-              <div style={{ fontSize: 13, fontWeight: 800 }}>{c.name} <span style={{ color: T.faint, fontWeight: 400, fontSize: 10.5 }}>{c.rn}</span></div>
-              <ChordDiagram frets={c.frets} size={86} label={c.name} rootPc={rootPcOf(c.name)} />
-              <div style={{ fontSize: 10.5, color: T.amber, paddingBottom: 3 }}>{c.open ? "open chord" : c.barre ? "barre" : INV_NAMES[c.inv]}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{ marginTop: 14 }}>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
-            <span style={{ fontSize: 12.5, color: T.muted, fontWeight: 700 }}>Jam scale:</span>
-            <button className="chip" style={chip(jam === null)} onClick={() => setJam(null)}>Hide</button>
-            {[["majp", "Major Pent"], ["minp", "Minor Pent"], ["maj", "Major"], ["blues", "Blues"]].map(([id, label]) => (
-              <button key={id} className="chip" style={chip(jam === id)} onClick={() => setJam(id)}>{label}</button>
-            ))}
-          </div>
-          {jam && (
-            <>
-              <Fretboard frets={12} maxFret={12} dots={jamDots} onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
-              <div style={{ fontSize: 11.5, color: T.faint, marginTop: 4 }}>
-                {NOTES[keyPc]} {SCALES.find((s) => s.id === jam).name} across the neck — turn on Loop and improvise over the changes.
-              </div>
-            </>
-          )}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
-          <button className="chip" style={btnGhost} onClick={() => bump(progId)}>☑ Mark practiced</button>
-          <span style={{ fontSize: 13, color: reps > 0 ? T.green : T.faint, fontWeight: 700 }}>
-            {reps > 0 ? `Practiced ${reps}×` : "Not practiced yet"}
-          </span>
-        </div>
+        <div style={{ display: "flex", gap: 6 }}>{Object.keys(SIXTH_REFERENCE_CHORDS).map((n) => <button key={n} className="chip" style={chip(name === n)} onClick={() => setName(n)}>{n}</button>)}</div>
       </div>
-      <p style={{ fontSize: 12.5, color: T.faint, marginTop: 10 }}>
-        Try the same progression in all three positions — notice how the inversions trade places but the chords stay within a few frets.
-      </p>
+      <div style={{ fontSize: 12.5, color: T.muted, fontWeight: 700, marginBottom: 2 }}>{name} chord voicing on the top four strings</div>
+      <FourStringDiagram dots={chordDots} />
+      <div style={{ fontSize: 12.5, color: T.muted, fontWeight: 700, margin: "10px 0 2px" }}>The three associated pairs of sixths</div>
+      <FourStringDiagram dots={pairDots} />
     </div>
   );
 }
@@ -2003,35 +2208,6 @@ const BOX_VARIANTS = [
   { id: "minor", name: "No 2 · bluesy", drop: [2] },
   { id: "major", name: "No ♭3 · sweet", drop: [3] },
 ];
-/* ---- The Albert King box ---------------------------------------------------
-   The five notes from the TOP of minor-pentatonic shape 2 — 1 ♭3 4 5 ♭7 — with
-   the tonic on the B string. This is SRV's home. In G: 5th on the G string (7),
-   ♭7 and root on the B string (6, 8), ♭3 and 4 on the high E (6, 8). The 5th
-   and root are your resolution notes; the ♭7, ♭3 and 4 are all bend targets —
-   Albert bent with savage whole- and tone-and-a-half pushes off exactly these.
-   Offsets relative to f6 (root fret on low E); B-string root at f6+3. */
-const AK_BOX = [
-  [], [], [],
-  [4],        // G string: 5th
-  [3, 5],     // B string: ♭7, ROOT
-  [3, 5],     // high E:   ♭3, 4
-];
-/* the three bend targets, drawn hollow — ♭7→root, ♭3→4, 4→5 */
-const AK_BENDS = [{ s: 4, x: 3, up: 2 }, { s: 5, x: 3, up: 2 }, { s: 5, x: 5, up: 2 }];
-/* ---- Three notes per string -----------------------------------------------
-   The OTHER major system. Seven positions (one per mode) instead of CAGED's
-   five, three notes on every string, connecting the neck diagonally. Each row
-   is the fret offset from the low-E root for the [low-E … high-E] strings, three
-   per string. Built from the major scale; index = which degree starts the box. */
-const TNPS_MAJ = [
-  [[0, 2, 4], [0, 2, 4], [1, 2, 4], [1, 2, 4], [2, 4, 5], [2, 4, 5]],
-  [[2, 4, 5], [2, 4, 6], [2, 4, 6], [2, 4, 6], [4, 5, 7], [4, 5, 7]],
-  [[4, 5, 7], [4, 6, 7], [4, 6, 7], [4, 6, 8], [5, 7, 9], [5, 7, 9]],
-  [[5, 7, 9], [6, 7, 9], [6, 7, 9], [6, 8, 9], [7, 9, 10], [7, 9, 11]],
-  [[7, 9, 11], [7, 9, 11], [7, 9, 11], [8, 9, 11], [9, 10, 12], [9, 11, 12]],
-  [[9, 11, 12], [9, 11, 12], [9, 11, 13], [9, 11, 13], [10, 12, 14], [11, 12, 14]],
-  [[11, 12, 14], [11, 12, 14], [11, 13, 14], [11, 13, 14], [12, 14, 16], [12, 14, 16]],
-];
 const DRILL_PREFS = { formId: "cmaj", rootPc: 0, bpm: 70, secs: 10 };
 const DRILL_FORMS = [
   { id: "cmaj", name: "CAGED Major", type: "caged", scale: "maj" },
@@ -2039,10 +2215,7 @@ const DRILL_FORMS = [
   { id: "cmajp", name: "CAGED Maj Pent", type: "caged", scale: "majp" },
   { id: "cminp", name: "CAGED Min Pent", type: "caged", scale: "minp" },
   { id: "cblues", name: "CAGED Blues", type: "caged", scale: "blues" },
-  { id: "3nps", name: "3 Notes/String", type: "tnps", patterns: TNPS_MAJ },
   { id: "bbbox", name: "B.B. Box", type: "box", box: BB_BOX, bends: BB_BENDS, variants: true },
-  { id: "akbox", name: "Albert King Box", type: "box", box: AK_BOX, bends: AK_BENDS },
-  { id: "comp", name: "Composite Blues", type: "caged", scale: "comp" },
   { id: "32maj", name: "3:2 Major Pent", type: "32", patterns: P32_MAJ },
   { id: "32min", name: "3:2 Minor Pent", type: "32", patterns: P32_MIN },
   { id: "amaj", name: "Arp: Major", type: "caged", ivs: [0, 4, 7], arp: true },
@@ -2061,7 +2234,6 @@ function ScaleFormDrill({ formId, setFormId }) {
   const [sessionDone, setSessionDone] = useState(false);
   const posCount = useMemo(() => {
     if (form.type === "caged") return 5;
-    if (form.type === "tnps") return 7;
     if (form.type === "box") {
       const f6 = (rootPc - OPEN_PC[0] + 12) % 12;
       let n = 0;
@@ -2104,7 +2276,7 @@ function ScaleFormDrill({ formId, setFormId }) {
       const iv = (OPEN_PC[s] + f - rootPc + 1200) % 12;
       const ct = iv === 0 || iv === 3 || iv === 4 || iv === 7
         || (form.arp && (iv === 10 || iv === 11))
-        || (form.type === "box" && (iv === 9 || iv === 10));   // 6th (BB) / ♭7 (AK) are colour tones
+        || (form.type === "box" && iv === 9);   // the 6th is the B.B.-box colour tone
       return { s, f, iv, color: ct ? IV_COLORS[iv].color : "#E4D6B8", text: ct ? IV_COLORS[iv].text : "#4A3524", label: DEGREE_LABEL[iv] };
     };
     if (form.type === "box") {
@@ -2135,27 +2307,8 @@ function ScaleFormDrill({ formId, setFormId }) {
         out.push({ ...d, bend: true, color: IV_COLORS[d.iv] ? IV_COLORS[d.iv].color : IV_COLORS[4].color });
       });
       const which = octs.length > 1 ? ` · ${(pos % octs.length) + 1} of ${octs.length}` : "";
-      const name = form.id === "akbox" ? "Albert King box · tonic on the B string" : "B.B. box · root on the B string";
+      const name = "B.B. box · root on the B string";
       return { dots: out, numFrets: Math.max(12, Math.min(20, hi + 2)), posLabel: `${name}${which} · frets ${lo}–${hi}` };
-    }
-    if (form.type === "tnps") {
-      const f6 = (rootPc - OPEN_PC[0] + 12) % 12;
-      const pat = form.patterns[pos % 7];
-      /* choose the octave that keeps the whole box on the neck, lowest first */
-      let o = 0;
-      for (const cand of [-12, 0, 12]) {
-        const fr = pat.flatMap((str) => str.map((x) => f6 + x + cand));
-        if (fr.every((f) => f >= 0 && f <= 20)) { o = cand; break; }
-      }
-      const out = [];
-      let lo = 99, hi = 0;
-      pat.forEach((offs, s) => offs.forEach((x) => {
-        const f = f6 + x + o;
-        if (f < 0 || f > 22) return;
-        out.push(mkDot(s, f));
-        lo = Math.min(lo, f); hi = Math.max(hi, f);
-      }));
-      return { dots: out, numFrets: Math.max(12, Math.min(22, hi + 1)), posLabel: `3 notes/string · box ${(pos % 7) + 1} of 7 · frets ${lo}–${hi}` };
     }
     if (form.type === "caged") {
       const shape = CAGED_ORDER[pos % 5];
@@ -2308,21 +2461,6 @@ function ScaleFormDrill({ formId, setFormId }) {
           </div>
         </div>
       </>)}
-      {form.id === "akbox" && (
-        <div style={{ fontSize: 12.5, color: T.cream, background: T.raised, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 11px", marginBottom: 10, lineHeight: 1.55 }}>
-          <b style={{ color: T.amber }}>The Albert King box.</b> The top five notes of minor-pentatonic shape 2 — <b>1 ♭3 4 5 ♭7</b> — tonic on the B string. This is where SRV lived. The <b>5th (G string) and root (B string)</b> are your landing notes; the <b style={{ color: IV_COLORS[10].color }}>♭7</b>, <b>♭3</b> and <b>4</b> are all bend targets — the dashed dots show where they go. Albert bent with the whole hand, ♭7→root, ♭3→4, 4→5, savage and vocal. Small box, enormous range.
-        </div>
-      )}
-      {form.id === "3nps" && (
-        <div style={{ fontSize: 12.5, color: T.cream, background: T.raised, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 11px", marginBottom: 10, lineHeight: 1.55 }}>
-          <b style={{ color: T.amber }}>Three notes per string.</b> The other major-scale system — <b>seven boxes, one per mode</b>, three notes on every string. Where CAGED connects the neck in blocks, this connects it diagonally, and the even three-per-string layout is what makes fast legato runs flow. The drill walks all seven up the neck. Same notes as CAGED Major, organised for speed instead of chords.
-        </div>
-      )}
-      {form.id === "comp" && (
-        <div style={{ fontSize: 12.5, color: T.cream, background: T.raised, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 11px", marginBottom: 10, lineHeight: 1.55 }}>
-          <b style={{ color: T.amber }}>Composite blues.</b> Minor and major pentatonic <b>overlaid on one board</b> — <b>1 2 ♭3 <span style={{ color: IV_COLORS[4].color }}>♮3</span> 4 5 6 ♭7</b>. Both the ♭3 and the ♮3, both the ♭7 and the 6. This is how blues and country players actually think: not "which scale," but one pool where you slide the ♭3 into the 3 and back. The whole vocabulary of the two boxes above, written out as a scale.
-        </div>
-      )}
       </>)}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
         <div>
@@ -2858,191 +2996,6 @@ function DiatonicTriadDrill() {
   );
 }
 
-/* ---------------- 6ths in Context (I–IV–V across the string sets) ---------------- */
-/* 6ths aren't licks you memorise — they're a map. Over each chord you play that
-   chord's own R/3, 2/4, 3/5 (and 5/♭7 for dominant grit). The real skill is
-   choosing WHICH string set keeps your hand still as the changes move: a song in
-   E sits on the 2&4 set for the I, then hops to the top set for the IV and V. */
-const SIXTH_PROGS = [
-  { id: "145", name: "I – IV – V", seq: [0, 5, 7], hint: "The backbone — one bar each" },
-  { id: "1454", name: "I – IV – V – IV", seq: [0, 5, 7, 5], hint: "The soul/country vamp" },
-  { id: "1541", name: "I – V – IV – I", seq: [0, 7, 5, 0], hint: "Descending — the fall home" },
-  { id: "blues", name: "12-bar blues", seq: [0, 0, 0, 0, 5, 5, 0, 0, 7, 5, 0, 7], hint: "Where the 6ths live across a whole blues", dom: true },
-];
-const ROMAN_OF_OFF = { 0: "I", 5: "IV", 7: "V" };
-/* All 6th pairs for one chord, on one string set, at one octave */
-function sixthLayout(rootPc, setName, oct) {
-  const [loS, hiS] = CROPPER_PAIR_SETS[setName];
-  const pairs = cropperPairs(rootPc, loS, hiS).map((p) => {
-    const mf = p.mf + oct, hf = p.hf + oct;
-    const frets = [-1, -1, -1, -1, -1, -1];
-    frets[loS] = hf; frets[hiS] = mf;
-    return { ...p, mf, hf, frets };
-  });
-  /* the hand's zone is set by the three core pairs; the dominant 5/♭7 is colour
-     that sits above it, so it shouldn't drag the position choice around */
-  const core = pairs.slice(0, 3).flatMap((p) => [p.mf, p.hf]);
-  const all = pairs.flatMap((p) => [p.mf, p.hf]);
-  const lo = Math.min(...core), hi = Math.max(...core);
-  return { setName, loS, hiS, pairs, lo, hi, top: Math.max(...all), bottom: Math.min(...all),
-    mean: core.reduce((a, b) => a + b, 0) / core.length };
-}
-/* Pick the set + octave that keeps the hand closest to where it already is */
-function chooseSixthLayout(rootPc, prevMean, pinned) {
-  const sets = pinned ? [pinned] : Object.keys(CROPPER_PAIR_SETS);
-  let best = null;
-  for (const sn of sets) {
-    for (const oct of [-12, 0, 12]) {
-      const L = sixthLayout(rootPc, sn, oct);
-      if (L.bottom < 0 || L.top > 15) continue;
-      const score = (prevMean == null ? Math.abs(L.mean - 6) : Math.abs(L.mean - prevMean) + 0.3 * Math.abs(L.mean - 6));
-      if (!best || score < best.score) best = { ...L, score };
-    }
-  }
-  return best || sixthLayout(rootPc, sets[0], 0);
-}
-function SixthsMap() {
-  const [keyPc, setKeyPc] = useState(4);          // E — the classic 6ths key
-  const [progId, setProgId] = useState("145");
-  const [pin, setPin] = useState(null);           // null = auto sets
-  const [bpm, setBpm] = useState(80);
-  const [cur, setCur] = useState(0);
-  const [hotPair, setHotPair] = useState(-1);
-  const [loop, setLoop] = useState(false);
-  const [playing, setPlaying] = useState(false);
-  const loopRef = useRef(false); useEffect(() => { loopRef.current = loop; }, [loop]);
-  const timers = useRef([]);
-  const prog = SIXTH_PROGS.find((p) => p.id === progId);
-
-  const chart = useMemo(() => {
-    let prevMean = null;
-    return prog.seq.map((off) => {
-      const rpc = (keyPc + off) % 12;
-      const L = chooseSixthLayout(rpc, prevMean, pin);
-      prevMean = L.mean;
-      return { off, rpc, rn: ROMAN_OF_OFF[off], name: NOTES[rpc], ...L };
-    });
-  }, [prog, keyPc, pin]);
-
-  const stop = () => { timers.current.forEach(clearTimeout); timers.current = []; setPlaying(false); setHotPair(-1); };
-  useEffect(() => { stop(); setCur(0); }, [keyPc, progId, pin]);
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
-
-  const playPair = (L, pr, at = 0) => {
-    pluck(freqAt(L.loS, pr.hf), at, { gain: 0.34, dur: 1.3, damp: 0.994 });
-    pluck(freqAt(L.hiS, pr.mf), at + 0.015, { gain: 0.34, dur: 1.3, damp: 0.994 });
-  };
-  /* the move: R/3 → 2/4 → 3/5 → back down (dominant blues lands on 5/♭7) */
-  const move = prog.dom ? [0, 1, 2, 3] : [0, 1, 2, 1];
-  const pass = () => {
-    const ctx = audioCtx(); if (!ctx) return;
-    const spb = 60 / bpm;
-    const t0 = ctx.currentTime + 0.1;
-    chart.forEach((L, i) => {
-      for (let b = 0; b < 4; b++) {
-        const at = (i * 4 + b) * spb;
-        click(t0 + at, b === 0);
-        playPair(L, L.pairs[move[b]], 0.1 + at);
-        timers.current.push(setTimeout(() => { setCur(i); setHotPair(move[b]); }, (0.1 + at) * 1000));
-      }
-    });
-    const total = chart.length * 4 * spb * 1000 + 100;
-    timers.current.push(setTimeout(() => { if (loopRef.current) pass(); else { setPlaying(false); setHotPair(-1); } }, total));
-  };
-  const play = () => { stop(); setPlaying(true); setTimeout(pass, 10); };
-
-  const L = chart[Math.min(cur, chart.length - 1)];
-  const dots = useMemo(() => L.pairs.flatMap((pr, i) => {
-    const mIv = (pr.mPc - L.rpc + 12) % 12, hIv = (pr.hPc - L.rpc + 12) % 12;
-    const dim = hotPair >= 0 && hotPair !== i;
-    const mk = (s, f, iv) => {
-      const info = IV_COLORS[iv];
-      return { s, f, color: info ? info.color : "#E4D6B8", text: info ? info.text : "#4A3524", label: DEGREE_LABEL[iv], dim };
-    };
-    return [mk(L.hiS, pr.mf, mIv), mk(L.loS, pr.hf, hIv)];
-  }), [L, hotPair]);
-  const numFrets = Math.min(15, Math.max(12, L.top + 1));
-
-  return (
-    <div className="card" style={{ marginBottom: 14 }}>
-      <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>6ths in Context · I–IV–V</div>
-      <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 10 }}>
-        Over every chord, the 6ths come from that chord's own scale: R/3, 2/4, 3/5 — plus 5/♭7 for dominant grit. The real skill is picking the string set that keeps your hand still through the changes. In E, the I sits low on the 2&amp;4 set and the IV and V hop up to the top set. Skip and mute the middle string; hybrid picking works best.
-      </div>
-      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
-        {NOTES.map((n, i) => (
-          <button key={n} className="chip" style={drillChip(keyPc === i)} onClick={() => setKeyPc(i)}>{n}</button>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
-        {SIXTH_PROGS.map((p) => (
-          <button key={p.id} className="chip" style={drillChip(progId === p.id)} onClick={() => setProgId(p.id)}>{p.name}</button>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
-        <span style={{ fontSize: 11.5, color: T.faint }}>string sets</span>
-        <button className="chip" style={drillChip(pin === null)} onClick={() => setPin(null)}>Auto (least movement)</button>
-        {Object.keys(CROPPER_PAIR_SETS).map((sn) => (
-          <button key={sn} className="chip" style={drillChip(pin === sn)} onClick={() => setPin(sn)}>Pin {sn}</button>
-        ))}
-      </div>
-
-      {/* the map: one card per change, showing which set it lives on */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 10 }}>
-        {chart.map((c, i) => (
-          <button key={i} className="ans" onClick={() => { setCur(i); setHotPair(-1); }}
-            style={{
-              padding: "8px 12px", borderRadius: 10, cursor: "pointer", textAlign: "center", minWidth: 92,
-              background: cur === i ? "rgba(233,161,59,0.16)" : T.raised, color: T.cream,
-              border: `2px solid ${cur === i ? T.amber : T.line}`,
-            }}>
-            <div style={{ fontWeight: 800, fontSize: 15 }}>{c.name}{prog.dom ? "7" : ""} <span style={{ color: T.faint, fontWeight: 400, fontSize: 11 }}>{c.rn}</span></div>
-            <div style={{ fontSize: 11, color: T.amber, fontWeight: 700 }}>strings {c.setName}</div>
-            <div style={{ fontSize: 10.5, color: T.faint }}>frets {c.lo}–{c.hi}</div>
-          </button>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-        <div>
-          <span style={{ fontWeight: 800, fontSize: 16, fontFamily: "'Fraunces', Georgia, serif", color: T.amber }}>{L.name} {L.rn}</span>
-          <span style={{ color: T.faint, fontSize: 13 }}> · strings {L.setName} · frets {L.lo}–{L.hi}</span>
-          <div style={{ fontSize: 12.5, color: T.muted }}>{prog.hint} — the move: {move.map((m) => L.pairs[m].label.replace(/ /g, "")).join(" → ")}</div>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="chip" style={playing ? btnGhost : btnAmber} onClick={playing ? stop : play}>{playing ? "■ Stop" : "▶ Play changes"}</button>
-          <button className="chip" style={loop ? { ...btnGhost, borderColor: T.amber, color: T.amber } : btnGhost} onClick={() => setLoop(!loop)}>⟳ Loop</button>
-        </div>
-      </div>
-
-      <Fretboard frets={numFrets} maxFret={numFrets} dots={dots}
-        activePair={hotPair >= 0 ? [{ s: L.hiS, f: L.pairs[hotPair].mf }, { s: L.loS, f: L.pairs[hotPair].hf }] : []}
-        onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
-
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
-        {L.pairs.map((pr, i) => (
-          <button key={i} className="ans" onClick={() => { setHotPair(i); playPair(L, pr); }}
-            style={{
-              padding: "10px 14px", borderRadius: 10, cursor: "pointer", textAlign: "center",
-              background: hotPair === i ? "rgba(233,161,59,0.16)" : T.raised, color: T.cream,
-              border: `1.5px solid ${hotPair === i ? T.amber : move.includes(i) ? "rgba(233,161,59,0.45)" : T.line}`,
-            }}>
-            <div style={{ fontWeight: 800, fontSize: 14 }}>{pr.label}</div>
-            <div style={{ fontSize: 12, color: T.muted }}>{NOTES[pr.mPc]} over {NOTES[pr.hPc]}</div>
-            <div style={{ fontSize: 10.5, color: T.faint }}>frets {pr.mf} &amp; {pr.hf}{pr.dom ? " · dom" : ""}</div>
-          </button>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
-        <button className="chip" style={drillChip(false)} onClick={() => setBpm(Math.max(50, bpm - 5))}>−</button>
-        <span style={{ fontSize: 13.5, fontWeight: 800, minWidth: 64, textAlign: "center" }}>{bpm} bpm</span>
-        <button className="chip" style={drillChip(false)} onClick={() => setBpm(Math.min(160, bpm + 5))}>+</button>
-      </div>
-    </div>
-  );
-}
-
 /* ---------------- Progression Drill (voice-led chart: triads + dominants) ---------------- */
 const DIATONIC_PROGS = [
   { id: "pop", name: "I – V – vi – IV", seq: ["I", "V", "vi", "IV"] },
@@ -3247,8 +3200,8 @@ function PracticeTab({ save, toggle, resetWarm }) {
         <ScaleFormDrill formId={formId} setFormId={setFormId} />
       </div>
       <DiatonicTriadDrill />
-      <SixthsMap />
       <ProgressionDrillChart />
+      <CagedPairDrill />
       <div className="card" style={{ marginBottom: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
           <div style={{ fontWeight: 800, fontSize: 16 }}>Warm-ups</div>
@@ -3314,7 +3267,7 @@ function Progress({ save }) {
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 10, marginBottom: 18 }}>
-        {[["Answers", save.totals.answers], ["Accuracy", acc + "%"], ["Best streak", save.totals.bestStreak], ["Play-along reps", Object.values(save.practice || {}).reduce((a, b) => a + b, 0)], ["Songs learned", Object.keys((save.checklist || {}).songs || {}).length]].map(([k, v]) => (
+        {[["Answers", save.totals.answers], ["Accuracy", acc + "%"], ["Best streak", save.totals.bestStreak], ["Songs learned", Object.keys((save.checklist || {}).songs || {}).length]].map(([k, v]) => (
           <div key={k} className="card" style={{ textAlign: "center", padding: "16px 8px" }}>
             <div style={{ fontSize: 26, fontWeight: 800, color: T.amber, fontFamily: "'Fraunces', Georgia, serif" }}>{v}</div>
             <div style={{ fontSize: 12.5, color: T.muted }}>{k}</div>
@@ -3410,7 +3363,6 @@ const SAVE_KEY = "fretwork:save:v1";
 
 function App() {
   const [tab, setTab] = useState("notes");
-  const [chordView, setChordView] = useState("trainer");
   const [save, setSave] = useState(DEFAULT_SAVE);
   const [loaded, setLoaded] = useState(false);
   const [toast, setToast] = useState(null);
@@ -3483,13 +3435,6 @@ function App() {
     setTimeout(() => setToast(null), 3200);
   };
 
-  const bumpPractice = (k) => {
-    setSave((prev) => {
-      const next = { ...prev, practice: { ...(prev.practice || {}), [k]: ((prev.practice || {})[k] || 0) + 1 } };
-      persist(next);
-      return next;
-    });
-  };
 
   const toggleCheck = (section, id) => {
     setSave((prev) => {
@@ -3563,25 +3508,7 @@ function App() {
         ) : tab === "notes" ? (
           <NoteTrainer save={save} record={record} onLevelDone={onLevelDone} />
         ) : tab === "chords" ? (
-          <>
-            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-              {[["trainer", "Trainer"], ["play", "Play-along"]].map(([m, label]) => (
-                <button key={m} className="chip" onClick={() => setChordView(m)}
-                  style={{
-                    padding: "8px 16px", borderRadius: 999, fontSize: 13.5, fontWeight: 700, cursor: "pointer",
-                    border: `1.5px solid ${chordView === m ? T.amber : T.line}`,
-                    background: chordView === m ? "rgba(233,161,59,0.16)" : T.surface, color: T.cream,
-                  }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            {chordView === "trainer" ? (
-              <ChordTrainer save={save} record={record} onLevelDone={onLevelDone} />
-            ) : (
-              <PlayAlong save={save} bump={bumpPractice} />
-            )}
-          </>
+          <ChordTrainer save={save} record={record} onLevelDone={onLevelDone} />
         ) : tab === "ear" ? (
           <EarTrainer save={save} record={record} onLevelDone={onLevelDone} />
         ) : tab === "practice" ? (
