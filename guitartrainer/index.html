@@ -3331,7 +3331,58 @@ const DEFAULT_SAVE = {
 };
 const SAVE_KEY = "fretwork:save:v1";
 
+/* Keep the display awake while the app is actively being used.
+   The Screen Wake Lock API is supported by current Chromium browsers.
+   Unsupported browsers simply ignore this without affecting the app. */
+function useScreenWakeLock() {
+  const wakeLockRef = useRef(null);
+
+  const requestWakeLock = useCallback(async () => {
+    if (!("wakeLock" in navigator) || document.visibilityState !== "visible" || wakeLockRef.current) return;
+    try {
+      const lock = await navigator.wakeLock.request("screen");
+      wakeLockRef.current = lock;
+      lock.addEventListener("release", () => {
+        if (wakeLockRef.current === lock) wakeLockRef.current = null;
+      });
+    } catch (e) {
+      // A browser may decline the request because of battery settings, permissions,
+      // an inactive tab, or an unsupported embedded preview. The app still works.
+    }
+  }, []);
+
+  useEffect(() => {
+    const releaseWakeLock = async () => {
+      const lock = wakeLockRef.current;
+      wakeLockRef.current = null;
+      if (lock) {
+        try { await lock.release(); } catch (e) {}
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") requestWakeLock();
+      else releaseWakeLock();
+    };
+
+    // Try immediately, then again after the first interaction for browsers that
+    // require a user gesture before granting a screen wake lock.
+    requestWakeLock();
+    window.addEventListener("pointerdown", requestWakeLock);
+    window.addEventListener("keydown", requestWakeLock);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pointerdown", requestWakeLock);
+      window.removeEventListener("keydown", requestWakeLock);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      releaseWakeLock();
+    };
+  }, [requestWakeLock]);
+}
+
 function App() {
+  useScreenWakeLock();
   const [tab, setTab] = useState("notes");
   const [save, setSave] = useState(DEFAULT_SAVE);
   const [loaded, setLoaded] = useState(false);
