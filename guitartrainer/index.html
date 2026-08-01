@@ -1644,30 +1644,42 @@ const CAGED_ROOTS = [
   { name: "E", pc: 4 }, { name: "F", pc: 5 }, { name: "F#", pc: 6 }, { name: "G", pc: 7 },
   { name: "Ab", pc: 8 }, { name: "A", pc: 9 }, { name: "Bb", pc: 10 }, { name: "B", pc: 11 },
 ];
-/* Standard canon versions of Scotty's Lesson 4/5 E-A-D-G-C forms.
-   Most forms are shown as their normal full movable shapes; the G-family stays
-   in the commonly used playable version rather than an overstuffed textbook grip. */
+/* Practical CAGED vocabulary.
+   E, A and D use familiar movable grips. C and G are the compact fragments
+   players actually use rather than six-string textbook shapes that demand an
+   unrealistic number of separate fingers. Every grip has been checked for the
+   required root/3rd/7th chord tones; the fifth may be omitted in a 7th chord. */
 const CAGED_CHORD_FORMS = {
   Major: {
-    E: [0, 2, 2, 1, 0, 0], A: [-1, 0, 2, 2, 2, 0], D: [-1, -1, 0, 2, 3, 2],
-    G: [3, 2, 0, 0, 0, 3], C: [-1, 3, 2, 0, 1, 0],
+    E: [0, 2, 2, 1, -1, -1], A: [-1, 0, 2, 2, 2, -1], D: [-1, -1, 0, 2, 3, 2],
+    G: [3, 2, 0, 0, -1, -1], C: [-1, 3, 2, 0, 1, -1],
   },
   Minor: {
-    E: [0, 2, 2, 0, 0, 0], A: [-1, 0, 2, 2, 1, 0], D: [-1, -1, 0, 2, 3, 1],
-    G: [3, 1, 0, 0, 3, 3], C: [-1, 3, 1, 0, 1, 3],
+    E: [0, 2, 2, 0, -1, -1], A: [-1, 0, 2, 2, 1, -1], D: [-1, -1, 0, 2, 3, 1],
+    G: [3, 1, 0, 0, -1, -1], C: [-1, 3, 1, 0, 1, -1],
   },
   "7": {
-    E: [0, 2, 0, 1, 0, 0], A: [-1, 0, 2, 0, 2, 0], D: [-1, -1, 0, 2, 1, 2],
-    G: [3, 2, 3, 0, 0, 1], C: [-1, 3, 2, 3, 1, 0],
+    E: [0, 2, 0, 1, -1, -1], A: [-1, 0, 2, 0, 2, -1], D: [-1, -1, 0, 2, 1, 2],
+    G: [3, 2, 3, 0, -1, -1], C: [-1, 3, 2, 3, 1, -1],
   },
   Min7: {
-    E: [0, 2, 0, 0, 0, 0], A: [-1, 0, 2, 0, 1, 0], D: [-1, -1, 0, 2, 1, 1],
-    G: [3, 1, 3, 0, 3, 3], C: [-1, 3, 1, 3, 1, 3],
+    E: [0, 2, 0, 0, -1, -1], A: [-1, 0, 2, 0, 1, -1], D: [-1, -1, 0, 2, 1, 1],
+    G: [3, -1, 3, 3, 3, -1], C: [-1, 3, 1, 3, 1, -1],
   },
   Maj7: {
-    E: [0, 2, 1, 1, 0, 0], A: [-1, 0, 2, 1, 2, 0], D: [-1, -1, 0, 2, 2, 2],
-    G: [3, 2, 4, 0, 3, 2], C: [-1, 3, 2, 0, 0, 0],
+    E: [0, 2, 1, 1, -1, -1], A: [-1, 0, 2, 1, 2, -1], D: [-1, -1, 0, 2, 2, 2],
+    G: [3, 2, 4, 0, -1, -1], C: [-1, 3, 2, 0, 0, -1],
   },
+};
+/* The first suggested set should sound like a real comping part, not a CAGED
+   exam. C/G fragments remain available under Alternate voicings, but familiar
+   E/A/D grips receive a modest preference in the main set. */
+const CAGED_FORM_DIFFICULTY = {
+  Major: { E: 0, A: 0, D: 1, G: 4, C: 3 },
+  Minor: { E: 0, A: 0, D: 1, G: 4, C: 4 },
+  "7": { E: 0, A: 0, D: 1, G: 4, C: 3 },
+  Min7: { E: 0, A: 0, D: 1, G: 4, C: 3 },
+  Maj7: { E: 0, A: 0, D: 1, G: 4, C: 2 },
 };
 const CAGED_BASE_ROOT_PC = { E: 4, A: 9, D: 2, G: 7, C: 0 };
 const CAGED_CHORD_TYPES = {
@@ -1759,7 +1771,8 @@ function cagedVoicingCandidate(rootPc, type, form) {
   const min = Math.min(...played);
   const max = Math.max(...played);
   const center = played.reduce((a, b) => a + b, 0) / played.length;
-  return { form, frets, min, max, center };
+  const difficulty = CAGED_FORM_DIFFICULTY[type][form];
+  return { form, frets, min, max, center, difficulty };
 }
 function progressionVoicingSets(chords, area) {
   const lists = chords.map((ch) => CAGED_FORM_ORDER.map((form) => cagedVoicingCandidate(ch.pc, ch.type, form)));
@@ -1775,15 +1788,19 @@ function progressionVoicingSets(chords, area) {
       const areaCenter = (area.lo + area.hi) / 2;
       const centering = chosen.reduce((sum, c) => sum + Math.abs(c.center - areaCenter), 0);
       const repeats = chosen.length - new Set(forms).size;
-      const score = span * 2.4 + movement * 1.5 + outside * 9 + centering * 0.45 + repeats * 35;
+      const difficulty = chosen.reduce((sum, c) => sum + c.difficulty, 0);
+      const score = span * 2.4 + movement * 1.5 + outside * 9 + centering * 0.45
+        + repeats * 3 + difficulty * 8;
       combos.push({ items: chosen, score, signature: forms.join("-") });
       return;
     }
     lists[depth].forEach((c) => build(depth + 1, [...chosen, c]));
   };
   build(0, []);
-  const distinct = combos.filter((c) => new Set(c.items.map((x) => x.form)).size === c.items.length);
-  const pool = distinct.length ? distinct : combos;
+  /* Repeating a useful form is normal guitar playing. The old version forced
+     every chord to use a different form, which is exactly how uncommon G/C
+     shapes ended up in otherwise simple progressions. */
+  const pool = combos;
   pool.sort((a, b) => a.score - b.score);
   const unique = [];
   const seen = new Set();
@@ -1880,7 +1897,7 @@ function CagedPairDrill() {
     <div className="card" style={{ marginBottom: 14 }}>
       <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>CAGED Progression Practice</div>
       <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 12 }}>
-        Practise a real progression without chasing one shape up the neck. These use the standard canon of Scotty’s E, A, D, G and C forms. Most are shown as their normal full movable shapes, while the G-family stays in the common playable version.
+        Practise a real progression in one neck area. Voicing set 1 favours familiar, playable E, A and D grips; Alternate voicings gradually brings in practical C and G fragments without forcing six-string textbook shapes.
       </div>
 
       <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 9 }}>
@@ -2578,24 +2595,30 @@ const RHYTHM_CELLS = {
    meaningless (and the notes would collide). */
 const swingOff = (o, cell) => (cell.sixt || cell.trip || o % 1 !== 0.5 ? o : Math.floor(o) + 2 / 3);
 const RHYTHM_EXERCISES = [
-  { name: "Quarter pulse", cells: ["q", "q", "q", "q"], hint: "One strum per click — the anchor" },
-  { name: "Half notes", cells: ["h", "h"], hint: "Hold two full beats; count through the space" },
-  { name: "Dotted half", cells: ["hd", "q"], hint: "Three beats held, then a quarter — the waltz-into-4 feel" },
-  { name: "Even eighths", cells: ["ee", "ee", "ee", "ee"], hint: "Down-up, perfectly even" },
-  { name: "Quarters & eighths", cells: ["q", "ee", "q", "ee"], hint: "Switch densities without rushing" },
-  { name: "Rests count too", cells: ["q", "qr", "ee", "q"], hint: "Silence has a beat — feel the empty 2" },
+  { name: "Quarter pulse", cells: ["q", "q", "q", "q"], hint: "One strum per click — the anchor", say: "ta | ta | ta | ta" },
+  { name: "Half notes", cells: ["h", "h"], hint: "Hold two full beats; count through the space", say: "ta-a | ta-a" },
+  { name: "Dotted half", cells: ["hd", "q"], hint: "Three beats held, then a quarter — the waltz-into-4 feel", say: "ta-a-a | ta" },
+  { name: "Even eighths", cells: ["ee", "ee", "ee", "ee"], hint: "Down-up, perfectly even", say: "ti-ti | ti-ti | ti-ti | ti-ti" },
+  { name: "Quarters & eighths", cells: ["q", "ee", "q", "ee"], hint: "Switch densities without rushing", say: "ta | ti-ti | ta | ti-ti" },
+  { name: "Density ladder", cells: ["q", "ee", "ssss", "ee"], hint: "Move from one sound per beat to two, then four, and back", say: "ta | ti-ti | tika-tika | ti-ti" },
+  { name: "Rests count too", cells: ["q", "qr", "ee", "q"], hint: "Silence has a beat — feel the empty 2", say: "ta | rest | ti-ti | ta" },
   { name: "Offbeat eighths", cells: ["re", "re", "re", "re"], hint: "Only the &s — reggae skank territory" },
   { name: "Syncopa", cells: ["ee", "re", "ee", "q"], hint: "The missing downbeat of 2 is the hook" },
-  { name: "Anticipation", cells: ["ede", "ede"], hint: "Eighth–quarter–eighth: the note lands early and hangs over the beat" },
+  { name: "Anticipation", cells: ["ede", "ede"], hint: "Eighth–quarter–eighth: the note lands early and hangs over the beat", say: "ti-ta-ti | ti-ta-ti" },
   { name: "Dotted quarter", cells: ["dqe", "ee", "q"], hint: "The push — land on the & of 2" },
-  { name: "Sixteenth bursts", cells: ["ssss", "q", "ssss", "q"], hint: "1 e & a — keep it a burst, not a blur" },
-  { name: "Gallop", cells: ["ess", "ess", "q", "q"], hint: "Eighth + two sixteenths — the driving figure" },
-  { name: "Reverse gallop", cells: ["sse", "sse", "q", "q"], hint: "Two sixteenths + eighth — flip the gallop" },
+  { name: "Steady tika-tika", cells: ["ssss", "ssss", "ssss", "ssss"], hint: "Four even sixteenths on every beat", say: "tika-tika | tika-tika | tika-tika | tika-tika" },
+  { name: "Sixteenth bursts", cells: ["ssss", "q", "ssss", "q"], hint: "1 e & a — keep it a burst, not a blur", say: "tika-tika | ta | tika-tika | ta" },
+  { name: "Steady ti-tika", cells: ["ess", "ess", "ess", "ess"], hint: "Eighth + two sixteenths on every beat", say: "ti-tika | ti-tika | ti-tika | ti-tika" },
+  { name: "Gallop", cells: ["ess", "ess", "q", "q"], hint: "Eighth + two sixteenths — the driving figure", say: "ti-tika | ti-tika | ta | ta" },
+  { name: "Steady tika-ti", cells: ["sse", "sse", "sse", "sse"], hint: "Two sixteenths + eighth on every beat", say: "tika-ti | tika-ti | tika-ti | tika-ti" },
+  { name: "Reverse gallop", cells: ["sse", "sse", "q", "q"], hint: "Two sixteenths + eighth — flip the gallop", say: "tika-ti | tika-ti | ta | ta" },
+  { name: "Kodály mix", cells: ["q", "ee", "ess", "sse"], hint: "Change subdivision cleanly without changing tempo", say: "ta | ti-ti | ti-tika | tika-ti" },
+  { name: "Kodály mix 2", cells: ["ssss", "q", "sse", "ess"], hint: "A denser mixed bar for reading and strumming", say: "tika-tika | ta | tika-ti | ti-tika" },
   { name: "Dotted 8th–16th", cells: ["des", "des", "q", "q"], hint: "Long–short inside one beat — the march, the strut" },
   { name: "Scotch snap", cells: ["sde", "sde", "q", "q"], hint: "Short–long — flip it; the 'e' is the kick" },
   { name: "16th syncopation", cells: ["ses", "ses", "q", "q"], hint: "16th–8th–16th — the inner push, the funk of it" },
   { name: "Funk 16ths", cells: ["rsss", "ssss", "rsss", "q"], hint: "Leave the downbeat empty — come in on the 'e'" },
-  { name: "Triplets", cells: ["t", "t", "t", "t"], hint: "Three per beat — say trip-l-et" },
+  { name: "Triplets", cells: ["t", "t", "t", "t"], hint: "Three per beat — say trip-l-et", say: "tri-o-la | tri-o-la | tri-o-la | tri-o-la" },
   { name: "Written shuffle", cells: ["shf", "shf", "shf", "shf"], hint: "Quarter + eighth inside the triplet — the shuffle, spelled out" },
   { name: "Shuffle", cells: ["ee", "ee", "ee", "ee"], hint: "Same eighths, swung — long-short, the blues engine", feel: "swing" },
   { name: "Charleston", cells: ["dqe", "qr", "qr"], hint: "Beat 1 and the & of 2, then let it ring — swing it", feel: "swing" },
@@ -2847,7 +2870,7 @@ function RhythmTrainer() {
     <div className="card" style={{ marginBottom: 14 }}>
       <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Rhythm Reading</div>
       <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 10 }}>
-        Read the bar, count it out loud, then clap or strum it against the click. Each rhythm repeats for your set number of bars, then rolls to the next — a full reading circuit.
+        Read the bar, count it out loud, then clap or strum it against the click. Familiar figures also show the Kodály syllables you learned — ta, ti-ti, tika-tika, ti-tika and tika-ti.
       </div>
       <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
         {RHYTHM_EXERCISES.map((e, i) => (
@@ -2859,6 +2882,11 @@ function RhythmTrainer() {
           <span style={{ fontWeight: 800, fontSize: 16, fontFamily: "'Fraunces', Georgia, serif", color: T.amber }}>{ex.name}</span>
           <span style={{ color: T.faint, fontSize: 13 }}> · {exIdx + 1} of {RHYTHM_EXERCISES.length}</span>
           <div style={{ fontSize: 12.5, color: T.muted }}>{ex.hint}</div>
+          {ex.say && (
+            <div style={{ fontSize: 12.5, color: T.cream, marginTop: 3 }}>
+              <span style={{ color: T.amber, fontWeight: 800 }}>Say it:</span> {ex.say}
+            </div>
+          )}
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="chip" style={running ? btnGhost : btnAmber} onClick={running ? stop : start}>{running ? "■ Stop" : "▶ Start"}</button>
