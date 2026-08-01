@@ -771,8 +771,9 @@ function ChordDiagram({ frets, size = 150, label, rootPc = null, noteNames = nul
   const maxF = Math.max(0, ...fretted);
   const minF = fretted.length ? Math.min(...fretted) : 1;
   const base = maxF > 4 ? minF : 1;
-  const W = 150, H = 186;
-  const left = 26, right = 134, top = 40, bottom = 172;
+  /* Extra left margin keeps 10fr–15fr labels clear of the first string's dot. */
+  const W = 168, H = 186;
+  const left = 42, right = 158, top = 40, bottom = 172;
   const sx = (s) => left + (s * (right - left)) / 5;
   const rowH = (bottom - top) / 5;
   return (
@@ -781,7 +782,7 @@ function ChordDiagram({ frets, size = 150, label, rootPc = null, noteNames = nul
       {base === 1 ? (
         <rect x={left - 2} y={top - 5} width={right - left + 4} height={6} rx={2} fill={T.cream} />
       ) : (
-        <text x={left - 3} y={top + rowH * 0.66} fontSize="14" fontWeight="800" fill={T.muted} textAnchor="end" fontFamily="inherit">{base}fr</text>
+        <text x={left - 12} y={top + rowH * 0.66} fontSize="13.5" fontWeight="800" fill={T.muted} textAnchor="end" fontFamily="inherit">{base}fr</text>
       )}
       {/* grid */}
       {Array.from({ length: 6 }, (_, i) => (
@@ -1743,7 +1744,43 @@ const CAGED_PROGRESSIONS = [
     ],
   },
   {
-    id: "164", name: "I – vi – IV", hint: "Pop and singer-songwriter",
+    id: "1564", name: "I – V – vi – IV", hint: "The modern pop loop",
+    chords: [
+      { rn: "I", off: 0, letter: 0, type: "Major" },
+      { rn: "V", off: 7, letter: 4, type: "Major" },
+      { rn: "vi", off: 9, letter: 5, type: "Minor" },
+      { rn: "IV", off: 5, letter: 3, type: "Major" },
+    ],
+  },
+  {
+    id: "1645", name: "I – vi – IV – V", hint: "50s, doo-wop and ballads",
+    chords: [
+      { rn: "I", off: 0, letter: 0, type: "Major" },
+      { rn: "vi", off: 9, letter: 5, type: "Minor" },
+      { rn: "IV", off: 5, letter: 3, type: "Major" },
+      { rn: "V", off: 7, letter: 4, type: "Major" },
+    ],
+  },
+  {
+    id: "6415", name: "vi – IV – I – V", hint: "Minor-start pop and rock loop",
+    chords: [
+      { rn: "vi", off: 9, letter: 5, type: "Minor" },
+      { rn: "IV", off: 5, letter: 3, type: "Major" },
+      { rn: "I", off: 0, letter: 0, type: "Major" },
+      { rn: "V", off: 7, letter: 4, type: "Major" },
+    ],
+  },
+  {
+    id: "6251", name: "vi7 – ii7 – V7 – Imaj7", hint: "Circle-of-fifths turnaround",
+    chords: [
+      { rn: "vi7", off: 9, letter: 5, type: "Min7" },
+      { rn: "ii7", off: 2, letter: 1, type: "Min7" },
+      { rn: "V7", off: 7, letter: 4, type: "7" },
+      { rn: "Imaj7", off: 0, letter: 0, type: "Maj7" },
+    ],
+  },
+  {
+    id: "164", name: "I – vi – IV", hint: "Three-chord singer-songwriter loop",
     chords: [
       { rn: "I", off: 0, letter: 0, type: "Major" },
       { rn: "vi", off: 9, letter: 5, type: "Minor" },
@@ -1756,6 +1793,15 @@ const CAGED_PROGRESSIONS = [
       { rn: "i", off: 0, letter: 0, type: "Minor" },
       { rn: "iv", off: 5, letter: 3, type: "Minor" },
       { rn: "V7", off: 7, letter: 4, type: "7" },
+    ],
+  },
+  {
+    id: "minor1367", name: "i – VI – III – VII", hint: "Minor-key cinematic and rock loop",
+    chords: [
+      { rn: "i", off: 0, letter: 0, type: "Minor" },
+      { rn: "VI", off: 8, letter: 5, type: "Major" },
+      { rn: "III", off: 3, letter: 2, type: "Major" },
+      { rn: "VII", off: 10, letter: 6, type: "Major" },
     ],
   },
 ];
@@ -1820,7 +1866,7 @@ function progressionVoicingSets(chords, area) {
   unique.forEach((c) => { if (selected.length < 10) add(c); });
   return selected.slice(0, 10);
 }
-function CagedPairDrill() {
+function CagedPairDrill({ embedded = false }) {
   const [progressionId, setProgressionId] = useState("251");
   const [keyIndex, setKeyIndex] = useState(0);
   const [areaId, setAreaId] = useState("mid");
@@ -1894,10 +1940,10 @@ function CagedPairDrill() {
   const anySevenths = chords.some((c) => c.type === "7" || c.type === "Min7" || c.type === "Maj7");
 
   return (
-    <div className="card" style={{ marginBottom: 14 }}>
-      <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>CAGED Progression Practice</div>
+    <div className={embedded ? "" : "card"} style={embedded ? {} : { marginBottom: 14 }}>
+      {!embedded && <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>CAGED Progression Practice</div>}
       <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 12 }}>
-        Practise a real progression in one neck area. Voicing set 1 favours familiar, playable E, A and D grips; Alternate voicings gradually brings in practical C and G fragments without forcing six-string textbook shapes.
+        Use familiar movable chord forms in one neck area. Voicing set 1 favours playable E, A and D grips; Alternate voicings gradually brings in practical C and G fragments without forcing six-string textbook shapes.
       </div>
 
       <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 9 }}>
@@ -3012,14 +3058,20 @@ function DiatonicTriadDrill() {
   );
 }
 
-/* ---------------- Progression Drill (voice-led chart: triads + dominants) ---------------- */
+/* ---------------- Unified Progression Practice: triads, 7ths and CAGED forms ---------------- */
 const DIATONIC_PROGS = [
-  { id: "pop", name: "I – V – vi – IV", seq: ["I", "V", "vi", "IV"] },
-  { id: "jazz", name: "ii – V – I", seq: ["ii", "V", "I"] },
-  { id: "50s", name: "I – vi – IV – V", seq: ["I", "vi", "IV", "V"] },
-  { id: "axis", name: "vi – IV – I – V", seq: ["vi", "IV", "I", "V"] },
-  { id: "canon", name: "Canon", seq: ["I", "V", "vi", "iii", "IV", "I", "IV", "V"] },
-  { id: "andalu", name: "i – VII – VI – V", seq: ["vi", "V", "IV", "V"] },
+  { id: "pop", name: "I – V – vi – IV", hint: "Modern pop anthem loop", seq: ["I", "V", "vi", "IV"] },
+  { id: "145", name: "I – IV – V", hint: "Rock, folk and blues backbone", seq: ["I", "IV", "V"] },
+  { id: "jazz", name: "ii – V – I", hint: "The essential cadence", seq: ["ii", "V", "I"] },
+  { id: "50s", name: "I – vi – IV – V", hint: "50s doo-wop and ballads", seq: ["I", "vi", "IV", "V"] },
+  { id: "axis", name: "vi – IV – I – V", hint: "Minor-start pop loop", seq: ["vi", "IV", "I", "V"] },
+  { id: "1465", name: "I – IV – vi – V", hint: "Bright lift into a strong V", seq: ["I", "IV", "vi", "V"] },
+  { id: "1245", name: "I – ii – IV – V", hint: "Soul, gospel and classic pop movement", seq: ["I", "ii", "IV", "V"] },
+  { id: "6251", name: "vi – ii – V – I", hint: "Circle-of-fifths resolution", seq: ["vi", "ii", "V", "I"] },
+  { id: "1345", name: "I – iii – IV – V", hint: "Rising diatonic colour", seq: ["I", "iii", "IV", "V"] },
+  { id: "2415", name: "ii – IV – I – V", hint: "Contemporary pop and worship loop", seq: ["ii", "IV", "I", "V"] },
+  { id: "canon", name: "Canon", hint: "Pachelbel sequence", seq: ["I", "V", "vi", "iii", "IV", "I", "IV", "V"] },
+  { id: "minorloop", name: "vi – V – IV – V", hint: "Relative-minor loop", seq: ["vi", "V", "IV", "V"] },
 ];
 /* --- Sevenths: four-note drop-2 grips, the shapes on every jazz/blues chart --- */
 const SEVENTH_SETS = { "1–4": [2, 3, 4, 5], "2–5": [1, 2, 3, 4], "3–6": [0, 1, 2, 3] };
@@ -3084,6 +3136,14 @@ const DOM_PROGS = [
     seq: [[4, "dom7", "III7"], [9, "dom7", "VI7"], [2, "dom7", "II7"], [7, "dom7", "V7"], [0, "maj7", "Imaj7"]] },
   { id: "min251", name: "iiø – V7 – i7", hint: "The minor cadence — half-diminished into the dominant",
     seq: [[2, "m7b5", "iiø"], [7, "dom7", "V7"], [0, "min7", "i7"]] },
+  { id: "jazzturn", name: "Imaj7 – vi7 – ii7 – V7", hint: "The classic jazz turnaround",
+    seq: [[0, "maj7", "Imaj7"], [9, "min7", "vi7"], [2, "min7", "ii7"], [7, "dom7", "V7"]] },
+  { id: "anime", name: "ii7 – V7 – iii7 – VI7", hint: "A bright deceptive turnaround",
+    seq: [[2, "min7", "ii7"], [7, "dom7", "V7"], [4, "min7", "iii7"], [9, "dom7", "VI7"]] },
+  { id: "backdoor", name: "Imaj7 – ♭VII7 – IVmaj7 – Imaj7", hint: "Backdoor dominant colour",
+    seq: [[0, "maj7", "Imaj7"], [10, "dom7", "♭VII7"], [5, "maj7", "IVmaj7"], [0, "maj7", "Imaj7"]] },
+  { id: "minorblues", name: "i7 – iv7 – V7 – i7", hint: "Minor blues cadence",
+    seq: [[0, "min7", "i7"], [5, "min7", "iv7"], [7, "dom7", "V7"], [0, "min7", "i7"]] },
 ];
 
 function ProgressionDrillChart() {
@@ -3135,13 +3195,28 @@ function ProgressionDrillChart() {
   };
   const play = () => { stop(); pass(); };
 
+  if (family === "caged") return (
+    <div className="card" style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+        <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif" }}>Progression Practice</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <button className="chip" style={drillChip(false)} onClick={() => setFamily("triads")}>Triads</button>
+          <button className="chip" style={drillChip(false)} onClick={() => setFamily("sevenths")}>Dominants &amp; 7ths</button>
+          <button className="chip" style={drillChip(true)} onClick={() => setFamily("caged")}>CAGED Forms</button>
+        </div>
+      </div>
+      <CagedPairDrill embedded />
+    </div>
+  );
+
   return (
     <div className="card" style={{ marginBottom: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-        <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif" }}>Progression Drill</div>
+        <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif" }}>Progression Practice</div>
         <div style={{ display: "flex", gap: 6 }}>
           <button className="chip" style={drillChip(!seventh)} onClick={() => setFamily("triads")}>Triads</button>
           <button className="chip" style={drillChip(seventh)} onClick={() => setFamily("sevenths")}>Dominants &amp; 7ths</button>
+          <button className="chip" style={drillChip(family === "caged")} onClick={() => setFamily("caged")}>CAGED Forms</button>
         </div>
       </div>
       <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 10 }}>
@@ -3210,7 +3285,6 @@ function PracticeTab({ save, toggle }) {
       <ScaleFormDrill formId={formId} setFormId={setFormId} />
       <DiatonicTriadDrill />
       <ProgressionDrillChart />
-      <CagedPairDrill />
       <div className="card">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 2 }}>
           <div style={{ fontWeight: 800, fontSize: 16 }}>Song list</div>
