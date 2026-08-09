@@ -3058,6 +3058,117 @@ function DiatonicTriadDrill() {
   );
 }
 
+
+/* ---------------- Diatonic Triads — One Position ---------------- */
+function bestTriadInArea(rootPc, quality, setIdx, area, prevMean) {
+  const center = (area.lo + area.hi) / 2;
+  let best = null;
+  for (let inv = 0; inv < 3; inv++) {
+    const base = triadVoicing(rootPc, quality, inv, setIdx);
+    for (const off of [-12, 0, 12]) {
+      const act = setIdx.map((s) => base[s] + off);
+      if (Math.min(...act) < 0 || Math.max(...act) > 15) continue;
+      const fr = [-1, -1, -1, -1, -1, -1];
+      setIdx.forEach((s, i) => (fr[s] = act[i]));
+      const mean = act.reduce((a, b) => a + b, 0) / act.length;
+      const outside = act.reduce((sum, f) => sum + Math.max(0, area.lo - f) + Math.max(0, f - area.hi), 0);
+      const movement = prevMean == null ? 0 : Math.abs(mean - prevMean);
+      const score = outside * 12 + movement * 1.5 + Math.abs(mean - center) * 0.55;
+      if (!best || score < best.score) best = { frets: fr, inv, mean, score, outside };
+    }
+  }
+  return best;
+}
+function PositionTriadDrill() {
+  const [keyPc, setKeyPc] = useState(0);
+  const [setName, setSetName] = useState("1–3");
+  const [areaId, setAreaId] = useState("low");
+  const [bpm, setBpm] = useState(70);
+  const [loop, setLoop] = useState(false);
+  const [live, setLive] = useState(-1);
+  const timers = useRef([]);
+  const loopRef = useRef(false);
+  useEffect(() => { loopRef.current = loop; }, [loop]);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  const area = CAGED_NECK_AREAS.find((a) => a.id === areaId);
+  const setIdx = TRIAD_SETS[setName];
+  const row = useMemo(() => {
+    let prevMean = null;
+    return DIATONIC.map((d) => {
+      const rpc = (keyPc + d.off) % 12;
+      const best = bestTriadInArea(rpc, d.q, setIdx, area, prevMean);
+      if (best) prevMean = best.mean;
+      return { name: NOTES[rpc] + qLabel(d.q), deg: d.deg, rootPc: rpc, q: d.q, ...(best || { frets: [-1,-1,-1,-1,-1,-1], inv: 0, outside: 0 }) };
+    });
+  }, [keyPc, setName, areaId]);
+
+  const stop = () => { timers.current.forEach(clearTimeout); timers.current = []; setLive(-1); };
+  useEffect(() => { stop(); }, [keyPc, setName, areaId, bpm]);
+  const pass = () => {
+    const dur = 120 / bpm; // two beats per chord
+    row.forEach((c, i) => {
+      strum(c.frets, false, i * dur);
+      timers.current.push(setTimeout(() => setLive(i), i * dur * 1000));
+    });
+    timers.current.push(setTimeout(() => {
+      if (loopRef.current) pass(); else setLive(-1);
+    }, row.length * dur * 1000));
+  };
+  const play = () => { stop(); pass(); };
+
+  return (
+    <div className="card" style={{ marginBottom: 14 }}>
+      <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Diatonic Triads — One Position</div>
+      <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 10 }}>
+        Play I → ii → iii → IV → V → vi → vii° while your hand stays in one neck area. The inversion changes automatically to keep the next chord close.
+      </div>
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
+        {NOTES.map((n, i) => (
+          <button key={n} className="chip" style={drillChip(keyPc === i)} onClick={() => setKeyPc(i)}>{n}</button>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+        <span style={{ fontSize: 11.5, color: T.faint }}>neck area</span>
+        {CAGED_NECK_AREAS.map((a) => (
+          <button key={a.id} className="chip" style={drillChip(areaId === a.id)} onClick={() => setAreaId(a.id)}>{a.name}</button>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+        <span style={{ fontSize: 11.5, color: T.faint }}>string set</span>
+        {Object.keys(TRIAD_SETS).map((sn) => (
+          <button key={sn} className="chip" style={drillChip(setName === sn)} onClick={() => setSetName(sn)}>Strings {sn}</button>
+        ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+        <div>
+          <span style={{ fontWeight: 800, fontSize: 16 }}>{NOTES[keyPc]} major</span>
+          <span style={{ color: T.faint, fontSize: 13 }}> · {area.name} · strings {setName}</span>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button className="chip" style={btnAmber} onClick={play}>▶ Play row</button>
+          <button className="chip" style={loop ? { ...btnGhost, borderColor: T.amber, color: T.amber } : btnGhost} onClick={() => setLoop(!loop)}>⟳ Loop</button>
+          <button className="chip" style={btnGhost} onClick={stop}>■ Stop</button>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", overflowX: "auto", paddingBottom: 6 }}>
+        {row.map((c, i) => (
+          <div key={i} onClick={() => strum(c.frets)}
+            style={{ cursor: "pointer", textAlign: "center", background: T.raised, borderRadius: 10, padding: "6px 6px 3px", border: `2px solid ${live === i ? T.amber : T.line}`, minWidth: 102, transition: "border-color .15s" }}>
+            <div style={{ fontSize: 12.5, fontWeight: 800 }}>{c.name} <span style={{ color: T.faint, fontWeight: 400, fontSize: 10 }}>{c.deg}</span></div>
+            <ChordDiagram frets={c.frets} size={106} label={c.name} rootPc={c.rootPc} />
+            <div style={{ fontSize: 10.5, color: T.amber, paddingBottom: 3 }}>{INV_NAMES[c.inv]}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+        <button className="chip" style={drillChip(false)} onClick={() => setBpm(Math.max(45, bpm - 5))}>−</button>
+        <span style={{ fontSize: 13.5, fontWeight: 800, minWidth: 64, textAlign: "center" }}>{bpm} bpm</span>
+        <button className="chip" style={drillChip(false)} onClick={() => setBpm(Math.min(150, bpm + 5))}>+</button>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- Unified Progression Practice: triads, 7ths and CAGED forms ---------------- */
 const DIATONIC_PROGS = [
   { id: "pop", name: "I – V – vi – IV", hint: "Modern pop anthem loop", seq: ["I", "V", "vi", "IV"] },
@@ -3284,6 +3395,7 @@ function PracticeTab({ save, toggle }) {
       <RhythmTrainer />
       <ScaleFormDrill formId={formId} setFormId={setFormId} />
       <DiatonicTriadDrill />
+      <PositionTriadDrill />
       <ProgressionDrillChart />
       <div className="card">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 2 }}>
