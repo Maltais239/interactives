@@ -76,6 +76,43 @@ const SCALES = [
   { id: "blues", name: "Blues", ivs: [0, 3, 5, 6, 7, 10] },
   { id: "nmin", name: "Natural Minor", ivs: [0, 2, 3, 5, 7, 8, 10] },
 ];
+
+/* Suggested harmony for solo practice. These stay intentionally musical and
+   compact: choose a scale, loop one of these progressions elsewhere (or just
+   hear the changes here), and improvise while keeping the scale on screen. */
+const SCALE_JAM_PROGRESSIONS = {
+  maj: [
+    { name: "I – V – vi – IV", hint: "pop / rock", chords: [[0,"maj","I"],[7,"maj","V"],[9,"min","vi"],[5,"maj","IV"]] },
+    { name: "ii – V – I", hint: "jazz / soul", chords: [[2,"min","ii"],[7,"maj","V"],[0,"maj","I"]] },
+    { name: "I – IV – V", hint: "rock / folk", chords: [[0,"maj","I"],[5,"maj","IV"],[7,"maj","V"]] },
+    { name: "Imaj7 – vi7 – ii7 – V7", hint: "major-7 colour", chords: [[0,"maj7","Imaj7"],[9,"min7","vi7"],[2,"min7","ii7"],[7,"dom7","V7"]] },
+  ],
+  majp: [
+    { name: "I – IV – V", hint: "country / roots", chords: [[0,"maj","I"],[5,"maj","IV"],[7,"maj","V"]] },
+    { name: "I – V – IV", hint: "open rock", chords: [[0,"maj","I"],[7,"maj","V"],[5,"maj","IV"]] },
+    { name: "I – vi – IV – V", hint: "classic pop", chords: [[0,"maj","I"],[9,"min","vi"],[5,"maj","IV"],[7,"maj","V"]] },
+    { name: "I7 – IV7 – V7", hint: "major-pentatonic blues", chords: [[0,"dom7","I7"],[5,"dom7","IV7"],[7,"dom7","V7"]] },
+  ],
+  minp: [
+    { name: "i – ♭VII – ♭VI – ♭VII", hint: "rock / minor vamp", chords: [[0,"min","i"],[10,"maj","♭VII"],[8,"maj","♭VI"],[10,"maj","♭VII"]] },
+    { name: "i – ♭III – IV", hint: "minor-pentatonic rock", chords: [[0,"min","i"],[3,"maj","♭III"],[5,"maj","IV"]] },
+    { name: "i – iv – ♭VII", hint: "dark roots groove", chords: [[0,"min","i"],[5,"min","iv"],[10,"maj","♭VII"]] },
+    { name: "i7 – iv7 – V7", hint: "minor blues", chords: [[0,"min7","i7"],[5,"min7","iv7"],[7,"dom7","V7"]] },
+  ],
+  blues: [
+    { name: "I7 – IV7 – V7", hint: "the blues", chords: [[0,"dom7","I7"],[5,"dom7","IV7"],[7,"dom7","V7"]] },
+    { name: "12-bar turnaround", hint: "V7 – IV7 – I7 – V7", chords: [[7,"dom7","V7"],[5,"dom7","IV7"],[0,"dom7","I7"],[7,"dom7","V7"]] },
+    { name: "i7 – iv7 – V7 – i7", hint: "minor blues", chords: [[0,"min7","i7"],[5,"min7","iv7"],[7,"dom7","V7"],[0,"min7","i7"]] },
+    { name: "I7 – ♭VII7 – IV7", hint: "roots / funk", chords: [[0,"dom7","I7"],[10,"dom7","♭VII7"],[5,"dom7","IV7"]] },
+  ],
+  nmin: [
+    { name: "i – ♭VI – ♭III – ♭VII", hint: "cinematic minor", chords: [[0,"min","i"],[8,"maj","♭VI"],[3,"maj","♭III"],[10,"maj","♭VII"]] },
+    { name: "i – iv – ♭VII – ♭III", hint: "minor circle motion", chords: [[0,"min","i"],[5,"min","iv"],[10,"maj","♭VII"],[3,"maj","♭III"]] },
+    { name: "i – ♭VII – ♭VI – ♭VII", hint: "rock minor", chords: [[0,"min","i"],[10,"maj","♭VII"],[8,"maj","♭VI"],[10,"maj","♭VII"]] },
+    { name: "i – iv – v – i", hint: "pure natural minor", chords: [[0,"min","i"],[5,"min","iv"],[7,"min","v"],[0,"min","i"]] },
+  ],
+};
+const JAM_SUFFIX = { maj: "", min: "m", dom7: "7", min7: "m7", maj7: "maj7" };
 /* Fret windows for each CAGED scale position, offset from the root's low-E fret */
 const SHAPE_WINDOWS = { E: [-1, 2], D: [1, 5], C: [4, 7], A: [6, 9], G: [8, 12] };
 /* Semitone offsets of open strings above low E */
@@ -1441,6 +1478,21 @@ function ScaleExplorer() {
     run.forEach((d, i) => pluck(d.fr, i * 0.35, { gain: 0.38, dur: 1.0, damp: 0.985 }));
   };
 
+  const jamProgressions = SCALE_JAM_PROGRESSIONS[scaleId] || [];
+  const jamChordName = (off, q) => NOTES[(rootPc + off + 12) % 12] + (JAM_SUFFIX[q] || "");
+  const hearJam = (p) => {
+    const typeMap = { maj: "Major", min: "Minor", dom7: "7", min7: "Min7", maj7: "Maj7" };
+    p.chords.forEach(([off, q], i) => {
+      const rpc = (rootPc + off + 12) % 12;
+      const type = typeMap[q];
+      const candidates = ["E", "A", "D"].map((form) => cagedVoicingCandidate(rpc, type, form))
+        .filter((c) => c.min >= 0 && c.max <= 12)
+        .sort((a, b) => a.center - b.center || a.difficulty - b.difficulty);
+      const chosen = candidates[0];
+      if (chosen) strum(chosen.frets, false, i * 1.05);
+    });
+  };
+
   const chip = (active) => ({
     flexShrink: 0, padding: "7px 12px", borderRadius: 999, fontSize: 13, fontWeight: 700, cursor: "pointer",
     border: `1.5px solid ${active ? T.amber : T.line}`,
@@ -1485,6 +1537,28 @@ function ScaleExplorer() {
         </div>
         <Fretboard frets={Math.max(12, win[1])} maxFret={Math.max(12, win[1])} dots={dots} onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
         {!focus && <IntervalLegend seventh={false} gray />}
+        {!focus && (
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${T.line}` }}>
+            <div style={{ fontWeight: 800, fontSize: 14.5, marginBottom: 3 }}>Suggested progressions for solo practice</div>
+            <div style={{ fontSize: 12, color: T.faint, marginBottom: 9 }}>
+              Keep this scale on screen and improvise over one set of changes. The second line shows the actual chords in {NOTES[rootPc]}.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(205px, 1fr))", gap: 8 }}>
+              {jamProgressions.map((p, i) => (
+                <div key={i} style={{ background: T.raised, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                    <div style={{ fontSize: 13, fontWeight: 800 }}>{p.name}</div>
+                    <button className="chip" style={{ ...btnGhost, padding: "5px 8px", fontSize: 11.5 }} onClick={() => hearJam(p)}>▶ Hear</button>
+                  </div>
+                  <div style={{ color: T.amber, fontSize: 12.5, fontWeight: 700, marginTop: 3 }}>
+                    {p.chords.map(([off, q]) => jamChordName(off, q)).join("  –  ")}
+                  </div>
+                  <div style={{ color: T.faint, fontSize: 11.5, marginTop: 2 }}>{p.hint}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       {!focus && (
       <p style={{ fontSize: 12.5, color: T.faint, marginTop: 10 }}>
@@ -1802,6 +1876,42 @@ const CAGED_PROGRESSIONS = [
       { rn: "VI", off: 8, letter: 5, type: "Major" },
       { rn: "III", off: 3, letter: 2, type: "Major" },
       { rn: "VII", off: 10, letter: 6, type: "Major" },
+    ],
+  },
+  {
+    id: "majturn", name: "Imaj7 – VI7 – ii7 – V7", hint: "Major-7 turnaround with a secondary dominant",
+    chords: [
+      { rn: "Imaj7", off: 0, letter: 0, type: "Maj7" },
+      { rn: "VI7", off: 9, letter: 5, type: "7" },
+      { rn: "ii7", off: 2, letter: 1, type: "Min7" },
+      { rn: "V7", off: 7, letter: 4, type: "7" },
+    ],
+  },
+  {
+    id: "secvi", name: "Imaj7 – V7/vi – vi7 – IVmaj7", hint: "Secondary dominant pulling into vi",
+    chords: [
+      { rn: "Imaj7", off: 0, letter: 0, type: "Maj7" },
+      { rn: "V7/vi", off: 4, letter: 2, type: "7" },
+      { rn: "vi7", off: 9, letter: 5, type: "Min7" },
+      { rn: "IVmaj7", off: 5, letter: 3, type: "Maj7" },
+    ],
+  },
+  {
+    id: "minor7cad", name: "i7 – iv7 – V7 – i7", hint: "Minor blues / soul cadence",
+    chords: [
+      { rn: "i7", off: 0, letter: 0, type: "Min7" },
+      { rn: "iv7", off: 5, letter: 3, type: "Min7" },
+      { rn: "V7", off: 7, letter: 4, type: "7" },
+      { rn: "i7", off: 0, letter: 0, type: "Min7" },
+    ],
+  },
+  {
+    id: "royal", name: "IVmaj7 – V7 – iii7 – vi7", hint: "Smooth major-7 pop / soul movement",
+    chords: [
+      { rn: "IVmaj7", off: 5, letter: 3, type: "Maj7" },
+      { rn: "V7", off: 7, letter: 4, type: "7" },
+      { rn: "iii7", off: 4, letter: 2, type: "Min7" },
+      { rn: "vi7", off: 9, letter: 5, type: "Min7" },
     ],
   },
 ];
@@ -2473,6 +2583,31 @@ function ScaleFormDrill({ formId, setFormId }) {
     (si >= 0 ? uniq.slice(si) : uniq).slice(0, 17).forEach((d, i) => pluck(d.fr, i * 0.35, { gain: 0.38, dur: 1.0, damp: 0.985 }));
   };
 
+  /* Solo-practice harmony belongs here, in the actual Scale Form Drill the user
+     is looking at. Pick a musically sensible progression family for every form. */
+  const jamScaleId = form.scale
+    || (form.id === "32maj" ? "majp"
+      : form.id === "32min" ? "minp"
+      : form.id === "bbbox" ? "blues"
+      : form.id === "amaj" ? "maj"
+      : form.id === "amin" ? "nmin"
+      : form.id === "adom" ? "blues"
+      : "maj");
+  const jamProgressions = SCALE_JAM_PROGRESSIONS[jamScaleId] || [];
+  const jamChordName = (off, q) => NOTES[(rootPc + off + 12) % 12] + (JAM_SUFFIX[q] || "");
+  const hearJam = (p) => {
+    const typeMap = { maj: "Major", min: "Minor", dom7: "7", min7: "Min7", maj7: "Maj7" };
+    p.chords.forEach(([off, q], i) => {
+      const rpc = (rootPc + off + 12) % 12;
+      const type = typeMap[q];
+      const candidates = ["E", "A", "D"].map((shapeName) => cagedVoicingCandidate(rpc, type, shapeName))
+        .filter((c) => c.min >= 0 && c.max <= 12)
+        .sort((a, b) => a.difficulty - b.difficulty || a.center - b.center);
+      const chosen = candidates[0];
+      if (chosen) strum(chosen.frets, false, i * 1.05);
+    });
+  };
+
   return (
     <div className="card" style={{ marginBottom: 14 }}>
       <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Scale Form Drill</div>
@@ -2529,6 +2664,26 @@ function ScaleFormDrill({ formId, setFormId }) {
       {sessionDone && <div style={{ color: T.green, fontWeight: 800, fontSize: 13, marginTop: 6 }}>Circuit complete — every form, every position 🎸</div>}
       <div style={{ marginTop: 10 }}>
         <Fretboard frets={numFrets} maxFret={numFrets} dots={dots} activePair={activePair} onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
+      </div>
+      <div style={{ marginTop: 14, paddingTop: 13, borderTop: `1px solid ${T.line}` }}>
+        <div style={{ fontWeight: 800, fontSize: 14.5, marginBottom: 3 }}>Suggested progressions for solo practice</div>
+        <div style={{ fontSize: 12, color: T.faint, marginBottom: 9 }}>
+          Keep this scale shape on screen and solo over one of these. The chords below are already transposed to <b style={{ color: T.cream }}>{NOTES[rootPc]}</b>.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(205px, 1fr))", gap: 8 }}>
+          {jamProgressions.map((p, i) => (
+            <div key={i} style={{ background: T.raised, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 10px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                <div style={{ fontSize: 13, fontWeight: 800 }}>{p.name}</div>
+                <button className="chip" style={{ ...btnGhost, padding: "5px 8px", fontSize: 11.5 }} onClick={() => hearJam(p)}>▶ Hear</button>
+              </div>
+              <div style={{ color: T.amber, fontSize: 12.5, fontWeight: 700, marginTop: 3 }}>
+                {p.chords.map(([off, q]) => jamChordName(off, q)).join("  –  ")}
+              </div>
+              <div style={{ color: T.faint, fontSize: 11.5, marginTop: 2 }}>{p.hint}</div>
+            </div>
+          ))}
+        </div>
       </div>
       {seqStep > 0 && (form.scale === "maj" || form.scale === "nmin") && activePair.length === 2 && (
         <div style={{ marginTop: 10, background: T.raised, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 12px" }}>
@@ -3255,6 +3410,20 @@ const DOM_PROGS = [
     seq: [[0, "maj7", "Imaj7"], [10, "dom7", "♭VII7"], [5, "maj7", "IVmaj7"], [0, "maj7", "Imaj7"]] },
   { id: "minorblues", name: "i7 – iv7 – V7 – i7", hint: "Minor blues cadence",
     seq: [[0, "min7", "i7"], [5, "min7", "iv7"], [7, "dom7", "V7"], [0, "min7", "i7"]] },
+  { id: "sec2", name: "Imaj7 – V7/ii – ii7 – V7 – I", hint: "VI7 is the secondary dominant of ii",
+    seq: [[0, "maj7", "Imaj7"], [9, "dom7", "V7/ii"], [2, "min7", "ii7"], [7, "dom7", "V7"], [0, "maj7", "Imaj7"]] },
+  { id: "sec6", name: "Imaj7 – V7/vi – vi7 – ii7 – V7", hint: "III7 tonicises vi before the normal turnaround",
+    seq: [[0, "maj7", "Imaj7"], [4, "dom7", "V7/vi"], [9, "min7", "vi7"], [2, "min7", "ii7"], [7, "dom7", "V7"]] },
+  { id: "royalroad", name: "IVmaj7 – V7 – iii7 – vi7", hint: "Lush major-7 pop / soul movement",
+    seq: [[5, "maj7", "IVmaj7"], [7, "dom7", "V7"], [4, "min7", "iii7"], [9, "min7", "vi7"]] },
+  { id: "passdim", name: "Imaj7 – ♯I°7 – ii7 – V7", hint: "Chromatic diminished passing chord into ii",
+    seq: [[0, "maj7", "Imaj7"], [1, "dim7", "♯I°7"], [2, "min7", "ii7"], [7, "dom7", "V7"]] },
+  { id: "minorcircle", name: "i7 – iv7 – ♭VII7 – ♭IIImaj7", hint: "Natural-minor circle motion",
+    seq: [[0, "min7", "i7"], [5, "min7", "iv7"], [10, "dom7", "♭VII7"], [3, "maj7", "♭IIImaj7"]] },
+  { id: "minorcolour", name: "i7 – ♭VImaj7 – iv7 – V7", hint: "Minor key with a rich ♭VImaj7 colour",
+    seq: [[0, "min7", "i7"], [8, "maj7", "♭VImaj7"], [5, "min7", "iv7"], [7, "dom7", "V7"]] },
+  { id: "gospel", name: "Imaj7 – III7 – vi7 – II7 – V7", hint: "Secondary-dominant chain heard in gospel, soul and standards",
+    seq: [[0, "maj7", "Imaj7"], [4, "dom7", "III7"], [9, "min7", "vi7"], [2, "dom7", "II7"], [7, "dom7", "V7"]] },
 ];
 
 function ProgressionDrillChart() {
@@ -3384,9 +3553,8 @@ function ProgressionDrillChart() {
 
 function PracticeTab({ save, toggle }) {
   const cl = { songs: {}, ...(save.checklist || {}) };
-  const [open, setOpen] = useState({ tech: true });   // band sets start folded
-  const totalAll = SONGS.length + BAND_SETS.reduce((a, s) => a + s.songs.length, 0);
-  const learnedAll = Object.keys(cl.songs || {}).length;
+  const [open, setOpen] = useState(true);
+  const learned = SONGS.filter((_, i) => cl.songs["s" + i]).length;
   const [formId, setFormIdRaw] = useState(DRILL_PREFS.formId);
   const setFormId = (id) => { DRILL_PREFS.formId = id; setFormIdRaw(id); };
   return (
@@ -3399,40 +3567,51 @@ function PracticeTab({ save, toggle }) {
       <ProgressionDrillChart />
       <div className="card">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 2 }}>
-          <div style={{ fontWeight: 800, fontSize: 16 }}>Song list</div>
-          <div style={{ fontSize: 13, color: learnedAll > 0 ? T.green : T.faint, fontWeight: 700 }}>{learnedAll}/{totalAll} learned</div>
+          <div style={{ fontWeight: 800, fontSize: 16 }}>Technique songs</div>
+          <div style={{ fontSize: 13, color: learned > 0 ? T.green : T.faint, fontWeight: 700 }}>{learned}/{SONGS.length} learned</div>
         </div>
         <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 8 }}>
-          Technique songs, then the Massey Sound book. Tap a heading to open it.
+          Repertoire that connects directly to the skills in the drills above. Massey Sound now has its own tab.
         </div>
-
-        <SongGroup title="Technique songs" sub="what the drills are for" open={!!open.tech}
-          count={SONGS.filter((_, i) => cl.songs["s" + i]).length} total={SONGS.length}
-          onToggle={() => setOpen((o) => ({ ...o, tech: !o.tech }))}>
+        <SongGroup title="Technique songs" sub="what the drills are for" open={open}
+          count={learned} total={SONGS.length} onToggle={() => setOpen(!open)}>
           {SONGS.map((s, i) => (
             <CheckRow key={i} checked={!!cl.songs["s" + i]} title={s.t} meta={s.m} onToggle={() => toggle("songs", "s" + i)} />
           ))}
         </SongGroup>
-
-        <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: 0.6, color: T.amber, margin: "14px 0 2px" }}>
-          MASSEY SOUND · GRANITE CURLING
-        </div>
-        {BAND_SETS.map((set) => {
-          const ids = set.songs.map((_, i) => `${set.id}-${i}`);
-          const n = ids.filter((id) => cl.songs[id]).length;
-          const keys = [...new Set(set.songs.map((s) => (s.k || "").split(" ")[0]).filter(Boolean))];
-          return (
-            <SongGroup key={set.id} title={set.name} sub={keys.length + " keys"} count={n} total={set.songs.length}
-              open={!!open[set.id]} onToggle={() => setOpen((o) => ({ ...o, [set.id]: !o[set.id] }))}>
-              {set.songs.map((s, i) => (
-                <CheckRow key={i} checked={!!cl.songs[`${set.id}-${i}`]}
-                  title={s.t} meta={[s.a, s.k].filter(Boolean).join(" · ")}
-                  onToggle={() => toggle("songs", `${set.id}-${i}`)} />
-              ))}
-            </SongGroup>
-          );
-        })}
       </div>
+    </div>
+  );
+}
+
+function MasseyTab({ save, toggle }) {
+  const cl = { songs: {}, ...(save.checklist || {}) };
+  const [open, setOpen] = useState({ b1: true, b2: false, b3: false, b4: false });
+  const total = BAND_SETS.reduce((a, s) => a + s.songs.length, 0);
+  const learned = BAND_SETS.reduce((n, set) => n + set.songs.filter((_, i) => cl.songs[`${set.id}-${i}`]).length, 0);
+  return (
+    <div className="card">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 3 }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 20, fontFamily: "'Fraunces', Georgia, serif" }}>Massey Sound Sets</div>
+          <div style={{ fontSize: 12.5, color: T.faint }}>Granite Curling set book and reserve pool</div>
+        </div>
+        <div style={{ fontSize: 13, color: learned > 0 ? T.green : T.faint, fontWeight: 800 }}>{learned}/{total} learned</div>
+      </div>
+      {BAND_SETS.map((set) => {
+        const ids = set.songs.map((_, i) => `${set.id}-${i}`);
+        const n = ids.filter((id) => cl.songs[id]).length;
+        const keys = [...new Set(set.songs.map((s) => (s.k || "").split(" ")[0]).filter(Boolean))];
+        return (
+          <SongGroup key={set.id} title={set.name} sub={keys.length + " keys"} count={n} total={set.songs.length}
+            open={!!open[set.id]} onToggle={() => setOpen((o) => ({ ...o, [set.id]: !o[set.id] }))}>
+            {set.songs.map((s, i) => (
+              <CheckRow key={i} checked={!!cl.songs[`${set.id}-${i}`]} title={s.t}
+                meta={[s.a, s.k].filter(Boolean).join(" · ")} onToggle={() => toggle("songs", `${set.id}-${i}`)} />
+            ))}
+          </SongGroup>
+        );
+      })}
     </div>
   );
 }
@@ -3683,7 +3862,7 @@ function App() {
   };
 
   const tabs = [
-    ["notes", "Notes"], ["chords", "Chords"], ["ear", "Ear"], ["practice", "Practice"], ["library", "Library"], ["progress", "Progress"],
+    ["notes", "Notes"], ["chords", "Chords"], ["ear", "Ear"], ["practice", "Practice"], ["massey", "Massey Sound"], ["library", "Library"], ["progress", "Progress"],
   ];
 
   return (
@@ -3741,6 +3920,8 @@ function App() {
           <EarTrainer save={save} record={record} onLevelDone={onLevelDone} />
         ) : tab === "practice" ? (
           <PracticeTab save={save} toggle={toggleCheck} />
+        ) : tab === "massey" ? (
+          <MasseyTab save={save} toggle={toggleCheck} />
         ) : tab === "library" ? (
           <ChordLibrary />
         ) : (
