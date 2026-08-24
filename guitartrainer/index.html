@@ -8,7 +8,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-<style> html, body { margin: 0; padding: 0; background: #211812; } </style>
+<style>
+html, body { margin: 0; padding: 0; background: #211812; }
+.scale-chip-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+.scale-chip-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+</style>
 </head>
 <body>
 <div id="root"></div>
@@ -670,7 +674,7 @@ const T = {
 };
 
 /* ---------------- Fretboard (horizontal, the signature element) ---------------- */
-function Fretboard({ maxFret = 12, frets = 12, marker, tapped, onTap, disabled, dots, activePair = [] }) {
+function Fretboard({ maxFret = 12, frets = 12, marker, tapped, onTap, disabled, dots, activePair = [], connections = [] }) {
   const FRETS = frets;
   const W = 980, H = 258;
   const nutX = 64, endX = W - 12;
@@ -691,6 +695,9 @@ function Fretboard({ maxFret = 12, frets = 12, marker, tapped, onTap, disabled, 
           <stop offset="0.5" stopColor="#E3CFA0" />
           <stop offset="1" stopColor="#A88F60" />
         </linearGradient>
+        <marker id="slideArrow" markerWidth="5.5" markerHeight="5.5" refX="4.6" refY="2.75" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L5.5,2.75 L0,5.5 z" fill={T.amber} />
+        </marker>
       </defs>
       {/* board */}
       <rect x={nutX} y={8} width={endX - nutX} height={H - 16} rx={6} fill="url(#woodg)" />
@@ -724,6 +731,23 @@ function Fretboard({ maxFret = 12, frets = 12, marker, tapped, onTap, disabled, 
       {[3, 5, 7, 9, 12, 15, 17, 19].filter((f) => f <= FRETS).map((f) => (
         <text key={f} x={nutX + (f - 0.5) * fw} y={H - 0} fill={T.faint} fontSize="13" textAnchor="middle" fontFamily="inherit">{f}</text>
       ))}
+      {/* position-connection slides: same-string scale tones that bridge into the adjacent CAGED shape */}
+      {connections.length > 0 && (
+        <g pointerEvents="none">
+          {connections.map((c, i) => {
+            const x1 = fretCenter(c.fromF), x2 = fretCenter(c.toF);
+            const y = yOf(c.s) - 18;
+            return (
+              <g key={"conn" + i}>
+                <line x1={x1} y1={y} x2={x2} y2={y} stroke={T.amber} strokeWidth="2.2" strokeLinecap="round"
+                  markerEnd="url(#slideArrow)" opacity="0.9" />
+                <circle cx={x1} cy={yOf(c.s)} r="15.5" fill="none" stroke={T.amber} strokeWidth="1.5" opacity="0.8" />
+                <circle cx={x2} cy={yOf(c.s)} r="15.5" fill="none" stroke={T.cream} strokeWidth="1.5" opacity="0.8" />
+              </g>
+            );
+          })}
+        </g>
+      )}
       {/* scale / interval dots */}
       {dots &&
         dots.map((d, i) => (
@@ -2383,6 +2407,68 @@ const DRILL_FORMS = [
   { id: "amin", name: "Arp: Minor", type: "caged", ivs: [0, 3, 7], arp: true },
   { id: "adom", name: "Arp: Dom 7", type: "caged", ivs: [0, 4, 7, 10], arp: true },
 ];
+
+/* Adjacent-position connectors. CAGED shapes overlap; the most useful escape
+   routes are same-string slides from a note near the edge of one shape to the
+   next scale tone that belongs to the neighbouring shape. We calculate these
+   from the scale itself, so they transpose cleanly to every key and work for
+   major/minor scales, pentatonics and blues. */
+function cagedWindowPlacement(rootPc, ivs, shape, octaveShift = 0) {
+  const w = positionWindow(rootPc, ivs, shape, 2);
+  return [w[0] + octaveShift, w[1] + octaveShift];
+}
+function adjacentCagedPlacement(rootPc, ivs, currentShape, direction) {
+  const currentWin = positionWindow(rootPc, ivs, currentShape, 2);
+  const center = (currentWin[0] + currentWin[1]) / 2;
+  const candidates = [];
+  CAGED_ORDER.forEach((shape) => {
+    [-12, 0, 12, 24].forEach((shift) => {
+      const win = cagedWindowPlacement(rootPc, ivs, shape, shift);
+      if (win[1] < 0 || win[0] > 20) return;
+      const c = (win[0] + win[1]) / 2;
+      if (shape === currentShape && shift === 0) return;
+      if (direction === "up" && c <= center + 0.5) return;
+      if (direction === "down" && c >= center - 0.5) return;
+      candidates.push({ shape, win, center: c, distance: Math.abs(c - center) });
+    });
+  });
+  candidates.sort((a, b) => a.distance - b.distance || a.win[0] - b.win[0]);
+  return candidates[0] || null;
+}
+function scaleDotsForWindow(rootPc, ivs, win) {
+  const out = [];
+  for (let s = 0; s < 6; s++) for (let f = Math.max(0, win[0]); f <= Math.min(20, win[1]); f++) {
+    const iv = (OPEN_PC[s] + f - rootPc + 1200) % 12;
+    if (!ivs.includes(iv)) continue;
+    const base = IV_COLORS[iv] || { color: "#E4D6B8", text: "#4A3524" };
+    out.push({ s, f, iv, color: base.color, text: base.text, label: DEGREE_LABEL[iv] });
+  }
+  return out;
+}
+function bestScaleSlideConnections(currentDots, neighbourDots, direction, currentWin) {
+  const currentKeys = new Set(currentDots.map((d) => `${d.s}:${d.f}`));
+  const perString = [];
+  for (let s = 0; s < 6; s++) {
+    const srcs = currentDots.filter((d) => d.s === s && !d.bend);
+    const dsts = neighbourDots.filter((d) => d.s === s && !d.bend && !currentKeys.has(`${d.s}:${d.f}`));
+    let best = null;
+    srcs.forEach((a) => dsts.forEach((b) => {
+      const delta = b.f - a.f;
+      if (direction === "up" && delta <= 0) return;
+      if (direction === "down" && delta >= 0) return;
+      const dist = Math.abs(delta);
+      if (dist < 1 || dist > 4) return;
+      const edge = direction === "up" ? Math.abs(currentWin[1] - a.f) : Math.abs(a.f - currentWin[0]);
+      const twoFretBonus = Math.abs(dist - 2) * 0.8;
+      const stringPreference = [0.8, 0.5, 0.2, 0, 0.1, 0.35][s];
+      const score = edge * 1.8 + twoFretBonus + stringPreference;
+      if (!best || score < best.score) best = { s, fromF: a.f, toF: b.f, fromIv: a.iv, toIv: b.iv, score };
+    }));
+    if (best) perString.push(best);
+  }
+  perString.sort((a, b) => a.score - b.score);
+  return perString.slice(0, 3);
+}
 function ScaleFormDrill({ formId, setFormId }) {
   const form = DRILL_FORMS.find((f) => f.id === formId);
   const [rootPc, setRootPc] = useState(DRILL_PREFS.rootPc);
@@ -2392,6 +2478,7 @@ function ScaleFormDrill({ formId, setFormId }) {
   const [pos, setPos] = useState(0);
   const [focus, setFocus] = useState(false);
   const [boxVar, setBoxVar] = useState("full");
+  const [connectMode, setConnectMode] = useState("off"); // off | up | down
   const [sessionDone, setSessionDone] = useState(false);
   const posCount = useMemo(() => {
     if (form.type === "caged") return 5;
@@ -2519,6 +2606,39 @@ function ScaleFormDrill({ formId, setFormId }) {
     return { dots: out, numFrets: Math.min(20, mx), posLabel: `Pattern ${(pos % 2) + 1} of 2${partial ? " · low partial" : ""}` };
   }, [form, rootPc, pos]);
 
+  const canConnectPositions = form.type === "caged" && !form.arp && !!form.scale;
+  const connectionData = useMemo(() => {
+    if (!canConnectPositions || connectMode === "off") return null;
+    const ivs = SCALES.find((s) => s.id === form.scale).ivs;
+    const shape = CAGED_ORDER[pos % 5];
+    const currentWin = positionWindow(rootPc, ivs, shape, 2);
+    const neighbour = adjacentCagedPlacement(rootPc, ivs, shape, connectMode);
+    if (!neighbour) return null;
+    const neighbourDots = scaleDotsForWindow(rootPc, ivs, neighbour.win);
+    const slides = bestScaleSlideConnections(dots, neighbourDots, connectMode, currentWin);
+    return { shape, currentWin, neighbour, neighbourDots, slides };
+  }, [canConnectPositions, connectMode, form, rootPc, pos, dots]);
+
+  const displayDots = useMemo(() => {
+    if (!connectionData) return dots;
+    const existing = new Set(dots.map((d) => `${d.s}:${d.f}`));
+    const neighbourOnly = connectionData.neighbourDots
+      .filter((d) => !existing.has(`${d.s}:${d.f}`));
+    return [...dots, ...neighbourOnly];
+  }, [dots, connectionData]);
+  const displayFrets = connectionData
+    ? Math.min(20, Math.max(numFrets, connectionData.neighbour.win[1] + 1))
+    : numFrets;
+
+  const hearConnections = () => {
+    if (!connectionData || !connectionData.slides.length) return;
+    connectionData.slides.forEach((c, i) => {
+      const at = i * 0.8;
+      pluck(freqAt(c.s, c.fromF), at, { gain: 0.38, dur: 1.2, damp: 0.988 });
+      pluck(freqAt(c.s, c.toF), at + 0.28, { gain: 0.4, dur: 1.4, damp: 0.988 });
+    });
+  };
+
   const [seq, setSeq] = useState("scale"); // scale | thirds | fourths | fifths | sixths
   const seqStep = { scale: 0, thirds: 2, fourths: 3, fifths: 4, sixths: 5 }[seq];
   const [pairIndex, setPairIndex] = useState(0);
@@ -2613,14 +2733,14 @@ function ScaleFormDrill({ formId, setFormId }) {
       <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Scale Form Drill</div>
       {!focus && (<>
       <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 10 }}>
-        The board shows one position at a time; at the chime the next appears. After a form’s last position it rolls into the next form automatically — one continuous circuit through every scale and arpeggio. Switch keys anytime.
+        The board shows one position at a time; at the chime the next appears. After a form’s last position it rolls into the next form automatically. For CAGED scales and pentatonics, use Connect the neck to reveal practical slide routes into the neighbouring position instead of getting trapped in one box.
       </div>
-      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
+      <div className="scale-chip-scroll" style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
         {DRILL_FORMS.map((f) => (
           <button key={f.id} className="chip" style={drillChip(formId === f.id)} onClick={() => setFormId(f.id)}>{f.name}</button>
         ))}
       </div>
-      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 10 }}>
+      <div className="scale-chip-scroll" style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 10 }}>
         {NOTES.map((n, i) => (
           <button key={n} className="chip" style={drillChip(rootPc === i)} onClick={() => setRootPc(i)}>{n}</button>
         ))}
@@ -2631,6 +2751,29 @@ function ScaleFormDrill({ formId, setFormId }) {
           {[["scale", "None"], ["thirds", "Broken 3rds"], ["fourths", "Broken 4ths"], ["fifths", "Broken 5ths"], ["sixths", "Broken 6ths"]].map(([m, label]) => (
             <button key={m} className="chip" style={drillChip(seq === m)} onClick={() => setSeq(m)}>{label}</button>
           ))}
+        </div>
+      )}
+      {canConnectPositions && (
+        <div style={{ marginBottom: 10, background: T.raised, border: `1px solid ${T.line}`, borderRadius: 11, padding: "9px 10px" }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: T.faint, fontWeight: 700 }}>connect the neck:</span>
+            {[["off", "Position only"], ["up", "Connect ↑ to next shape"], ["down", "Connect ↓ to previous shape"]].map(([m, label]) => (
+              <button key={m} className="chip" style={drillChip(connectMode === m)} onClick={() => setConnectMode(m)}>{label}</button>
+            ))}
+            {connectionData && connectionData.slides.length > 0 && (
+              <button className="chip" style={btnGhost} onClick={hearConnections}>♪ Hear slides</button>
+            )}
+          </div>
+          {connectionData && (
+            <div style={{ marginTop: 7, fontSize: 11.8, color: T.muted, lineHeight: 1.5 }}>
+              <b style={{ color: T.cream }}>{connectionData.shape} → {connectionData.neighbour.shape}</b> · Both positions are shown at full strength. The small amber arrows mark especially smooth same-string routes, but they are suggestions, not rules. {connectMode === "up" ? "Play toward the upper edge, slide or shift into any comfortable note in the next shape, then keep going there." : "Play toward the lower edge, slide or shift into any comfortable note in the previous shape, then keep going there."}
+              {connectionData.slides.length > 0 && (
+                <div style={{ marginTop: 4, color: T.amber, fontWeight: 700 }}>
+                  {connectionData.slides.map((c) => `${STRING_NAMES[c.s].replace(" (low)", "").replace(" (high)", "")} ${c.fromF}→${c.toF} (${DEGREE_LABEL[c.fromIv]}→${DEGREE_LABEL[c.toIv]})`).join("   ·   ")}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
       {form.id === "bbbox" && (<>
@@ -2663,7 +2806,9 @@ function ScaleFormDrill({ formId, setFormId }) {
       <TimerBar remaining={remaining} secs={secs} />
       {sessionDone && <div style={{ color: T.green, fontWeight: 800, fontSize: 13, marginTop: 6 }}>Circuit complete — every form, every position 🎸</div>}
       <div style={{ marginTop: 10 }}>
-        <Fretboard frets={numFrets} maxFret={numFrets} dots={dots} activePair={activePair} onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
+        <Fretboard frets={displayFrets} maxFret={displayFrets} dots={displayDots} activePair={activePair}
+          connections={connectionData ? connectionData.slides : []}
+          onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
       </div>
       <div style={{ marginTop: 14, paddingTop: 13, borderTop: `1px solid ${T.line}` }}>
         <div style={{ fontWeight: 800, fontSize: 14.5, marginBottom: 3 }}>Suggested progressions for solo practice</div>
