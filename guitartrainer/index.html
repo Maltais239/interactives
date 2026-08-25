@@ -762,6 +762,7 @@ function Fretboard({ maxFret = 12, frets = 12, marker, tapped, onTap, disabled, 
             ) : (
               <>
                 <circle cx={fretCenter(d.f)} cy={yOf(d.s)} r={13.5} fill={d.color} stroke="rgba(0,0,0,0.4)" strokeWidth="1.5" />
+                {d.target && <circle cx={fretCenter(d.f)} cy={yOf(d.s)} r={18} fill="none" stroke={T.cream} strokeWidth="2.5" opacity="0.95" />}
                 <text x={fretCenter(d.f)} y={yOf(d.s) + 4.5} textAnchor="middle" fontSize="12" fontWeight="800" fill={d.text} fontFamily="inherit">{d.label}</text>
               </>
             )}
@@ -2478,8 +2479,12 @@ function ScaleFormDrill({ formId, setFormId }) {
   const [pos, setPos] = useState(0);
   const [focus, setFocus] = useState(false);
   const [boxVar, setBoxVar] = useState("full");
-  const [connectMode, setConnectMode] = useState("off"); // off | up | down
+  const [fullScale, setFullScale] = useState(false);
   const [sessionDone, setSessionDone] = useState(false);
+  const [jamGuide, setJamGuide] = useState(null); // { index, tick, done }
+  const [jamClickThrough, setJamClickThrough] = useState(false);
+  const [jamTargets, setJamTargets] = useState(true);
+  const jamTimerRef = useRef(null);
   const posCount = useMemo(() => {
     if (form.type === "caged") return 5;
     if (form.type === "box") {
@@ -2606,38 +2611,28 @@ function ScaleFormDrill({ formId, setFormId }) {
     return { dots: out, numFrets: Math.min(20, mx), posLabel: `Pattern ${(pos % 2) + 1} of 2${partial ? " · low partial" : ""}` };
   }, [form, rootPc, pos]);
 
-  const canConnectPositions = form.type === "caged" && !form.arp && !!form.scale;
-  const connectionData = useMemo(() => {
-    if (!canConnectPositions || connectMode === "off") return null;
+  const canShowFullScale = form.type === "caged" && !form.arp && !!form.scale;
+  useEffect(() => {
+    if (!canShowFullScale) setFullScale(false);
+  }, [formId, canShowFullScale]);
+
+  const fullScaleDots = useMemo(() => {
+    if (!canShowFullScale || !fullScale) return null;
     const ivs = SCALES.find((s) => s.id === form.scale).ivs;
-    const shape = CAGED_ORDER[pos % 5];
-    const currentWin = positionWindow(rootPc, ivs, shape, 2);
-    const neighbour = adjacentCagedPlacement(rootPc, ivs, shape, connectMode);
-    if (!neighbour) return null;
-    const neighbourDots = scaleDotsForWindow(rootPc, ivs, neighbour.win);
-    const slides = bestScaleSlideConnections(dots, neighbourDots, connectMode, currentWin);
-    return { shape, currentWin, neighbour, neighbourDots, slides };
-  }, [canConnectPositions, connectMode, form, rootPc, pos, dots]);
-
-  const displayDots = useMemo(() => {
-    if (!connectionData) return dots;
-    const existing = new Set(dots.map((d) => `${d.s}:${d.f}`));
-    const neighbourOnly = connectionData.neighbourDots
-      .filter((d) => !existing.has(`${d.s}:${d.f}`));
-    return [...dots, ...neighbourOnly];
-  }, [dots, connectionData]);
-  const displayFrets = connectionData
-    ? Math.min(20, Math.max(numFrets, connectionData.neighbour.win[1] + 1))
-    : numFrets;
-
-  const hearConnections = () => {
-    if (!connectionData || !connectionData.slides.length) return;
-    connectionData.slides.forEach((c, i) => {
-      const at = i * 0.8;
-      pluck(freqAt(c.s, c.fromF), at, { gain: 0.38, dur: 1.2, damp: 0.988 });
-      pluck(freqAt(c.s, c.toF), at + 0.28, { gain: 0.4, dur: 1.4, damp: 0.988 });
-    });
-  };
+    const out = [];
+    for (let s = 0; s < 6; s++) {
+      for (let f = 0; f <= 17; f++) {
+        const iv = (OPEN_PC[s] + f - rootPc + 1200) % 12;
+        if (!ivs.includes(iv)) continue;
+        const ct = iv === 0 || iv === 3 || iv === 4 || iv === 7;
+        const base = ct && IV_COLORS[iv]
+          ? IV_COLORS[iv]
+          : { color: "#E4D6B8", text: "#4A3524" };
+        out.push({ s, f, iv, color: base.color, text: base.text, label: DEGREE_LABEL[iv] });
+      }
+    }
+    return out;
+  }, [canShowFullScale, fullScale, form, rootPc]);
 
   const [seq, setSeq] = useState("scale"); // scale | thirds | fourths | fifths | sixths
   const seqStep = { scale: 0, thirds: 2, fourths: 3, fifths: 4, sixths: 5 }[seq];
@@ -2704,7 +2699,8 @@ function ScaleFormDrill({ formId, setFormId }) {
   };
 
   /* Solo-practice harmony belongs here, in the actual Scale Form Drill the user
-     is looking at. Pick a musically sensible progression family for every form. */
+     is looking at. The app acts as a practice director: one-bar count-in,
+     four beats per chord, four passes. Record your own guitar on your phone. */
   const jamScaleId = form.scale
     || (form.id === "32maj" ? "majp"
       : form.id === "32min" ? "minp"
@@ -2715,25 +2711,78 @@ function ScaleFormDrill({ formId, setFormId }) {
       : "maj");
   const jamProgressions = SCALE_JAM_PROGRESSIONS[jamScaleId] || [];
   const jamChordName = (off, q) => NOTES[(rootPc + off + 12) % 12] + (JAM_SUFFIX[q] || "");
-  const hearJam = (p) => {
-    const typeMap = { maj: "Major", min: "Minor", dom7: "7", min7: "Min7", maj7: "Maj7" };
-    p.chords.forEach(([off, q], i) => {
-      const rpc = (rootPc + off + 12) % 12;
-      const type = typeMap[q];
-      const candidates = ["E", "A", "D"].map((shapeName) => cagedVoicingCandidate(rpc, type, shapeName))
-        .filter((c) => c.min >= 0 && c.max <= 12)
-        .sort((a, b) => a.difficulty - b.difficulty || a.center - b.center);
-      const chosen = candidates[0];
-      if (chosen) strum(chosen.frets, false, i * 1.05);
-    });
+  const JAM_TONES = {
+    maj: [0, 4, 7], min: [0, 3, 7], dom7: [0, 4, 7, 10], min7: [0, 3, 7, 10], maj7: [0, 4, 7, 11],
   };
+  const stopJamGuide = useCallback((done = false) => {
+    clearInterval(jamTimerRef.current);
+    jamTimerRef.current = null;
+    setJamGuide((g) => g ? { ...g, done, active: false } : null);
+  }, []);
+  const startJamGuide = useCallback((index) => {
+    clearInterval(jamTimerRef.current);
+    stop();
+    setSessionDone(false);
+    const p = jamProgressions[index];
+    if (!p) return;
+    const totalPerformanceBeats = p.chords.length * 4 * 4;
+    const totalTicks = 4 + totalPerformanceBeats; // one bar count-in + four passes
+    let tick = 0;
+    const fireTick = () => {
+      if (tick >= totalTicks) {
+        clearInterval(jamTimerRef.current);
+        jamTimerRef.current = null;
+        setJamGuide({ index, tick: totalTicks, active: false, done: true });
+        if (canShowFullScale) setFullScale(true);
+        return;
+      }
+      const inCount = tick < 4;
+      const perfTick = tick - 4;
+      const beat = inCount ? tick : ((perfTick % 4) + 4) % 4;
+      const ctx = audioCtx();
+      if (ctx && (inCount || jamClickThrough)) click(ctx.currentTime + 0.015, beat === 0);
+      setJamGuide({ index, tick, active: true, done: false });
+      tick += 1;
+    };
+    fireTick();
+    jamTimerRef.current = setInterval(fireTick, 60000 / bpm);
+  }, [jamProgressions, bpm, jamClickThrough, stop, canShowFullScale]);
+  useEffect(() => () => clearInterval(jamTimerRef.current), []);
+
+  const activeJam = jamGuide ? jamProgressions[jamGuide.index] : null;
+  const jamPerfTick = jamGuide ? jamGuide.tick - 4 : -1;
+  const jamCountingIn = !!jamGuide && jamGuide.active && jamGuide.tick < 4;
+  const jamChordIndex = activeJam && jamPerfTick >= 0
+    ? Math.min(activeJam.chords.length - 1, Math.floor(jamPerfTick / 4) % activeJam.chords.length)
+    : -1;
+  const jamBeat = jamGuide && jamGuide.active
+    ? (jamGuide.tick < 4 ? jamGuide.tick : ((jamPerfTick % 4) + 4) % 4)
+    : -1;
+  const jamPass = activeJam && jamPerfTick >= 0
+    ? Math.min(4, Math.floor(jamPerfTick / (activeJam.chords.length * 4)) + 1)
+    : 0;
+  const activeJamChord = activeJam && jamChordIndex >= 0 ? activeJam.chords[jamChordIndex] : null;
+  const activeTargetPcs = useMemo(() => {
+    if (!jamTargets || !activeJamChord || !jamGuide?.active || jamCountingIn) return null;
+    const [off, q] = activeJamChord;
+    const chordRoot = (rootPc + off + 12) % 12;
+    return new Set((JAM_TONES[q] || []).map((iv) => (chordRoot + iv) % 12));
+  }, [jamTargets, activeJamChord, jamGuide, jamCountingIn, rootPc]);
+
+  const baseDisplayDots = fullScaleDots || dots;
+  const displayDots = useMemo(() => {
+    if (!activeTargetPcs) return baseDisplayDots;
+    return baseDisplayDots.map((d) => ({ ...d, target: activeTargetPcs.has((OPEN_PC[d.s] + d.f) % 12) }));
+  }, [baseDisplayDots, activeTargetPcs]);
+  const displayFrets = fullScaleDots ? 17 : numFrets;
+  const shownPosLabel = fullScaleDots ? "Full scale · frets 0–17" : posLabel;
 
   return (
     <div className="card" style={{ marginBottom: 14 }}>
       <div style={{ fontWeight: 800, fontSize: 17, fontFamily: "'Fraunces', Georgia, serif", marginBottom: 4 }}>Scale Form Drill</div>
       {!focus && (<>
       <div style={{ fontSize: 12.5, color: T.faint, marginBottom: 10 }}>
-        The board shows one position at a time; at the chime the next appears. After a form’s last position it rolls into the next form automatically. For CAGED scales and pentatonics, use Connect the neck to reveal practical slide routes into the neighbouring position instead of getting trapped in one box.
+        The board shows one position at a time; at the chime the next appears. After a form’s last position it rolls into the next form automatically. For solo practice, switch to Show full scale and roam freely across the neck instead of treating the CAGED shapes as separate boxes.
       </div>
       <div className="scale-chip-scroll" style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
         {DRILL_FORMS.map((f) => (
@@ -2753,25 +2802,16 @@ function ScaleFormDrill({ formId, setFormId }) {
           ))}
         </div>
       )}
-      {canConnectPositions && (
+      {canShowFullScale && (
         <div style={{ marginBottom: 10, background: T.raised, border: `1px solid ${T.line}`, borderRadius: 11, padding: "9px 10px" }}>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontSize: 12, color: T.faint, fontWeight: 700 }}>connect the neck:</span>
-            {[["off", "Position only"], ["up", "Connect ↑ to next shape"], ["down", "Connect ↓ to previous shape"]].map(([m, label]) => (
-              <button key={m} className="chip" style={drillChip(connectMode === m)} onClick={() => setConnectMode(m)}>{label}</button>
-            ))}
-            {connectionData && connectionData.slides.length > 0 && (
-              <button className="chip" style={btnGhost} onClick={hearConnections}>♪ Hear slides</button>
-            )}
+          <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: T.faint, fontWeight: 700 }}>scale view:</span>
+            <button className="chip" style={drillChip(!fullScale)} onClick={() => setFullScale(false)}>Position</button>
+            <button className="chip" style={drillChip(fullScale)} onClick={() => setFullScale(true)}>Show full scale</button>
           </div>
-          {connectionData && (
-            <div style={{ marginTop: 7, fontSize: 11.8, color: T.muted, lineHeight: 1.5 }}>
-              <b style={{ color: T.cream }}>{connectionData.shape} → {connectionData.neighbour.shape}</b> · Both positions are shown at full strength. The small amber arrows mark especially smooth same-string routes, but they are suggestions, not rules. {connectMode === "up" ? "Play toward the upper edge, slide or shift into any comfortable note in the next shape, then keep going there." : "Play toward the lower edge, slide or shift into any comfortable note in the previous shape, then keep going there."}
-              {connectionData.slides.length > 0 && (
-                <div style={{ marginTop: 4, color: T.amber, fontWeight: 700 }}>
-                  {connectionData.slides.map((c) => `${STRING_NAMES[c.s].replace(" (low)", "").replace(" (high)", "")} ${c.fromF}→${c.toF} (${DEGREE_LABEL[c.fromIv]}→${DEGREE_LABEL[c.toIv]})`).join("   ·   ")}
-                </div>
-              )}
+          {fullScale && (
+            <div style={{ marginTop: 6, fontSize: 11.8, color: T.muted, lineHeight: 1.45 }}>
+              Every note of the scale is visible from the open strings through fret 17. Meander, shift, slide or cross strings wherever the phrase wants to go — the CAGED positions are landmarks, not walls.
             </div>
           )}
         </div>
@@ -2794,7 +2834,7 @@ function ScaleFormDrill({ formId, setFormId }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
         <div>
           <span style={{ fontWeight: 800, fontSize: 16 }}>{NOTES[rootPc]} {form.name}</span>
-          <span style={{ color: T.amber, fontWeight: 700, fontSize: 14 }}> · {posLabel}</span>
+          <span style={{ color: T.amber, fontWeight: 700, fontSize: 14 }}> · {shownPosLabel}</span>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="chip" style={running ? btnGhost : btnAmber} onClick={running ? stop : begin}>{running ? "■ Stop" : "▶ Start drill"}</button>
@@ -2806,31 +2846,81 @@ function ScaleFormDrill({ formId, setFormId }) {
       <TimerBar remaining={remaining} secs={secs} />
       {sessionDone && <div style={{ color: T.green, fontWeight: 800, fontSize: 13, marginTop: 6 }}>Circuit complete — every form, every position 🎸</div>}
       <div style={{ marginTop: 10 }}>
-        <Fretboard frets={displayFrets} maxFret={displayFrets} dots={displayDots} activePair={activePair}
-          connections={connectionData ? connectionData.slides : []}
+        <Fretboard frets={displayFrets} maxFret={displayFrets} dots={displayDots} activePair={fullScale ? [] : activePair}
           onTap={(s, f) => pluck(freqAt(s, f), 0, { gain: 0.35 })} />
       </div>
       <div style={{ marginTop: 14, paddingTop: 13, borderTop: `1px solid ${T.line}` }}>
-        <div style={{ fontWeight: 800, fontSize: 14.5, marginBottom: 3 }}>Suggested progressions for solo practice</div>
-        <div style={{ fontSize: 12, color: T.faint, marginBottom: 9 }}>
-          Keep this scale shape on screen and solo over one of these. The chords below are already transposed to <b style={{ color: T.cream }}>{NOTES[rootPc]}</b>.
+        <div style={{ fontWeight: 800, fontSize: 14.5, marginBottom: 3 }}>Solo backing practice</div>
+        <div style={{ fontSize: 12, color: T.faint, marginBottom: 9, lineHeight: 1.5 }}>
+          Pick a progression, start the guide, and record yourself strumming it on your phone. You get a <b style={{ color: T.cream }}>1-bar count-in</b>, then <b style={{ color: T.cream }}>4 beats per chord × 4 passes</b> at {bpm} bpm. After the fourth pass, Show full scale turns on automatically so you can play the recording back and solo.
         </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+          <button className="chip" style={drillChip(jamClickThrough)} onClick={() => setJamClickThrough(!jamClickThrough)}>
+            {jamClickThrough ? "✓ Click through recording" : "Click only for count-in"}
+          </button>
+          <button className="chip" style={drillChip(jamTargets)} onClick={() => setJamTargets(!jamTargets)}>
+            {jamTargets ? "✓ Chord-tone targets" : "Chord-tone targets"}
+          </button>
+          <span style={{ fontSize: 11.5, color: T.faint }}>Current Scale Drill tempo: <b style={{ color: T.cream }}>{bpm} bpm</b></span>
+        </div>
+
+        {jamGuide && activeJam && (
+          <div style={{ background: "rgba(233,161,59,0.08)", border: `1.5px solid ${jamGuide.done ? T.green : T.amber}`, borderRadius: 12, padding: "12px 14px", marginBottom: 10 }}>
+            {jamGuide.done ? (
+              <div>
+                <div style={{ color: T.green, fontWeight: 800, fontSize: 15 }}>Four passes complete ✓</div>
+                <div style={{ color: T.muted, fontSize: 12, marginTop: 3 }}>Play your phone recording back and improvise. Full scale is on; restart this guide if you also want the chord-tone rings to change with the harmony.</div>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+                  <div>
+                    <div style={{ fontSize: 11.5, color: T.faint, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 800 }}>
+                      {jamCountingIn ? "Count in" : `Pass ${jamPass} of 4`}
+                    </div>
+                    <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontWeight: 800, fontSize: jamCountingIn ? 28 : 38, color: T.cream, marginTop: 2 }}>
+                      {jamCountingIn ? `${jamBeat + 1}` : jamChordName(activeJamChord[0], activeJamChord[1])}
+                    </div>
+                    {!jamCountingIn && (
+                      <div style={{ color: T.faint, fontSize: 11.5, marginTop: 2 }}>
+                        next: {jamChordName(activeJam.chords[(jamChordIndex + 1) % activeJam.chords.length][0], activeJam.chords[(jamChordIndex + 1) % activeJam.chords.length][1])}
+                      </div>
+                    )}
+                  </div>
+                  <button className="chip" style={btnGhost} onClick={() => stopJamGuide(false)}>■ Stop</button>
+                </div>
+                <div style={{ display: "flex", gap: 7, marginTop: 10 }}>
+                  {[0,1,2,3].map((b) => (
+                    <span key={b} style={{
+                      width: 34, height: 34, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      background: jamBeat === b ? T.amber : T.surface,
+                      color: jamBeat === b ? "#2A1C0B" : T.muted,
+                      border: `1.5px solid ${jamBeat === b ? T.amber : T.line}`,
+                      fontWeight: 800, fontSize: 13,
+                    }}>{b + 1}</span>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(205px, 1fr))", gap: 8 }}>
           {jamProgressions.map((p, i) => (
-            <div key={i} style={{ background: T.raised, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 10px" }}>
+            <div key={i} style={{ background: T.raised, border: `1px solid ${jamGuide?.index === i && jamGuide?.active ? T.amber : T.line}`, borderRadius: 10, padding: "9px 10px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
                 <div style={{ fontSize: 13, fontWeight: 800 }}>{p.name}</div>
-                <button className="chip" style={{ ...btnGhost, padding: "5px 8px", fontSize: 11.5 }} onClick={() => hearJam(p)}>▶ Hear</button>
+                <button className="chip" style={{ ...btnGhost, padding: "5px 8px", fontSize: 11.5 }} onClick={() => startJamGuide(i)}>▶ Guide 4×</button>
               </div>
               <div style={{ color: T.amber, fontSize: 12.5, fontWeight: 700, marginTop: 3 }}>
                 {p.chords.map(([off, q]) => jamChordName(off, q)).join("  –  ")}
               </div>
-              <div style={{ color: T.faint, fontSize: 11.5, marginTop: 2 }}>{p.hint}</div>
+              <div style={{ color: T.faint, fontSize: 11.5, marginTop: 2 }}>{p.hint} · 4 beats each</div>
             </div>
           ))}
         </div>
       </div>
-      {seqStep > 0 && (form.scale === "maj" || form.scale === "nmin") && activePair.length === 2 && (
+      {!fullScale && seqStep > 0 && (form.scale === "maj" || form.scale === "nmin") && activePair.length === 2 && (
         <div style={{ marginTop: 10, background: T.raised, border: `1px solid ${T.line}`, borderRadius: 12, padding: "10px 12px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <div>
