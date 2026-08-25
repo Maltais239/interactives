@@ -86,30 +86,40 @@ const SCALES = [
    hear the changes here), and improvise while keeping the scale on screen. */
 const SCALE_JAM_PROGRESSIONS = {
   maj: [
+    { name: "I – IV", hint: "two-chord roots / soul vamp", chords: [[0,"maj","I"],[5,"maj","IV"]] },
+    { name: "Imaj7 – IVmaj7", hint: "two-chord warm soul vamp", chords: [[0,"maj7","Imaj7"],[5,"maj7","IVmaj7"]] },
     { name: "I – V – vi – IV", hint: "pop / rock", chords: [[0,"maj","I"],[7,"maj","V"],[9,"min","vi"],[5,"maj","IV"]] },
     { name: "ii – V – I", hint: "jazz / soul", chords: [[2,"min","ii"],[7,"maj","V"],[0,"maj","I"]] },
     { name: "I – IV – V", hint: "rock / folk", chords: [[0,"maj","I"],[5,"maj","IV"],[7,"maj","V"]] },
     { name: "Imaj7 – vi7 – ii7 – V7", hint: "major-7 colour", chords: [[0,"maj7","Imaj7"],[9,"min7","vi7"],[2,"min7","ii7"],[7,"dom7","V7"]] },
   ],
   majp: [
+    { name: "I – IV", hint: "two-chord country / roots vamp", chords: [[0,"maj","I"],[5,"maj","IV"]] },
+    { name: "I – V", hint: "two-chord open-road vamp", chords: [[0,"maj","I"],[7,"maj","V"]] },
     { name: "I – IV – V", hint: "country / roots", chords: [[0,"maj","I"],[5,"maj","IV"],[7,"maj","V"]] },
     { name: "I – V – IV", hint: "open rock", chords: [[0,"maj","I"],[7,"maj","V"],[5,"maj","IV"]] },
     { name: "I – vi – IV – V", hint: "classic pop", chords: [[0,"maj","I"],[9,"min","vi"],[5,"maj","IV"],[7,"maj","V"]] },
     { name: "I7 – IV7 – V7", hint: "major-pentatonic blues", chords: [[0,"dom7","I7"],[5,"dom7","IV7"],[7,"dom7","V7"]] },
   ],
   minp: [
+    { name: "i – ♭VII", hint: "two-chord rock / roots vamp", chords: [[0,"min","i"],[10,"maj","♭VII"]] },
+    { name: "i – iv", hint: "two-chord minor soul vamp", chords: [[0,"min","i"],[5,"min","iv"]] },
     { name: "i – ♭VII – ♭VI – ♭VII", hint: "rock / minor vamp", chords: [[0,"min","i"],[10,"maj","♭VII"],[8,"maj","♭VI"],[10,"maj","♭VII"]] },
     { name: "i – ♭III – IV", hint: "minor-pentatonic rock", chords: [[0,"min","i"],[3,"maj","♭III"],[5,"maj","IV"]] },
     { name: "i – iv – ♭VII", hint: "dark roots groove", chords: [[0,"min","i"],[5,"min","iv"],[10,"maj","♭VII"]] },
     { name: "i7 – iv7 – V7", hint: "minor blues", chords: [[0,"min7","i7"],[5,"min7","iv7"],[7,"dom7","V7"]] },
   ],
   blues: [
+    { name: "I7 – IV7", hint: "two-chord blues / R&B vamp", chords: [[0,"dom7","I7"],[5,"dom7","IV7"]] },
+    { name: "i7 – iv7", hint: "two-chord minor blues vamp", chords: [[0,"min7","i7"],[5,"min7","iv7"]] },
     { name: "I7 – IV7 – V7", hint: "the blues", chords: [[0,"dom7","I7"],[5,"dom7","IV7"],[7,"dom7","V7"]] },
     { name: "12-bar turnaround", hint: "V7 – IV7 – I7 – V7", chords: [[7,"dom7","V7"],[5,"dom7","IV7"],[0,"dom7","I7"],[7,"dom7","V7"]] },
     { name: "i7 – iv7 – V7 – i7", hint: "minor blues", chords: [[0,"min7","i7"],[5,"min7","iv7"],[7,"dom7","V7"],[0,"min7","i7"]] },
     { name: "I7 – ♭VII7 – IV7", hint: "roots / funk", chords: [[0,"dom7","I7"],[10,"dom7","♭VII7"],[5,"dom7","IV7"]] },
   ],
   nmin: [
+    { name: "i – ♭VII", hint: "two-chord moody vamp", chords: [[0,"min","i"],[10,"maj","♭VII"]] },
+    { name: "i – ♭VI", hint: "two-chord cinematic vamp", chords: [[0,"min","i"],[8,"maj","♭VI"]] },
     { name: "i – ♭VI – ♭III – ♭VII", hint: "cinematic minor", chords: [[0,"min","i"],[8,"maj","♭VI"],[3,"maj","♭III"],[10,"maj","♭VII"]] },
     { name: "i – iv – ♭VII – ♭III", hint: "minor circle motion", chords: [[0,"min","i"],[5,"min","iv"],[10,"maj","♭VII"],[3,"maj","♭III"]] },
     { name: "i – ♭VII – ♭VI – ♭VII", hint: "rock minor", chords: [[0,"min","i"],[10,"maj","♭VII"],[8,"maj","♭VI"],[10,"maj","♭VII"]] },
@@ -2619,15 +2629,30 @@ function ScaleFormDrill({ formId, setFormId }) {
   const fullScaleDots = useMemo(() => {
     if (!canShowFullScale || !fullScale) return null;
     const ivs = SCALES.find((s) => s.id === form.scale).ivs;
+    /* Full-neck solo view should feel as vivid as the original position drills.
+       Keep the established root/3rd/5th/etc. colours, and give the remaining
+       scale degrees their own strong-but-compatible colours instead of washing
+       most of the neck out in beige. Chord-tone targets are shown only by rings. */
+    const fullDegreeColors = {
+      0: IV_COLORS[0],
+      1: IV_COLORS[1],
+      2: { color: "#D98A45", text: "#FFF5E8" },
+      3: IV_COLORS[3],
+      4: IV_COLORS[4],
+      5: { color: "#5E9C8A", text: "#F0FFF9" },
+      6: IV_COLORS[6],
+      7: IV_COLORS[7],
+      8: { color: "#B46F8C", text: "#FFF1F7" },
+      9: IV_COLORS[9],
+      10: IV_COLORS[10],
+      11: IV_COLORS[11],
+    };
     const out = [];
     for (let s = 0; s < 6; s++) {
       for (let f = 0; f <= 17; f++) {
         const iv = (OPEN_PC[s] + f - rootPc + 1200) % 12;
         if (!ivs.includes(iv)) continue;
-        const ct = iv === 0 || iv === 3 || iv === 4 || iv === 7;
-        const base = ct && IV_COLORS[iv]
-          ? IV_COLORS[iv]
-          : { color: "#E4D6B8", text: "#4A3524" };
+        const base = fullDegreeColors[iv] || { color: "#E4D6B8", text: "#4A3524" };
         out.push({ s, f, iv, color: base.color, text: base.text, label: DEGREE_LABEL[iv] });
       }
     }
@@ -2851,8 +2876,8 @@ function ScaleFormDrill({ formId, setFormId }) {
       </div>
       <div style={{ marginTop: 14, paddingTop: 13, borderTop: `1px solid ${T.line}` }}>
         <div style={{ fontWeight: 800, fontSize: 14.5, marginBottom: 3 }}>Solo backing practice</div>
-        <div style={{ fontSize: 12, color: T.faint, marginBottom: 9, lineHeight: 1.5 }}>
-          Pick a progression, start the guide, and record yourself strumming it on your phone. You get a <b style={{ color: T.cream }}>1-bar count-in</b>, then <b style={{ color: T.cream }}>4 beats per chord × 4 passes</b> at {bpm} bpm. After the fourth pass, Show full scale turns on automatically so you can play the recording back and solo.
+        <div style={{ fontSize: 12, color: T.muted, marginBottom: 9, lineHeight: 1.5 }}>
+          Pick a progression or a two-chord vamp, start the guide, and record yourself strumming it on your phone. You get a <b style={{ color: T.cream }}>1-bar count-in</b>, then <b style={{ color: T.cream }}>4 beats per chord × 4 passes</b> at {bpm} bpm. After the fourth pass, Show full scale turns on automatically so you can play the recording back and solo.
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
           <button className="chip" style={drillChip(jamClickThrough)} onClick={() => setJamClickThrough(!jamClickThrough)}>
