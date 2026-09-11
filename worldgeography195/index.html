@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>World Geography 195</title>
+    <title>World Geography 195 — Fixed Basemap</title>
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -29,6 +29,7 @@
             background: #d7e9ee;
             outline: 1px solid transparent; /* Prevents tile tearing */
         }
+
 
         #map {
             flex: 1;
@@ -214,23 +215,11 @@
             maxBoundsViscosity: 1.0 // Makes the bounds firm
         }).setView([30, 10], 2);
         
-        // KEY-FREE BASEMAP:
-        // CARTO's old public raster endpoint now displays an "API KEY REQUIRED" watermark.
-        // This geography game does not actually need a raster basemap: the GeoJSON country
-        // polygons below provide all clickable geography. Keeping the basemap tile-free
-        // also prevents future API-key/provider breakage.
-        //
-        // If you ever want an optional labeled background again, set this to true.
-        const USE_OSM_BASEMAP = false;
+        // The old CARTO raster basemap now requires an API key.
+        // Instead of replacing it with a visually different road map, this game now
+        // builds its own clean neutral world background from the same GeoJSON shapes.
+        // The interactive coloured countries are drawn on top later.
 
-        if (USE_OSM_BASEMAP) {
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors',
-                maxZoom: 10,
-                minZoom: 2,
-                noWrap: true
-            }).addTo(map);
-        }
 
         const exploreModeBtn = document.getElementById('explore-mode-btn');
         const quizModeBtn = document.getElementById('quiz-mode-btn');
@@ -249,6 +238,7 @@
 
         // --- App State ---
         let geojson;
+        let contextGeojson;
         let countriesData = {};
         let quizState = {};
         let currentMode = 'explore';
@@ -323,7 +313,28 @@
             const allFeatures = Object.values(countriesData).map(c => ({
                 type: "Feature", properties: { name: c.name }, geometry: c.geometry
             }));
-            geojson = L.geoJson({ type: "FeatureCollection", features: allFeatures }, { style, onEachFeature }).addTo(map);
+
+            // Neutral, non-interactive "basemap" made from the same country polygons.
+            // This restores the visual context that CARTO used to provide without any API key.
+            contextGeojson = L.geoJson(
+                { type: "FeatureCollection", features: allFeatures },
+                {
+                    interactive: false,
+                    style: {
+                        fillColor: '#f7f5ef',
+                        fillOpacity: 1,
+                        color: '#d6dde1',
+                        weight: 0.8,
+                        opacity: 1
+                    }
+                }
+            ).addTo(map);
+
+            // Interactive/coloured geography layer goes on top.
+            geojson = L.geoJson(
+                { type: "FeatureCollection", features: allFeatures },
+                { style, onEachFeature }
+            ).addTo(map);
             
             // Add a clickable proxy for the Vatican
             geojson.eachLayer(layer => {
@@ -602,10 +613,10 @@
             const isGuessed = quizState['World Tour']?.correctlyGuessed.includes(countryName);
             const isVisibleRegion = currentRegion === 'World Tour' || (countriesData[countryName] && countriesData[countryName].region === currentRegion);
 
-            let fillColor = '#e0e0e0';
-            let fillOpacity = 0.2;
-            let weight = 0.5;
-            let color = '#f5f5f5';
+            let fillColor = '#f7f5ef';
+            let fillOpacity = 0.18;
+            let weight = 0.6;
+            let color = '#d6dde1';
 
             if (isVisibleRegion) {
                 weight = 1.5;
@@ -616,7 +627,7 @@
                 } else { // Explore mode or correctly guessed countries
                     const hash = countryName.split('').reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
                     fillColor = palette[Math.abs(hash) % palette.length];
-                    fillOpacity = 0.88;
+                    fillOpacity = 0.8;
                 }
             }
             
