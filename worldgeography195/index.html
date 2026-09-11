@@ -26,14 +26,8 @@
         }
         /* CSS rules to fix rendering artifacts */
         .leaflet-container {
-            background: #aadaff;
+            background: #d7e9ee;
             outline: 1px solid transparent; /* Prevents tile tearing */
-        }
-        
-        .map-background-tiles {
-            /* Helps prevent seams between map tiles on some browsers */
-            image-rendering: -webkit-optimize-contrast; /* Chrome/Safari */
-            image-rendering: crisp-edges; /* Firefox/Opera */
         }
 
         #map {
@@ -220,14 +214,23 @@
             maxBoundsViscosity: 1.0 // Makes the bounds firm
         }).setView([30, 10], 2);
         
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: 'abcd',
-            maxZoom: 10,
-            minZoom: 2,
-            noWrap: true,
-            className: 'map-background-tiles'
-        }).addTo(map);
+        // KEY-FREE BASEMAP:
+        // CARTO's old public raster endpoint now displays an "API KEY REQUIRED" watermark.
+        // This geography game does not actually need a raster basemap: the GeoJSON country
+        // polygons below provide all clickable geography. Keeping the basemap tile-free
+        // also prevents future API-key/provider breakage.
+        //
+        // If you ever want an optional labeled background again, set this to true.
+        const USE_OSM_BASEMAP = false;
+
+        if (USE_OSM_BASEMAP) {
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors',
+                maxZoom: 10,
+                minZoom: 2,
+                noWrap: true
+            }).addTo(map);
+        }
 
         const exploreModeBtn = document.getElementById('explore-mode-btn');
         const quizModeBtn = document.getElementById('quiz-mode-btn');
@@ -613,7 +616,7 @@
                 } else { // Explore mode or correctly guessed countries
                     const hash = countryName.split('').reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
                     fillColor = palette[Math.abs(hash) % palette.length];
-                    fillOpacity = 0.8;
+                    fillOpacity = 0.88;
                 }
             }
             
@@ -719,4 +722,3 @@
     </script>
 </body>
 </html>
-
