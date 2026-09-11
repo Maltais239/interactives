@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>GeoTrek</title>
+    <title>GeoTrek — Fixed Basemap</title>
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -26,15 +26,10 @@
         }
         /* CSS rules to fix rendering artifacts */
         .leaflet-container {
-            background: #aadaff;
+            background: #d7e9ee;
             outline: 1px solid transparent; /* Prevents tile tearing */
         }
-        
-        .map-background-tiles {
-            /* Helps prevent seams between map tiles on some browsers */
-            image-rendering: -webkit-optimize-contrast; /* Chrome/Safari */
-            image-rendering: crisp-edges; /* Firefox/Opera */
-        }
+
 
         #map {
             flex: 1;
@@ -115,7 +110,7 @@
         .region-btn.active, .difficulty-btn.active {
             background-color: #14b8a6;
             color: white;
-            box-shadow: 0 4px 6px rgba[0, 0, 0, 0.1];
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         .difficulty-switcher {
             background-color: #e0f2fe;
@@ -300,14 +295,10 @@
             maxBoundsViscosity: 1.0
         }).setView([30, 10], 2);
         
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: 'abcd',
-            maxZoom: 10,
-            minZoom: 2,
-            noWrap: true,
-            className: 'map-background-tiles'
-        }).addTo(map);
+        // CARTO's old public raster tiles now display "API KEY REQUIRED".
+        // GeoTrek already has country GeoJSON, so we build a clean neutral world
+        // background from those shapes instead of relying on a third-party basemap.
+
 
         const regionBtns = document.querySelectorAll('.region-btn');
         const difficultyBtns = document.querySelectorAll('.difficulty-btn');
@@ -327,6 +318,7 @@
 
         // --- App State ---
         let geojson;
+        let contextGeojson;
         let countriesData = {};
         let countryNameMap = {}; // For quick lookup of official name by alternatives
         let trekState = {};
@@ -387,7 +379,29 @@
             const allFeatures = Object.values(countriesData).map(c => ({
                 type: "Feature", properties: { name: c.name }, geometry: c.geometry
             }));
-            geojson = L.geoJson({ type: "FeatureCollection", features: allFeatures }, { style, onEachFeature }).addTo(map);
+
+            // Neutral world context layer. This replaces the old CARTO basemap and
+            // keeps every country visible without any API key or watermark.
+            contextGeojson = L.geoJson(
+                { type: "FeatureCollection", features: allFeatures },
+                {
+                    interactive: false,
+                    style: {
+                        fillColor: '#f7f5ef',
+                        fillOpacity: 1,
+                        color: '#d2dbe0',
+                        weight: 0.9,
+                        opacity: 1
+                    }
+                }
+            ).addTo(map);
+
+            // GeoTrek gameplay layer sits above the neutral world context.
+            geojson = L.geoJson(
+                { type: "FeatureCollection", features: allFeatures },
+                { style, onEachFeature }
+            ).addTo(map);
+
             startNewTrek();
         }
 
@@ -705,7 +719,7 @@
                 if (trekState.pathTaken.includes(countryName)) return { fillColor: '#2563eb', weight: 1.5, color: 'white', fillOpacity: 0.8 }; // Blue for path taken
             }
             
-            return { fillColor: '#e0e0e0', weight: 0.5, color: '#f5f5f5', fillOpacity: 0.4 }; // Made more transparent
+            return { fillColor: '#d7dee2', weight: 0.7, color: '#ffffff', fillOpacity: 0.55 };
         }
 
         function onEachFeature(feature, layer) {
@@ -750,4 +764,3 @@
     </script>
 </body>
 </html>
-
