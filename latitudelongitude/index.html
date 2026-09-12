@@ -95,7 +95,7 @@
 </head>
 <body>
     <h1>Geo-Locator Challenge</h1>
-    
+
     <div id="game-ui">
         <h2 id="target-coords">Loading...</h2>
         <p id="feedback-message">Click on the map to make your guess!</p>
@@ -126,15 +126,15 @@
             noWrap: true,
             minZoom: 2,
         }).setView([20, 0], 2);
-        
+
         // Set bounds to prevent panning outside the world
         map.setMaxBounds([[-90, -180], [90, 180]]);
 
-        // Base map layer from CartoDB
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: 'abcd',
-            maxZoom: 19
+        // Standard OpenStreetMap basemap — no CARTO API key required
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19,
+            noWrap: true
         }).addTo(map);
 
         // --- Manually draw grid lines and labels ---
@@ -160,7 +160,7 @@
                 L.marker([-70, i], { icon: createLabelIcon(labelText), interactive: false }).addTo(map);
             }
         }
-        
+
         for (let i = -90; i <= 90; i += 10) {
             const isMajor = i % 30 === 0;
             const style = isMajor ? majorLineStyle : minorLineStyle;
@@ -171,12 +171,6 @@
                 L.marker([i, 170], { icon: createLabelIcon(labelText), interactive: false }).addTo(map);
             }
         }
-        
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
-        	attribution: '',
-        	subdomains: 'abcd',
-        	pane: 'shadowPane'
-        }).addTo(map);
 
         function cleanUpMap() {
             if (guessMarker) map.removeLayer(guessMarker);
@@ -240,11 +234,10 @@
                 feedbackMessageEl.textContent = `Not quite. You were ${Math.round(distance)} km away. ${feedbackBase}`;
             }
         });
-        
+
         nextBtn.addEventListener('click', generateNewLocation);
 
         generateNewLocation();
     </script>
 </body>
 </html>
-
