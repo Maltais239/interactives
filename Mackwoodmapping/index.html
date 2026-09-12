@@ -680,6 +680,7 @@ let completed = 0;
 let attempts = 0;
 let wrongAttempts = 0;
 let missed = new Set();
+let correctCountries = new Set();
 let gameRunning = false;
 let startedAt = 0;
 let timerId = null;
@@ -753,12 +754,15 @@ function countryFeatures() {
 }
 
 function baseStyle(feature) {
+  const name = feature?.properties?.name;
+  const isCorrect = correctCountries.has(name);
+
   return {
-    fillColor:"#228947",
-    fillOpacity:1,
-    color:"#9bd4dd",
-    weight:0.8,
-    opacity:1
+    fillColor: isCorrect ? "#e5bd45" : "#228947",
+    fillOpacity: 1,
+    color: isCorrect ? "#fff3c4" : "#9bd4dd",
+    weight: isCorrect ? 1.35 : 0.8,
+    opacity: 1
   };
 }
 
@@ -788,9 +792,17 @@ function addTinyMarkers() {
   });
 }
 
+function syncTinyCountryStyles() {
+  document.querySelectorAll(".tiny-dot").forEach(el => {
+    const name = el.dataset.country;
+    el.classList.toggle("correct", correctCountries.has(name));
+    el.classList.remove("wrong");
+  });
+}
+
 function resetAllStyles() {
   if(geojson) geojson.setStyle(baseStyle);
-  document.querySelectorAll(".tiny-dot").forEach(el=>el.classList.remove("correct","wrong"));
+  syncTinyCountryStyles();
 }
 
 function flashLayer(name, kind) {
@@ -801,14 +813,23 @@ function flashLayer(name, kind) {
       : {fillColor:"#ee5568",fillOpacity:1,color:"#ffffff",weight:2.5};
     layer.setStyle(style);
     layer.bringToFront();
-    setTimeout(()=>{
-      if(geojson && gameRunning) geojson.resetStyle(layer);
-    }, kind==="correct"?520:380);
+
+    setTimeout(() => {
+      if (geojson && gameRunning) geojson.resetStyle(layer);
+    }, kind==="correct" ? 520 : 380);
   }
 
-  document.querySelectorAll(`.tiny-dot[data-country="${CSS.escape(name)}"]`).forEach(el=>{
-    el.classList.add(kind);
-    setTimeout(()=>el.classList.remove(kind),kind==="correct"?520:380);
+  document.querySelectorAll(`.tiny-dot[data-country="${CSS.escape(name)}"]`).forEach(el => {
+    if (kind === "correct") {
+      el.classList.add("correct");
+      el.classList.remove("wrong");
+    } else {
+      el.classList.add("wrong");
+      setTimeout(() => {
+        el.classList.remove("wrong");
+        if (correctCountries.has(name)) el.classList.add("correct");
+      }, 380);
+    }
   });
 }
 
@@ -871,6 +892,7 @@ function handleCountryClick(name, clickedLayer=null) {
   if(name===current.name) {
     questionLocked=true;
     completed++;
+    correctCountries.add(name);
     flashLayer(name,"correct");
     showMessage("Correct! ✓",620);
     setTimeout(nextQuestion,650);
@@ -903,9 +925,12 @@ function buildQuestionSet(region, onlyNames=null) {
 }
 
 function startGame(onlyMissed=false) {
-  resetAllStyles();
-
   const missedCopy = new Set(missed);
+
+  // Correct countries stay gold for the current game, but a brand-new run
+  // starts with a clean green map.
+  correctCountries = new Set();
+  resetAllStyles();
   questions = onlyMissed
     ? buildQuestionSet(currentRegion, missedCopy)
     : buildQuestionSet(currentRegion);
