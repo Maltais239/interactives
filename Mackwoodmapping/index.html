@@ -1039,62 +1039,141 @@ els.practiceBtn.addEventListener("click",()=>{
 
 
 /*
- * GEOMETRY RESOLUTION
+ * GEOMETRY RESOLUTION — TERRITORY-SAFE + MULTI-PART SAFE
  *
- * Natural Earth's "countries" file groups some overseas territories with
- * their administering country. That can make a click on French Guiana count
- * as France. We intentionally use the more detailed "map units" dataset
- * instead and resolve each polygon by its own GEOUNIT / GU_A3 identity.
+ * Natural Earth's "map units" data is deliberately more detailed than a
+ * simple country layer. That is useful for French Guiana, Puerto Rico, etc.,
+ * but it also means some normal countries are split into several map units.
  *
- * Important rule: we do NOT fall back from a dependency to its ADMIN country.
- * Example: Martinique has ADMIN="France" but GEOUNIT="Martinique".
- * Martinique is not in this quiz, so it stays visible as geographic context
- * but clicking it will NOT count as France.
+ * Example:
+ *   Belgium -> Brussels / Flemish / Walloon map units
+ *
+ * The previous version kept only the FIRST matching map unit. That is why
+ * part of Belgium could look like ocean.
+ *
+ * This version:
+ *   1. assigns separately-coded territories to themselves;
+ *   2. groups internal map units back into their parent quiz country;
+ *   3. combines EVERY matching geometry instead of keeping only the first;
+ *   4. leaves unlisted overseas territories visible but non-clickable.
  */
-function resolveMapUnitFact(feature, factsByCode, factsByName) {
+
+function cleanMapCode(value) {
+  const code = String(value ?? "").trim();
+  return code && code !== "-99" ? code : "";
+}
+
+function cleanMapName(value) {
+  return String(value ?? "").trim();
+}
+
+function findDirectMapUnitFact(feature, factsByCode, factsByName) {
   const p = feature?.properties || {};
 
-  // Prefer the map unit's own codes, never the sovereign/admin code.
-  const codes = [
-    p.GU_A3,
-    p.ISO_A3,
-    p.ISO_A3_EH,
-    p.ADM0_ISO
-  ]
-    .map(v => String(v ?? "").trim())
-    .filter(v => v && v !== "-99");
+  // ISO codes are the safest signal that a map unit is its own entity.
+  const isoCodes = [
+    cleanMapCode(p.ISO_A3),
+    cleanMapCode(p.ISO_A3_EH)
+  ].filter(Boolean);
 
-  for (const code of codes) {
+  for (const code of isoCodes) {
     const fact = factsByCode.get(code);
     if (fact) return fact;
   }
 
-  // Then try the map unit's own names.
+  // Then use the map unit's OWN names.
   const ownNames = [
-    p.GEOUNIT,
-    p.NAME_LONG,
-    p.NAME
-  ]
-    .map(v => String(v ?? "").trim())
-    .filter(Boolean);
+    cleanMapName(p.GEOUNIT),
+    cleanMapName(p.NAME_LONG),
+    cleanMapName(p.NAME)
+  ].filter(Boolean);
 
   for (const name of ownNames) {
     const fact = factsByName.get(name);
     if (fact) return fact;
   }
 
-  // ADMIN is safe only when this really is the admin/home map unit.
-  // For a dependency such as Martinique (ADMIN France, GEOUNIT Martinique)
-  // we deliberately do not map the polygon to France.
-  const admin = String(p.ADMIN ?? "").trim();
-  const geounit = String(p.GEOUNIT ?? "").trim();
-
-  if (admin && (!geounit || geounit === admin)) {
-    const fact = factsByName.get(admin);
+  // GU_A3 is useful for entities with nonstandard ISO handling, but comes
+  // after names so a regional map-unit code cannot accidentally win first.
+  const guCode = cleanMapCode(p.GU_A3);
+  if (guCode) {
+    const fact = factsByCode.get(guCode);
     if (fact) return fact;
   }
 
   return null;
+}
+
+function findAdminFact(feature, factsByCode, factsByName) {
+  const p = feature?.properties || {};
+
+  const adminName = cleanMapName(p.ADMIN);
+  if (adminName) {
+    const byName = factsByName.get(adminName);
+    if (byName) return byName;
+  }
+
+  const adminCodes = [
+    cleanMapCode(p.ADM0_A3),
+    cleanMapCode(p.ADM0_ISO)
+  ].filter(Boolean);
+
+  for (const code of adminCodes) {
+    const byCode = factsByCode.get(code);
+    if (byCode) return byCode;
+  }
+
+  return null;
+}
+
+function isInternalPartOfAdmin(feature, adminFact) {
+  if (!adminFact) return false;
+
+  const p = feature?.properties || {};
+  const adminCode = cleanMapCode(adminFact.cca3);
+
+  // A real ISO code different from the parent country's code means this is
+  // a separately coded territory/dependency. Do NOT absorb it into the
+  // administering country.
+  //
+  // Examples:
+  //   Martinique -> MTQ, not FRA
+  //   French Guiana -> GUF, not FRA
+  //
+  // Internal map units such as Belgium's regions normally have ISO_A3=-99,
+  // so they ARE recombined into Belgium.
+  const ownIsoCodes = [
+    cleanMapCode(p.ISO_A3),
+    cleanMapCode(p.ISO_A3_EH)
+  ].filter(Boolean);
+
+  if (ownIsoCodes.some(code => code !== adminCode)) {
+    return false;
+  }
+
+  return true;
+}
+
+function addGeometryPart(partsByCountry, countryName, geometry) {
+  if (!countryName || !geometry) return;
+
+  if (!partsByCountry.has(countryName)) {
+    partsByCountry.set(countryName, []);
+  }
+
+  partsByCountry.get(countryName).push(geometry);
+}
+
+function combineGeometryParts(parts) {
+  if (!parts || parts.length === 0) return null;
+  if (parts.length === 1) return parts[0];
+
+  // Leaflet supports GeoJSON GeometryCollection. Keeping each original
+  // polygon intact is safer than trying to hand-merge rings in JavaScript.
+  return {
+    type: "GeometryCollection",
+    geometries: parts
+  };
 }
 
 function contextStyle() {
@@ -1125,47 +1204,68 @@ Promise.all([
       .map(f => [f.cca3, f])
   );
 
+  const partsByCountry = new Map();
   const contextFeatures = [];
 
-  // First choice: Natural Earth MAP UNITS.
-  // This separates French Guiana, Puerto Rico, Greenland, etc. from
-  // their administering/sovereign countries.
   mapUnits.features.forEach(feature => {
-    const fact = resolveMapUnitFact(feature, factsByCode, factsByName);
+    // First: does this map unit directly represent one of our quiz entities?
+    const directFact = findDirectMapUnitFact(feature, factsByCode, factsByName);
 
-    if (fact) {
-      const countryName = fact.name.common;
+    if (directFact) {
+      addGeometryPart(
+        partsByCountry,
+        directFact.name.common,
+        feature.geometry
+      );
+      return;
+    }
 
-      // The map-unit dataset can contain more than one feature for an entity.
-      // If that happens, keep the first exact map-unit geometry; the stable
-      // source below remains a fallback for anything genuinely missing.
-      if (!countriesData[countryName]) {
-        countriesData[countryName] = {
-          ...fact,
-          geometry: feature.geometry,
-          name: countryName
-        };
-      }
-    } else {
-      // Unlisted territories (Martinique, Guadeloupe, Réunion, etc.) remain
-      // visible so the map looks complete, but they are not clickable answers.
-      contextFeatures.push({
-        type: "Feature",
-        properties: {
-          name:
-            feature.properties?.GEOUNIT ||
-            feature.properties?.NAME_LONG ||
-            feature.properties?.NAME ||
-            ""
-        },
-        geometry: feature.geometry
-      });
+    // Second: is this merely an internal piece of a quiz country?
+    // Belgium's Brussels/Flemish/Walloon units fall here and are ALL added
+    // back into Belgium instead of only keeping the first one.
+    const adminFact = findAdminFact(feature, factsByCode, factsByName);
+
+    if (adminFact && isInternalPartOfAdmin(feature, adminFact)) {
+      addGeometryPart(
+        partsByCountry,
+        adminFact.name.common,
+        feature.geometry
+      );
+      return;
+    }
+
+    // Otherwise it is useful map context but not one of this game's answers.
+    // This is intentional for places such as Martinique or Guadeloupe:
+    // they remain visible, but clicking them cannot be counted as France.
+    contextFeatures.push({
+      type: "Feature",
+      properties: {
+        name:
+          feature.properties?.GEOUNIT ||
+          feature.properties?.NAME_LONG ||
+          feature.properties?.NAME ||
+          ""
+      },
+      geometry: feature.geometry
+    });
+  });
+
+  // Build quiz geometries from ALL of their matched map-unit pieces.
+  partsByCountry.forEach((parts, countryName) => {
+    const fact = factsByName.get(countryName);
+    const geometry = combineGeometryParts(parts);
+
+    if (fact && geometry) {
+      countriesData[countryName] = {
+        ...fact,
+        geometry,
+        name: countryName
+      };
     }
   });
 
-  // Fallback only for quiz entities that the map-unit resolver did not find.
-  // Because matched entities are never overwritten, France cannot absorb
-  // French Guiana (or similar territories) through this fallback.
+  // Conservative fallback for any quiz entity that genuinely wasn't
+  // represented by the map-unit resolver.
   stable.features.forEach(feature => {
     const countryName = feature.properties.name;
     const fact = factsByName.get(countryName);
@@ -1179,7 +1279,9 @@ Promise.all([
     }
   });
 
-  // Draw non-quiz dependencies first as non-interactive geographic context.
+  // Draw dependencies / territories that are not quiz answers underneath the
+  // interactive layer. They are geographic context only, so they cannot
+  // steal a click from the country the student is trying to identify.
   if (contextFeatures.length) {
     L.geoJson(
       { type: "FeatureCollection", features: contextFeatures },
@@ -1189,6 +1291,27 @@ Promise.all([
       }
     ).addTo(map);
   }
+
+  const missing = countryFacts
+    .map(f => f.name.common)
+    .filter(name => !countriesData[name]);
+
+  const multipart = Array.from(partsByCountry.entries())
+    .filter(([, parts]) => parts.length > 1)
+    .map(([name, parts]) => `${name} (${parts.length})`);
+
+  if (missing.length) {
+    console.warn("World Country Challenge geometry missing:", missing);
+  } else {
+    console.info(
+      `World Country Challenge geometry audit passed: ${Object.keys(countriesData).length} quiz entities mapped.`
+    );
+  }
+
+  console.info(
+    "Countries assembled from multiple Natural Earth map units:",
+    multipart
+  );
 
   const collection = {type:"FeatureCollection",features:countryFeatures()};
   geojson=L.geoJson(collection,{
@@ -1207,18 +1330,6 @@ Promise.all([
       });
     }
   }).addTo(map);
-
-  // Audit in the browser console. Missing entities are automatically excluded
-  // from the question pool because questions are built from countriesData.
-  const missing = countryFacts
-    .map(f => f.name.common)
-    .filter(name => !countriesData[name]);
-
-  if (missing.length) {
-    console.warn("World Country Challenge: map geometry not found for:", missing);
-  } else {
-    console.info(`World Country Challenge geometry audit passed: ${Object.keys(countriesData).length} quiz entities mapped.`);
-  }
 
   addTinyMarkers();
   renderRegionButtons();
