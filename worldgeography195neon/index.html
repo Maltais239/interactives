@@ -7,7 +7,7 @@
   <style>
     html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#03010d}
     #game{width:100%;height:100%;border:0;display:block;background:#03010d;opacity:0;transition:opacity .18s ease}
-    #boot{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:5;background:radial-gradient(circle at 50% 45%,#151052 0%,#08051d 42%,#03010d 78%);font-family:monospace;color:#00f5ff;letter-spacing:.18em;text-shadow:0 0 8px #00f5ff,0 0 24px #ff2bd6}
+    #boot{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:5;background:radial-gradient(circle at 50% 45%,#151052 0%,#08051d 42%,#03010d 78%);font-family:monospace;color:#10d7e2;letter-spacing:.18em;text-shadow:0 0 7px rgba(16,215,226,.7),0 0 18px rgba(230,0,233,.28)}
   </style>
 </head>
 <body>
@@ -18,41 +18,49 @@
     const boot=document.getElementById('boot');
 
     const enhancement=`<script>
-      const neonPalette=['#21C7D9','#D954B5','#78D95B','#E8C64A','#8E67D7','#2EC69B','#D77A3A','#6687D9','#D765A8','#3DB8D1','#A7C94A','#D85F84'];
+      // Palette based on the supplied Neon / 80s Brights reference.
+      // Bright hues, but deliberately translucent so the map glows instead of shouting.
+      const neonPalette=[
+        '#D600F4','#A111F5','#6460FF','#12A8F4',
+        '#17BDD7','#16D9C9','#18E4AF','#18E85F',
+        '#C6ED00','#FF5E55','#F60790','#EC0BD3',
+        '#E3094D','#E70A82','#F23B67','#E661D9',
+        '#75F500','#FFD912','#4B2AF5','#FF720D'
+      ];
 
       style=function(feature){
         const countryName=feature.properties.name;
 
         if(currentMode==='practice'){
           if(practiceBank.includes(countryName)){
-            return{fillColor:'#C94FAF',weight:2.2,color:'#EAB8DF',fillOpacity:.76,opacity:.9};
+            return{fillColor:'#E70A82',weight:2,color:'#F6A8DB',fillOpacity:.58,opacity:.86};
           }
-          return{fillColor:'#030611',weight:.7,color:'#14233D',fillOpacity:.78,opacity:.95};
+          return{fillColor:'#030611',weight:.7,color:'#14233D',fillOpacity:.76,opacity:.9};
         }
 
         if(countryName===justMissedCountry){
-          return{fillColor:'#D94A68',weight:2.5,color:'#E6A7B3',fillOpacity:.78,opacity:.95};
+          return{fillColor:'#E3094D',weight:2.3,color:'#F29AB2',fillOpacity:.60,opacity:.9};
         }
 
         const guessed=quizState['World Tour']?.correctlyGuessed.includes(countryName);
         const visible=currentRegion==='World Tour'||(countriesData[countryName]&&countriesData[countryName].region===currentRegion);
 
         if(!visible){
-          return{fillColor:'#02030A',weight:.6,color:'#101B30',fillOpacity:.58,opacity:.9};
+          return{fillColor:'#02030A',weight:.6,color:'#101B30',fillOpacity:.56,opacity:.86};
         }
 
         if(currentMode==='quiz'&&!guessed){
-          return{fillColor:'#050713',weight:1,color:'#173454',fillOpacity:.78,opacity:.95};
+          return{fillColor:'#050713',weight:1,color:'#173454',fillOpacity:.76,opacity:.9};
         }
 
         const hash=countryName.split('').reduce((a,c)=>c.charCodeAt(0)+((a<<5)-a),0);
         const fill=neonPalette[Math.abs(hash)%neonPalette.length];
         return{
           fillColor:fill,
-          weight:guessed?2.1:1.45,
-          color:guessed?'#A7E6EC':'#4DB9C7',
-          fillOpacity:guessed?.76:.64,
-          opacity:.92
+          weight:guessed?2.0:1.35,
+          color:guessed?'#A5EDF2':'#4DB9C7',
+          fillOpacity:guessed?.66:.48,
+          opacity:.84
         };
       };
 
@@ -63,10 +71,10 @@
         const name=layer.feature.properties.name;
         const guessed=quizState['World Tour']?.correctlyGuessed.includes(name);
         layer.setStyle({
-          weight:guessed?3.2:2.6,
-          color:guessed?'#D8FAFC':'#D67AC8',
-          fillOpacity:guessed?.86:.76,
-          opacity:1
+          weight:guessed?3:2.4,
+          color:guessed?'#D9FAFC':'#D978CA',
+          fillOpacity:guessed?.76:.62,
+          opacity:.96
         });
         layer.bringToFront();
       };
@@ -75,7 +83,7 @@
       initializeLogic=function(){
         originalInitializeLogic();
         if(contextGeojson){
-          contextGeojson.setStyle({fillColor:'#02040D',fillOpacity:1,color:'#102746',weight:.8,opacity:.9});
+          contextGeojson.setStyle({fillColor:'#02040D',fillOpacity:1,color:'#102746',weight:.8,opacity:.86});
         }
         if(geojson)geojson.resetStyle();
       };
@@ -87,11 +95,11 @@
         let target;
         geojson.eachLayer(layer=>{if(layer.feature?.properties?.name===answer)target=layer;});
         if(!target)return;
-        const flashes=['#BFEFF4','#74DDE8','#B6E889','#D58BC8'];
+        const flashes=['#8DECF2','#21D9E5','#B6F45B','#E56AD7'];
         let i=0;
         const timer=setInterval(()=>{
           if(i>=flashes.length){clearInterval(timer);geojson.resetStyle(target);return;}
-          target.setStyle({fillColor:flashes[i],color:'#DDF9FA',weight:3.3,fillOpacity:.84,opacity:1});
+          target.setStyle({fillColor:flashes[i],color:'#DDF9FA',weight:3.1,fillOpacity:.72,opacity:.98});
           i++;
         },120);
       });
@@ -109,7 +117,7 @@
         '<link rel="preconnect" href="https://fonts.googleapis.com">'+
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'+
         '<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">'+
-        '<style>'+theme+'#map .leaflet-overlay-pane canvas{filter:saturate(.92) brightness(.9) contrast(1.02) drop-shadow(0 0 2px rgba(77,185,199,.22)) !important}</style></head>'
+        '<style>'+theme+'#map .leaflet-overlay-pane canvas{filter:saturate(.88) brightness(.86) contrast(1.01) drop-shadow(0 0 3px rgba(16,215,226,.18)) !important}</style></head>'
       );
       html=html.replace('</body>',enhancement+'</body>');
       frame.srcdoc=html;
