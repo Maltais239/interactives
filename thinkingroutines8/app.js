@@ -117,7 +117,7 @@ function renderOutcomes(){
 }
 function renderPhases(){
   $("phases").innerHTML=phases.map((p,i)=>`<button class="phase p${i} ${i===pi?"on":""}" data-p="${i}">${p.label}</button>`).join("");
-  document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{pi=+b.dataset.p;choice=null;renderPhase();});
+  document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{pi=+b.dataset.p;choice=null;renderPhases();renderPhase();});
 }
 function renderPhase(){
   const o=outcomes[oi],p=phases[pi],items=o.map[p.id];
