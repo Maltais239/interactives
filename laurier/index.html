@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laurier — Darren + Jeff + Brad</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Outfit:wght@400;600;700;800&display=swap">
+<style>
+:root{
+  --bg:#211812; --surface:#2b2019; --raised:#34271f; --line:#5a4030;
+  --cream:#fff2df; --muted:#c9ac8f; --faint:#947a65; --amber:#f2a33a;
+  --green:#77a866; --red:#d76359;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--cream);font-family:"Outfit",system-ui,sans-serif}
+body{min-height:100vh}
+.wrap{max-width:1500px;margin:0 auto;padding:18px 18px 40px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.brand h1{font-family:"Fraunces",Georgia,serif;font-size:44px;line-height:1;margin:0;letter-spacing:-.5px}
+.brand h1 span{color:var(--amber)}
+.brand .sub{color:var(--muted);font-size:13px;letter-spacing:.13em;text-transform:uppercase;margin-top:7px}
+.rule{height:3px;border-radius:3px;background:linear-gradient(90deg,var(--amber),transparent 70%);margin:0 0 16px}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+button{font:inherit}
+.btn{border:1px solid var(--line);background:transparent;color:var(--cream);font-weight:700;padding:9px 13px;border-radius:10px;cursor:pointer}
+.btn:hover{filter:brightness(1.12)}
+.summary{color:var(--muted);font-size:13px}
+.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:start}
+.col{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;min-width:0}
+.colhead{position:sticky;top:0;z-index:2;background:linear-gradient(180deg,var(--surface) 85%,rgba(43,32,25,.94));padding:16px 16px 12px;border-bottom:1px solid var(--line)}
+.coltitle{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.coltitle h2{font-family:"Fraunces",Georgia,serif;margin:0;font-size:25px}
+.count{font-weight:800;color:var(--amber);font-size:13px;white-space:nowrap}
+.note{font-size:12px;color:var(--faint);margin-top:4px}
+.list{padding:4px 10px 10px}
+.song{display:grid;grid-template-columns:32px minmax(0,1fr);gap:10px;align-items:center;padding:11px 6px;border-bottom:1px solid rgba(90,64,48,.55);cursor:pointer;border-radius:9px}
+.song:hover{background:rgba(255,255,255,.025)}
+.song.done{opacity:.46}
+.song.done .title{text-decoration:line-through}
+.check{width:24px;height:24px;border:2px solid var(--line);border-radius:7px;display:grid;place-items:center;color:#2a1c0b;font-weight:900}
+.song.done .check{background:var(--amber);border-color:var(--amber)}
+.song.done .check:after{content:"✓"}
+.title{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.alt .colhead{border-top:3px solid var(--amber)}
+.set1 .colhead,.set2 .colhead{border-top:3px solid rgba(242,163,58,.55)}
+.footer{margin-top:14px;color:var(--faint);font-size:12px;text-align:center}
+@media(max-width:900px){
+  .grid{grid-template-columns:1fr}
+  .colhead{position:static}
+}
+@media(min-width:901px){
+  .list{max-height:calc(100vh - 205px);overflow:auto;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+}
+@media(max-width:520px){
+  .wrap{padding:14px 10px 30px}
+  .brand h1{font-size:38px}
+  .title{font-size:15px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1><span>Laurier</span></h1>
+      <div class="sub">Darren + Jeff + Brad · tomorrow night's gig</div>
+    </div>
+    <div class="toolbar">
+      <div class="summary" id="summary"></div>
+      <button class="btn" id="reset">Reset played</button>
+    </div>
+  </header>
+  <div class="rule"></div>
+
+  <main class="grid" id="grid"></main>
+  <div class="footer">Tap a song as you play it. Your checkmarks stay on this device.</div>
+</div>
+
+<script>
+const SETS = [
+  {
+    id:"set1", title:"Set 1", note:"20 songs", cls:"set1",
+    songs:[
+      ["Get Back","The Beatles","A"],
+      ["Cleopatra","The Lumineers","Ab · capo 1"],
+      ["Don't Want to Wait","Darren Maltais",""],
+      ["You Wreck Me","Tom Petty","D"],
+      ["Blank Space","Ryan Adams","C"],
+      ["Pride and Joy","Stevie Ray Vaughan","E"],
+      ["Ahead by a Century","The Tragically Hip","D"],
+      ["Five Dollar Bill","Corb Lund","A"],
+      ["Real Love Baby","Father John Misty","D"],
+      ["King of the Road","Roger Miller","Bb"],
+      ["Something in the Orange","Zach Bryan","Em"],
+      ["Don't Walk Away Eileen","Sam Roberts","C"],
+      ["Island in the Sun","Weezer","Em"],
+      ["Wagon Wheel","Old Crow Medicine Show","G"],
+      ["Green River","Creedence Clearwater Revival","E"],
+      ["Dancing in the Dark","Bruce Springsteen","G"],
+      ["Folsom Prison Blues","Johnny Cash","E"],
+      ["Still Falling","Jeff McLellan","C"],
+      ["I Need Never Get Old","Nathaniel Rateliff","G"],
+      ["Johnny B. Goode","Chuck Berry","A"]
+    ]
+  },
+  {
+    id:"set2", title:"Set 2", note:"20 songs", cls:"set2",
+    songs:[
+      ["Blister in the Sun","Violent Femmes","G"],
+      ["Faith","Wham!","B"],
+      ["Harvest Moon","Neil Young","G"],
+      ["American Girl","Tom Petty","D"],
+      ["Dirty Old Town","The Pogues","D"],
+      ["Blow at High Dough","The Tragically Hip","B"],
+      ["No Bright Light","Darren Maltais","E"],
+      ["Where Is My Mind?","Pixies","E"],
+      ["Tennessee Whiskey","Chris Stapleton","E"],
+      ["I'm on Fire","Whitehorse","E"],
+      ["Steal My Kisses","Ben Harper","G"],
+      ["Big River","Johnny Cash","F"],
+      ["Copperhead Road","Steve Earle","D"],
+      ["Back to Black","Amy Winehouse","Dm"],
+      ["Day Tripper","The Beatles","E"],
+      ["Oh Boy","Buddy Holly","A"],
+      ["Norwegian Wood","The Beatles","D"],
+      ["Tonight in Black and White","Jeff McLellan","D"],
+      ["Hand It Over","Darren Maltais","G"],
+      ["What'd I Say","Ray Charles","E"]
+    ]
+  },
+  {
+    id:"alt", title:"Alternates", note:"pull from here if needed", cls:"alt",
+    songs:[
+      ["Bobcaygeon","The Tragically Hip","G"],
+      ["All Apologies","Nirvana","D · capo 2"],
+      ["Hungry Like the Wolf","Duran Duran","E"],
+      ["That's All Right Mama","Elvis / Beatles","A"],
+      ["Wanted Dead or Alive","Bon Jovi","C"],
+      ["Those Days","","G"],
+      ["Fishin' in the Dark","Nitty Gritty Dirt Band","D"],
+      ["Paper Planes","M.I.A.","D · ♩=86"],
+      ["Cry Me a River","Justin Timberlake","Em"],
+      ["Colors","","F#m"],
+      ["You Can't Judge a Book by the Cover","Bo Diddley","A"],
+      ["Sob","Nathaniel Rateliff & the Night Sweats","F"],
+      ["Runaround Sue","Dion","D · capo 2"],
+      ["Rocket Man","Elton John","Em"],
+      ["No Diggity","Blackstreet","Gm"],
+      ["Cadillac Ranch","Nitty Gritty Dirt Band","E"],
+      ["I Shot the Sheriff","Bob Marley","F#m"],
+      ["Driving My Life Away","Eddie Rabbitt",""],
+      ["Life of Sin","Sturgill Simpson","E"],
+      ["Paranoid","Black Sabbath","Em"],
+      ["Beautiful Things","Darren Maltais","E"],
+      ["Corinna","Taj Mahal","A"],
+      ["Creep","Radiohead","G"],
+      ["My Babe","Willie Dixon","F"],
+      ["The Thrill Is Gone","B.B. King","Bm"],
+      ["Before Our Graves","Jeff McLellan","G"],
+      ["It Takes a Lot to Laugh, It Takes a Train to Cry","Bob Dylan","Ab"],
+      ["Flowers in Your Hair","The Lumineers","G"],
+      ["Ophelia","The Band","C"],
+      ["Sunflower","Post Malone & Swae Lee","C"],
+      ["Hasn't Hit Me Yet","Blue Rodeo","E · capo 2"]
+    ]
+  }
+];
+
+const KEY = "laurier:gig:played:v1";
+let played = {};
+try { played = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch(e) { played = {}; }
+
+function songId(setId,index,title){ return setId + ":" + index + ":" + title; }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(played)); } catch(e) {} }
+
+function render(){
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+  SETS.forEach(function(set){
+    const col = document.createElement("section");
+    col.className = "col " + set.cls;
+
+    const head = document.createElement("div");
+    head.className = "colhead";
+    const titleRow = document.createElement("div");
+    titleRow.className = "coltitle";
+    const h = document.createElement("h2");
+    h.textContent = set.title;
+    const count = document.createElement("div");
+    count.className = "count";
+    const doneCount = set.songs.reduce(function(n,s,i){ return n + (played[songId(set.id,i,s[0])] ? 1 : 0); },0);
+    count.textContent = doneCount + "/" + set.songs.length + " played";
+    titleRow.appendChild(h); titleRow.appendChild(count);
+    const note = document.createElement("div");
+    note.className = "note";
+    note.textContent = set.note;
+    head.appendChild(titleRow); head.appendChild(note);
+
+    const list = document.createElement("div");
+    list.className = "list";
+    set.songs.forEach(function(s,i){
+      const id = songId(set.id,i,s[0]);
+      const row = document.createElement("div");
+      row.className = "song" + (played[id] ? " done" : "");
+      row.tabIndex = 0;
+      row.setAttribute("role","checkbox");
+      row.setAttribute("aria-checked", played[id] ? "true" : "false");
+
+      const check = document.createElement("div");
+      check.className = "check";
+      const text = document.createElement("div");
+      const title = document.createElement("div");
+      title.className = "title";
+      title.textContent = s[0];
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = [s[1],s[2]].filter(Boolean).join(" · ");
+      text.appendChild(title); text.appendChild(meta);
+      row.appendChild(check); row.appendChild(text);
+
+      const toggle = function(){
+        if (played[id]) delete played[id]; else played[id] = true;
+        save(); render();
+      };
+      row.addEventListener("click", toggle);
+      row.addEventListener("keydown", function(e){
+        if(e.key === "Enter" || e.key === " "){ e.preventDefault(); toggle(); }
+      });
+      list.appendChild(row);
+    });
+
+    col.appendChild(head); col.appendChild(list); grid.appendChild(col);
+  });
+
+  const mainTotal = SETS[0].songs.length + SETS[1].songs.length;
+  const mainDone = SETS.slice(0,2).reduce(function(total,set){
+    return total + set.songs.reduce(function(n,s,i){ return n + (played[songId(set.id,i,s[0])] ? 1 : 0); },0);
+  },0);
+  document.getElementById("summary").textContent = mainDone + "/" + mainTotal + " main-set songs played";
+}
+
+document.getElementById("reset").addEventListener("click", function(){
+  if(confirm("Clear all played checkmarks for tonight?")){
+    played = {}; save(); render();
+  }
+});
+
+async function keepAwake(){
+  if(!("wakeLock" in navigator) || document.visibilityState !== "visible") return;
+  try { await navigator.wakeLock.request("screen"); } catch(e) {}
+}
+keepAwake();
+document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible") keepAwake(); });
+document.addEventListener("pointerdown", keepAwake, {once:true});
+
+render();
+</script>
+</body>
+</html>
