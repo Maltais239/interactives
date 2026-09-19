@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Outfit:wght@400;600;700;800&family=Roboto+Mono:wght@400;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 :root{--bg:#211812;--surface:#2b2019;--raised:#34271f;--line:#5a4030;--cream:#fff2df;--muted:#c9ac8f;--faint:#947a65;--amber:#f2a33a;--green:#77a866}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -33,6 +34,20 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
 .alt .colhead{border-top:3px solid var(--amber)}.set1 .colhead,.set2 .colhead{border-top:3px solid rgba(242,163,58,.55)}
 .sortable-ghost{opacity:.18!important}.sortable-chosen{background:var(--raised)!important}.sortable-drag{box-shadow:0 12px 30px rgba(0,0,0,.45);border:1px solid var(--amber)}
 .footer{margin-top:14px;color:var(--faint);font-size:12px;text-align:center}
+.qr-modal{position:fixed;inset:0;background:rgba(12,8,6,.86);z-index:120;display:none;align-items:center;justify-content:center;padding:20px}
+.qr-modal.open{display:flex}
+.qr-card{width:min(430px,100%);background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px;text-align:center;box-shadow:0 22px 70px rgba(0,0,0,.55)}
+.qr-card h2{font-family:"Fraunces",Georgia,serif;font-size:28px;margin:0 0 6px}.qr-card p{color:var(--muted);font-size:13px;margin:0 0 16px}
+#qr-code{display:flex;justify-content:center;background:white;padding:14px;border-radius:14px;width:max-content;margin:0 auto 16px}
+#qr-code img,#qr-code canvas{display:block}
+.qr-url{font-size:11px;color:var(--faint);overflow-wrap:anywhere;margin-bottom:14px}
+.audience-only{max-width:1500px;margin:0 auto;padding:20px}
+.audience-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.audience-col{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px}
+.audience-col h2{font-family:"Fraunces",Georgia,serif;font-size:25px;margin:0 0 10px;color:var(--amber)}
+.audience-song{font-size:17px;font-weight:700;padding:9px 4px;border-bottom:1px solid rgba(90,64,48,.5)}
+.audience-song:last-child{border-bottom:0}
+@media(max-width:900px){.audience-grid{grid-template-columns:1fr}.audience-only{padding:12px}.audience-col{padding:14px}.audience-song{font-size:16px;padding:8px 2px}}
 .modal{position:fixed;inset:0;background:rgba(12,8,6,.84);z-index:100;display:none;padding:18px}.modal.open{display:flex}
 .sheet{width:min(1180px,100%);height:100%;margin:auto;background:var(--surface);border:1px solid var(--line);border-radius:18px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.55)}
 .sheet-head{padding:14px 16px 11px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start}.sheet-title-wrap{flex:1;min-width:0}
@@ -73,8 +88,17 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
 <body>
 <div class="wrap">
 <header><div class="brand"><h1><span>Laurier</span></h1><div class="sub">Darren + Jeff + Brad · gig setlist</div></div>
-<div class="toolbar"><div><div class="summary" id="summary"></div><div class="local-note">drag order + played checks save only on this device</div></div><button class="btn" id="reset-order" type="button">Reset set order</button><button class="btn" id="reset-played" type="button">Reset played</button></div></header>
+<div class="toolbar"><div><div class="summary" id="summary"></div><div class="local-note">drag order + played checks save only on this device</div></div><button class="btn" id="audience-qr" type="button">Audience QR</button><button class="btn" id="reset-order" type="button">Reset set order</button><button class="btn" id="reset-played" type="button">Reset played</button></div></header>
 <div class="rule"></div><main class="grid" id="grid"></main><div class="footer">☰ drag · tap the song title or ♪ for chords/lyrics · tap the box when played</div>
+</div>
+<div class="qr-modal" id="qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-title">
+  <div class="qr-card">
+    <h2 id="qr-title">Audience Setlist</h2>
+    <p>Scan to see tonight's songs only.</p>
+    <div id="qr-code"></div>
+    <div class="qr-url" id="qr-url"></div>
+    <button class="btn" id="close-qr" type="button">Close</button>
+  </div>
 </div>
 <div class="modal" id="lyrics-modal" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
 <div class="sheet"><div class="sheet-head"><div class="sheet-title-wrap"><div class="sheet-title" id="sheet-title">Song</div><div class="sheet-meta" id="sheet-meta"></div><div class="sheet-source" id="sheet-source"></div></div><button class="close-btn" id="close-sheet" type="button" aria-label="Close chord sheet">×</button></div>
@@ -466,6 +490,7 @@ const DEFAULT_SETS=[
 ];
 const LYRIC_FILES={"Get Back":"Get Back.txt","You Wreck Me":"You Wreck Me.txt","Pride and Joy":"Pride And Joy.txt","Ahead by a Century":"Ahead By A Century.txt","All Apologies":"ALL APOLOGIES.txt","Cleopatra":"Cleopatra.txt","Don't Want to Wait":"Don't Want to Wait.txt","Blank Space":"Blank Space.txt","Five Dollar Bill":"Five Dollar Bill.txt","Real Love Baby":"REAL LOVE BABY.txt","King of the Road":"KING OF THE ROAD.txt","Something in the Orange":"SOMETHING IN THE ORANGE.txt","Don't Walk Away Eileen":"Dont Walk Away Eileen.txt","That's All Right Mama":"Thats All Right Mama.txt","Green River":"Green River.txt","Dancing in the Dark":"Dancing In The Dark.txt","Ophelia":"Ophelia.txt","Folsom Prison Blues":"Folsom Prison Blues.txt","Still Falling":"Still Falling.txt","I Need Never Get Old":"I Need Never Get Old.txt","Johnny B. Goode":"Johnny B Goode.txt","Blister in the Sun":"Blister In The Sun.txt","American Girl":"American Girl.txt","Day Tripper":"Day Tripper.txt","Faith":"Faith.txt","Blow at High Dough":"Blow At High Dough.txt","Harvest Moon":"Harvest Moon.txt","No Bright Light":"No Bright Light.txt","Colors":"Colors.txt","Tennessee Whiskey":"Tennessee Whiskey.txt","I'm on Fire":"I'm On Fire.txt","Steal My Kisses":"Steal My Kisses.txt","It Takes a Lot to Laugh, It Takes a Train to Cry":"It Takes a Lot to Laugh, It Takes a Train to Cry.txt","Big River":"Big River.txt","Copperhead Road":"Copperhead Road.txt","Back to Black":"Back To Black.txt","Oh Boy":"Oh Boy.txt","Norwegian Wood":"Norwegian Wood (This Bird Has Flown).txt","Tonight in Black and White":"Tonight in Black and White.txt","Hand It Over":"Hand it over.txt","Island in the Sun":"Island In The Sun.txt","Wagon Wheel":"Wagon Wheel.txt","Dirty Old Town":"Dirty Old Town.txt","What'd I Say":"What’d I Say.txt","Bobcaygeon":"Bobcaygeon.txt","Hungry Like the Wolf":"Hungry Like The Wolf.txt","Wanted Dead or Alive":"Wanted Dead Or Alive.txt","Those Days":"Those Days.txt","Fishin' in the Dark":"Fishin In The Dark.txt","Paper Planes":"Paper Planes.txt","Cry Me a River":"Cry Me A River.txt","You Can't Judge a Book by the Cover":"You Cant Judge A Book By The Cover.txt","Sob":"Sob.txt","Runaround Sue":"Runaround Sue.txt","Rocket Man":"Rocket Man.txt","No Diggity":"No Diggity.txt","Cadillac Ranch":"CADILLAC RANCH.txt","I Shot the Sheriff":"I Shot The Sheriff.txt","Driving My Life Away":"Driving My Life Away.docx","Life of Sin":"Life Of Sin.txt","Paranoid":"Paranoid.txt","Beautiful Things":"Beautiful things.txt","Corinna":"Corinna.txt","Creep":"Creep.txt","My Babe":"My Babe.txt","The Thrill Is Gone":"The Thrill Is Gone.txt","Before Our Graves":"Before Our Graves.txt","Flowers in Your Hair":"Flowers In Your Hair.txt","Sunflower":"Sunflower.txt","Hasn't Hit Me Yet":"Hasnt Hit Me Yet.txt","Where Is My Mind?":"Where Is My Mind.txt"};
 const RAW_BASE="https://raw.githubusercontent.com/Maltais239/interactives/main/songfiles/";
+const AUDIENCE_MODE=new URLSearchParams(window.location.search).get("audience")==="1";
 const ORDER_KEY="laurier:gig:order:v2",PLAYED_KEY="laurier:gig:played:v2",OLD_PLAYED_KEY="laurier:gig:played:v1",FONT_KEY="laurier:gig:lyrics-font",SPEED_KEY="laurier:gig:scroll-delay";
 const deepClone=x=>JSON.parse(JSON.stringify(x)); const allPublishedTitles=()=>DEFAULT_SETS.flatMap(s=>s.songs.map(x=>x[0]));
 function loadOrder(){try{const saved=JSON.parse(localStorage.getItem(ORDER_KEY)||"null");if(!Array.isArray(saved)||saved.length!==DEFAULT_SETS.length)return deepClone(DEFAULT_SETS);const a=allPublishedTitles().slice().sort(),b=saved.flatMap(s=>(s.songs||[]).map(x=>x[0])).slice().sort();if(a.length!==b.length)return deepClone(DEFAULT_SETS);for(let i=0;i<a.length;i++)if(a[i]!==b[i])return deepClone(DEFAULT_SETS);return saved}catch(e){return deepClone(DEFAULT_SETS)}}
@@ -481,10 +506,32 @@ async function loadLyrics(title){if(lyricCache.has(title))return lyricCache.get(
 async function openSong(title){stopAutoScroll();currentSongTitle=title;const f=findSong(title);if(!f)return;const s=f.song,modal=document.getElementById("lyrics-modal"),text=document.getElementById("lyrics-text");document.getElementById("sheet-title").textContent=s[0];document.getElementById("sheet-meta").textContent=[s[1],s[2]].filter(Boolean).join(" · ");document.getElementById("sheet-source").textContent="";document.getElementById("sheet-position").textContent=sets[f.setIndex].title+" · "+(f.index+1)+" of "+sets[f.setIndex].songs.length;document.getElementById("nav-label").textContent=sets[f.setIndex].title;document.getElementById("prev-song").disabled=f.index===0;document.getElementById("next-song").disabled=f.index===sets[f.setIndex].songs.length-1;text.className="lyrics loading";text.textContent="Loading chord sheet…";document.getElementById("sheet-body").scrollTop=0;modal.classList.add("open");applyFont();const r=await loadLyrics(title);if(currentSongTitle!==title)return;text.className=r.ok?"lyrics":"lyrics missing";text.textContent=r.text;document.getElementById("sheet-source").textContent=r.file?"GitHub · songfiles/"+r.file:"No linked file";document.getElementById("sheet-body").scrollTop=0}
 function moveModalSong(d){const f=findSong(currentSongTitle);if(!f)return;const n=f.index+d;if(n<0||n>=sets[f.setIndex].songs.length)return;openSong(sets[f.setIndex].songs[n][0])} function closeSong(){stopAutoScroll();currentSongTitle=null;document.getElementById("lyrics-modal").classList.remove("open")}
 document.getElementById("close-sheet").addEventListener("click",closeSong);document.getElementById("lyrics-modal").addEventListener("click",function(e){if(e.target===this)closeSong()});document.getElementById("prev-song").addEventListener("click",()=>moveModalSong(-1));document.getElementById("next-song").addEventListener("click",()=>moveModalSong(1));document.getElementById("font-down").addEventListener("click",()=>{lyricsFont=Math.max(12,lyricsFont-1);applyFont()});document.getElementById("font-up").addEventListener("click",()=>{lyricsFont=Math.min(28,lyricsFont+1);applyFont()});document.getElementById("auto-scroll").addEventListener("click",()=>{scrollTimer?stopAutoScroll():startAutoScroll()});document.getElementById("scroll-slower").addEventListener("click",()=>{scrollDelay=Math.min(140,scrollDelay+10);try{localStorage.setItem(SPEED_KEY,String(scrollDelay))}catch(e){}restartAutoIfNeeded()});document.getElementById("scroll-faster").addEventListener("click",()=>{scrollDelay=Math.max(12,scrollDelay-10);try{localStorage.setItem(SPEED_KEY,String(scrollDelay))}catch(e){}restartAutoIfNeeded()});
+function audienceUrl(){return window.location.origin+window.location.pathname+"?audience=1"}
+function openAudienceQr(){
+  const modal=document.getElementById("qr-modal"),box=document.getElementById("qr-code"),url=audienceUrl();
+  box.innerHTML="";document.getElementById("qr-url").textContent=url;modal.classList.add("open");
+  if(window.QRCode)new QRCode(box,{text:url,width:260,height:260,colorDark:"#211812",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
+  else box.textContent=url;
+}
+function closeAudienceQr(){document.getElementById("qr-modal").classList.remove("open")}
+function renderAudience(){
+  document.title="Laurier — Tonight's Songs";
+  document.body.innerHTML='<main class="audience-only"><div class="audience-grid" id="audience-grid"></div></main>';
+  const grid=document.getElementById("audience-grid");
+  DEFAULT_SETS.forEach(set=>{
+    const col=document.createElement("section");col.className="audience-col";
+    const h=document.createElement("h2");h.textContent=set.title;col.appendChild(h);
+    set.songs.forEach(song=>{const row=document.createElement("div");row.className="audience-song";row.textContent=song[0];col.appendChild(row)});
+    grid.appendChild(col);
+  });
+}
+document.getElementById("audience-qr").addEventListener("click",openAudienceQr);
+document.getElementById("close-qr").addEventListener("click",closeAudienceQr);
+document.getElementById("qr-modal").addEventListener("click",function(e){if(e.target===this)closeAudienceQr()});
 document.getElementById("reset-order").addEventListener("click",()=>{if(confirm("Restore the published Laurier set order and move every song back to its original column?")){sets=deepClone(DEFAULT_SETS);try{localStorage.removeItem(ORDER_KEY)}catch(e){}render()}});document.getElementById("reset-played").addEventListener("click",()=>{if(confirm("Clear all played checkmarks?")){played={};savePlayed();render()}});
 document.addEventListener("keydown",e=>{const open=document.getElementById("lyrics-modal").classList.contains("open");if(e.key==="Escape"&&open)closeSong();if(!open)return;if(e.key==="ArrowLeft"&&!document.getElementById("prev-song").disabled)moveModalSong(-1);if(e.key==="ArrowRight"&&!document.getElementById("next-song").disabled)moveModalSong(1)});
 let wakeLock=null;async function keepAwake(){if(!("wakeLock" in navigator)||document.visibilityState!=="visible"||wakeLock)return;try{wakeLock=await navigator.wakeLock.request("screen");wakeLock.addEventListener("release",()=>{wakeLock=null})}catch(e){}}keepAwake();document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")keepAwake()});document.addEventListener("pointerdown",keepAwake,{once:true});
-render();applyFont();
+if(AUDIENCE_MODE){renderAudience()}else{render();applyFont()}
 </script>
 </body>
 </html>
