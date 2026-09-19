@@ -592,6 +592,71 @@ const BAND_SETS = [
   ] },
 ];
 
+/* ---- Darren + Jeff + Brad gig ----
+   Melissa's originals are excluded automatically, along with the covers Darren
+   identified as Melissa vocals. The two main sets are intentionally balanced as
+   long gig sets; every other eligible tune remains available under Alternates. */
+const MELISSA_VOCAL_TITLES = new Set([
+  "Zombie", "Rhiannon", "Flowers", "Can't Let Go", "Heart of Glass", "Dreams", "Jolene",
+]);
+const isMelissaVocal = (song) => song.a === "Melissa Majeau" || MELISSA_VOCAL_TITLES.has(song.t);
+const ALL_BAND_SONGS = BAND_SETS.flatMap((set) => set.songs);
+function findBandSong(title, key) {
+  return ALL_BAND_SONGS.find((s) => s.t === title && (!key || s.k === key)) || { t: title, a: "", k: key || "" };
+}
+const TRIO_GIG_SETS = [
+  { id: "trio1", name: "Set 1", songs: [
+    findBandSong("Get Back"),
+    findBandSong("Cleopatra"),
+    findBandSong("Don't Want to Wait"),
+    findBandSong("You Wreck Me"),
+    findBandSong("Blank Space"),
+    findBandSong("Pride and Joy"),
+    findBandSong("Ahead by a Century"),
+    findBandSong("Five Dollar Bill"),
+    findBandSong("Real Love Baby"),
+    findBandSong("King of the Road"),
+    findBandSong("Something in the Orange"),
+    findBandSong("Don't Walk Away Eileen"),
+    findBandSong("Island in the Sun"),
+    findBandSong("Wagon Wheel"),
+    findBandSong("Green River"),
+    findBandSong("Dancing in the Dark"),
+    findBandSong("Folsom Prison Blues"),
+    findBandSong("Still Falling"),
+    findBandSong("I Need Never Get Old"),
+    findBandSong("Johnny B. Goode"),
+  ] },
+  { id: "trio2", name: "Set 2", songs: [
+    findBandSong("Blister in the Sun"),
+    findBandSong("Faith"),
+    findBandSong("Harvest Moon"),
+    findBandSong("American Girl"),
+    findBandSong("Dirty Old Town", "D"),
+    findBandSong("Blow at High Dough"),
+    findBandSong("No Bright Light"),
+    findBandSong("Where Is My Mind?"),
+    findBandSong("Tennessee Whiskey"),
+    findBandSong("I'm on Fire"),
+    findBandSong("Steal My Kisses"),
+    findBandSong("Big River"),
+    findBandSong("Copperhead Road"),
+    findBandSong("Back to Black"),
+    findBandSong("Day Tripper"),
+    findBandSong("Oh Boy"),
+    findBandSong("Norwegian Wood"),
+    findBandSong("Tonight in Black and White"),
+    findBandSong("Hand It Over"),
+    findBandSong("What'd I Say"),
+  ] },
+];
+const TRIO_MAIN_TITLES = new Set(TRIO_GIG_SETS.flatMap((set) => set.songs.map((s) => s.t)));
+const TRIO_ALTERNATES = ALL_BAND_SONGS.filter((song, i, arr) =>
+  !isMelissaVocal(song) &&
+  !TRIO_MAIN_TITLES.has(song.t) &&
+  arr.findIndex((s) => s.t === song.t) === i
+);
+
 /* A collapsing group with a caret. Header always shows the learned count so a
    folded section still tells you where you stand. */
 function SongGroup({ title, sub, count, total, open, onToggle, children }) {
@@ -3904,6 +3969,61 @@ function MasseyTab({ save, toggle }) {
   );
 }
 
+function TrioGigTab({ save, toggle }) {
+  const cl = { trioGig: {}, ...(save.checklist || {}) };
+  const [open, setOpen] = useState({ trio1: true, trio2: true, trioAlt: false });
+  const sets = [
+    ...TRIO_GIG_SETS,
+    { id: "trioAlt", name: "Alternates", songs: TRIO_ALTERNATES },
+  ];
+  const total = TRIO_GIG_SETS.reduce((n, set) => n + set.songs.length, 0);
+  const picked = TRIO_GIG_SETS.reduce(
+    (n, set) => n + set.songs.filter((s) => cl.trioGig["trio:" + s.t]).length,
+    0
+  );
+  return (
+    <div className="card">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 20, fontFamily: "'Fraunces', Georgia, serif" }}>Darren + Jeff + Brad Gig</div>
+          <div style={{ fontSize: 12.5, color: T.faint }}>Two long sets · Melissa vocals removed</div>
+        </div>
+        <div style={{ fontSize: 13, color: picked > 0 ? T.amber : T.faint, fontWeight: 800 }}>
+          {picked}/{total} main-set songs checked
+        </div>
+      </div>
+
+      <div style={{ fontSize: 12.2, color: T.muted, marginBottom: 8, lineHeight: 1.45 }}>
+        I balanced the available repertoire into two 20-song sets. Everything else you three can sing is still below under <b style={{ color: T.cream }}>Alternates</b>.
+      </div>
+      <div style={{ fontSize: 11.7, color: T.faint, marginBottom: 12, lineHeight: 1.45 }}>
+        Melissa vocals excluded: Zombie · Rhiannon · Flowers · Can't Let Go · Heart of Glass · Dreams · Jolene — plus songs credited to Melissa Majeau.
+      </div>
+
+      {sets.map((set) => {
+        const n = set.songs.filter((s) => cl.trioGig["trio:" + s.t]).length;
+        const keys = [...new Set(set.songs.map((s) => (s.k || "").split(" ")[0]).filter(Boolean))];
+        const sub = set.id === "trioAlt"
+          ? set.songs.length + " available"
+          : set.songs.length + " songs · " + keys.length + " keys";
+        return (
+          <SongGroup key={set.id} title={set.name}
+            sub={sub} count={n} total={set.songs.length} open={!!open[set.id]}
+            onToggle={() => setOpen((o) => ({ ...o, [set.id]: !o[set.id] }))}>
+            {set.songs.map((s, i) => {
+              const id = "trio:" + s.t;
+              return (
+                <CheckRow key={s.t + ":" + i} checked={!!cl.trioGig[id]} title={s.t}
+                  meta={[s.a, s.k].filter(Boolean).join(" · ")} onToggle={() => toggle("trioGig", id)} />
+              );
+            })}
+          </SongGroup>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ---------------- Progress ---------------- */
 function Progress({ save }) {
   const acc = save.totals.answers ? Math.round((100 * save.totals.correct) / save.totals.answers) : 0;
@@ -4150,7 +4270,7 @@ function App() {
   };
 
   const tabs = [
-    ["notes", "Notes"], ["chords", "Chords"], ["ear", "Ear"], ["practice", "Practice"], ["massey", "Massey Sound"], ["library", "Library"], ["progress", "Progress"],
+    ["notes", "Notes"], ["chords", "Chords"], ["ear", "Ear"], ["practice", "Practice"], ["massey", "Massey Sound"], ["trio", "Darren + Jeff + Brad"], ["library", "Library"], ["progress", "Progress"],
   ];
 
   return (
@@ -4210,6 +4330,8 @@ function App() {
           <PracticeTab save={save} toggle={toggleCheck} />
         ) : tab === "massey" ? (
           <MasseyTab save={save} toggle={toggleCheck} />
+        ) : tab === "trio" ? (
+          <TrioGigTab save={save} toggle={toggleCheck} />
         ) : tab === "library" ? (
           <ChordLibrary />
         ) : (
