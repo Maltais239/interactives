@@ -138,6 +138,11 @@ function renderPhase(){
     </button>`;
   }).join("");
   document.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>{choice=b.dataset.r;renderPhase();});
+  if(choice){
+    requestAnimationFrame(()=>{
+      document.querySelector(`[data-r="${choice}"]`)?.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"});
+    });
+  }
   $("go").disabled=!choice;
   $("selected").textContent=choice?`${routines[choice].name} selected`:"Choose a routine to continue.";
 }
