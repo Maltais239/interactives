@@ -116,17 +116,30 @@ function renderOutcomes(){
   document.querySelectorAll("[data-o]").forEach(b=>b.onclick=()=>{oi=+b.dataset.o;choice=null;render();$("workspace").scrollIntoView({behavior:"smooth",block:"start"});});
 }
 function renderPhases(){
-  $("phases").innerHTML=phases.map((p,i)=>`<button class="phase p${i} ${i===pi?"on":""}" data-p="${i}">${p.label}</button>`).join("");
+  $("phases").innerHTML=phases.map((p,i)=>`<button class="phase p${i} ${i===pi?"on":""}" data-p="${i}" aria-pressed="${i===pi}">${p.label}</button>`).join("");
   document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{pi=+b.dataset.p;choice=null;renderPhases();renderPhase();});
 }
 function renderPhase(){
   const o=outcomes[oi],p=phases[pi],items=o.map[p.id];
   $("phaseTitle").textContent=p.title;
   $("phaseIntro").textContent=p.intro;
-  $("routines").innerHTML=items.map(([id,why,useWith])=>{const r=routines[id];return `<button class="routine ${choice===id?"on":""}" data-r="${id}"><span class="dot"></span><i>${r.tag}</i><h3>${r.name}</h3><p>${r.short}</p></button>`}).join("");
+  $("routines").innerHTML=items.map(([id,why,useWith],index)=>{
+    const r=routines[id];
+    return `<button class="routine ${choice===id?"on":""} ${index===0?"suggested-card":""}" data-r="${id}" aria-pressed="${choice===id}">
+      <span class="dot" aria-hidden="true"></span>
+      <div class="routine-top">
+        <i>${r.tag}</i>
+        ${index===0?'<span class="suggested">★ Suggested starting point</span>':""}
+      </div>
+      <h3>${r.name}</h3>
+      <p class="routine-desc">${r.short}</p>
+      <div class="fit"><b>Why here:</b> ${why}</div>
+      <div class="routine-foot"><span>⏱ ${r.time}</span><span>Teacher process →</span></div>
+    </button>`;
+  }).join("");
   document.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>{choice=b.dataset.r;renderPhase();});
   $("go").disabled=!choice;
-  $("selected").textContent=choice?`${routines[choice].name} selected — ready when you are.`:"Choose one routine.";
+  $("selected").textContent=choice?`${routines[choice].name} selected`:"Choose a routine to continue.";
 }
 function render(){
   renderOutcomes();renderPhases();
