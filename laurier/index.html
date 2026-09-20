@@ -589,15 +589,17 @@ function stopAutoScroll(){if(scrollTimer)clearInterval(scrollTimer);scrollTimer=
 
 let swRegistration=null;
 function chartUrl(file){return new URL("../songfiles/"+encodeURIComponent(file),window.location.href).href}
-function offlineUrls(){
-  const urls=[
-    new URL("./index.html",window.location.href).href,
+function offlineCoreUrls(){
+  const urls=[new URL("./index.html",window.location.href).href];
+  Object.values(LYRIC_FILES).forEach(file=>urls.push(chartUrl(file)));
+  return [...new Set(urls)];
+}
+function offlineExtraUrls(){
+  return [
     "https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js",
     "https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js",
     "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
   ];
-  Object.values(LYRIC_FILES).forEach(file=>urls.push(chartUrl(file)));
-  return [...new Set(urls)];
 }
 async function swRequest(type,urls){
   if(!("serviceWorker" in navigator)) throw new Error("Service workers are not supported on this device.");
@@ -633,9 +635,10 @@ function setOfflineUi(state,detail){
 }
 async function refreshOfflineStatus(){
   try{
-    const result=await swRequest("CHECK_URLS",offlineUrls());
-    if(result.ok)setOfflineUi("ready","all "+Object.keys(LYRIC_FILES).length+" charts saved");
-    else if(result.cached>0)setOfflineUi("partial",result.cached+"/"+result.total+" offline files saved");
+    const result=await swRequest("CHECK_URLS",offlineCoreUrls());
+    const chartCount=Object.keys(LYRIC_FILES).length;
+    if(result.ok)setOfflineUi("ready","all "+chartCount+" charts saved");
+    else if(result.cached>1)setOfflineUi("partial",Math.max(0,result.cached-1)+"/"+chartCount+" charts saved");
     else setOfflineUi("idle","offline not prepared");
   }catch(e){
     setOfflineUi("idle","offline setup unavailable");
@@ -644,16 +647,21 @@ async function refreshOfflineStatus(){
 async function prepareOffline(){
   const btn=document.getElementById("offline-btn");
   if(btn)btn.disabled=true;
-  setOfflineUi("working","saving "+Object.keys(LYRIC_FILES).length+" chord charts…");
+  const chartCount=Object.keys(LYRIC_FILES).length;
+  setOfflineUi("working","saving "+chartCount+" chord charts…");
   try{
     if(navigator.storage&&navigator.storage.persist){try{await navigator.storage.persist()}catch(e){}}
-    const result=await swRequest("CACHE_URLS",offlineUrls());
-    if(result.ok){
+    const core=await swRequest("CACHE_URLS",offlineCoreUrls());
+    // Dragging, QR and DOCX support are useful but not required for the core
+    // offline gig experience. Cache them best-effort without failing readiness.
+    try{await swRequest("CACHE_URLS",offlineExtraUrls())}catch(e){}
+    if(core.ok){
       try{localStorage.setItem(OFFLINE_KEY,new Date().toISOString())}catch(e){}
-      setOfflineUi("ready","all "+Object.keys(LYRIC_FILES).length+" charts saved");
+      setOfflineUi("ready","all "+chartCount+" charts saved");
     }else{
-      setOfflineUi("partial",(result.cached||0)+"/"+(result.total||offlineUrls().length)+" offline files saved");
-      alert("Most files were saved, but "+(result.failed||[]).length+" could not be cached. Stay online and tap Refresh Offline to try again.");
+      const saved=Math.max(0,(core.cached||0)-1);
+      setOfflineUi("partial",saved+"/"+chartCount+" charts saved");
+      alert("A few chord charts could not be saved yet. Tap Refresh Offline while connected to Wi-Fi to retry.");
     }
   }catch(e){
     setOfflineUi("partial","offline setup needs an internet connection");
