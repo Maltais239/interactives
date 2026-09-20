@@ -18,7 +18,7 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
 .brand .sub{color:var(--muted);font-size:13px;letter-spacing:.13em;text-transform:uppercase;margin-top:7px}
 .rule{height:3px;border-radius:3px;background:linear-gradient(90deg,var(--amber),transparent 70%);margin:0 0 16px}
 .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.btn{border:1px solid var(--line);background:transparent;color:var(--cream);font-weight:700;padding:9px 13px;border-radius:10px;cursor:pointer}.btn:hover{filter:brightness(1.12)}
-.summary{color:var(--muted);font-size:13px}.local-note{font-size:11.5px;color:var(--faint)}
+.summary{color:var(--muted);font-size:13px}.local-note{font-size:11.5px;color:var(--faint)}.btn.offline-ready{background:var(--green);border-color:var(--green);color:#142010}.btn.offline-working{opacity:.75;cursor:wait}
 .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:start}.col{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;min-width:0}
 .colhead{position:sticky;top:0;z-index:2;background:linear-gradient(180deg,var(--surface) 85%,rgba(43,32,25,.94));padding:16px 16px 12px;border-bottom:1px solid var(--line)}
 .coltitle{display:flex;align-items:baseline;justify-content:space-between;gap:10px}.coltitle h2{font-family:"Fraunces",Georgia,serif;margin:0;font-size:25px}
@@ -88,7 +88,7 @@ header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
 <body>
 <div class="wrap">
 <header><div class="brand"><h1><span>Laurier</span></h1><div class="sub">Darren + Jeff + Brad · gig setlist</div></div>
-<div class="toolbar"><div><div class="summary" id="summary"></div><div class="local-note">drag order + played checks save only on this device</div></div><button class="btn" id="audience-qr" type="button">Audience QR</button><button class="btn" id="reset-order" type="button">Reset set order</button><button class="btn" id="reset-played" type="button">Reset played</button></div></header>
+<div class="toolbar"><div><div class="summary" id="summary"></div><div class="local-note">drag order + played checks save only on this device · <span id="offline-status">offline not prepared</span></div></div><button class="btn" id="offline-btn" type="button">Prepare Offline</button><button class="btn" id="audience-qr" type="button">Audience QR</button><button class="btn" id="reset-order" type="button">Reset set order</button><button class="btn" id="reset-played" type="button">Reset played</button></div></header>
 <div class="rule"></div><main class="grid" id="grid"></main><div class="footer">☰ drag · tap the song title or ♪ for chords/lyrics · tap the box when played</div>
 </div>
 <div class="qr-modal" id="qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-title">
@@ -573,9 +573,9 @@ const LYRIC_FILES={
   "Me and Julio Down by the Schoolyard": "Me and Julio Down By the School Yard.txt",
   "Do I Ever Cross Your Mind": "Do I Ever Cross Your Mind.txt"
 };
-const RAW_BASE="https://raw.githubusercontent.com/Maltais239/interactives/main/songfiles/";
+const RAW_BASE="../songfiles/";
 const AUDIENCE_MODE=new URLSearchParams(window.location.search).get("audience")==="1";
-const ORDER_KEY="laurier:gig:order:v2",PLAYED_KEY="laurier:gig:played:v2",OLD_PLAYED_KEY="laurier:gig:played:v1",FONT_KEY="laurier:gig:lyrics-font",SPEED_KEY="laurier:gig:scroll-delay";
+const ORDER_KEY="laurier:gig:order:v2",PLAYED_KEY="laurier:gig:played:v2",OLD_PLAYED_KEY="laurier:gig:played:v1",FONT_KEY="laurier:gig:lyrics-font",SPEED_KEY="laurier:gig:scroll-delay",OFFLINE_KEY="laurier:gig:offline-ready:v1";
 const deepClone=x=>JSON.parse(JSON.stringify(x)); const allPublishedTitles=()=>DEFAULT_SETS.flatMap(s=>s.songs.map(x=>x[0]));
 function loadOrder(){try{const saved=JSON.parse(localStorage.getItem(ORDER_KEY)||"null");if(!Array.isArray(saved)||saved.length!==DEFAULT_SETS.length)return deepClone(DEFAULT_SETS);const a=allPublishedTitles().slice().sort(),b=saved.flatMap(s=>(s.songs||[]).map(x=>x[0])).slice().sort();if(a.length!==b.length)return deepClone(DEFAULT_SETS);for(let i=0;i<a.length;i++)if(a[i]!==b[i])return deepClone(DEFAULT_SETS);return saved}catch(e){return deepClone(DEFAULT_SETS)}}
 let sets=loadOrder(),played={};try{played=JSON.parse(localStorage.getItem(PLAYED_KEY)||"{}")||{};if(!Object.keys(played).length){const old=JSON.parse(localStorage.getItem(OLD_PLAYED_KEY)||"{}")||{};Object.keys(old).forEach(k=>{if(old[k]){const p=k.split(":");if(p.length>=3)played[p.slice(2).join(":")]=true}});if(Object.keys(played).length)localStorage.setItem(PLAYED_KEY,JSON.stringify(played))}}catch(e){played={}}
@@ -586,6 +586,91 @@ function updateStats(){let md=0,mt=0;sets.forEach((set,si)=>{const d=set.songs.f
 function render(){sortables.forEach(s=>{try{s.destroy()}catch(e){}});sortables=[];const grid=document.getElementById("grid");grid.innerHTML="";sets.forEach(set=>{const col=document.createElement("section");col.className="col "+set.cls;const head=document.createElement("div");head.className="colhead";const tr=document.createElement("div");tr.className="coltitle";const h=document.createElement("h2");h.textContent=set.title;const count=document.createElement("div");count.className="count";count.dataset.countFor=set.id;tr.append(h,count);const note=document.createElement("div");note.className="note";note.textContent=set.id==="alt"?"pull from here if needed":set.songs.length+" songs";head.append(tr,note);const list=document.createElement("div");list.className="list";list.id="list-"+set.id;list.dataset.setId=set.id;set.songs.forEach(song=>{const titleText=song[0],artist=song[1],key=song[2],row=document.createElement("div");row.className="song"+(played[titleText]?" done":"");row.dataset.title=titleText;const pb=document.createElement("button");pb.className="play-toggle";pb.type="button";pb.setAttribute("aria-label","Mark "+titleText+" played");pb.setAttribute("aria-pressed",played[titleText]?"true":"false");const check=document.createElement("span");check.className="check";pb.appendChild(check);pb.addEventListener("click",e=>{e.stopPropagation();if(played[titleText])delete played[titleText];else played[titleText]=true;savePlayed();row.classList.toggle("done",!!played[titleText]);pb.setAttribute("aria-pressed",played[titleText]?"true":"false");updateStats()});const handle=document.createElement("button");handle.className="drag-handle";handle.type="button";handle.setAttribute("aria-label","Drag "+titleText);handle.title="Drag to move";handle.textContent="☰";const main=document.createElement("button");main.className="song-main";main.type="button";const title=document.createElement("div");title.className="title";title.textContent=titleText;const meta=document.createElement("div");meta.className="meta";meta.textContent=[artist,key].filter(Boolean).join(" · ");main.append(title,meta);main.addEventListener("click",()=>openSong(titleText));const lb=document.createElement("button");lb.className="lyrics-btn";lb.type="button";lb.title="Chords / lyrics";lb.setAttribute("aria-label","Open chords and lyrics for "+titleText);lb.textContent="♪";lb.addEventListener("click",()=>openSong(titleText));row.append(pb,handle,main,lb);list.appendChild(row)});col.append(head,list);grid.appendChild(col)});if(window.Sortable){sets.forEach(set=>{const el=document.getElementById("list-"+set.id);if(!el)return;sortables.push(new Sortable(el,{group:"laurier-songs",animation:180,handle:".drag-handle",delay:120,delayOnTouchOnly:true,touchStartThreshold:4,forceFallback:true,fallbackOnBody:true,ghostClass:"sortable-ghost",chosenClass:"sortable-chosen",dragClass:"sortable-drag",scroll:true,scrollSensitivity:60,scrollSpeed:16,onEnd:()=>{syncSetsFromDom();if(navigator.vibrate){try{navigator.vibrate(35)}catch(e){}}}}))})}updateStats()}
 function syncSetsFromDom(){const m=new Map(DEFAULT_SETS.flatMap(s=>s.songs).map(s=>[s[0],s]));sets=sets.map(set=>{const el=document.getElementById("list-"+set.id),titles=el?Array.from(el.children).map(r=>r.dataset.title):[];return{...set,songs:titles.map(t=>m.get(t)).filter(Boolean)}});saveOrder();updateStats()}
 function stopAutoScroll(){if(scrollTimer)clearInterval(scrollTimer);scrollTimer=null;const b=document.getElementById("auto-scroll");b.textContent="▶ Auto";b.classList.remove("active")} function startAutoScroll(){stopAutoScroll();const body=document.getElementById("sheet-body"),b=document.getElementById("auto-scroll");b.textContent="⏸ Auto";b.classList.add("active");scrollTimer=setInterval(()=>{body.scrollTop+=1;if(body.scrollTop+body.clientHeight>=body.scrollHeight-3)stopAutoScroll()},scrollDelay)} function restartAutoIfNeeded(){if(scrollTimer)startAutoScroll()} function applyFont(){document.getElementById("lyrics-text").style.fontSize=lyricsFont+"px";try{localStorage.setItem(FONT_KEY,String(lyricsFont))}catch(e){}}
+
+let swRegistration=null;
+function chartUrl(file){return new URL("../songfiles/"+encodeURIComponent(file),window.location.href).href}
+function offlineUrls(){
+  const urls=[
+    new URL("./index.html",window.location.href).href,
+    "https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
+  ];
+  Object.values(LYRIC_FILES).forEach(file=>urls.push(chartUrl(file)));
+  return [...new Set(urls)];
+}
+async function swRequest(type,urls){
+  if(!("serviceWorker" in navigator)) throw new Error("Service workers are not supported on this device.");
+  if(!swRegistration) swRegistration=await navigator.serviceWorker.ready;
+  const worker=swRegistration.active||swRegistration.waiting||swRegistration.installing||navigator.serviceWorker.controller;
+  if(!worker) throw new Error("Offline worker is not ready yet.");
+  return new Promise((resolve,reject)=>{
+    const channel=new MessageChannel();
+    const timer=setTimeout(()=>reject(new Error("Offline setup timed out.")),120000);
+    channel.port1.onmessage=e=>{clearTimeout(timer);resolve(e.data||{})};
+    worker.postMessage({type,urls},[channel.port2]);
+  });
+}
+function setOfflineUi(state,detail){
+  const btn=document.getElementById("offline-btn"),status=document.getElementById("offline-status");
+  if(!btn||!status)return;
+  btn.classList.remove("offline-ready","offline-working");
+  if(state==="ready"){
+    btn.textContent="✓ Offline Ready";
+    btn.classList.add("offline-ready");
+    status.textContent=detail||("all "+Object.keys(LYRIC_FILES).length+" charts saved");
+  }else if(state==="working"){
+    btn.textContent="Saving…";
+    btn.classList.add("offline-working");
+    status.textContent=detail||"downloading charts";
+  }else if(state==="partial"){
+    btn.textContent="Refresh Offline";
+    status.textContent=detail||"offline copy needs refresh";
+  }else{
+    btn.textContent="Prepare Offline";
+    status.textContent=detail||"offline not prepared";
+  }
+}
+async function refreshOfflineStatus(){
+  try{
+    const result=await swRequest("CHECK_URLS",offlineUrls());
+    if(result.ok)setOfflineUi("ready","all "+Object.keys(LYRIC_FILES).length+" charts saved");
+    else if(result.cached>0)setOfflineUi("partial",result.cached+"/"+result.total+" offline files saved");
+    else setOfflineUi("idle","offline not prepared");
+  }catch(e){
+    setOfflineUi("idle","offline setup unavailable");
+  }
+}
+async function prepareOffline(){
+  const btn=document.getElementById("offline-btn");
+  if(btn)btn.disabled=true;
+  setOfflineUi("working","saving "+Object.keys(LYRIC_FILES).length+" chord charts…");
+  try{
+    if(navigator.storage&&navigator.storage.persist){try{await navigator.storage.persist()}catch(e){}}
+    const result=await swRequest("CACHE_URLS",offlineUrls());
+    if(result.ok){
+      try{localStorage.setItem(OFFLINE_KEY,new Date().toISOString())}catch(e){}
+      setOfflineUi("ready","all "+Object.keys(LYRIC_FILES).length+" charts saved");
+    }else{
+      setOfflineUi("partial",(result.cached||0)+"/"+(result.total||offlineUrls().length)+" offline files saved");
+      alert("Most files were saved, but "+(result.failed||[]).length+" could not be cached. Stay online and tap Refresh Offline to try again.");
+    }
+  }catch(e){
+    setOfflineUi("partial","offline setup needs an internet connection");
+    alert("Offline setup could not finish. Connect to the internet and tap Prepare Offline again.");
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+}
+async function initOffline(){
+  if(!("serviceWorker" in navigator)){setOfflineUi("idle","offline mode unsupported");return}
+  try{
+    swRegistration=await navigator.serviceWorker.register("./sw.js");
+    await navigator.serviceWorker.ready;
+    await refreshOfflineStatus();
+  }catch(e){setOfflineUi("idle","offline setup unavailable")}
+}
+
 async function loadLyrics(title){if(lyricCache.has(title))return lyricCache.get(title);const file=LYRIC_FILES[title];if(!file){const r={ok:false,text:"No chord sheet is currently linked for this song.",file:null};lyricCache.set(title,r);return r}const url=RAW_BASE+encodeURIComponent(file);try{if(/\.txt$/i.test(file)){const res=await fetch(url,{cache:"no-store"});if(!res.ok)throw new Error("HTTP "+res.status);const r={ok:true,text:await res.text(),file};lyricCache.set(title,r);return r}if(/\.docx$/i.test(file)){const res=await fetch(url,{cache:"no-store"});if(!res.ok)throw new Error("HTTP "+res.status);const buf=await res.arrayBuffer();if(!window.mammoth)throw new Error("DOCX reader unavailable");const out=await window.mammoth.extractRawText({arrayBuffer:buf});const r={ok:true,text:out.value,file};lyricCache.set(title,r);return r}return{ok:false,text:"This chord sheet format cannot be displayed in Laurier yet.",file}}catch(e){return{ok:false,text:"Couldn't load this chord sheet. Try again with a connection.",file}}}
 async function openSong(title){stopAutoScroll();currentSongTitle=title;const f=findSong(title);if(!f)return;const s=f.song,modal=document.getElementById("lyrics-modal"),text=document.getElementById("lyrics-text");document.getElementById("sheet-title").textContent=s[0];document.getElementById("sheet-meta").textContent=[s[1],s[2]].filter(Boolean).join(" · ");document.getElementById("sheet-source").textContent="";document.getElementById("sheet-position").textContent=sets[f.setIndex].title+" · "+(f.index+1)+" of "+sets[f.setIndex].songs.length;document.getElementById("nav-label").textContent=sets[f.setIndex].title;document.getElementById("prev-song").disabled=f.index===0;document.getElementById("next-song").disabled=f.index===sets[f.setIndex].songs.length-1;text.className="lyrics loading";text.textContent="Loading chord sheet…";document.getElementById("sheet-body").scrollTop=0;modal.classList.add("open");applyFont();const r=await loadLyrics(title);if(currentSongTitle!==title)return;text.className=r.ok?"lyrics":"lyrics missing";text.textContent=r.text;document.getElementById("sheet-source").textContent=r.file?"GitHub · songfiles/"+r.file:"No linked file";document.getElementById("sheet-body").scrollTop=0}
 function moveModalSong(d){const f=findSong(currentSongTitle);if(!f)return;const n=f.index+d;if(n<0||n>=sets[f.setIndex].songs.length)return;openSong(sets[f.setIndex].songs[n][0])} function closeSong(){stopAutoScroll();currentSongTitle=null;document.getElementById("lyrics-modal").classList.remove("open")}
@@ -609,13 +694,14 @@ function renderAudience(){
     grid.appendChild(col);
   });
 }
+document.getElementById("offline-btn").addEventListener("click",prepareOffline);
 document.getElementById("audience-qr").addEventListener("click",openAudienceQr);
 document.getElementById("close-qr").addEventListener("click",closeAudienceQr);
 document.getElementById("qr-modal").addEventListener("click",function(e){if(e.target===this)closeAudienceQr()});
 document.getElementById("reset-order").addEventListener("click",()=>{if(confirm("Restore the published Laurier set order and move every song back to its original column?")){sets=deepClone(DEFAULT_SETS);try{localStorage.removeItem(ORDER_KEY)}catch(e){}render()}});document.getElementById("reset-played").addEventListener("click",()=>{if(confirm("Clear all played checkmarks?")){played={};savePlayed();render()}});
 document.addEventListener("keydown",e=>{const open=document.getElementById("lyrics-modal").classList.contains("open");if(e.key==="Escape"&&open)closeSong();if(!open)return;if(e.key==="ArrowLeft"&&!document.getElementById("prev-song").disabled)moveModalSong(-1);if(e.key==="ArrowRight"&&!document.getElementById("next-song").disabled)moveModalSong(1)});
 let wakeLock=null;async function keepAwake(){if(!("wakeLock" in navigator)||document.visibilityState!=="visible"||wakeLock)return;try{wakeLock=await navigator.wakeLock.request("screen");wakeLock.addEventListener("release",()=>{wakeLock=null})}catch(e){}}keepAwake();document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")keepAwake()});document.addEventListener("pointerdown",keepAwake,{once:true});
-if(AUDIENCE_MODE){renderAudience()}else{render();applyFont()}
+if(AUDIENCE_MODE){renderAudience()}else{render();applyFont();initOffline()}
 </script>
 </body>
 </html>
