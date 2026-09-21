@@ -502,6 +502,103 @@
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
         }
+        /* Final Swipe Review correction: a compact, app-style card deck */
+        #swipe-game-container { justify-content: flex-start; gap: 0; overflow-y: auto; }
+        #swipe-game-container .game-toolbar { margin-bottom: 0; }
+        .swipe-stage {
+            position: relative !important;
+            flex: 0 0 auto !important;
+            width: min(390px, calc(100vw - 48px)) !important;
+            height: clamp(430px, 58vh, 540px) !important;
+            min-height: 0 !important;
+            margin: 18px auto 0 !important;
+            isolation: isolate;
+        }
+        .swipe-stage::before,
+        .swipe-stage::after {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            border: 1.5px solid rgba(8, 36, 61, 0.2);
+            border-radius: 26px;
+            background: #fffdf7;
+            box-shadow: 0 14px 30px rgba(8, 36, 61, 0.1);
+            content: "";
+        }
+        .swipe-stage::before { transform: translateY(14px) rotate(-2deg) scale(.96); opacity: .55; }
+        .swipe-stage::after { transform: translateY(8px) rotate(1.3deg) scale(.98); opacity: .82; }
+        .swipe-stage > div:not(#swipe-card) { display: none !important; }
+        #swipe-card {
+            position: absolute !important;
+            inset: 0 !important;
+            z-index: 2;
+            display: flex !important;
+            flex-direction: column !important;
+            width: 100% !important;
+            height: 100% !important;
+            overflow: hidden;
+            border: 1.5px solid rgba(8, 36, 61, 0.5) !important;
+            border-radius: 26px !important;
+            background: #fffdf7 !important;
+            box-shadow: 0 22px 48px rgba(8, 36, 61, 0.22) !important;
+            cursor: grab;
+            touch-action: none;
+            user-select: none;
+            will-change: transform, opacity;
+        }
+        #swipe-card:active { cursor: grabbing; }
+        #swipe-card > div:first-child {
+            flex: 0 0 58%;
+            width: 100% !important;
+            height: auto !important;
+            padding: 22px !important;
+            border-right: 0 !important;
+            border-bottom: 1.5px solid rgba(8, 36, 61, 0.25) !important;
+            background: linear-gradient(155deg, #edf4ef, #e6ece9) !important;
+        }
+        #swipe-card > div:nth-child(2) {
+            flex: 1 1 auto;
+            width: 100% !important;
+            height: auto !important;
+            padding: 20px 24px !important;
+            background: #fffdf7;
+        }
+        #swipe-card #swipe-term { color: #08243d; font-size: clamp(2rem, 5vw, 3rem); line-height: 1.05; }
+        #swipe-card #swipe-def { display: block; max-width: 32ch; color: #516273; font-size: .98rem; line-height: 1.4; }
+        #overlay-nope,
+        #overlay-like { top: 22px !important; padding: 6px 10px !important; border-width: 4px !important; border-radius: 9px !important; background: rgba(255,253,247,.9); font-size: 1.45rem !important; }
+        #overlay-nope { right: 18px !important; }
+        #overlay-like { left: 18px !important; }
+        .swipe-controls { width: auto !important; margin: 22px auto 0 !important; justify-content: center; gap: 46px !important; }
+        #btn-swipe-left,
+        #btn-swipe-right {
+            flex: 0 0 76px !important;
+            width: 76px !important;
+            height: 76px !important;
+            padding: 0 !important;
+            flex-direction: column;
+            gap: 0;
+            border: 1.5px solid currentColor !important;
+            border-radius: 50% !important;
+            background: #fffdf7 !important;
+            box-shadow: 0 8px 20px rgba(8, 36, 61, 0.16) !important;
+            font-size: 1.9rem !important;
+        }
+        #btn-swipe-left { color: #df4545 !important; }
+        #btn-swipe-right { color: #12975a !important; }
+        #btn-swipe-left span,
+        #btn-swipe-right span { position: static !important; color: currentColor !important; font-size: .58rem !important; letter-spacing: .08em; }
+        #swipe-game-container > div:last-child { margin: 10px 0 18px !important; color: #657587 !important; }
+        @media (max-width: 680px) {
+            .swipe-stage { width: min(360px, calc(100vw - 34px)) !important; height: clamp(410px, 61vh, 510px) !important; }
+            #swipe-card > div:first-child { flex-basis: 56%; padding: 16px !important; }
+            #swipe-card > div:nth-child(2) { padding: 16px 20px !important; }
+            .swipe-controls { margin-top: 18px !important; }
+        }
+        @media (max-height: 720px) and (min-width: 681px) {
+            .swipe-stage { height: 405px !important; margin-top: 8px !important; }
+            .swipe-controls { margin-top: 12px !important; }
+        }
     </style>
     <style>
         /* =========================================================
@@ -1932,12 +2029,12 @@
                     <div class="h-3/5 bg-slate-50 flex items-center justify-center p-8 relative overflow-hidden">
                         <img id="swipe-img" src="" class="max-w-full max-h-full object-contain drop-shadow-md pointer-events-none">
                         <!-- Overlays -->
-                        <div id="overlay-nope" class="absolute top-4 right-4 border-4 border-red-500 text-red-500 font-black text-2xl px-2 py-1 rounded opacity-0 transform rotate-12 pointer-events-none">NOPE</div>
-                        <div id="overlay-like" class="absolute top-4 left-4 border-4 border-green-500 text-green-500 font-black text-2xl px-2 py-1 rounded opacity-0 transform -rotate-12 pointer-events-none">YES</div>
+                        <div id="overlay-nope" class="absolute top-4 right-4 border-4 border-red-500 text-red-500 font-black text-2xl px-2 py-1 rounded opacity-0 transform rotate-12 pointer-events-none">PASS</div>
+                        <div id="overlay-like" class="absolute top-4 left-4 border-4 border-green-500 text-green-500 font-black text-2xl px-2 py-1 rounded opacity-0 transform -rotate-12 pointer-events-none">MATCH</div>
                     </div>
                     <!-- Text Area -->
                     <div class="h-2/5 p-6 flex flex-col items-center justify-center text-center">
-                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Is this...</p>
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Potential vocab match</p>
                         <h2 id="swipe-term" class="text-3xl font-bold text-slate-800 mb-2">Term</h2>
                         <p id="swipe-def" class="text-sm text-slate-500 line-clamp-3">Definition</p>
                     </div>
@@ -1947,16 +2044,16 @@
             <!-- Controls -->
             <div class="swipe-controls mt-8 flex gap-6 z-20">
                 <button id="btn-swipe-left" class="flex items-center justify-center relative">
-                    ✕
-                    <span class="font-bold uppercase">No match</span>
+                    ×
+                    <span class="font-bold uppercase">Pass</span>
                 </button>
                 <button id="btn-swipe-right" class="flex items-center justify-center relative">
-                    ✓
-                    <span class="font-bold uppercase">It matches</span>
+                    ♥
+                    <span class="font-bold uppercase">Match</span>
                 </button>
             </div>
             
-            <div class="mt-4 text-slate-400 text-sm font-medium">Use Arrow Keys or Swipe</div>
+            <div class="mt-4 text-slate-400 text-sm font-medium">Drag or flick the card · Keyboard: ← pass · → match</div>
         </main>
 
         <!-- GAME 4: Scramble Game Container -->
@@ -2779,43 +2876,56 @@
 
             bindEvents: function() {
                 const card = this.cardEl;
-                const start = (x) => { this.isDragging = true; this.startX = x; card.style.transition = 'none'; };
-                const move = (x) => {
-                    if (!this.isDragging) return;
-                    const delta = x - this.startX;
-                    const rotate = delta * 0.1;
-                    card.style.transform = `translateX(${delta}px) rotate(${rotate}deg)`;
-                    
-                    this.likeOverlay.style.opacity = delta > 0 ? Math.min(delta/100, 1) : 0;
-                    this.nopeOverlay.style.opacity = delta < 0 ? Math.min(Math.abs(delta)/100, 1) : 0;
-                };
-                const end = (x) => {
-                    if (!this.isDragging) return;
+                let pointerId = null;
+                let currentX = 0;
+                const reset = () => {
                     this.isDragging = false;
-                    const delta = x - this.startX;
-                    if (delta > 100) this.handleSwipe('right');
-                    else if (delta < -100) this.handleSwipe('left');
-                    else {
-                        card.style.transition = 'transform 0.3s ease';
-                        card.style.transform = '';
-                        this.likeOverlay.style.opacity = 0;
-                        this.nopeOverlay.style.opacity = 0;
-                    }
+                    pointerId = null;
+                    card.style.transition = 'transform 0.25s cubic-bezier(.2,.8,.2,1)';
+                    card.style.transform = '';
+                    this.likeOverlay.style.opacity = 0;
+                    this.nopeOverlay.style.opacity = 0;
+                };
+                const start = (e) => {
+                    if (this.locked || !e.isPrimary) return;
+                    e.preventDefault();
+                    this.isDragging = true;
+                    pointerId = e.pointerId;
+                    this.startX = e.clientX;
+                    currentX = e.clientX;
+                    card.style.transition = 'none';
+                    card.setPointerCapture?.(pointerId);
+                };
+                const move = (e) => {
+                    if (!this.isDragging || e.pointerId !== pointerId) return;
+                    e.preventDefault();
+                    currentX = e.clientX;
+                    const delta = currentX - this.startX;
+                    card.style.transform = `translateX(${delta}px) rotate(${delta * 0.035}deg)`;
+                    this.likeOverlay.style.opacity = delta > 0 ? Math.min(delta / 110, 1) : 0;
+                    this.nopeOverlay.style.opacity = delta < 0 ? Math.min(Math.abs(delta) / 110, 1) : 0;
+                };
+                const end = (e) => {
+                    if (!this.isDragging || e.pointerId !== pointerId) return;
+                    const delta = currentX - this.startX;
+                    this.isDragging = false;
+                    pointerId = null;
+                    if (delta > 85) this.handleSwipe('right');
+                    else if (delta < -85) this.handleSwipe('left');
+                    else reset();
                 };
 
-                card.onmousedown = e => start(e.clientX);
-                document.onmousemove = e => move(e.clientX);
-                document.onmouseup = e => end(e.clientX);
-
-                card.ontouchstart = e => start(e.touches[0].clientX);
-                document.ontouchmove = e => move(e.touches[0].clientX);
-                document.ontouchend = e => end(e.changedTouches[0].clientX);
+                card.onpointerdown = start;
+                document.onpointermove = move;
+                document.onpointerup = end;
+                document.onpointercancel = reset;
 
                 document.getElementById('btn-swipe-left').onclick = () => this.handleSwipe('left');
                 document.getElementById('btn-swipe-right').onclick = () => this.handleSwipe('right');
 
                 document.onkeydown = (e) => {
                     if (containers.swipe.classList.contains('hidden')) return;
+                    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.preventDefault();
                     if (e.key === 'ArrowLeft') this.handleSwipe('left');
                     if (e.key === 'ArrowRight') this.handleSwipe('right');
                 };
