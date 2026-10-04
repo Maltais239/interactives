@@ -5,3 +5,5 @@ Optimized real screenshots and Google Slides template previews for Darren Maltai
 manifest.json records each stable image ID, source activity, credit and capture date. Replace the matching JPEG when an activity changes. Keep the filenames stable so existing catalogue links continue to work.
 
 These images are served by the existing personal GitHub Pages site. The complete catalogue metadata, page code and maintenance list live with the Black Gold catalogue.
+
+The morphology additions include real browser captures of Morpheme Missions and Word Detective, published October 4, 2026.
