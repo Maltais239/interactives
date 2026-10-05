@@ -107,16 +107,29 @@
     #play-again-btn { display: none; background-color: #16a34a; }
     #play-again-btn:hover { background-color: #15803d; }
 
-  </style>
+  
+    *, *::before, *::after { box-sizing: border-box; }
+    html { display: block; }
+    body { min-height: 0; overflow: hidden; }
+    #map { min-width: 0; }
+    #info-panel { flex-shrink: 0; }
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      #map { flex: none; width: 100%; height: 48dvh; border-right: 0; }
+      #info-panel { width: 100%; max-width: none; height: 52dvh; padding: 1rem; border-left: 0; border-top: 4px solid #4f46e5; }
+    }
+
+</style>
+  <script src="../geography-shared/basemap.js?v=20261005"></script>
 </head>
 <body>
   <div id="map"></div>
   <div id="info-panel">
     <h2>Canada Map Challenge</h2>
-    <div id="question-box"><!-- Question will be loaded here --></div>
-    <div id="result-box"><p>Read the clue and click the correct province or territory on the map!</p></div>
+    <div id="question-box" role="status" aria-live="polite">Loading the map…</div>
+    <div id="result-box" role="status" aria-live="polite"><p>Read the clue and click the correct province or territory on the map!</p></div>
     <div id="button-controls">
-        <button id="hint-btn" class="game-btn">Get a Hint!</button>
+        <button id="hint-btn" class="game-btn" disabled>Get a Hint!</button>
         <button id="next-question-btn" class="game-btn">Next Question &rarr;</button>
         <button id="play-again-btn" class="game-btn">Play Again? ↻</button>
     </div>
@@ -124,11 +137,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo" crossorigin=""></script>
   <script>
     const map = L.map('map').setView([60, -98], 4);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: 'abcd',
-      maxZoom: 19
-    }).addTo(map);
+    addSchoolBasemap(map);
 
     // --- DOM Elements ---
     const questionBox = document.getElementById('question-box');
@@ -172,6 +181,8 @@
     // --- Game Logic Functions ---
     function loadNewQuestion() {
         if (availableQuestions.length === 0) {
+            currentQuestion = null;
+            isGameActive = false;
             questionBox.innerHTML = "You've answered all the questions!";
             resultBox.innerHTML = "<h2>Congratulations!</h2><p>You've completed the Canada Map Challenge!</p>";
             nextQuestionBtn.style.display = 'none';
@@ -200,7 +211,7 @@
     }
 
     function showHint() {
-        if (!isGameActive) return;
+        if (!isGameActive || !geojson || !currentQuestion?.hints) return;
         currentHintIndex++;
         if (currentHintIndex < currentQuestion.hints.length) {
             questionBox.textContent = currentQuestion.hints[currentHintIndex];
@@ -211,7 +222,7 @@
     }
 
     function checkAnswer(provinceName) {
-        if (!isGameActive) return;
+        if (!isGameActive || !geojson || !currentQuestion?.hints) return;
         const provinceKey = provinceNames.find(p => provinceName.includes(p)) || provinceName;
 
         if (provinceKey === currentQuestion.answer) {
@@ -255,7 +266,7 @@
     }
 
     function highlightFeature(e) {
-      if (!isGameActive) return;
+      if (!isGameActive || !geojson || !currentQuestion?.hints) return;
       const layer = e.target;
       layer.setStyle({ weight: 4, color: '#4f46e5', dashArray: '', fillOpacity: 0.85 });
       if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) { layer.bringToFront(); }
@@ -269,10 +280,11 @@
     }
     
     // --- Initial Load ---
-    fetch('https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@master/public/data/canada.geojson')
-      .then(res => res.json())
+    fetch('../geography-shared/canada.geojson')
+      .then(res => { if (!res.ok) throw new Error('Map data could not load'); return res.json(); })
       .then(data => { 
-        geojson = L.geoJson(data, { style, onEachFeature }).addTo(map); 
+        geojson = L.geoJson(data, { style, onEachFeature }).addTo(map);
+                map.fitBounds(geojson.getBounds(), { padding: [24, 24] }); 
         resetGame(); // Start the game for the first time
       })
       .catch(err => { 
@@ -282,3 +294,4 @@
   </script>
 </body>
 </html>
+

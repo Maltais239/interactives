@@ -139,7 +139,20 @@
       #map { height: 50vh; border-right: none; border-bottom: 1px solid #cbd5e1; }
       #info-panel { width: 100%; max-width: 100%; height: 50vh; padding: 1rem; }
     }
-  </style>
+  
+    *, *::before, *::after { box-sizing: border-box; }
+    html { display: block; }
+    body { min-height: 0; overflow: hidden; }
+    #map { min-width: 0; }
+    #info-panel { flex-shrink: 0; }
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      #map { flex: none; width: 100%; height: 48dvh; border-right: 0; }
+      #info-panel { width: 100%; max-width: none; height: 52dvh; padding: 1rem; border-left: 0; border-top: 4px solid #b45309; }
+    }
+
+</style>
+  <script src="../geography-shared/basemap.js?v=20261005"></script>
 </head>
 <body>
 
@@ -147,7 +160,7 @@
 
   <div id="info-panel">
     <h2>Civilizations of the World</h2>
-    <div id="info-content"></div>
+    <div id="info-content"><p role="status">Loading civilization regions…</p></div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -160,10 +173,7 @@
     const map = L.map('map', { zoomControl: true, minZoom: 2 })
                  .setView([20, -20], 2);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-      subdomains: 'abcd', maxZoom: 19
-    }).addTo(map);
+    addSchoolBasemap(map);
 
     // ====================================================================
     // 2. COLORS — distinct hues within successor families
@@ -538,7 +548,7 @@
             <a href="https://github.com/aourednik/historical-basemaps" target="_blank" rel="noopener">
               aourednik/historical-basemaps</a> (MIT licensed). Each civilization is
               shown at its classical or peak era — see the "Era" badge when you click.</p>
-          <p><strong>Basemap:</strong> OpenStreetMap (CARTO Voyager).</p>
+          <p><strong>Basemap:</strong> OpenStreetMap. Modern borders provide geographic context; coloured regions show historical interpretations.</p>
         </div>
       `;
       infoContent.innerHTML = html;
@@ -564,6 +574,7 @@
 
     function clearFocus() {
       focusedId = null;
+      map.setView([20, -20], 2);
       applyVisibility();
       renderDefaultPanel();
     }
@@ -694,7 +705,7 @@
     // ====================================================================
     // 8. LOAD
     // ====================================================================
-    const GEOJSON_URL = 'https://raw.githubusercontent.com/Maltais239/interactives/main/curriculum_civilizations.geojson';
+    const GEOJSON_URL = '../curriculum_civilizations.geojson';
 
     fetch(GEOJSON_URL)
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
@@ -709,11 +720,10 @@
         console.error('GeoJSON load failed:', err);
         infoContent.innerHTML = `
           <p style="color:#b91c1c;"><strong>Could not load map data.</strong></p>
-          <p>Upload <code>curriculum_civilizations.geojson</code> to your GitHub repo
-             (or update <code>GEOJSON_URL</code> in this file).</p>
-          <p>Expected URL:<br><code style="font-size:0.78rem; word-break:break-all;">${GEOJSON_URL}</code></p>
+          <p>Please reload this page to try again.</p>
         `;
       });
   </script>
 </body>
 </html>
+
