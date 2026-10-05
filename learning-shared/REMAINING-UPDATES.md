@@ -14,8 +14,8 @@ Preserve existing launch URLs, learning ideas and real source visuals. Commit an
 - [x] Boreal Forest Comprehension — key-idea selection, comprehension feedback, read aloud
 - [ ] Writer Spark and Writer Spark Practice
 - [ ] Heart Word Mapper
-- [ ] Definition Draw
-- [ ] Make Your Own Flashcards
+- [x] Definition Draw — scaled drawing coordinates, optional images, undo/redo, finite rounds
+- [x] Make Your Own Flashcards — text/JSON import, review set, export, print, keyboard controls
 - [ ] Morpheme Match-Up
 - [ ] Cashier Change Challenge
 - [ ] What's the Angle?
@@ -27,4 +27,4 @@ Preserve existing launch URLs, learning ideas and real source visuals. Commit an
 - [ ] Updated hub descriptions and real screenshots; final live checks
 
 ## Current checkpoint
-Batch 1 passed interaction checks (wrong answers, hints, full journey, quiz correction and restart). Next: writing and word-work activities. Live visual checks follow deployment. No student accounts or new remote student-data collection. Verify wrong answers, hints, completion and restart, plus responsive and keyboard behaviour.
+Batch 1 passed interaction checks (wrong answers, hints, full journey, quiz correction and restart). Batch 2 passed import/review and drawing/round checks. Next: writing and word-work activities. First reading activity verified live. No student accounts or new remote student-data collection. Verify wrong answers, hints, completion and restart, plus responsive and keyboard behaviour.
