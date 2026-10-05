@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vocabulary Worksheet</title>
     <!-- Tailwind CSS for styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="app.css?v=20261005">
     <!-- Google Font: Patrick Hand for the handwriting look -->
     <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
     <!-- FontAwesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- html2pdf.js for direct PDF download -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
     
     <style>
         .font-handwriting {
@@ -70,13 +70,13 @@
             color: black;
         }
     </style>
-</head>
+<style>@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Lexend:wght@400;600&display=swap');body{background:#f8f6ef!important;font-family:Nunito,system-ui,sans-serif!important}.worksheet-intro{max-width:896px;margin:0 auto 22px;line-height:1.6;color:#294c3d}.worksheet-intro h1{font-family:Lexend,system-ui;font-size:clamp(1.7rem,5vw,2.5rem);margin:16px 0}.worksheet-intro a{color:#167463}.worksheet-tools{display:flex;gap:10px;flex-wrap:wrap}.worksheet-tools button{background:#eaf4ed;border:1px solid #aec8b9;border-radius:10px;padding:10px 16px;font-weight:700}button{min-height:44px}button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid #167fa7!important;outline-offset:3px}#worksheet-container{box-shadow:0 8px 30px #203c2014!important}#input-name{padding-left:18px!important}.font-handwriting{font-family:Nunito,system-ui,sans-serif!important}#clear-modal[hidden]{display:none!important}@media print{body{padding:0!important}.print-text-display{height:auto!important;min-height:60px;overflow:visible!important;overflow-wrap:anywhere;font-family:Nunito,system-ui,sans-serif!important}#worksheet-container .grid{display:grid;grid-template-columns:1fr 1fr!important;gap:20px!important}.print-text-display:empty::after{content:' ';display:block;min-height:60px}.print-text-display.pl-32{padding-left:18px!important}.relative:has(>.print-text-display){height:auto!important;min-height:80px}#worksheet-container>.mb-8{margin-bottom:25px!important}#worksheet-container .group{break-inside:avoid}#worksheet-container .group>div:last-child{box-shadow:none!important}#worksheet-container .h-48{height:auto!important;min-height:80px}.bg-lines{background:none!important;line-height:1.5!important}.print-text-display{line-height:1.5!important}.md\:flex.col-span-2{display:none!important}}@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}</style></head>
 <body class="min-h-screen bg-gray-100 p-4 md:p-8 font-sans">
 
-    <!-- Controls (Hidden when printing) -->
+<section class="worksheet-intro no-print"><a href="https://interactives.blackgold.ca/interactive-learning-lab/">← Interactive Learning Lab</a><h1>Can I Have a Word?</h1><p>Explore a word, explain its meaning, use it in a sentence, and find a synonym.</p><div class="worksheet-tools"><button id="save-text">Download writing</button><button id="read-sentence">Read my sentence</button></div><p id="draft-state" role="status"></p></section>    <!-- Controls (Hidden when printing) -->
     <div class="max-w-4xl mx-auto mb-6 flex flex-wrap justify-between items-center gap-3 no-print">
         <!-- Dictionary Link -->
-        <a href="https://www.merriam-webster.com/kids" target="_blank" class="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-bold text-lg underline decoration-2 underline-offset-2 transition-colors">
+        <a href="https://www.merriam-webster.com/kids" target="_blank" rel="noopener" class="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-bold text-lg underline decoration-2 underline-offset-2 transition-colors">
             <i class="fas fa-book-open"></i> Dictionary for Kids
         </a>
 
@@ -86,7 +86,7 @@
                 <i class="fas fa-trash-alt"></i> Clear
             </button>
             <button type="button" onclick="downloadPDF()" class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md transition-transform hover:scale-105 font-bold cursor-pointer">
-                <i class="fas fa-file-pdf"></i> Download PDF
+                <i class="fas fa-file-pdf"></i> Print / Save PDF
             </button>
         </div>
     </div>
@@ -268,85 +268,6 @@
     </div>
 
     <!-- JavaScript Logic -->
-    <script>
-        // Make functions globally accessible by attaching to window
-        window.updatePrintText = function(id) {
-            const inputVal = document.getElementById('input-' + id).value;
-            // Use textContent for safety
-            document.getElementById('print-' + id).innerText = inputVal;
-        };
-
-        // Modal Logic replacement for confirm()
-        window.showClearModal = function() {
-            const modal = document.getElementById('clear-modal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        };
-
-        window.closeClearModal = function() {
-            const modal = document.getElementById('clear-modal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        };
-
-        window.performClear = function() {
-            const inputs = ['name', 'word', 'definition', 'sentence', 'synonym'];
-            inputs.forEach(id => {
-                const el = document.getElementById('input-' + id);
-                if (el) {
-                    el.value = '';
-                    window.updatePrintText(id); // Clear the print view too
-                }
-            });
-            window.closeClearModal();
-        };
-
-        window.downloadPDF = function() {
-            // 1. Prepare for PDF generation
-            const element = document.getElementById('worksheet-container');
-            const originalShadow = element.style.boxShadow;
-            
-            // 2. Hide inputs, show static divs MANUALLY
-            // We do this by adding a temporary class to the container that CSS targets
-            element.classList.add('pdf-mode');
-
-            // Access the inputs and display divs manually to toggle visibility for html2pdf capture
-            // Note: with data-html2canvas-ignore on inputs, we just need to ensure the print divs are visible.
-            const printDivs = document.querySelectorAll('.print-text-display');
-            
-            // We only need to show the print divs. The inputs will be ignored by the library.
-            printDivs.forEach(el => el.style.display = 'block');
-            
-            // Remove shadow for clean PDF
-            element.style.boxShadow = 'none';
-
-            // 3. Generate PDF
-            const studentName = document.getElementById('input-name').value.trim();
-            const filename = studentName ? `Worksheet-${studentName}.pdf` : 'Vocabulary-Worksheet.pdf';
-
-            const opt = {
-                margin:       0.3,
-                filename:     filename,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true }, 
-                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-            };
-
-            html2pdf().set(opt).from(element).save().then(() => {
-                // 4. Cleanup / Restore State
-                element.style.boxShadow = originalShadow;
-                element.classList.remove('pdf-mode');
-                
-                // Revert to stylesheet default (inputs visible, print divs hidden)
-                printDivs.forEach(el => el.style.display = ''); 
-            });
-        };
-
-        // Initialize on load
-        window.onload = function() {
-            const inputs = ['name', 'word', 'definition', 'sentence', 'synonym'];
-            inputs.forEach(id => window.updatePrintText(id));
-        };
-    </script>
+    <script src="../learning-shared/workshop.js?v=20261005"></script><script src="app.js?v=20261005"></script>
 </body>
 </html>
