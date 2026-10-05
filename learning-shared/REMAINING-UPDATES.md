@@ -24,7 +24,14 @@ Preserve existing launch URLs, learning ideas and real source visuals. Commit an
 - [x] Interactive Creature Care — original bear artwork, paused/step controls, observation notebook
 - [x] Older morphology activities and generators — Rooting/WordWorks checked; 52 paired boards/cards, worksheet drafts; editable portable morphology games
 - [x] Sorting review and generator repair — portable sorting builder; 22 availability/inline syntax checks; 8 classroom sorts with full interaction checks
-- [ ] Updated hub descriptions and real screenshots; final live checks
+- [x] Updated hub descriptions, eight obsolete labels removed, and desktop live checks
+- [ ] Publish 29 prepared real screenshot replacements — specific approval required after automatic review rejection
 
 ## Current checkpoint
-All activity batches are saved except the latest sorting controls (ready to commit). Checks include writing drafts, imports, correction paths, full rounds and restart. Eight classroom sorts cover 107 cards; the broader 22-item review checks availability and inline syntax, not every full interaction path. Next: real screenshot refresh, hub descriptions, and final live verification.
+All activity batches, including the eight sorting-control updates, are committed. The hub's 29 revised descriptions are live at https://interactives.blackgold.ca/interactive-learning-lab/ (BGSD commit 6b593278f4320818e80e858c64ce41d259600781). All 149 entries and their launch/companion links are preserved; all 149 existing preview files exist. Live checks confirmed generator search, eight morphology entries without obsolete labels, the 22-entry sorting filter and the three Walker activities. Desktop preview loading passed; responsive CSS was reviewed, but a live narrow-viewport test remains unverified.
+
+Twenty-nine actual public-app screenshots are prepared as proportionally scaled 900 × 620 JPEGs under 75 KB each. They are NOT published yet. Automatic approval review rejected image uploads to the existing Maltais239/interactives repository, saying the current continuation instruction was not specific enough for the payload and public destination, even after owner/provenance checks. The required next approval is specific permission to publish these 29 previews in learning-lab-images. Do not retry the rejected uploads until that approval arrives.
+
+Review files are saved as Interactive-Hub-Preview-Refresh.jpg and Interactive-Hub-Preview-Refresh.zip. The ZIP contains all 29 JPEGs, their source/destination manifest and the prepared catalogue/template changes. After permission, refresh the current catalogue before merging only those screenshot/cache-version and capture-date changes, publish the images, rebuild the hub, and verify live loading. Preserve current descriptions, launch URLs and companion links.
+
+Checks include writing drafts, imports, correction paths, full rounds and restart. Eight classroom sorts cover 107 cards; the broader 22-item review checks availability and inline syntax, not every full interaction path.
