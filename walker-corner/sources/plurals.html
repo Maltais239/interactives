@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plural Practice</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load React -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Load Babel for JSX compiling in the browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- ICON COMPONENTS ---
+        const CheckCircle2 = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>;
+        const XCircle = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>;
+        const Trophy = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>;
+        const RefreshCw = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>;
+        const BookOpen = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>;
+        const Star = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
+        const Lightbulb = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.9 1.2 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>;
+        const Home = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
+
+        // --- WORD DATA ---
+        const wordBank = [
+          // Rule: Add <s>
+          { singular: 'cat', plural: 'cats', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'dog', plural: 'dogs', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'book', plural: 'books', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'car', plural: 'cars', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'tree', plural: 'trees', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'boy', plural: 'boys', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'toy', plural: 'toys', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'key', plural: 'keys', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'day', plural: 'days', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'monkey', plural: 'monkeys', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'apple', plural: 'apples', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'chair', plural: 'chairs', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'desk', plural: 'desks', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'shoe', plural: 'shoes', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'hat', plural: 'hats', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'pencil', plural: 'pencils', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'flower', plural: 'flowers', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'house', plural: 'houses', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'game', plural: 'games', rule: 's', ruleText: 'Add <s>' },
+          { singular: 'star', plural: 'stars', rule: 's', ruleText: 'Add <s>' },
+
+          // Rule: Add <es>
+          { singular: 'bus', plural: 'buses', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'box', plural: 'boxes', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'fox', plural: 'foxes', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'dish', plural: 'dishes', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'wish', plural: 'wishes', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'church', plural: 'churches', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'bench', plural: 'benches', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'match', plural: 'matches', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'buzz', plural: 'buzzes', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'quiz', plural: 'quizzes', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'glass', plural: 'glasses', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'class', plural: 'classes', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'brush', plural: 'brushes', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'lash', plural: 'lashes', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'peach', plural: 'peaches', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'watch', plural: 'watches', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'stitch', plural: 'stitches', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'kiss', plural: 'kisses', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'patch', plural: 'patches', rule: 'es', ruleText: 'Add <es>' },
+          { singular: 'torch', plural: 'torches', rule: 'es', ruleText: 'Add <es>' },
+
+          // Rule: Change <y> to <i> and add <es>
+          { singular: 'baby', plural: 'babies', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'lady', plural: 'ladies', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'city', plural: 'cities', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'puppy', plural: 'puppies', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'party', plural: 'parties', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'story', plural: 'stories', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'berry', plural: 'berries', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'cherry', plural: 'cherries', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'family', plural: 'families', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'hobby', plural: 'hobbies', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'pony', plural: 'ponies', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'army', plural: 'armies', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'country', plural: 'countries', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'fairy', plural: 'fairies', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'diary', plural: 'diaries', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'enemy', plural: 'enemies', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'mystery', plural: 'mysteries', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'balcony', plural: 'balconies', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'duty', plural: 'duties', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+          { singular: 'activity', plural: 'activities', rule: 'ies', ruleText: 'Change <y> to <i> & add <es>' },
+        ];
+
+        // Utility to shuffle array
+        const shuffleArray = (array) => {
+          const shuffled = [...array];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          return shuffled;
+        };
+
+        // Generate multiple choice options with plausible distractors
+        const generateOptions = (wordObj) => {
+          const { singular, plural } = wordObj;
+          const options = new Set();
+          options.add(plural); // Always include correct answer
+
+          // Common mistake patterns
+          options.add(`${singular}s`);
+          options.add(`${singular}es`);
+          
+          if (singular.endsWith('y')) {
+            options.add(`${singular.slice(0, -1)}ies`);
+          } else {
+            options.add(`${singular}ies`);
+          }
+
+          // Extra distractors if needed to reach 4 total options
+          const extraDistractors = [
+            `${singular}ses`,
+            `${singular}${singular.slice(-1)}s`,
+            `${singular}z`
+          ];
+
+          let i = 0;
+          while (options.size < 4 && i < extraDistractors.length) {
+            options.add(extraDistractors[i]);
+            i++;
+          }
+
+          // Separate correct answer from distractors to guarantee exactly 4 unique choices
+          const distractors = Array.from(options).filter(opt => opt.toLowerCase() !== plural.toLowerCase());
+          const finalOptions = [plural, ...distractors.slice(0, 3)];
+          
+          return shuffleArray(finalOptions);
+        };
+
+        // Generate an explanation for the rule based on the word
+        const getRuleExplanation = (word) => {
+          if (word.rule === 'es') {
+            return `Words that end in s, x, z, ch, or sh need an <es> to make them plural.`;
+          }
+          if (word.rule === 'ies') {
+            return `When a word ends in a consonant and a <y>, we change the <y> to an <i> and add <es>!`;
+          }
+          if (word.rule === 's') {
+            if (word.singular.endsWith('y')) {
+              return `Since there is a vowel right before the <y> in "${word.singular}", we just add <s> instead of changing the <y>.`;
+            }
+            return `For most regular words like "${word.singular}", we simply add an <s> to the end.`;
+          }
+          return word.ruleText;
+        };
+
+        function App() {
+          const [gameState, setGameState] = useState('menu'); // 'menu', 'playing', 'finished'
+          const [activeWords, setActiveWords] = useState([]);
+          const [currentIndex, setCurrentIndex] = useState(0);
+          const [feedback, setFeedback] = useState(null); // 'correct', 'incorrect', or null
+          const [currentOptions, setCurrentOptions] = useState([]);
+
+          const QUESTIONS_PER_ROUND = 20;
+
+          // Start game with mixed rules
+          const startGame = () => {
+            // Shuffle all words and pick 20 questions
+            const shuffled = shuffleArray([...wordBank]).slice(0, QUESTIONS_PER_ROUND);
+            
+            setActiveWords(shuffled);
+            setCurrentIndex(0);
+            setFeedback(null);
+            setGameState('playing');
+          };
+
+          // Generate new options when the word changes
+          useEffect(() => {
+            if (gameState === 'playing' && activeWords.length > 0) {
+              setCurrentOptions(generateOptions(activeWords[currentIndex]));
+            }
+          }, [currentIndex, activeWords, gameState]);
+
+          const handleOptionClick = (option) => {
+            const currentWord = activeWords[currentIndex];
+            const isCorrect = option.toLowerCase() === currentWord.plural.toLowerCase();
+
+            if (isCorrect) {
+              setFeedback('correct');
+            } else {
+              setFeedback('incorrect');
+            }
+          };
+
+          const handleNext = () => {
+            if (currentIndex + 1 < activeWords.length) {
+              setCurrentIndex(prev => prev + 1);
+              setFeedback(null);
+            } else {
+              setGameState('finished');
+            }
+          };
+
+          // Main Menu Component
+          const MainMenu = () => (
+            <div className="flex flex-col items-center w-full max-w-2xl mx-auto space-y-6">
+              <div className="bg-white p-8 md:p-12 rounded-3xl shadow-xl border-4 border-teal-500 w-full text-center relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-4 bg-teal-500"></div>
+                <BookOpen className="w-20 h-20 text-teal-500 mx-auto mb-6" />
+                <h1 className="text-5xl font-extrabold text-gray-800 mb-4">Plural Power!</h1>
+                <p className="text-xl text-gray-600 mb-10">Can you choose the correct plural for each word? All the rules are mixed together!</p>
+                
+                <button 
+                  onClick={startGame}
+                  className="w-full sm:w-auto px-10 py-5 bg-teal-500 hover:bg-teal-600 text-white text-2xl font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-3 mx-auto"
+                >
+                  <Star className="w-8 h-8" /> Start Playing!
+                </button>
+              </div>
+            </div>
+          );
+
+          // Playing Area Component
+          const PlayingArea = () => {
+            const currentWord = activeWords[currentIndex];
+
+            return (
+              <div className="w-full max-w-xl mx-auto flex flex-col">
+                {/* Progress and Stats bar */}
+                <div className="flex justify-between items-center mb-6 text-gray-600 font-semibold px-2">
+                  <div className="flex items-center gap-2 text-lg">
+                    <span>Word: {currentIndex + 1} / {activeWords.length}</span>
+                  </div>
+                  <button
+                    onClick={() => setGameState('menu')}
+                    className="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-1.5 rounded-full text-sm font-bold shadow-sm transition-colors"
+                  >
+                    <Home className="w-4 h-4" /> Home
+                  </button>
+                </div>
+
+                {/* Game Card */}
+                <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+                  <div className="p-8 md:p-12 text-center">
+                    <p className="text-gray-500 mb-2 font-medium uppercase tracking-wider">Choose the correct plural:</p>
+                    <h2 className="text-6xl font-black text-gray-800 mb-8 tracking-tight">{currentWord.singular}</h2>
+                    
+                    {!feedback ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {currentOptions.map((option, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => handleOptionClick(option)}
+                            className="py-6 px-4 bg-white border-4 border-gray-200 hover:border-teal-500 hover:bg-teal-50 text-3xl font-bold text-gray-700 rounded-2xl shadow-sm transition-all hover:scale-[1.02] active:scale-95"
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className={`p-6 rounded-2xl flex flex-col items-center transition-all duration-300 ${feedback === 'correct' ? 'bg-green-50 border-2 border-green-200' : 'bg-red-50 border-2 border-red-200'}`}>
+                        {feedback === 'correct' ? (
+                          <>
+                            <CheckCircle2 className="w-16 h-16 text-green-500 mb-3" />
+                            <h3 className="text-3xl font-bold text-green-700 mb-2">Awesome!</h3>
+                            <p className="text-green-600 text-lg mb-4">You got it right!</p>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-16 h-16 text-red-500 mb-3" />
+                            <h3 className="text-3xl font-bold text-red-700 mb-2">Not quite.</h3>
+                            <p className="text-red-600 text-lg mb-4">
+                              The correct spelling is: <span className="font-bold block text-3xl mt-2">{currentWord.plural}</span>
+                            </p>
+                          </>
+                        )}
+                        
+                        <div className={`w-full text-left p-4 rounded-xl mb-6 flex items-start gap-3 shadow-inner ${feedback === 'correct' ? 'bg-green-100/70 text-green-800' : 'bg-red-100/70 text-red-800'}`}>
+                          <Lightbulb className="w-6 h-6 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold block mb-1">Rule: {currentWord.ruleText}</span>
+                            <span className="text-sm md:text-base leading-relaxed">{getRuleExplanation(currentWord)}</span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={handleNext}
+                          autoFocus
+                          className={`w-full py-4 text-white text-xl font-bold rounded-xl shadow-md transition-colors ${feedback === 'correct' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                        >
+                          {currentIndex + 1 < activeWords.length ? 'Next Word' : 'Finish Game'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          };
+
+          // Finished Area Component
+          const FinishedArea = () => {
+            return (
+              <div className="w-full max-w-lg mx-auto text-center bg-white p-10 rounded-3xl shadow-xl border border-gray-100">
+                <Trophy className="w-24 h-24 text-yellow-400 mx-auto mb-6 drop-shadow-md" />
+                <h2 className="text-4xl font-extrabold text-gray-800 mb-4">Amazing Job!</h2>
+                <p className="text-xl text-gray-600 mb-8">You finished all {activeWords.length} words.</p>
+                
+                <div className="flex flex-col gap-4">
+                  <button
+                    onClick={startGame}
+                    className="w-full py-4 bg-teal-500 hover:bg-teal-600 text-white text-xl font-bold rounded-2xl shadow-md transition-colors flex justify-center items-center gap-2"
+                  >
+                    <RefreshCw className="w-6 h-6" /> Play Again
+                  </button>
+                  
+                  <button
+                    onClick={() => setGameState('menu')}
+                    className="w-full py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xl font-bold rounded-2xl transition-colors flex justify-center items-center gap-2"
+                  >
+                    <Home className="w-6 h-6" /> Back to Home
+                  </button>
+                </div>
+              </div>
+            );
+          };
+
+          return (
+            <div className="min-h-screen flex items-center justify-center p-4 font-sans">
+              <div className="w-full max-w-4xl">
+                {gameState === 'menu' && <MainMenu />}
+                {gameState === 'playing' && <PlayingArea />}
+                {gameState === 'finished' && <FinishedArea />}
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

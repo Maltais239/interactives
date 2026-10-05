@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bridge Builder Force Test</title>
+  <style>
+    :root {
+      --slate-50: #f8fafc;
+      --slate-100: #f1f5f9;
+      --slate-200: #e2e8f0;
+      --slate-300: #cbd5e1;
+      --slate-500: #64748b;
+      --slate-600: #475569;
+      --slate-700: #334155;
+      --slate-800: #1e293b;
+      --slate-900: #0f172a;
+      --blue-50: #eff6ff;
+      --blue-100: #dbeafe;
+      --blue-600: #2563eb;
+      --blue-700: #1d4ed8;
+      --green-500: #22c55e;
+      --orange-500: #f97316;
+      --red-500: #ef4444;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--slate-50);
+      color: var(--slate-900);
+    }
+
+    .app {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-end;
+      margin-bottom: 24px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--blue-100);
+      color: #1e40af;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(32px, 5vw, 56px);
+      line-height: 1;
+      letter-spacing: -0.04em;
+    }
+
+    .subtitle {
+      margin: 12px 0 0;
+      max-width: 820px;
+      color: var(--slate-600);
+      font-size: 18px;
+      line-height: 1.45;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button, select, input, textarea {
+      font: inherit;
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 14px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
+      transition: transform 0.15s, background 0.15s;
+    }
+
+    .btn:active { transform: scale(0.98); }
+
+    .btn-primary {
+      background: var(--blue-600);
+      color: white;
+    }
+
+    .btn-primary:hover { background: var(--blue-700); }
+
+    .btn-secondary {
+      background: white;
+      color: var(--slate-800);
+      border: 1px solid var(--slate-300);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(310px, 1fr);
+      gap: 24px;
+    }
+
+    .left, .right {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .card {
+      background: white;
+      border: 1px solid var(--slate-200);
+      border-radius: 24px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+      overflow: hidden;
+    }
+
+    .card-content {
+      padding: 20px;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      background: var(--slate-200);
+      border-radius: 20px;
+      padding: 4px;
+    }
+
+    .tab {
+      border: 0;
+      border-radius: 15px;
+      background: transparent;
+      padding: 10px;
+      font-weight: 700;
+      color: var(--slate-600);
+      cursor: pointer;
+    }
+
+    .tab.active {
+      background: white;
+      color: var(--slate-900);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+    }
+
+    .force-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .metric {
+      border: 1px solid var(--slate-200);
+      border-radius: 16px;
+      padding: 16px;
+      background: white;
+    }
+
+    .metric-label {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--slate-500);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .metric-value {
+      margin-top: 4px;
+      font-size: 28px;
+      font-weight: 800;
+    }
+
+    .metric-detail {
+      margin-top: 4px;
+      color: var(--slate-500);
+      font-size: 12px;
+    }
+
+    .feedback {
+      background: var(--slate-100);
+      border-radius: 18px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+
+    .feedback h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+    }
+
+    .feedback ul {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--slate-700);
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .control-section-title {
+      margin: 0 0 16px;
+      font-size: 22px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .control-group {
+      margin-bottom: 18px;
+    }
+
+    .control-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--slate-700);
+      margin-bottom: 8px;
+    }
+
+    select {
+      width: 100%;
+      border: 1px solid var(--slate-300);
+      border-radius: 14px;
+      padding: 10px;
+      background: white;
+    }
+
+    .description {
+      margin: 6px 0 0;
+      font-size: 12px;
+      color: var(--slate-500);
+      line-height: 1.35;
+    }
+
+    .choice-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .choice {
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--slate-200);
+      background: white;
+      border-radius: 14px;
+      padding: 10px;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+
+    .choice:hover {
+      background: var(--slate-50);
+    }
+
+    .choice.active {
+      border-color: var(--blue-600);
+      background: var(--blue-50);
+      color: #1e3a8a;
+    }
+
+    .choice-title {
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .choice-description {
+      font-size: 12px;
+      color: var(--slate-500);
+      margin-top: 2px;
+      line-height: 1.3;
+    }
+
+    .range-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .summary-item {
+      background: var(--slate-100);
+      border-radius: 16px;
+      padding: 12px;
+    }
+
+    .summary-label {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--slate-500);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .summary-value {
+      margin-top: 5px;
+      font-weight: 800;
+    }
+
+    .goal {
+      margin-top: 16px;
+      background: var(--blue-50);
+      border: 1px solid var(--blue-100);
+      color: #1e3a8a;
+      border-radius: 16px;
+      padding: 12px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .vocab p {
+      color: var(--slate-700);
+      font-size: 14px;
+      line-height: 1.45;
+      margin: 10px 0;
+    }
+
+    .bridge-wrap {
+      position: relative;
+      height: 390px;
+      width: 100%;
+      border: 1px solid var(--slate-300);
+      border-radius: 24px;
+      overflow: hidden;
+      background: var(--slate-100);
+    }
+
+    .bridge-gradient {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, #dff3ff, #f8fbff 48%, #eef2f7);
+    }
+
+    .bridge-badge {
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      z-index: 10;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid var(--slate-200);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      box-shadow: 0 1px 3px rgba(15,23,42,0.1);
+    }
+
+    .bridge-badge strong { display: block; }
+
+    .wind-badge {
+      position: absolute;
+      right: 16px;
+      top: 16px;
+      z-index: 10;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid var(--slate-200);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      box-shadow: 0 1px 3px rgba(15,23,42,0.1);
+      color: var(--slate-700);
+    }
+
+    .visual-summary {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      z-index: 10;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid var(--slate-200);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: var(--slate-700);
+      box-shadow: 0 1px 3px rgba(15,23,42,0.1);
+      max-width: 230px;
+    }
+
+    .result-badge {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      z-index: 10;
+      background: rgba(255,255,255,0.94);
+      border: 1px solid var(--slate-200);
+      border-radius: 16px;
+      padding: 12px;
+      width: 260px;
+      box-shadow: 0 1px 3px rgba(15,23,42,0.12);
+    }
+
+    .progress {
+      height: 12px;
+      border-radius: 999px;
+      background: var(--slate-200);
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      transition: width 0.25s;
+    }
+
+    .shake {
+      animation: shake 0.35s 2;
+    }
+
+    .refresh {
+      animation: refresh 0.25s;
+    }
+
+    @keyframes shake {
+      0% { transform: translateX(0); }
+      20% { transform: translateX(-2px); }
+      40% { transform: translateX(2px); }
+      60% { transform: translateX(-2px); }
+      80% { transform: translateX(2px); }
+      100% { transform: translateX(0); }
+    }
+
+    @keyframes refresh {
+      from { opacity: 0.85; transform: scale(0.985); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .test-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .test-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      border: 1px solid var(--slate-200);
+      border-radius: 14px;
+      padding: 12px;
+      font-size: 14px;
+    }
+
+    .pass { color: #15803d; font-weight: 800; }
+    .fail { color: #b91c1c; font-weight: 800; }
+
+    .hidden { display: none; }
+
+    @media (max-width: 950px) {
+      .grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; }
+      .force-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 560px) {
+      .app { padding: 14px; }
+      .force-grid { grid-template-columns: 1fr; }
+      .bridge-wrap { height: 350px; }
+      .visual-summary { display: none; }
+      .result-badge { width: calc(100% - 32px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div>
+        <div class="badge">🔨 Internal & External Forces Engineering Lab</div>
+        <h1>Bridge Builder Force Test</h1>
+        <p class="subtitle">Design a bridge by choosing materials, deck style, bracing, piers, and reinforcements. Then test it with load, wind, compression, tension, and shear.</p>
+      </div>
+      <div class="button-row">
+        <button class="btn btn-secondary" id="resetBtn">↺ Reset</button>
+        <button class="btn btn-primary" id="testBtn">▶ Test Bridge</button>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="left">
+        <div class="card">
+          <div class="card-content">
+            <div id="bridgeVisual"></div>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <button class="tab active" data-tab="forces">Forces</button>
+          <button class="tab" data-tab="tests">Tests</button>
+        </div>
+
+        <div id="forcesPanel" class="card">
+          <div class="card-content">
+            <div class="force-grid">
+              <div class="metric">
+                <div class="metric-label">Compression</div>
+                <div class="metric-value" id="compressionValue">0</div>
+                <div class="metric-detail">pushing/squeezing</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Tension</div>
+                <div class="metric-value" id="tensionValue">0</div>
+                <div class="metric-detail">pulling/stretching</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Shear</div>
+                <div class="metric-value" id="shearValue">0</div>
+                <div class="metric-detail">sliding/twisting</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Failure Load</div>
+                <div class="metric-value" id="failureValue">0 kg</div>
+                <div class="metric-detail">estimated max</div>
+              </div>
+            </div>
+
+            <div class="feedback">
+              <h3>ℹ️ Engineering Feedback</h3>
+              <ul id="feedbackList"></ul>
+            </div>
+          </div>
+        </div>
+
+        <div id="testsPanel" class="card hidden">
+          <div class="card-content">
+            <div id="testSummary" class="goal"></div>
+            <div id="testList" class="test-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="right">
+        <div class="card">
+          <div class="card-content">
+            <h2 class="control-section-title">🛠️ Bridge Design Builder</h2>
+
+            <div class="control-group">
+              <label for="bridgeType">Bridge Type</label>
+              <select id="bridgeType"></select>
+              <p class="description" id="bridgeTypeDescription"></p>
+            </div>
+
+            <div class="control-group">
+              <label for="material">Material</label>
+              <select id="material"></select>
+              <p class="description" id="materialDescription"></p>
+            </div>
+
+            <div class="control-group">
+              <label for="supports">End Supports</label>
+              <select id="supports"></select>
+              <p class="description" id="supportsDescription"></p>
+            </div>
+
+            <div class="control-group">
+              <label>Deck Style</label>
+              <div id="deckStyleChoices" class="choice-list"></div>
+            </div>
+
+            <div class="control-group">
+              <label>Bracing Pattern</label>
+              <div id="bracingPatternChoices" class="choice-list"></div>
+            </div>
+
+            <div class="control-group">
+              <label>Piers</label>
+              <div id="pierOptionChoices" class="choice-list"></div>
+            </div>
+
+            <div class="control-group">
+              <label>Reinforcement</label>
+              <div id="reinforcementChoices" class="choice-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-content">
+            <h2 class="control-section-title">⚖️ Test Conditions</h2>
+
+            <div class="control-group">
+              <div class="range-row">
+                <label for="span">Bridge Span</label>
+                <strong><span id="spanValue">40</span> m</strong>
+              </div>
+              <input id="span" type="range" min="20" max="80" value="40" />
+            </div>
+
+            <div class="control-group">
+              <div class="range-row">
+                <label for="load">Test Load</label>
+                <strong><span id="loadValue">50</span> kg</strong>
+              </div>
+              <input id="load" type="range" min="10" max="150" value="50" />
+            </div>
+
+            <div class="control-group">
+              <div class="range-row">
+                <label for="wind">Wind / Side Force</label>
+                <strong><span id="windValue">10</span></strong>
+              </div>
+              <input id="wind" type="range" min="0" max="50" value="10" />
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-content">
+            <h2 class="control-section-title">📊 Design Summary</h2>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <div class="summary-label">Stability</div>
+                <div class="summary-value" id="summaryStability">0/100</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Cost</div>
+                <div class="summary-value" id="summaryCost">$0</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Efficiency</div>
+                <div class="summary-value" id="summaryEfficiency">0</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Effective Span</div>
+                <div class="summary-value" id="summaryEffectiveSpan">0 m</div>
+              </div>
+            </div>
+            <div class="goal"><strong>Goal:</strong> Build the strongest bridge with the fewest materials. A high score means your internal forces are balanced against the external forces.</div>
+          </div>
+        </div>
+
+        <div class="card vocab">
+          <div class="card-content">
+            <h2 class="control-section-title">Vocabulary Help</h2>
+            <p><strong>External force:</strong> a force applied from outside the bridge, such as weight, wind, or movement.</p>
+            <p><strong>Internal force:</strong> a force inside the bridge material as it reacts, such as tension, compression, shear, or bending.</p>
+            <p><strong>Engineer’s job:</strong> design a structure that spreads forces safely through the whole bridge.</p>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    const MATERIALS = {
+      timber: {
+        label: "Timber",
+        strength: 58,
+        cost: 2,
+        weight: 1.2,
+        description: "Used in smaller bridges. Light and fairly economical, but not ideal for very heavy or very long-span designs.",
+      },
+      reinforcedConcrete: {
+        label: "Reinforced Concrete",
+        strength: 82,
+        cost: 3,
+        weight: 2.8,
+        description: "A common bridge material. Very strong in compression and durable, but quite heavy.",
+      },
+      structuralSteel: {
+        label: "Structural Steel",
+        strength: 96,
+        cost: 4,
+        weight: 2.1,
+        description: "Very strong and excellent for long spans and truss systems. Expensive, but performs very well under tension and compression.",
+      },
+      prestressedConcrete: {
+        label: "Prestressed Concrete",
+        strength: 90,
+        cost: 4,
+        weight: 2.5,
+        description: "A high-performance concrete used in many modern bridges. Strong, durable, and better for longer spans than regular reinforced concrete.",
+      },
+    };
+
+    const BRIDGE_TYPES = {
+      beam: { label: "Beam Bridge", base: 52, best: "short spans", description: "Simple design. It handles downward loads, but can bend in the middle." },
+      truss: { label: "Truss Bridge", base: 78, best: "balanced loads", description: "Triangles spread compression and tension forces through the structure." },
+      arch: { label: "Arch Bridge", base: 70, best: "compression", description: "The arch pushes forces outward and down into the supports." },
+      suspension: { label: "Suspension Bridge", base: 64, best: "long spans", description: "Cables carry tension, while towers and anchors resist the load." },
+    };
+
+    const SUPPORTS = {
+      weak: { label: "Basic Abutments", bonus: 0, cost: 0, description: "Simple end supports only. Less resistance to external forces." },
+      reinforced: { label: "Reinforced Abutments", bonus: 10, cost: 5, description: "Stronger end supports help handle compression and sideways forces." },
+      anchored: { label: "Anchored Abutments", bonus: 18, cost: 9, description: "Anchors resist pulling, twisting, and movement." },
+    };
+
+    const DECK_STYLES = {
+      light: { label: "Light Deck", strength: 0, cost: 0, weight: 0.8, thickness: 10, description: "Cheapest and lightest, but bends more easily." },
+      standard: { label: "Standard Deck", strength: 8, cost: 4, weight: 1.0, thickness: 14, description: "A balanced deck for normal designs." },
+      heavy: { label: "Heavy Deck", strength: 16, cost: 9, weight: 1.35, thickness: 20, description: "Stronger against bending, but adds weight and cost." },
+    };
+
+    const BRACING_PATTERNS = {
+      none: { label: "No Bracing", strength: 0, cost: 0, count: 0, description: "A simple bridge with no extra internal triangles." },
+      warren: { label: "Warren Triangles", strength: 14, cost: 8, count: 4, description: "Repeating triangles spread compression and tension." },
+      pratt: { label: "Pratt Truss", strength: 18, cost: 11, count: 5, description: "Verticals and diagonals help handle heavy centre loads." },
+      x: { label: "X-Bracing", strength: 22, cost: 14, count: 6, description: "Cross braces add strong resistance to shear and twisting." },
+    };
+
+    const PIER_OPTIONS = {
+      zero: { label: "No Centre Pier", strength: 0, cost: 0, piers: 0, description: "The bridge must carry the full span from end to end." },
+      one: { label: "One Centre Pier", strength: 15, cost: 8, piers: 1, description: "A centre pier shortens the unsupported span and reduces bending." },
+      two: { label: "Two Piers", strength: 22, cost: 14, piers: 2, description: "Two piers divide the span into smaller sections, but cost more." },
+    };
+
+    const REINFORCEMENTS = {
+      none: { label: "No Extra Reinforcement", strength: 0, cost: 0, description: "No added reinforcement beyond the main design." },
+      gussets: { label: "Gusset Plates", strength: 8, cost: 5, description: "Strengthens joints where beams meet." },
+      cables: { label: "Tension Cables", strength: 12, cost: 7, description: "Helps resist pulling and sagging forces." },
+      deepBeams: { label: "Deep Side Beams", strength: 14, cost: 9, description: "Improves bending resistance along the deck." },
+    };
+
+    const state = {
+      bridgeType: "truss",
+      material: "reinforcedConcrete",
+      supports: "reinforced",
+      deckStyle: "standard",
+      bracingPattern: "warren",
+      pierOption: "zero",
+      reinforcement: "gussets",
+      span: 40,
+      load: 50,
+      wind: 10,
+      tested: false,
+      tab: "forces",
+      visualKey: "",
+    };
+
+    function calculateBridgeResults(design) {
+      const bridge = BRIDGE_TYPES[design.bridgeType];
+      const mat = MATERIALS[design.material];
+      const support = SUPPORTS[design.supports];
+      const deck = DECK_STYLES[design.deckStyle];
+      const bracing = BRACING_PATTERNS[design.bracingPattern];
+      const piers = PIER_OPTIONS[design.pierOption];
+      const reinforce = REINFORCEMENTS[design.reinforcement];
+
+      const designStrength = bridge.base + mat.strength * 0.55 + support.bonus + deck.strength + bracing.strength + piers.strength + reinforce.strength;
+      const effectiveSpan = Math.max(18, design.span - piers.piers * 14);
+      const externalForces = design.load * 1.15 + design.wind * 1.8 + effectiveSpan * 0.95;
+      const bridgeWeightPenalty = mat.weight * deck.weight * design.span * 0.55 + piers.piers * 2.5;
+      const cost = Math.round(20 + mat.cost * design.span * 0.7 + support.cost + deck.cost + bracing.cost + piers.cost + reinforce.cost);
+      const efficiency = Math.round((designStrength / Math.max(1, cost)) * 10);
+
+      let score = Math.round(100 - (externalForces + bridgeWeightPenalty - designStrength) * 0.9);
+      score = Math.max(5, Math.min(100, score));
+
+      const failurePoint = Math.round((designStrength - design.wind * 1.5 - effectiveSpan * 0.75 - bridgeWeightPenalty * 0.55) / 1.15);
+      const compression = Math.round(design.load * (design.bridgeType === "arch" ? 0.9 : design.bridgeType === "truss" ? 0.75 : 0.55) + effectiveSpan * 0.7 + piers.piers * 4);
+      const tension = Math.round(design.load * (design.bridgeType === "suspension" ? 0.95 : design.bridgeType === "truss" ? 0.8 : 0.45) + design.wind * 0.8 + (design.reinforcement === "cables" ? 8 : 0));
+      const shear = Math.round(design.load * 0.45 + design.wind * 1.3 + effectiveSpan * 0.25 - (design.bracingPattern === "x" ? 8 : 0));
+
+      const feedback = [];
+      if (score >= 85) feedback.push("Excellent design. Your bridge handles the load with strong force distribution.");
+      else if (score >= 70) feedback.push("Good design. Your bridge is stable, but it could be made more efficient.");
+      else if (score >= 45) feedback.push("Needs improvement. The bridge survives, but it shows major stress under the test load.");
+      else feedback.push("Bridge failure. The external forces are stronger than your design can safely handle.");
+
+      if (design.bridgeType === "beam" && design.span > 45 && design.pierOption === "zero") feedback.push("A beam bridge over a long span bends more in the middle. Adding a centre pier or deep side beams would help.");
+      if (design.bridgeType === "truss" && design.bracingPattern === "none") feedback.push("A truss bridge needs triangular bracing to spread tension and compression.");
+      if (design.bridgeType === "arch" && design.supports === "weak") feedback.push("Arch bridges push force outward, so stronger or anchored abutments would help.");
+      if (design.bridgeType === "suspension" && design.wind > 25 && design.reinforcement !== "cables") feedback.push("Suspension bridges can struggle with strong sideways wind unless they are well anchored and reinforced with cables.");
+      if (design.deckStyle === "heavy" && design.material === "reinforcedConcrete" && design.span > 55) feedback.push("A heavy reinforced concrete deck is strong, but its weight can reduce efficiency over long spans.");
+      if (design.bracingPattern === "x") feedback.push("X-bracing improves resistance to shear and twisting forces.");
+      if (design.pierOption !== "zero") feedback.push("Adding piers reduces the unsupported span, which lowers bending stress near the middle.");
+
+      if (design.material === "timber" && (design.load > 85 || design.span > 55)) feedback.push("Timber works best for smaller bridges. Heavy loads or long spans can reduce its effectiveness.");
+      if (design.material === "reinforcedConcrete" && design.span > 60) feedback.push("Reinforced concrete is very strong, but its weight can reduce efficiency on longer spans.");
+      if (design.material === "structuralSteel" && score >= 75) feedback.push("Structural steel performs well because it handles both tension and compression effectively.");
+      if (design.material === "prestressedConcrete" && design.span >= 50) feedback.push("Prestressed concrete is well suited for longer spans because it reduces bending and improves load carrying ability.");
+
+      return {
+        score,
+        cost,
+        efficiency,
+        failurePoint: Math.max(5, failurePoint),
+        compression: Math.max(0, compression),
+        tension: Math.max(0, tension),
+        shear: Math.max(0, shear),
+        feedback,
+        designStrength: Math.round(designStrength),
+        externalForces: Math.round(externalForces),
+        effectiveSpan,
+      };
+    }
+
+    function runSelfTests() {
+      const baseDesign = {
+        bridgeType: "truss",
+        material: "reinforcedConcrete",
+        supports: "reinforced",
+        deckStyle: "standard",
+        bracingPattern: "warren",
+        pierOption: "zero",
+        reinforcement: "gussets",
+        span: 40,
+        load: 50,
+        wind: 10,
+      };
+
+      const strong = calculateBridgeResults({
+        ...baseDesign,
+        material: "structuralSteel",
+        supports: "anchored",
+        deckStyle: "heavy",
+        bracingPattern: "x",
+        pierOption: "one",
+        reinforcement: "cables",
+        load: 30,
+        wind: 0,
+        span: 30,
+      });
+
+      const weak = calculateBridgeResults({
+        ...baseDesign,
+        bridgeType: "beam",
+        material: "timber",
+        supports: "weak",
+        deckStyle: "light",
+        bracingPattern: "none",
+        pierOption: "zero",
+        reinforcement: "none",
+        load: 140,
+        wind: 45,
+        span: 80,
+      });
+
+      const moreLoad = calculateBridgeResults({ ...baseDesign, load: 100 });
+      const lessLoad = calculateBridgeResults({ ...baseDesign, load: 25 });
+      const trussNoBracing = calculateBridgeResults({ ...baseDesign, bridgeType: "truss", bracingPattern: "none" });
+      const withPiers = calculateBridgeResults({ ...baseDesign, pierOption: "two", span: 70 });
+      const withoutPiers = calculateBridgeResults({ ...baseDesign, pierOption: "zero", span: 70 });
+      const longTimberBridge = calculateBridgeResults({ ...baseDesign, material: "timber", span: 70, load: 90 });
+      const longPrestressedBridge = calculateBridgeResults({ ...baseDesign, material: "prestressedConcrete", span: 60 });
+
+      return [
+        { name: "Scores stay within 5–100", pass: strong.score >= 5 && strong.score <= 100 && weak.score >= 5 && weak.score <= 100 },
+        { name: "A stronger design scores higher than an overloaded weak design", pass: strong.score > weak.score },
+        { name: "Increasing the load lowers the score", pass: moreLoad.score < lessLoad.score },
+        { name: "Failure load is always shown as a positive number", pass: weak.failurePoint >= 5 },
+        { name: "Truss without bracing gives triangle feedback", pass: trussNoBracing.feedback.some((item) => item.toLowerCase().includes("triangular")) },
+        { name: "Piers improve long-span score", pass: withPiers.score > withoutPiers.score },
+        { name: "Timber gives feedback for heavy or long-span designs", pass: longTimberBridge.feedback.some((item) => item.toLowerCase().includes("timber")) },
+        { name: "Prestressed concrete gives long-span feedback", pass: longPrestressedBridge.feedback.some((item) => item.toLowerCase().includes("prestressed")) },
+      ];
+    }
+
+    function setOptions(selectId, options, value) {
+      const select = document.getElementById(selectId);
+      select.innerHTML = "";
+      Object.entries(options).forEach(([key, option]) => {
+        const el = document.createElement("option");
+        el.value = key;
+        el.textContent = option.label;
+        select.appendChild(el);
+      });
+      select.value = value;
+    }
+
+    function createChoices(containerId, options, stateKey) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = "";
+      Object.entries(options).forEach(([key, option]) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "choice" + (state[stateKey] === key ? " active" : "");
+        btn.innerHTML = `<div class="choice-title">${option.label}</div><div class="choice-description">${option.description}</div>`;
+        btn.addEventListener("click", () => {
+          state[stateKey] = key;
+          state.tested = false;
+          render();
+        });
+        container.appendChild(btn);
+      });
+    }
+
+    function escapeText(text) {
+      return String(text)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function bridgeVisual(results) {
+      const stress = Math.min(100, Math.max(0, 100 - results.score));
+      const sag = state.tested ? Math.min(16, Math.max(0, stress / 6.5)) : 0;
+
+      const deckThickness = DECK_STYLES[state.deckStyle].thickness;
+      const supportWidth = state.supports === "weak" ? 26 : state.supports === "reinforced" ? 36 : 46;
+      const supportTopWidth = supportWidth + 10;
+
+      const leftX = 85;
+      const rightX = 515;
+      const centerX = 300;
+      const deckY = 185 + sag;
+      const span = rightX - leftX;
+
+      const materialStroke =
+        state.material === "structuralSteel" ? "#334155" :
+        state.material === "reinforcedConcrete" ? "#6b7280" :
+        state.material === "prestressedConcrete" ? "#4b5563" : "#7c4a21";
+
+      const materialFill =
+        state.material === "structuralSteel" ? "#64748b" :
+        state.material === "reinforcedConcrete" ? "#9ca3af" :
+        state.material === "prestressedConcrete" ? "#7b8794" : "#a16207";
+
+      const materialAccent =
+        state.material === "structuralSteel" ? "#94a3b8" :
+        state.material === "reinforcedConcrete" ? "#d1d5db" :
+        state.material === "prestressedConcrete" ? "#9aa7b4" : "#c2410c";
+
+      const supportFill =
+        state.supports === "weak" ? "#a8a29e" :
+        state.supports === "reinforced" ? "#78716c" : "#44403c";
+
+      const scoreColor = results.score >= 70 ? "var(--green-500)" : results.score >= 45 ? "var(--orange-500)" : "var(--red-500)";
+      const visualKey = `${state.bridgeType}-${state.material}-${state.supports}-${state.deckStyle}-${state.bracingPattern}-${state.pierOption}-${state.reinforcement}`;
+      const refreshClass = state.visualKey !== visualKey ? "refresh" : "";
+      state.visualKey = visualKey;
+
+      const loadBlockSize = 34;
+      const loadBlockX = centerX - loadBlockSize / 2;
+      const loadBlockY = deckY - loadBlockSize;
+
+      function windArrows() {
+        if (state.wind <= 0) return "";
+        const count = state.wind >= 35 ? 4 : state.wind >= 20 ? 3 : 2;
+        let out = "";
+        for (let i = 0; i < count; i++) {
+          const y = 95 + i * 28;
+          out += `<g opacity="${0.5 + i * 0.12}">
+            <line x1="530" y1="${y}" x2="570" y2="${y}" stroke="#64748b" stroke-width="3" stroke-linecap="round" />
+            <polygon points="570,${y} 560,${y - 6} 560,${y + 6}" fill="#64748b" />
+          </g>`;
+        }
+        return out;
+      }
+
+      function piers() {
+        if (state.pierOption === "zero") return "";
+        const xs = state.pierOption === "one" ? [centerX] : [230, 370];
+        return xs.map(x => `
+          <g>
+            <rect x="${x - 12}" y="${deckY + deckThickness}" width="24" height="${290 - deckY - deckThickness}" rx="2" fill="#737373" />
+            <rect x="${x - 20}" y="${deckY + deckThickness - 2}" width="40" height="8" rx="2" fill="#525252" />
+          </g>
+        `).join("");
+      }
+
+      function supportAnchors() {
+        if (state.supports !== "anchored") return "";
+        return `
+          <rect x="18" y="246" width="40" height="16" rx="2" fill="#525252" />
+          <rect x="542" y="246" width="40" height="16" rx="2" fill="#525252" />
+          <line x1="58" y1="254" x2="70" y2="250" stroke="#44403c" stroke-width="4" />
+          <line x1="542" y1="254" x2="530" y2="250" stroke="#44403c" stroke-width="4" />
+        `;
+      }
+
+      function deckSurface() {
+        return `
+          <rect x="${leftX}" y="${deckY}" width="${span}" height="${deckThickness}" rx="2" fill="${materialFill}" stroke="${materialStroke}" stroke-width="2" />
+          <rect x="${leftX + 4}" y="${deckY + 2}" width="${span - 8}" height="${Math.max(3, deckThickness / 3)}" rx="1" fill="${materialAccent}" opacity="0.45" />
+        `;
+      }
+
+      function reinforcement() {
+        if (state.reinforcement === "none") return "";
+        if (state.reinforcement === "gussets") {
+          const jointXs = state.bracingPattern === "none"
+            ? [leftX + 80, centerX, rightX - 80]
+            : [leftX + 55, leftX + 150, centerX, rightX - 150, rightX - 55];
+          return jointXs.map(x => `<polygon points="${x - 11},${deckY - 4} ${x + 11},${deckY - 4} ${x},${deckY - 22}" fill="#334155" opacity="0.78" />`).join("");
+        }
+        if (state.reinforcement === "cables") {
+          return `
+            <path d="M ${leftX + 18} ${deckY - 4} Q ${centerX} ${deckY - 54} ${rightX - 18} ${deckY - 4}" fill="none" stroke="#1e293b" stroke-width="3" stroke-linecap="round" />
+            <line x1="${centerX}" y1="${deckY - 44}" x2="${centerX}" y2="${deckY}" stroke="#1e293b" stroke-width="2" />
+          `;
+        }
+        if (state.reinforcement === "deepBeams") {
+          return `<rect x="${leftX + 12}" y="${deckY + deckThickness + 5}" width="${span - 24}" height="14" rx="2" fill="${materialStroke}" opacity="0.92" />`;
+        }
+        return "";
+      }
+
+      function bracing(xStart, xEnd, yTop, yBottom, style = state.bracingPattern) {
+        if (style === "none") return "";
+        const panelCount = style === "pratt" ? 7 : 6;
+        const panelWidth = (xEnd - xStart) / panelCount;
+        const braceStroke = state.material === "timber" ? "#5b3716" : "#334155";
+        let out = "";
+        for (let i = 0; i < panelCount; i++) {
+          const x1 = xStart + i * panelWidth;
+          const x2 = xStart + (i + 1) * panelWidth;
+          if (style === "warren") {
+            out += `<g>
+              <line x1="${x1}" y1="${yBottom}" x2="${x2}" y2="${yTop}" stroke="${braceStroke}" stroke-width="4" />
+              <line x1="${x1}" y1="${yTop}" x2="${x2}" y2="${yBottom}" stroke="${braceStroke}" stroke-width="4" />
+            </g>`;
+          } else if (style === "pratt") {
+            out += `<g>
+              <line x1="${x1}" y1="${yTop}" x2="${x1}" y2="${yBottom}" stroke="${braceStroke}" stroke-width="3" />
+              <line x1="${x1}" y1="${yTop}" x2="${x2}" y2="${yBottom}" stroke="${braceStroke}" stroke-width="4" />
+            </g>`;
+          } else if (style === "x") {
+            out += `<g>
+              <line x1="${x1}" y1="${yBottom}" x2="${x2}" y2="${yTop}" stroke="${braceStroke}" stroke-width="4" />
+              <line x1="${x1}" y1="${yTop}" x2="${x2}" y2="${yBottom}" stroke="${braceStroke}" stroke-width="4" />
+              <line x1="${x1}" y1="${yTop}" x2="${x1}" y2="${yBottom}" stroke="${braceStroke}" stroke-width="3" opacity="0.8" />
+            </g>`;
+          }
+        }
+        return out;
+      }
+
+      function bridgeStructure() {
+        const topY = deckY - 42;
+
+        if (state.bridgeType === "beam") {
+          const braceTop = deckY + deckThickness + 2;
+          const braceBottom = deckY + deckThickness + 26;
+          return `
+            ${deckSurface()}
+            ${state.bracingPattern !== "none" ? `
+              <line x1="${leftX + 16}" y1="${braceTop}" x2="${rightX - 16}" y2="${braceTop}" stroke="${materialStroke}" stroke-width="4" />
+              <line x1="${leftX + 16}" y1="${braceBottom}" x2="${rightX - 16}" y2="${braceBottom}" stroke="${materialStroke}" stroke-width="4" />
+              ${bracing(leftX + 16, rightX - 16, braceTop, braceBottom)}
+            ` : ""}
+            ${reinforcement()}
+          `;
+        }
+
+        if (state.bridgeType === "truss") {
+          return `
+            ${deckSurface()}
+            <line x1="${leftX}" y1="${topY}" x2="${rightX}" y2="${topY}" stroke="${materialStroke}" stroke-width="5" />
+            <line x1="${leftX}" y1="${deckY + 6}" x2="${rightX}" y2="${deckY + 6}" stroke="${materialStroke}" stroke-width="5" />
+            ${bracing(leftX, rightX, topY, deckY + 6)}
+            ${reinforcement()}
+          `;
+        }
+
+        if (state.bridgeType === "arch") {
+          const archPoints = Array.from({ length: 7 }).map((_, i) => {
+            const x = leftX + 35 + i * 55;
+            const t = (x - leftX) / span;
+            const archY = deckY + 10 + (1 - Math.pow((t - 0.5) / 0.5, 2)) * 85;
+            return { x, archY };
+          });
+
+          const verticals = archPoints.map((p, i) => `<line x1="${p.x}" y1="${deckY + 2}" x2="${p.x}" y2="${p.archY}" stroke="${materialStroke}" stroke-width="3" />`).join("");
+          let archBracing = "";
+          if (state.bracingPattern !== "none") {
+            archPoints.slice(0, -1).forEach((p, i) => {
+              const next = archPoints[i + 1];
+              if (state.bracingPattern === "warren") {
+                archBracing += `<g>
+                  <line x1="${p.x}" y1="${p.archY}" x2="${next.x}" y2="${deckY + 2}" stroke="${materialStroke}" stroke-width="4" />
+                  <line x1="${p.x}" y1="${deckY + 2}" x2="${next.x}" y2="${next.archY}" stroke="${materialStroke}" stroke-width="4" />
+                </g>`;
+              } else if (state.bracingPattern === "pratt") {
+                archBracing += `<g>
+                  <line x1="${p.x}" y1="${deckY + 2}" x2="${p.x}" y2="${p.archY}" stroke="${materialStroke}" stroke-width="3" />
+                  <line x1="${p.x}" y1="${p.archY}" x2="${next.x}" y2="${deckY + 2}" stroke="${materialStroke}" stroke-width="4" />
+                </g>`;
+              } else if (state.bracingPattern === "x") {
+                archBracing += `<g>
+                  <line x1="${p.x}" y1="${p.archY}" x2="${next.x}" y2="${deckY + 2}" stroke="${materialStroke}" stroke-width="4" />
+                  <line x1="${p.x}" y1="${deckY + 2}" x2="${next.x}" y2="${next.archY}" stroke="${materialStroke}" stroke-width="4" />
+                  <line x1="${p.x}" y1="${deckY + 2}" x2="${p.x}" y2="${p.archY}" stroke="${materialStroke}" stroke-width="3" opacity="0.8" />
+                </g>`;
+              }
+            });
+          }
+
+          return `
+            ${deckSurface()}
+            <path d="M ${leftX + 10} ${deckY + 10} Q ${centerX} ${deckY + 95} ${rightX - 10} ${deckY + 10}" fill="none" stroke="#57534e" stroke-width="12" stroke-linecap="round" />
+            ${verticals}
+            ${archBracing}
+            ${reinforcement()}
+          `;
+        }
+
+        if (state.bridgeType === "suspension") {
+          const towerLeft = 175;
+          const towerRight = 425;
+          const cableTopY = deckY - 95;
+          const stiffTop = deckY + 2;
+          const stiffBottom = deckY + 28;
+          const hangers = [125, 165, 205, 245, 300, 355, 395, 435, 475].map((x) => {
+            const normalized = (x - leftX) / span;
+            const cableY = deckY - 8 - Math.sin(normalized * Math.PI) * 55 - (Math.abs(normalized - 0.5) < 0.15 ? 8 : 0);
+            return `<line x1="${x}" y1="${cableY}" x2="${x}" y2="${deckY}" stroke="#475569" stroke-width="2" />`;
+          }).join("");
+
+          return `
+            ${deckSurface()}
+            <rect x="${towerLeft}" y="${deckY - 90}" width="12" height="90" fill="#475569" />
+            <rect x="${towerRight}" y="${deckY - 90}" width="12" height="90" fill="#475569" />
+            <path d="M ${leftX} ${deckY - 8} Q ${towerLeft} ${cableTopY} ${centerX} ${cableTopY + 18} Q ${towerRight} ${cableTopY} ${rightX} ${deckY - 8}" fill="none" stroke="#334155" stroke-width="5" stroke-linecap="round" />
+            ${hangers}
+            ${state.bracingPattern !== "none" ? `
+              <line x1="${leftX + 10}" y1="${stiffTop}" x2="${rightX - 10}" y2="${stiffTop}" stroke="${materialStroke}" stroke-width="4" />
+              <line x1="${leftX + 10}" y1="${stiffBottom}" x2="${rightX - 10}" y2="${stiffBottom}" stroke="${materialStroke}" stroke-width="4" />
+              ${bracing(leftX + 10, rightX - 10, stiffTop, stiffBottom)}
+            ` : ""}
+            ${reinforcement()}
+          `;
+        }
+
+        return "";
+      }
+
+      const shakeClass = state.tested && results.score < 45 ? "shake" : "";
+      const resultBadge = state.tested ? `
+        <div class="result-badge">
+          <div><strong>${results.score >= 70 ? "✅" : "⚠️"} Test Result</strong></div>
+          <div style="margin-top: 8px; font-size: 14px;">Stability Score: <strong>${results.score}/100</strong></div>
+          <div class="progress"><div class="progress-fill" style="width: ${results.score}%; background: ${scoreColor};"></div></div>
+        </div>
+      ` : "";
+
+      return `
+        <div class="bridge-wrap">
+          <div class="bridge-gradient"></div>
+
+          <div class="bridge-badge">
+            <strong>Bridge Test View</strong>
+            <span>${BRIDGE_TYPES[state.bridgeType].label} • ${MATERIALS[state.material].label}</span>
+          </div>
+
+          ${state.wind > 0 ? `<div class="wind-badge">→ Wind: ${state.wind}</div>` : ""}
+
+          <div class="${refreshClass}">
+            <svg viewBox="0 0 600 390" class="${shakeClass}" style="position:absolute; inset:0; width:100%; height:100%;">
+              <path d="M0 215 C90 195, 140 230, 220 210 C310 185, 360 225, 460 205 C530 191, 560 199, 600 193 L600 390 L0 390 Z" fill="#dbe4ea" />
+              <rect x="0" y="298" width="600" height="92" fill="#7dd3fc" />
+              <path d="M0 320 H600" stroke="#bae6fd" stroke-width="3" opacity="0.6" />
+              <path d="M0 344 H600" stroke="#e0f2fe" stroke-width="2" opacity="0.45" />
+
+              <rect x="0" y="265" width="110" height="33" fill="#a3a3a3" />
+              <rect x="490" y="265" width="110" height="33" fill="#a3a3a3" />
+
+              <rect x="70" y="210" width="${supportWidth}" height="88" rx="3" fill="${supportFill}" />
+              <rect x="${530 - supportWidth}" y="210" width="${supportWidth}" height="88" rx="3" fill="${supportFill}" />
+              <rect x="65" y="202" width="${supportTopWidth}" height="12" rx="2" fill="#57534e" opacity="0.7" />
+              <rect x="${535 - supportTopWidth}" y="202" width="${supportTopWidth}" height="12" rx="2" fill="#57534e" opacity="0.7" />
+
+              ${supportAnchors()}
+              ${windArrows()}
+              ${piers()}
+              ${bridgeStructure()}
+
+              <rect x="${loadBlockX}" y="${loadBlockY}" width="${loadBlockSize}" height="${loadBlockSize}" rx="2" fill="#52525b" stroke="#27272a" stroke-width="2" />
+              <rect x="${loadBlockX + 4}" y="${loadBlockY + 4}" width="${loadBlockSize - 8}" height="${loadBlockSize - 8}" fill="#71717a" opacity="0.5" />
+              <text x="${centerX}" y="${loadBlockY - 8}" text-anchor="middle" font-size="12" font-weight="700" fill="#991b1b">${state.load} kg</text>
+              <ellipse cx="${centerX}" cy="${deckY + deckThickness + 8}" rx="18" ry="4" fill="black" opacity="0.15" />
+            </svg>
+          </div>
+
+          <div class="visual-summary">
+            <div><strong>Deck:</strong> ${DECK_STYLES[state.deckStyle].label}</div>
+            <div><strong>Bracing:</strong> ${BRACING_PATTERNS[state.bracingPattern].label}</div>
+            <div><strong>Piers:</strong> ${PIER_OPTIONS[state.pierOption].label}</div>
+            <div><strong>Reinforcement:</strong> ${REINFORCEMENTS[state.reinforcement].label}</div>
+          </div>
+
+          ${resultBadge}
+        </div>
+      `;
+    }
+
+    function renderTests() {
+      const tests = runSelfTests();
+      const allPassed = tests.every(t => t.pass);
+      document.getElementById("testSummary").innerHTML = `<strong>${allPassed ? "All app logic tests passed." : "Some app logic tests failed."}</strong><br><span style="font-size:14px;">These tests check that the bridge scoring model behaves correctly after code changes.</span>`;
+      document.getElementById("testList").innerHTML = tests.map(test => `
+        <div class="test-item">
+          <span>${escapeText(test.name)}</span>
+          <span class="${test.pass ? "pass" : "fail"}">${test.pass ? "PASS" : "FAIL"}</span>
+        </div>
+      `).join("");
+    }
+
+    function render() {
+      const results = calculateBridgeResults(state);
+
+      document.getElementById("bridgeVisual").innerHTML = bridgeVisual(results);
+
+      document.getElementById("compressionValue").textContent = results.compression;
+      document.getElementById("tensionValue").textContent = results.tension;
+      document.getElementById("shearValue").textContent = results.shear;
+      document.getElementById("failureValue").textContent = `${results.failurePoint} kg`;
+      document.getElementById("feedbackList").innerHTML = results.feedback.map(item => `<li>${escapeText(item)}</li>`).join("");
+
+      document.getElementById("summaryStability").textContent = `${results.score}/100`;
+      document.getElementById("summaryCost").textContent = `$${results.cost}`;
+      document.getElementById("summaryEfficiency").textContent = results.efficiency;
+      document.getElementById("summaryEffectiveSpan").textContent = `${results.effectiveSpan} m`;
+
+      document.getElementById("spanValue").textContent = state.span;
+      document.getElementById("loadValue").textContent = state.load;
+      document.getElementById("windValue").textContent = state.wind;
+      document.getElementById("span").value = state.span;
+      document.getElementById("load").value = state.load;
+      document.getElementById("wind").value = state.wind;
+
+      document.getElementById("bridgeType").value = state.bridgeType;
+      document.getElementById("material").value = state.material;
+      document.getElementById("supports").value = state.supports;
+
+      document.getElementById("bridgeTypeDescription").textContent = BRIDGE_TYPES[state.bridgeType].description;
+      document.getElementById("materialDescription").textContent = MATERIALS[state.material].description;
+      document.getElementById("supportsDescription").textContent = SUPPORTS[state.supports].description;
+
+      createChoices("deckStyleChoices", DECK_STYLES, "deckStyle");
+      createChoices("bracingPatternChoices", BRACING_PATTERNS, "bracingPattern");
+      createChoices("pierOptionChoices", PIER_OPTIONS, "pierOption");
+      createChoices("reinforcementChoices", REINFORCEMENTS, "reinforcement");
+
+      renderTests();
+
+      document.querySelectorAll(".tab").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === state.tab));
+      document.getElementById("forcesPanel").classList.toggle("hidden", state.tab !== "forces");
+      document.getElementById("testsPanel").classList.toggle("hidden", state.tab !== "tests");
+    }
+
+    function init() {
+      setOptions("bridgeType", BRIDGE_TYPES, state.bridgeType);
+      setOptions("material", MATERIALS, state.material);
+      setOptions("supports", SUPPORTS, state.supports);
+
+      ["bridgeType", "material", "supports"].forEach(id => {
+        document.getElementById(id).addEventListener("change", (event) => {
+          state[id] = event.target.value;
+          state.tested = false;
+          render();
+        });
+      });
+
+      ["span", "load", "wind"].forEach(id => {
+        document.getElementById(id).addEventListener("input", (event) => {
+          state[id] = Number(event.target.value);
+          state.tested = false;
+          render();
+        });
+      });
+
+      document.getElementById("testBtn").addEventListener("click", () => {
+        state.tested = true;
+        render();
+      });
+
+      document.getElementById("resetBtn").addEventListener("click", () => {
+        Object.assign(state, {
+          bridgeType: "truss",
+          material: "reinforcedConcrete",
+          supports: "reinforced",
+          deckStyle: "standard",
+          bracingPattern: "warren",
+          pierOption: "zero",
+          reinforcement: "gussets",
+          span: 40,
+          load: 50,
+          wind: 10,
+          tested: false,
+          tab: "forces",
+          visualKey: "",
+        });
+        render();
+      });
+
+      document.querySelectorAll(".tab").forEach(btn => {
+        btn.addEventListener("click", () => {
+          state.tab = btn.dataset.tab;
+          render();
+        });
+      });
+
+      render();
+    }
+
+    init();
+  </script>
+</body>
+</html>
