@@ -19,9 +19,9 @@ Preserve existing launch URLs, learning ideas and real source visuals. Commit an
 - [ ] Morpheme Match-Up
 - [x] Cashier Change Challenge — real money, optional timer, keyboard/touch controls, eight transactions
 - [x] What's the Angle? — protractor construction, hints, keyboard/touch controls, eight angles
-- [ ] Photosynthesis Virtual Lab (BGSD repository)
-- [ ] Interactive Plant Grower
-- [ ] Interactive Creature Care
+- [x] Photosynthesis Virtual Lab (BGSD repository) — relative model units, fair-test trials, CSV, table and graphs
+- [x] Interactive Plant Grower — paused/step controls, observation notebook, stable growth completion
+- [x] Interactive Creature Care — original bear artwork, paused/step controls, observation notebook
 - [ ] Older morphology activities and generators
 - [ ] Sorting review and generator repair
 - [ ] Updated hub descriptions and real screenshots; final live checks

@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="app.css?v=20261005">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-    <title>Interactive Plant Grower v7</title>
+    
+    <title>Interactive Plant Grower</title>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -220,8 +220,8 @@
          }
 
     </style>
-</head>
-<body>
+<style>@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Lexend:wght@400;600&display=swap');body{background:#f8f6ef!important;display:block!important;font-family:Nunito,system-ui,sans-serif!important;padding:24px!important;color:#25483c}.game-container,.tips-section,.main-content,.tips-container{background:#fff!important;border-color:#dfe8e2!important;box-shadow:0 8px 24px #193a2510!important}.title{color:#235a4b!important;font-family:Lexend,system-ui,sans-serif}.lab-nav{max-width:1100px;margin:0 auto 20px;display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap}.lab-nav a{color:#176b5e}.experiment{max-width:1000px;margin:24px auto;padding:24px;background:#fff;border:1px solid #dfe8e2;border-radius:20px;line-height:1.6}.experiment h2{font-family:Lexend,system-ui,sans-serif}.experiment .controls{display:flex;gap:10px;flex-wrap:wrap;margin:15px 0}.experiment button{font:700 1rem Nunito,system-ui;padding:10px 18px;border-radius:10px;background:#edf5ef;border:1px solid #a8cbb9;cursor:pointer}.experiment button:first-child{background:#087966;color:#fff}.experiment textarea{display:block;width:100%;box-sizing:border-box;min-height:85px;border:1px solid #a8cbb9;border-radius:10px;padding:12px;font:inherit}.experiment table{width:100%;border-collapse:collapse;font-size:.85rem}.experiment td,.experiment th{text-align:left;border-bottom:1px solid #dfe8e2;padding:8px}.experiment .table-scroll{overflow:auto}.experiment .small{font-size:.85rem;color:#536c62}button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid #147daf;outline-offset:3px}button{min-height:44px}button:disabled{opacity:.5}.feedback-message{min-height:52px;height:auto!important}#feedbackMessage{line-height:1.5}.action-buttons,.controls-area{flex-wrap:wrap}@media(max-width:600px){body{padding:12px!important}.game-container{width:100%!important;padding:18px!important;box-sizing:border-box}.status-bars{grid-template-columns:1fr!important}.status-bar-container{min-width:0!important}.experiment{padding:18px}.temperature-control{min-width:0!important}}@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}</style></head>
+<body><nav class="lab-nav"><a href="https://interactives.blackgold.ca/interactive-learning-lab/">← Interactive Learning Lab</a><span>Explore · Observe · Explain</span></nav>
     <div class="game-container">
         <h1 class="title">Plant Grower</h1>
 
@@ -277,7 +277,7 @@
                  <input type="range" id="tempSlider" name="tempSlider" min="0" max="40" value="20">
             </div>
         </div>
-        <div id="feedbackMessage" class="feedback-message">Care for your plant!</div>
+        <div id="feedbackMessage" role="status" class="feedback-message">Care for your plant!</div>
 
         <div class="reset-button-container">
              <button id="resetButton" class="action-button reset-button">
@@ -288,326 +288,16 @@
         <div class="tips-section">
              <h3>Quick Tips</h3>
              <ul>
-                 <li>Keep 💧 Water (30-90%) and ☀️ Sun (30-90%) in the ideal range.</li>
+                 <li>Keep 💧 Water (30% to below 90%) and ☀️ Sun (30% to below 90%) in the ideal range.</li>
                  <li>Keep 🌡️ Temperature ideally between 15°C and 30°C.</li>
                  <li>Too much water/sun (>90%) or extreme temperatures cause 😟 Stress!</li>
-                 <li>Low water/sun (<10%) also increases stress over time.</li>
-                 <li>High stress (>75%) stops 🌱 Growth. Max stress (100%) is fatal!</li>
-                 <li>Water/Sun levels decrease automatically - keep an eye on them!</li>
+                 <li>Low water/sun (below 10%) also increases stress over time.</li>
+                 <li>High stress (>75%) stops 🌱 Growth. At 100% stress, restart and compare a new trial.</li>
+                 <li>Advance time when you are ready; observe how the levels change.</li>
              </ul>
         </div>
         </div>
 
-    <script>
-        // --- Sound Synthesis Setup (Tone.js) ---
-        const synth = new Tone.Synth().toDestination();
-        const noiseSynth = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0 } }).toDestination();
-        const pluckSynth = new Tone.PluckSynth().toDestination();
-        pluckSynth.volume.value = -10;
-        synth.volume.value = -8;
-        noiseSynth.volume.value = -15;
-
-        function playSound(type) {
-            Tone.start();
-            try {
-                switch (type) {
-                    case 'water': pluckSynth.triggerAttackRelease('C5', '16n', Tone.now()); pluckSynth.triggerAttackRelease('E5', '16n', Tone.now() + 0.05); break;
-                    case 'sun': synth.triggerAttackRelease('A5', '16n', Tone.now()); break;
-                    case 'grow': synth.triggerAttackRelease('C4', '8n', Tone.now()); synth.triggerAttackRelease('G4', '8n', Tone.now() + 0.15); synth.triggerAttackRelease('C5', '8n', Tone.now() + 0.3); break;
-                    case 'warning': synth.triggerAttackRelease('G3', '8n', Tone.now()); break;
-                    case 'stress': noiseSynth.triggerAttackRelease(Tone.now()); break;
-                    case 'dead': synth.triggerAttackRelease('C4', '4n', Tone.now()); synth.triggerAttackRelease('A3', '4n', Tone.now() + 0.2); synth.triggerAttackRelease('F3', '4n', Tone.now() + 0.4); break;
-                    case 'reset': pluckSynth.triggerAttackRelease('G4', '8n', Tone.now()); break;
-                }
-            } catch (error) {
-                console.error("Tone.js error:", error);
-            }
-        }
-
-        // --- Game State Variables ---
-        let waterLevel = 50;
-        let sunLevel = 50;
-        let temperatureLevel = 20;
-        let stressLevel = 0;
-        let growthPoints = 0;
-        let plantStage = 0;
-        let isDead = false;
-        let gameLoopInterval = null;
-
-        // --- Game Constants ---
-        const MAX_LEVEL = 100;
-        const MIN_LEVEL = 0;
-        const WATER_DECREASE_RATE = 2;
-        const SUN_DECREASE_RATE = 2;
-        const STRESS_INCREASE_LOW_RESOURCE = 2;
-        const STRESS_INCREASE_OVERCLICK = 15;
-        const STRESS_INCREASE_BAD_TEMP = 1;
-        const STRESS_DECREASE_RATE = 2;
-        const GROWTH_PER_TICK = 1;
-        const POINTS_PER_STAGE = [25, 40, 55, 70];
-        const IDEAL_WATER_LOW = 30;
-        const IDEAL_WATER_HIGH = 90;
-        const IDEAL_SUN_LOW = 30;
-        const IDEAL_SUN_HIGH = 90;
-        const IDEAL_TEMP_LOW = 15;
-        const IDEAL_TEMP_HIGH = 30;
-        const CRITICAL_THRESHOLD = 10;
-        const HIGH_STRESS_THRESHOLD = 75;
-        const WATER_PER_CLICK = 20;
-        const SUN_PER_CLICK = 20;
-        const GAME_TICK_MS = 1000;
-
-        const PLANT_STAGES_EMOJI = ['🌰', '🌱', '🌿', '🌳', '🌲', '💀'];
-
-        // --- DOM References ---
-        const plantImageEl = document.getElementById('plantImage');
-        const waterBarEl = document.getElementById('waterBar');
-        const sunBarEl = document.getElementById('sunBar');
-        const tempBarEl = document.getElementById('tempBar');
-        const stressBarEl = document.getElementById('stressBar');
-        const growthBarEl = document.getElementById('growthBar');
-        const feedbackMessageEl = document.getElementById('feedbackMessage');
-        const waterButton = document.getElementById('waterButton');
-        const sunButton = document.getElementById('sunButton');
-        const resetButton = document.getElementById('resetButton'); // Still need reference
-        const tempSlider = document.getElementById('tempSlider');
-        const tempValueDisplay = document.getElementById('tempValueDisplay');
-
-        // --- UI Update Functions ---
-        function updateUI() {
-            // Update progress bars
-            waterBarEl.style.width = `${waterLevel}%`;
-            waterBarEl.textContent = `${waterLevel}%`;
-            sunBarEl.style.width = `${sunLevel}%`;
-            sunBarEl.textContent = `${sunLevel}%`;
-            stressBarEl.style.width = `${stressLevel}%`;
-            stressBarEl.textContent = `${stressLevel}%`;
-
-            // Update temperature bar
-            const tempPercentage = (temperatureLevel / 40) * 100;
-            tempBarEl.style.width = `${tempPercentage}%`;
-            tempBarEl.textContent = `${temperatureLevel}°C`;
-
-            // Update growth bar
-            const currentStageMaxPoints = POINTS_PER_STAGE[plantStage] || 1;
-            const growthPercentage = plantStage < POINTS_PER_STAGE.length
-                ? Math.min(100, Math.round((growthPoints / currentStageMaxPoints) * 100))
-                : 100;
-            growthBarEl.style.width = `${growthPercentage}%`;
-            growthBarEl.textContent = `${growthPercentage}%`;
-
-            // Update plant image
-            const stageIndex = isDead ? PLANT_STAGES_EMOJI.length - 1 : plantStage;
-            plantImageEl.textContent = PLANT_STAGES_EMOJI[stageIndex];
-            plantImageEl.setAttribute('data-stage', isDead ? 'dead' : plantStage.toString());
-
-            // Update stressed class
-            plantImageEl.classList.toggle('stressed', stressLevel > HIGH_STRESS_THRESHOLD && !isDead);
-
-            // Update button/slider states
-            waterButton.disabled = isDead;
-            sunButton.disabled = isDead;
-            resetButton.disabled = false; // Reset button should always be enabled? Or disable when game ends? Currently enabled.
-            tempSlider.disabled = isDead;
-        }
-
-        function setFeedback(message, type = 'info') {
-            feedbackMessageEl.textContent = message;
-            switch (type) {
-                case 'success': feedbackMessageEl.style.color = '#16a34a'; break;
-                case 'error': feedbackMessageEl.style.color = '#dc2626'; break;
-                case 'warning': feedbackMessageEl.style.color = '#f97316'; break;
-                case 'stress': feedbackMessageEl.style.color = '#f43f5e'; break;
-                case 'info': default: feedbackMessageEl.style.color = '#4b5563'; break;
-            }
-        }
-
-        // --- Event Handlers ---
-        function handleTempChange(event) {
-            if (isDead) return;
-            temperatureLevel = parseInt(event.target.value, 10);
-            tempValueDisplay.textContent = temperatureLevel;
-            updateUI();
-        }
-
-        // --- Game Logic Functions ---
-        function waterPlant() {
-            if (isDead) return;
-            if (waterLevel >= IDEAL_WATER_HIGH) {
-                stressLevel = Math.min(MAX_LEVEL, stressLevel + STRESS_INCREASE_OVERCLICK);
-                setFeedback('Too much water! The plant is stressed!', 'stress');
-                playSound('stress');
-            } else {
-                waterLevel = Math.min(MAX_LEVEL, waterLevel + WATER_PER_CLICK);
-                setFeedback('Plant watered!', 'info');
-                playSound('water');
-            }
-            updateUI();
-            checkDeath();
-        }
-
-        function giveSunlight() {
-            if (isDead) return;
-            if (sunLevel >= IDEAL_SUN_HIGH) {
-                stressLevel = Math.min(MAX_LEVEL, stressLevel + STRESS_INCREASE_OVERCLICK);
-                setFeedback('Too much sun! The plant is stressed!', 'stress');
-                playSound('stress');
-            } else {
-                sunLevel = Math.min(MAX_LEVEL, sunLevel + SUN_PER_CLICK);
-                setFeedback('Plant received sunlight!', 'info');
-                playSound('sun');
-            }
-            updateUI();
-            checkDeath();
-        }
-
-        function checkGrowth() {
-            if (isDead || plantStage >= POINTS_PER_STAGE.length) return;
-
-            const isWaterOk = waterLevel >= IDEAL_WATER_LOW && waterLevel < IDEAL_WATER_HIGH;
-            const isSunOk = sunLevel >= IDEAL_SUN_LOW && sunLevel < IDEAL_SUN_HIGH;
-            const isTempOk = temperatureLevel >= IDEAL_TEMP_LOW && temperatureLevel <= IDEAL_TEMP_HIGH;
-            const isStressed = stressLevel > HIGH_STRESS_THRESHOLD;
-            const isCriticallyLow = waterLevel < CRITICAL_THRESHOLD || sunLevel < CRITICAL_THRESHOLD;
-
-            let feedbackMsg = "";
-            let feedbackType = "info";
-            let grewThisTick = false;
-            let stressIncreasedThisTick = false;
-
-            // Stress Handling
-            if (isCriticallyLow) {
-                stressLevel = Math.min(MAX_LEVEL, stressLevel + STRESS_INCREASE_LOW_RESOURCE);
-                feedbackMsg = "Conditions are poor, plant is getting stressed! ";
-                feedbackType = "warning";
-                playSound('warning');
-                stressIncreasedThisTick = true;
-            }
-            if (!isTempOk) {
-                stressLevel = Math.min(MAX_LEVEL, stressLevel + STRESS_INCREASE_BAD_TEMP);
-                let tempMsg = temperatureLevel < IDEAL_TEMP_LOW ? "It's too cold!" : "It's too hot!";
-                feedbackMsg += tempMsg + " ";
-                feedbackType = feedbackType === "warning" ? "warning" : "stress";
-                if (!stressIncreasedThisTick) playSound('stress');
-                stressIncreasedThisTick = true;
-            }
-            if (!stressIncreasedThisTick && isWaterOk && isSunOk && isTempOk && stressLevel > MIN_LEVEL) {
-                stressLevel = Math.max(MIN_LEVEL, stressLevel - STRESS_DECREASE_RATE);
-            }
-
-             // Growth Handling
-            if (isWaterOk && isSunOk && isTempOk) {
-                if (isStressed) {
-                    if (feedbackType !== 'warning' && feedbackType !== 'stress') {
-                        feedbackMsg = "Plant is too stressed to grow!";
-                        feedbackType = "stress";
-                    } else {
-                         feedbackMsg += "Plant is too stressed to grow!";
-                    }
-                    if (!stressIncreasedThisTick) playSound('stress');
-                } else {
-                    growthPoints += GROWTH_PER_TICK;
-                    grewThisTick = true;
-                    if (feedbackType === 'info') {
-                        feedbackMsg = "Plant is growing well!";
-                    }
-                }
-            } else if (!isCriticallyLow && !feedbackMsg) {
-                 feedbackMsg = "Plant needs something...";
-                 feedbackType = "info";
-            }
-
-            // Check for stage up
-            if (grewThisTick) {
-                const pointsNeeded = POINTS_PER_STAGE[plantStage];
-                if (growthPoints >= pointsNeeded) {
-                    plantStage++;
-                    growthPoints = 0;
-                    feedbackMsg = `Plant grew to the next stage! (${PLANT_STAGES_EMOJI[plantStage]})`;
-                    feedbackType = 'success';
-                    playSound('grow');
-                    if (plantStage >= POINTS_PER_STAGE.length) {
-                        feedbackMsg = `Congratulations! Your plant is fully grown! (${PLANT_STAGES_EMOJI[plantStage]})`;
-                    }
-                }
-            }
-
-            if (feedbackMsg) {
-                 setFeedback(feedbackMsg, feedbackType);
-            }
-        }
-
-        function checkDeath() {
-             if (isDead) return true;
-             if (waterLevel <= MIN_LEVEL || sunLevel <= MIN_LEVEL || stressLevel >= MAX_LEVEL) {
-                 isDead = true;
-                 let deathReason = "withered away";
-                 if (stressLevel >= MAX_LEVEL) deathReason = "died from stress";
-                 else if (waterLevel <= MIN_LEVEL) deathReason = "dried out";
-                 else if (sunLevel <= MIN_LEVEL) deathReason = "lacked sunlight";
-
-                 setFeedback(`Oh no! The plant ${deathReason}. Try again?`, 'error');
-                 playSound('dead');
-                 clearInterval(gameLoopInterval);
-                 gameLoopInterval = null;
-                 updateUI();
-                 return true;
-             }
-             return false;
-        }
-
-        function gameTick() {
-            if (isDead) return;
-            waterLevel = Math.max(MIN_LEVEL, waterLevel - WATER_DECREASE_RATE);
-            sunLevel = Math.max(MIN_LEVEL, sunLevel - SUN_DECREASE_RATE);
-            checkGrowth();
-            if (checkDeath()) return;
-            updateUI();
-        }
-
-        function resetGame() {
-             playSound('reset');
-             if (gameLoopInterval) clearInterval(gameLoopInterval);
-             waterLevel = 50;
-             sunLevel = 50;
-             temperatureLevel = 20;
-             stressLevel = 0;
-             growthPoints = 0;
-             plantStage = 0;
-             isDead = false;
-             tempSlider.value = temperatureLevel;
-             tempValueDisplay.textContent = temperatureLevel;
-             setFeedback('New plant started! Care for it well.', 'info');
-             updateUI();
-             startGameLoop();
-        }
-
-         function startGameLoop() {
-            if (gameLoopInterval) clearInterval(gameLoopInterval);
-            if (!isDead) {
-                 gameLoopInterval = setInterval(gameTick, GAME_TICK_MS);
-            }
-         }
-
-        // --- Initial Setup ---
-        function initializeGame() {
-            // Add event listeners
-            waterButton.addEventListener('click', waterPlant);
-            sunButton.addEventListener('click', giveSunlight);
-            resetButton.addEventListener('click', resetGame); // Reset listener remains
-            tempSlider.addEventListener('input', handleTempChange);
-
-            // Initial UI setup
-            tempValueDisplay.textContent = temperatureLevel;
-            updateUI();
-
-            // Start the game loop
-            startGameLoop();
-        }
-
-        // --- Start Game on Load ---
-        window.onload = initializeGame;
-
-    </script>
+    <section class="experiment" aria-label="Observation notebook"><h2>Care, observe, explain</h2><p>This fictional classroom model lets you explore how care changes growth. Its percentages, time steps and ideal ranges are game rules; real plants have different needs.</p><p>Choose water/sunlight and temperature, predict what will happen, then advance one time step. Change one thing at a time for a fair comparison.</p><div class="controls"><button id="step-care">Advance one step</button><button id="run-care">Run slowly</button><button id="export-care">Download observations</button><label><input id="sound-on" type="checkbox"> Sound</label></div><p id="care-clock" role="status">Paused · time step 0</p><label for="care-notes">Prediction and explanation</label><textarea id="care-notes" placeholder="I predict… I changed… I observed…"></textarea><p id="care-save" class="small" role="status"></p><div class="table-scroll"><table><caption>Recent observations (download includes the full trial)</caption><thead><tr><th>Step</th><th>Action</th><th>Water</th><th>Sun</th><th>Temperature °C</th><th>Stress</th><th>Stage</th></tr></thead><tbody id="care-journal"></tbody></table></div></section><script src="../learning-shared/workshop.js?v=20261005"></script><script src="app.js?v=20261005"></script>
 </body>
 </html>
