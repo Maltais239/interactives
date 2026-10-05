@@ -12,13 +12,13 @@ Preserve existing launch URLs, learning ideas and real source visuals. Commit an
 - [x] Canadian Geography: Local Places — explicit next, hints, accessible list, restart
 - [x] Alberta's Boundaries — vocabulary meanings, evidence feedback, read aloud, restart
 - [x] Boreal Forest Comprehension — key-idea selection, comprehension feedback, read aloud
-- [ ] Writer Spark and Writer Spark Practice
-- [ ] Heart Word Mapper
+- [x] Writer Spark and Writer Spark Practice — saved drafts, restored notebooks, stable compiled apps
+- [x] Heart Word Mapper — checked starter set, original word bank, teacher-reviewed custom mappings
 - [x] Definition Draw — scaled drawing coordinates, optional images, undo/redo, finite rounds
 - [x] Make Your Own Flashcards — text/JSON import, review set, export, print, keyboard controls
 - [ ] Morpheme Match-Up
-- [ ] Cashier Change Challenge
-- [ ] What's the Angle?
+- [x] Cashier Change Challenge — real money, optional timer, keyboard/touch controls, eight transactions
+- [x] What's the Angle? — protractor construction, hints, keyboard/touch controls, eight angles
 - [ ] Photosynthesis Virtual Lab (BGSD repository)
 - [ ] Interactive Plant Grower
 - [ ] Interactive Creature Care
@@ -27,4 +27,4 @@ Preserve existing launch URLs, learning ideas and real source visuals. Commit an
 - [ ] Updated hub descriptions and real screenshots; final live checks
 
 ## Current checkpoint
-Batch 1 passed interaction checks (wrong answers, hints, full journey, quiz correction and restart). Batch 2 passed import/review and drawing/round checks. Next: writing and word-work activities. First reading activity verified live. No student accounts or new remote student-data collection. Verify wrong answers, hints, completion and restart, plus responsive and keyboard behaviour.
+Batches 1–4 passed interaction checks. Writing and heart-word apps are compiled for reliable loading; original vocabulary and artwork are preserved. Cash and angle games passed retry, support, completion and restart checks. Next: science, remaining morphology, sorting, and final hub previews.
