@@ -31,3 +31,16 @@ Run `node geography-shared/repair-tests.cjs` from the repository root. The check
 JavaScript and JSX syntax are checked before publishing. Live browser checks cover map backgrounds, region/marker selection, mode switching, hints and quiz feedback. Browser resizing is not available in the current verification environment; the small-screen CSS needs a classroom-device check.
 
 Map details still require an internet connection. Province shapes and historical regions are served from this repository.
+
+## Map views — October 5, 2026
+
+The 21 activities using OpenStreetMap now share `addSchoolBasemap(map, options)`.
+Light grey is the default. The Map view selector also offers Muted colour and
+Original. A device's choice is remembered on this site when browser storage is
+available. The optional, disabled OSM background in Label the World uses the same
+helper if it is enabled in future; it remains disabled.
+
+These views filter only the background tile container. Activity markers, coloured
+boundaries, quizzes, popups and attribution remain unchanged. Switching the view
+reuses the loaded tiles and makes no extra tile requests. No API key is required.
+Each activity retains its existing zoom/wrapping limits.
