@@ -12,9 +12,14 @@ function render(){
 }
 function move(d,focus=false){if(done)return;const next=P.move(player,d);if(P.at(next,player)){$('feedback').classList.add('error');$('feedback').textContent='You reached the edge of this grid. Choose another direction.';return;}player=next;moves++;totalMoves++;path.push({...player});$('feedback').classList.remove('error');
  if(P.at(player,trip.waypoints[checkpoint])){checkpoint++;if(checkpoint===trip.waypoints.length){done=true;chests++;$('feedback').textContent=chests===5?`Voyage complete! You found all five treasures in ${totalMoves} paces. Start a new voyage or try another challenge.`:`Treasure found at ${P.reference(player)}! ${roundHints?'You used a clue to help.':'You followed the trail independently.'} Choose Next treasure when ready.`;}else $('feedback').textContent=`Checkpoint ${checkpoint} reached. Now follow the next clue from ${P.reference(player)}.`;}else $('feedback').textContent=`One pace ${d}. Keep following the current clue.`;
- render();if(focus)$('board').querySelector('.player').focus();}
+ render();if(focus)$('board').querySelector('.player').focus({preventScroll:true});}
 document.querySelector('.tabs').onclick=e=>{const b=e.target.closest('[data-mode]');if(!b||b.dataset.mode===mode)return;mode=b.dataset.mode;startVoyage();};document.querySelector('.compass').onclick=e=>{const b=e.target.closest('[data-direction]');if(b)move(b.dataset.direction);};
-$('board').onkeydown=e=>{const d={ArrowUp:'north',ArrowDown:'south',ArrowLeft:'west',ArrowRight:'east'}[e.key];if(d){e.preventDefault();move(d,true);}};
+document.addEventListener('keydown',e=>{
+ const d={ArrowUp:'north',ArrowDown:'south',ArrowLeft:'west',ArrowRight:'east'}[e.key];
+ if(!d||done||e.defaultPrevented||e.ctrlKey||e.metaKey||e.altKey||e.shiftKey)return;
+ if(e.target?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]'))return;
+ e.preventDefault();move(d,true);
+});
 $('board').onclick=e=>{const b=e.target.closest('[data-cell]');if(!b||done)return;const[x,y]=b.dataset.cell.split(',').map(Number);const dx=x-player.x,dy=y-player.y;if(Math.abs(dx)+Math.abs(dy)!==1){$('feedback').classList.add('error');$('feedback').textContent='Tap one square next to your pirate, or use a direction button.';return;}move(dx===1?'east':dx===-1?'west':dy===1?'south':'north',true);};
 $('reset-route').onclick=()=>{if(done)return;player={...trip.start};checkpoint=0;moves=0;path=[{...player}];$('feedback').textContent='Back at the original start. Your clues have not changed.';render();};
 $('hint').onclick=()=>{if(done)return;hints++;roundHints++;const t=trip.waypoints[checkpoint];$('feedback').classList.remove('error');$('feedback').textContent=`From where you are now: ${P.clues(player,t).join(', then ')}. Target grid reference: ${P.reference(t)}. North is up; east is right.`;render();};$('next').onclick=()=>{if(done&&chests<5)startTreasure();};$('new-voyage').onclick=startVoyage;startVoyage();
