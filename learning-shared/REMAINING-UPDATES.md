@@ -9,9 +9,9 @@ Preserve existing launch URLs, learning ideas and real source visuals. Commit an
 - [x] New Morpheme Missions and Word Detective.
 
 ## Remaining work
-- [ ] Canadian Geography: Local Places
-- [ ] Alberta's Boundaries
-- [ ] Boreal Forest Comprehension
+- [x] Canadian Geography: Local Places — explicit next, hints, accessible list, restart
+- [x] Alberta's Boundaries — vocabulary meanings, evidence feedback, read aloud, restart
+- [x] Boreal Forest Comprehension — key-idea selection, comprehension feedback, read aloud
 - [ ] Writer Spark and Writer Spark Practice
 - [ ] Heart Word Mapper
 - [ ] Definition Draw
@@ -27,4 +27,4 @@ Preserve existing launch URLs, learning ideas and real source visuals. Commit an
 - [ ] Updated hub descriptions and real screenshots; final live checks
 
 ## Current checkpoint
-Recovering originals. Next: Local Places and Alberta's Boundaries. No student accounts or new remote student-data collection. Verify wrong answers, hints, completion and restart, plus responsive and keyboard behaviour.
+Batch 1 passed interaction checks (wrong answers, hints, full journey, quiz correction and restart). Next: writing and word-work activities. Live visual checks follow deployment. No student accounts or new remote student-data collection. Verify wrong answers, hints, completion and restart, plus responsive and keyboard behaviour.
