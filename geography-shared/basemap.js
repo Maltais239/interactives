@@ -93,5 +93,24 @@ function addSchoolBasemap(map, options = {}) {
     };
     notice.addTo(map);
   });
+  // A sidebar, iframe or orientation change can resize the container without
+  // resizing the outer browser. Keep Leaflet's hit testing and tiles in sync.
+  if (typeof ResizeObserver !== 'undefined') {
+    const container = map.getContainer();
+    let width = container.clientWidth, height = container.clientHeight, frame = 0;
+    const observer = new ResizeObserver(() => {
+      const nextWidth = container.clientWidth, nextHeight = container.clientHeight;
+      if (!nextWidth || !nextHeight || (nextWidth === width && nextHeight === height)) return;
+      width = nextWidth; height = nextHeight;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        map.invalidateSize({ pan:false, debounceMoveend:true });
+        map.fire('screenresize');
+      });
+    });
+    observer.observe(container);
+    map.on('unload', () => { observer.disconnect(); cancelAnimationFrame(frame); });
+  }
   return layer;
 }
+
