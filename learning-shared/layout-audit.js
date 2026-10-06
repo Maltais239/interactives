@@ -11,7 +11,7 @@ auditButton.addEventListener('click',async()=>{
       status.textContent='Checking '+path+'…';
       auditFrame.style.width='1024px';auditFrame.style.height='540px';
       const loaded=new Promise(resolve=>{const timer=setTimeout(()=>resolve(false),15000);auditFrame.onload=()=>{clearTimeout(timer);resolve(true);};});
-      auditFrame.src='../'+path;
+      auditFrame.src='../'+path+'?screen-check='+Date.now();
       if(!await loaded){results.push({path,error:'load timeout'});continue;}
       await Promise.race([auditFrame.contentDocument.fonts?.ready||Promise.resolve(),wait(1500)]);
       for(const [width,height] of sizes){
