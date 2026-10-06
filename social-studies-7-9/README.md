@@ -14,14 +14,39 @@ except the Google Fonts link (which degrades gracefully).
 
 ## Folder layout
 ```
-index.html              ← the hub, auto-grouped by grade + DOK level
+index.html              ← illustrated activity hub, grouped by grade + DOK level
 assets/
-  styles.css            ← one shared stylesheet (grade colour themes inside)
+  menu.css              ← responsive picture-menu layout
+  menu/*.webp           ← 22 separate flat topic illustrations
+  menu/image-prompts.json ← image-generation prompts and provenance
+  styles.css            ← shared activity stylesheet (grade colour themes inside)
   engine.js             ← one engine powers ALL activity types
+source/menu-template.html ← editable hub template
 grade-7/  grade-8/  grade-9/
   *.html                ← each activity = ~40 lines of DATA only
 build.py                ← regenerates every page + the index from one list
 ```
+
+## Illustrated menu
+
+The main page uses large picture buttons with readable activity titles, grade
+colours, activity types and DOK levels. Grade links jump to each group. Cards
+adapt to desktop, tablet and phone widths; longer pages scroll vertically.
+
+The 22 original illustrations were generated with the built-in image-generation
+tool in a simple flat style. Each is saved separately as an optimized 720 × 480
+WebP in `assets/menu/`; the matching prompts are in `image-prompts.json`. These
+are topic illustrations, not exact maps or historical reconstructions.
+
+After editing the menu template or activity list, regenerate only the hub with:
+
+```sh
+python3 build.py --menu-only
+```
+
+This leaves all activity pages and their shared engine untouched. Running
+`python3 build.py` without the flag also regenerates the activity pages. A new
+activity needs an illustration named `assets/menu/<slug>.webp`.
 
 ## The point: adding an activity is trivial
 Every activity is just a config object handed to the shared engine. To add one,

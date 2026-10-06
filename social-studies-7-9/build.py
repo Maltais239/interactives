@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Generates all Social Studies 7-9 activity pages + the index hub."""
-import json, os, html
+import argparse, json, os, html
+from pathlib import Path
 
-ROOT = "/home/claude/ss"
+ROOT = str(Path(__file__).resolve().parent)
+PARSER = argparse.ArgumentParser(description=__doc__)
+PARSER.add_argument('--menu-only', action='store_true', help='Rebuild the picture menu without rewriting activity pages.')
+OPTIONS = PARSER.parse_args()
 
 # Each activity is a self-describing dict consumed by assets/engine.js
 ACTIVITIES = [
@@ -348,95 +352,62 @@ def clean(cfg):
     c["home"] = "../index.html"
     return c
 
-for a in ACTIVITIES:
-    cfg = clean(a)
-    out = PAGE.format(title=html.escape(a["title"]), grade=a["grade"],
-                      config=json.dumps(cfg, ensure_ascii=False))
-    path = os.path.join(ROOT, f"grade-{a['grade']}", f"{a['slug']}.html")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(out)
+if not OPTIONS.menu_only:
+    for a in ACTIVITIES:
+        cfg = clean(a)
+        out = PAGE.format(title=html.escape(a["title"]), grade=a["grade"],
+                          config=json.dumps(cfg, ensure_ascii=False))
+        path = os.path.join(ROOT, f"grade-{a['grade']}", f"{a['slug']}.html")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(out)
+    print(f"Wrote {len(ACTIVITIES)} activity pages.")
 
-print(f"Wrote {len(ACTIVITIES)} activity pages.")
+# ----------------------- PICTURE MENU -----------------------
+GRADE_TITLE = {
+    7: "Canada Since Confederation",
+    8: "Ideologies, Economic & Political Systems",
+    9: "Building a Modern Canada",
+}
+TYPE_COPY = {
+    "categorize": "Sort ideas into their groups.",
+    "match": "Connect terms with their meanings.",
+    "sequence": "Put events or steps in order.",
+    "compare": "Find what is shared and what is different.",
+    "spectrum": "Place ideas along a spectrum.",
+}
 
-# ----------------------- INDEX HUB -----------------------
-GRADE_THEME = {7:"#0984e3",8:"#6c5ce7",9:"#00897b"}
-GRADE_TITLE = {7:"Grade 7 — Canada Since Confederation",
-               8:"Grade 8 — Ideologies, Economic & Political Systems",
-               9:"Grade 9 — Building a Modern Canada"}
-TIER_NAME = {1:"Remember & Identify",2:"Understand & Apply",3:"Analyze & Evaluate"}
+def card(a, eager=False):
+    slug = html.escape(a["slug"], quote=True)
+    title = html.escape(a["title"])
+    loading = "eager" if eager else "lazy"
+    return (
+        f'<a class="card" href="grade-{a["grade"]}/{slug}.html">'
+        f'<span class="card-art"><img src="assets/menu/{slug}.webp?v=20261006-menu" '
+        f'alt="" width="720" height="480" loading="{loading}" decoding="async"></span>'
+        f'<span class="card-body"><span class="ctype">{html.escape(a["dok"])}</span>'
+        f'<span class="ctitle">{title}</span>'
+        f'<span class="card-description">{TYPE_COPY[a["type"]]}</span>'
+        f'<span class="card-bottom"><span class="ctag">{html.escape(a["cat"])}</span>'
+        f'<span class="card-go" aria-hidden="true">Open activity <span>→</span></span></span></span></a>'
+    )
 
-cards_by_grade = {7:[],8:[],9:[]}
-for a in ACTIVITIES:
-    cards_by_grade[a["grade"]].append(a)
+sections = []
+for grade in (7, 8, 9):
+    activities = sorted((a for a in ACTIVITIES if a["grade"] == grade),
+                        key=lambda a: (a["tier"], a["title"]))
+    cards = "".join(card(a, grade == 7) for a in activities)
+    sections.append(
+        f'<section class="grade-section" data-grade="{grade}" id="grade-{grade}" '
+        f'aria-labelledby="grade-{grade}-title">'
+        f'<div class="section-heading"><div><p class="grade-kicker">Grade {grade}</p>'
+        f'<h2 id="grade-{grade}-title">{html.escape(GRADE_TITLE[grade])}</h2></div>'
+        f'<span class="activity-count">{len(activities)} activities</span></div>'
+        f'<div class="cards">{cards}</div></section>'
+    )
 
-def card(a):
-    return (f'<a class="card" href="grade-{a["grade"]}/{a["slug"]}.html">'
-            f'<span class="ctype">{html.escape(a["dok"])}</span>'
-            f'<span class="ctitle">{html.escape(a["title"])}</span>'
-            f'<span class="ctag">{html.escape(a["cat"])}</span></a>')
-
-sections = ""
-for g in (7,8,9):
-    acts = sorted(cards_by_grade[g], key=lambda x:(x["tier"], x["title"]))
-    rows = ""
-    for tier in (1,2,3):
-        tier_acts = [a for a in acts if a["tier"]==tier]
-        if not tier_acts: continue
-        rows += (f'<div class="tier"><div class="tier-label">'
-                 f'<b>DOK {tier}</b> · {TIER_NAME[tier]}</div>'
-                 f'<div class="cards">{"".join(card(a) for a in tier_acts)}</div></div>')
-    sections += (f'<section data-grade="{g}"><h2>{html.escape(GRADE_TITLE[g])}</h2>{rows}</section>')
-
-INDEX = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Social Studies 7–9 · Interactive Activities</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
-<style>
-*{{box-sizing:border-box;}}
-body{{margin:0;font-family:'Poppins',system-ui,sans-serif;background:#2d3436;color:#fff;padding:28px 18px 60px;}}
-.wrap{{max-width:1000px;margin:0 auto;}}
-header.hero{{text-align:center;margin-bottom:8px;}}
-header.hero h1{{font-size:2.1rem;margin:0 0 6px;}}
-header.hero p{{opacity:.85;margin:0 auto;max-width:640px;font-size:.95rem;}}
-.legend{{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:18px 0 30px;}}
-.legend span{{font-size:.72rem;background:rgba(255,255,255,.1);padding:5px 11px;border-radius:20px;opacity:.9;}}
-section{{margin-bottom:34px;}}
-section h2{{font-size:1.25rem;border-left:5px solid var(--c);padding-left:12px;margin:0 0 14px;}}
-section[data-grade="7"]{{--c:#0984e3;}}
-section[data-grade="8"]{{--c:#6c5ce7;}}
-section[data-grade="9"]{{--c:#00897b;}}
-.tier{{margin-bottom:16px;}}
-.tier-label{{font-size:.78rem;opacity:.7;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}}
-.tier-label b{{color:var(--c);opacity:1;}}
-.cards{{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}}
-.card{{display:flex;flex-direction:column;gap:6px;background:#dfe6e9;color:#2d3436;border-radius:10px;
-  padding:14px 16px;text-decoration:none;border-left:5px solid var(--c);transition:transform .12s,box-shadow .12s;}}
-.card:hover{{transform:translateY(-3px);box-shadow:0 8px 18px rgba(0,0,0,.35);}}
-.ctype{{font-size:.68rem;font-weight:700;color:var(--c);text-transform:uppercase;letter-spacing:.03em;}}
-.ctitle{{font-size:1rem;font-weight:700;line-height:1.2;}}
-.ctag{{font-size:.72rem;opacity:.65;}}
-footer{{text-align:center;opacity:.6;font-size:.78rem;margin-top:40px;}}
-</style>
-</head>
-<body>
-<div class="wrap">
-<header class="hero">
-  <h1>Social Studies 7–9</h1>
-  <p>Interactive drag-and-drop activities, organized from simple recall to deeper analysis. Tap any card to play — works on phones, tablets and computers.</p>
-</header>
-<div class="legend">
-  <span>🟦 Sort &amp; Categorize</span><span>🔗 Match</span><span>📅 Sequence</span>
-  <span>⚖️ Compare</span><span>📈 Spectrum</span>
-</div>
-{sections}
-<footer>{len(ACTIVITIES)} activities · aligned to the Alberta Social Studies 7–9 curriculum · built to grow.</footer>
-</div>
-</body>
-</html>
-"""
-with open(os.path.join(ROOT,"index.html"),"w",encoding="utf-8") as f:
-    f.write(INDEX)
-print("Wrote index.html")
+template = (Path(ROOT) / "source/menu-template.html").read_text(encoding="utf-8")
+assert template.count("__SECTIONS__") == 1
+INDEX = template.replace("__SECTIONS__", "".join(sections)).replace("__COUNT__", str(len(ACTIVITIES)))
+(Path(ROOT) / "index.html").write_text(INDEX, encoding="utf-8")
+print(f"Wrote picture menu with {len(ACTIVITIES)} activity links.")
