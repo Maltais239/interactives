@@ -91,7 +91,7 @@ function startOver() {
     card.dataset.label=item.label;card.dataset.category=item.category;
     card.setAttribute('aria-label',item.label);card.setAttribute('aria-pressed','false');card.style.setProperty('--tint',item.tint);
     const picture = document.createElement('span');picture.className='picture';
-    const image = document.createElement('img');image.src=`assets/${item.id}.webp`;image.alt='';image.width=200;image.height=200;image.draggable=false;picture.appendChild(image);
+    const image = document.createElement('img');image.src=`assets/${item.id}.webp?v=20261006-flat`;image.alt='';image.width=200;image.height=200;image.draggable=false;picture.appendChild(image);
     const name = document.createElement('span');name.className='card-name';name.textContent=item.label;
     const feedback = document.createElement('span');feedback.className='card-feedback';feedback.id='feedback-'+item.id;
     card.append(picture,name,feedback);
