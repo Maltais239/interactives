@@ -20,4 +20,4 @@ try{if(typeof L==='undefined')throw Error('map library unavailable');map=L.map('
 render();
 
 
-Studio.fitWorkspace($('main'));
+Studio.fitWorkspace($('main'),{minHeight:300});
