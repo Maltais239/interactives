@@ -21,4 +21,4 @@ const model=E.prepare(truss),a=E.solve(model,'truck',600),b=E.solve(model,'truck
 assert.deepEqual(a.displacements,b.displacements,'Repeated conditions must give identical results');
 assert(Math.abs(a.displacements[model.map.get('264,250')*3+1])<1e-9,'Bank supports must remain fixed');
 const wind=E.scan(truss,'truck',28);assert(wind.maxStress>truck.maxStress,'Wind must alter the solved forces');
-console.log(JSON.stringify({checks:14,trussTruck:{stress:truck.maxStress,bend:truck.maxDeflection,cost:truck.cost},unbracedTruck:{stress:unbraced.maxStress,bend:unbraced.maxDeflection},reinforcedBus:E.scan(upgraded,'bus').pass},null,2));
+console.log(JSON.stringify({checks:16,trussTruck:{stress:truck.maxStress,bend:truck.maxDeflection,cost:truck.cost},unbracedTruck:{stress:unbraced.maxStress,bend:unbraced.maxDeflection},reinforcedBus:E.scan(upgraded,'bus').pass},null,2));
