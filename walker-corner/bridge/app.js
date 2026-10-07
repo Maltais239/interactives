@@ -164,7 +164,8 @@
     if(!reducedMotion){const phase=performance.now()/1400;ctx.globalAlpha=.18;ctx.strokeStyle='#e9f5dc';ctx.lineWidth=1.3;for(let i=0;i<5;i++){const x=480+i*47+Math.sin(phase+i)*12,y=525+i*20;line({x,y},{x:x+15,y:y-3},'#eff9eb',1.3);}ctx.globalAlpha=1;}
     ctx.restore();
   }
-  function loop(time){const dt=Math.min(.05,state.lastTime?(time-state.lastTime)/1000:0);state.lastTime=time;tick(dt);draw();requestAnimationFrame(loop);}
+  function loop(time){const elapsed=Math.min(1,state.lastTime?(time-state.lastTime)/1000:0);state.lastTime=time;let remaining=elapsed;while(remaining>0){const step=Math.min(.025,remaining);tick(step);remaining-=step;}draw();requestAnimationFrame(loop);}
+  document.addEventListener('visibilitychange',()=>{state.lastTime=0;});
   function openDialog(id){const dlg=$(id);if(!dlg.open)dlg.showModal();}
   $('helpBtn').onclick=()=>openDialog('helpDialog');$('notebookBtn').onclick=()=>{renderTrials();openDialog('notebookDialog');};$('viewTrialBtn').onclick=()=>{renderTrials();openDialog('notebookDialog');};
   document.querySelectorAll('.close-dialog').forEach(b=>b.onclick=()=>b.closest('dialog').close());
