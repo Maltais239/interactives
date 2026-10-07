@@ -58,10 +58,10 @@
   function resize(){
     const scene=$('scene'),shell=document.querySelector('.workspace'),dock=document.querySelector('.build-dock'),bench=document.querySelector('.workbench');
     const available=window.innerHeight-shell.getBoundingClientRect().top-dock.offsetHeight-bench.offsetHeight-45;
-    const desired=Math.min(scene.clientWidth*.57,Math.max(window.innerWidth<=650?260:235,available));
+    const desired=Math.min(scene.clientWidth*.5625,Math.max(window.innerWidth<=650?260:235,available));
     document.documentElement.style.setProperty('--scene-height',Math.round(Math.min(660,desired))+'px');
     width=scene.clientWidth;height=scene.clientHeight;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);
-    scale=width/(state.zoom?850:1200);ox=(width-1200*scale)/2;oy=height*.45-E.DECK*scale;
+    scale=width/(state.zoom?850:1200);ox=(width-1200*scale)/2;oy=Math.min(0,height*.45-E.DECK*scale);
   }
   window.addEventListener('resize',()=>{cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(resize);});new ResizeObserver(()=>{if(width!==$('scene').clientWidth||height!==$('scene').clientHeight)resize();}).observe($('scene'));document.fonts?.ready.then(resize);
   function position(event){const r=canvas.getBoundingClientRect();return {x:(event.clientX-r.left-ox)/scale,y:(event.clientY-r.top-oy)/scale};}
