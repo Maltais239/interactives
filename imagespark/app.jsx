@@ -44,7 +44,7 @@ const { useState, useEffect, useRef } = React;
             captureLibraryPromise=new Promise((resolve,reject)=>{
                 const script=document.createElement('script');
                 const timer=setTimeout(()=>{script.remove();captureLibraryPromise=null;reject(new Error('Export library timed out.'));},12000);
-                script.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                script.src='vendor/html2canvas.min.js';
                 script.onload=()=>{clearTimeout(timer);resolve();};
                 script.onerror=()=>{clearTimeout(timer);captureLibraryPromise=null;reject(new Error('Export library unavailable.'));};
                 document.head.appendChild(script);
@@ -63,12 +63,9 @@ const { useState, useEffect, useRef } = React;
                     useCORS: true
                 });
                 
-                const link = document.createElement('a');
-                link.download = `${filename(title)}_Analysis.png`;
-                link.href = canvas.toDataURL();
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                if (!blob) throw new Error('The image could not be encoded.');
+                downloadFile(blob, 'image/png', filename(title) + '_Analysis.png');
             } catch (err) {
                 console.error("Image capture failed:", err);
                 alert("Couldn't save image. Please try again.");
@@ -79,7 +76,7 @@ const { useState, useEffect, useRef } = React;
         const blankWeb = () => ({ ideas: [], question: 'What do I notice?' });
         const filename = title => title.replace(/[^a-z0-9_-]+/gi, '_').slice(0, 75) || 'Image_Spark';
         const downloadFile = (content, type, name) => {
-            const url = URL.createObjectURL(new Blob([content], {type}));
+            const url = URL.createObjectURL(content instanceof Blob ? content : new Blob([content], {type}));
             const link = document.createElement('a');
             link.href = url; link.download = name; document.body.appendChild(link);
             link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -124,6 +121,7 @@ const { useState, useEffect, useRef } = React;
         const MindWeb = ({ title, web, setWeb, sourceInfo, onSaveWork, onOpenWork, status }) => {
             const {ideas, question} = web;
             const [newIdea, setNewIdea] = useState('');
+            const [exporting, setExporting] = useState(false);
             const [activeCategory, setActiveCategory] = useState(null);
             const [undo, setUndo] = useState(null);
             const containerRef = useRef(null);
@@ -194,7 +192,7 @@ const { useState, useEffect, useRef } = React;
                     </div>
                     <div className="flex flex-wrap justify-between items-center mt-3 gap-2 shrink-0">
                         <div className="flex gap-1"><button onClick={resetWeb} className="text-slate-400 hover:text-rose-500 text-xs font-semibold flex items-center gap-1 px-2 py-1"><Icon name="trash" size={14}/>Reset</button><button disabled={!undo} onClick={()=>{setWeb(undo);setUndo(null);}} className="text-slate-500 disabled:opacity-40 text-xs font-semibold px-2">Undo</button></div>
-                        <div className="flex gap-2"><button onClick={saveAsText} className="bg-white border border-slate-200 text-slate-700 font-bold py-1.5 px-3 rounded-lg shadow-sm hover:bg-slate-50 flex items-center gap-1 text-xs"><Icon name="download" size={16}/>Text</button><button onClick={()=>saveAsImage('mind-web-capture',title)} className="bg-slate-800 text-white font-bold py-1.5 px-4 rounded-lg shadow-lg hover:bg-slate-700 flex items-center gap-1 text-xs"><Icon name="camera" size={16}/>Image</button></div>
+                        <div className="flex gap-2"><button onClick={saveAsText} className="bg-white border border-slate-200 text-slate-700 font-bold py-1.5 px-3 rounded-lg shadow-sm hover:bg-slate-50 flex items-center gap-1 text-xs"><Icon name="download" size={16}/>Text</button><button disabled={exporting} onClick={async()=>{setExporting(true);try{await saveAsImage('mind-web-capture',title);}finally{setExporting(false);}}} className="bg-slate-800 text-white font-bold py-1.5 px-4 rounded-lg shadow-lg hover:bg-slate-700 flex items-center gap-1 text-xs"><Icon name="camera" size={16}/>{exporting ? 'Saving…' : 'Image'}</button></div>
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-slate-500 shrink-0"><button onClick={onSaveWork} className="font-semibold hover:text-indigo-600">Save work</button><button onClick={onOpenWork} className="font-semibold hover:text-indigo-600">Open work</button><span role="status" className="status-line ml-auto">{status}</span></div>
                 </div>

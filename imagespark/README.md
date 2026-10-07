@@ -10,6 +10,6 @@ Drag notes using the three-dot handle, or focus the handle and use arrow keys. E
 
 ## Development
 
-Edit `app.jsx`, the custom CSS in `index.html`, or `grade7-images.js`. With Node 24+, run `npm install` then `npm run build` in this folder and commit the generated `app.js`, `styles.css` and vendor files. The production page uses compiled JSX/CSS and local React bundles; no runtime Babel or Tailwind CDN is required. Google Fonts and the existing html2canvas export library remain external. Deployment is static GitHub Pages.
+Edit `app.jsx`, the custom CSS in `index.html`, or `grade7-images.js`. With Node 24+, run `npm install` then `npm run build` in this folder and commit the generated `app.js`, `styles.css` and vendor files. The production page uses compiled JSX/CSS and local React bundles; no runtime Babel or Tailwind CDN is required. Google Fonts remains external. The html2canvas export library is hosted locally and loaded only when needed. Deployment is static GitHub Pages.
 
 The responsive layout stacks below 1024px, supports shorter embedded views with panel scrolling, and preserves work through resizing. No student notes are sent to a server by the app.
