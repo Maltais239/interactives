@@ -6,6 +6,8 @@ An illustrated bridge builder based on Tyler Walker’s Bridge Tester idea. The 
 
 Connect endpoints on the construction grid. Road members join neighbouring points along the road line. Wood and steel support the deck above or below it. All joints transfer rotation and force. Crossing beams do not join unless they share an endpoint. Test a car, truck or school bus; compare saved trials in the field notebook. Challenges require the named vehicle and budget. Free build has no budget limit.
 
+The driving surface needs eight Road sections. Missing sections are highlighted in the scene, and a gap result names the two points that need Road. An empty or incomplete restored design starts with Road selected. To convert a wood or steel beam on the road line, select Road and connect the same two neighbouring points; Undo restores the previous material. Road alone allows the vehicle to move but can bend too far without triangular bracing.
+
 Pointer and keyboard construction are supported, with equivalent labelled point controls below the scene. Designs and the latest 40 trials persist locally under a new key, leaving the earlier classroom lab’s stored data untouched. JSON designs and CSV notebooks can be exported. Invalid imports leave the current bridge intact.
 
 ## Model

@@ -44,9 +44,10 @@
       return {a,b,type:m.type};
     });
   }
-  function roadComplete(members){
-    return Array.from({length:8},(_,i)=>LEFT+i*STEP).every(x=>members.some(m=>m.type==='road'&&Math.min(m.a.x,m.b.x)===x&&Math.max(m.a.x,m.b.x)===x+STEP));
+  function roadGaps(members){
+    return Array.from({length:8},(_,i)=>({section:i+1,a:{x:LEFT+i*STEP,y:DECK},b:{x:LEFT+(i+1)*STEP,y:DECK}})).filter(gap=>!members.some(m=>m.type==='road'&&m.a.y===DECK&&m.b.y===DECK&&Math.min(m.a.x,m.b.x)===gap.a.x&&Math.max(m.a.x,m.b.x)===gap.b.x));
   }
+  function roadComplete(members){return roadGaps(members).length===0;}
   function element(m,ia,ib){
     const dx=(m.b.x-m.a.x)/STEP,dy=(m.a.y-m.b.y)/STEP,L=Math.hypot(dx,dy),c=dx/L,s=dy/L,p=materials[m.type];
     const a=p.EA/L,b=12*p.EI/L**3,d=6*p.EI/L**2,e=4*p.EI/L,f=2*p.EI/L;
@@ -78,7 +79,8 @@
     for(const el of elements)for(let i=0;i<6;i++)for(let j=0;j<6;j++)K[el.dofs[i]][el.dofs[j]]+=el.kg[i][j];
     const free=[];for(let i=0;i<nodes.length;i++)for(let d=0;d<3;d++)if(!((nodes[i].x===LEFT||nodes[i].x===RIGHT)&&nodes[i].y===DECK&&d<2))free.push(i*3+d);
     const L=factor(free.map(i=>free.map(j=>K[i][j])));
-    return {nodes,map,elements,free,L,N,complete:roadComplete(members),cost:cost(members)};
+    const gaps=roadGaps(members);
+    return {nodes,map,elements,free,L,N,gaps,complete:gaps.length===0,cost:cost(members)};
   }
   function solve(model,vehicleName,centre,wind=0){
     const F=new Float64Array(model.N),displacements=new Float64Array(model.N),vehicle=vehicles[vehicleName];
@@ -115,5 +117,5 @@
     for(let x=LEFT-vehicles[vehicle].wheelbase/2;x<=RIGHT+vehicles[vehicle].wheelbase/2;x+=7){const r=solve(model,vehicle,x,wind);if(!worst||r.maxStress>worst.maxStress)worst=r;if(r.unstable)return {pass:false,reason:'unstable',cost:model.cost,...r};}
     return {pass:worst.maxStress<=1&&worst.maxDeflection<=45,reason:worst.maxDeflection>45?'sag':worst.maxStress>1?'stress':'crossed',cost:model.cost,...worst};
   }
-  return {LEFT,RIGHT,DECK,STEP,materials,vehicles,key,length,cost,starter,validate,roadComplete,prepare,solve,scan};
+  return {LEFT,RIGHT,DECK,STEP,materials,vehicles,key,length,cost,starter,validate,roadGaps,roadComplete,prepare,solve,scan};
 });

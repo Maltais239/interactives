@@ -11,6 +11,14 @@ const upgraded=truss.map(m=>m.type==='wood'&&(m.a.x===E.LEFT||m.b.x===E.RIGHT||(
 assert(E.scan(upgraded,'bus').pass,'Steel at the compressed end struts and upper chord must carry the bus');
 assert(E.cost(upgraded)>E.cost(truss),'Steel reinforcement must increase cost');
 assert.equal(E.scan(truss.filter(m=>m!==truss[3]),'truck').reason,'gap','Missing deck segment must fail continuity');
+assert.deepEqual(E.roadGaps(truss),[],'The complete starter must have no missing Road');
+assert.deepEqual(E.roadGaps(truss.filter((m,i)=>![0,3,7].includes(i))).map(g=>g.section),[1,4,8],'Report the actual missing Road sections, including both banks');
+assert(E.roadComplete(beam.map(m=>({...m,a:m.b,b:m.a}))),'Road endpoint order must not change continuity');
+const woodDeck=beam.map(m=>({...m,type:'wood'}));
+assert.equal(E.roadGaps(woodDeck).length,8,'Wood along the deck is bracing, not the driving surface');
+assert.equal(E.roadGaps(beam.map((m,i)=>i===3?{...m,a:{...m.a,y:166},b:{...m.b,y:166},type:'steel'}:m))[0].section,4,'An overhead steel beam must not fill a Road gap');
+const incomplete=E.prepare(truss.filter(m=>m!==truss[3]));
+assert(!incomplete.complete&&incomplete.gaps.length===1&&incomplete.gaps[0].a.x===516&&incomplete.gaps[0].b.x===600,'Prepared model must identify the reached gap for feedback');
 const floating={a:{x:432,y:334},b:{x:516,y:334},type:'wood'};
 assert.equal(E.scan([...truss,floating],'truck').reason,'unstable','Unsupported island must not be given fake capacity');
 assert.throws(()=>E.validate([...truss,truss[0]]),/already a piece/);
@@ -21,4 +29,4 @@ const model=E.prepare(truss),a=E.solve(model,'truck',600),b=E.solve(model,'truck
 assert.deepEqual(a.displacements,b.displacements,'Repeated conditions must give identical results');
 assert(Math.abs(a.displacements[model.map.get('264,250')*3+1])<1e-9,'Bank supports must remain fixed');
 const wind=E.scan(truss,'truck',28);assert(wind.maxStress>truck.maxStress,'Wind must alter the solved forces');
-console.log(JSON.stringify({checks:16,trussTruck:{stress:truck.maxStress,bend:truck.maxDeflection,cost:truck.cost},unbracedTruck:{stress:unbraced.maxStress,bend:unbraced.maxDeflection},reinforcedBus:E.scan(upgraded,'bus').pass},null,2));
+console.log(JSON.stringify({checks:22,trussTruck:{stress:truck.maxStress,bend:truck.maxDeflection,cost:truck.cost},unbracedTruck:{stress:unbraced.maxStress,bend:unbraced.maxDeflection},reinforcedBus:E.scan(upgraded,'bus').pass},null,2));
