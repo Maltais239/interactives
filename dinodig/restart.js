@@ -1,0 +1,40 @@
+'use strict';
+// Reset only STRATA's expedition; other activities keep their saved work.
+const restartDialog=makeDigDialog('restart-dialog','Start over?',null);
+restartDialog.querySelector('.dialog-heading button').textContent='Keep playing';
+const restartCopy=document.createElement('p');
+restartCopy.className='restart-copy';
+restartCopy.id='restart-description';
+restartCopy.textContent='Start a new expedition? This clears all eight discoveries, notebook notes and evidence checks on this browser.';
+restartDialog.setAttribute('aria-describedby',restartCopy.id);
+const restartActions=document.createElement('div');
+restartActions.className='restart-actions';
+const keepPlaying=document.createElement('button');
+keepPlaying.className='study-button';
+keepPlaying.textContent='Keep playing';
+keepPlaying.onclick=()=>restartDialog.close();
+const confirmRestart=document.createElement('button');
+confirmRestart.id='confirmStartOver';
+confirmRestart.className='study-button primary';
+confirmRestart.textContent='Start over';
+restartActions.append(keepPlaying,confirmRestart);
+restartDialog.append(restartCopy,restartActions);
+const startOverButton=document.createElement('button');
+startOverButton.id='startOverBtn';
+startOverButton.className='study-button start-over';
+startOverButton.textContent='Start over';
+startOverButton.onclick=()=>{openDigDialog(restartDialog);keepPlaying.focus();};
+digHeader.append(startOverButton);
+confirmRestart.onclick=()=>{
+ // Finish any pending identification before closing its dialog.
+ waitingForIdentification=false;
+ found.fill(false);
+ fieldRecord={found:[...found],notes:{},checks:{}};
+ studyMode='observe';
+ const saved=Studio.save(studyKey,fieldRecord);
+ renderCards();
+ updateCount();
+ loadSite(0,true);
+ setHint(saved?'New expedition started. All eight dig sites are ready.':'New expedition started. Browser storage is unavailable, so this fresh start may not be kept after reloading.');
+ startOverButton.focus();
+};
