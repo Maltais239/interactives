@@ -95,7 +95,10 @@
     if(type==='custom')return true;
     const rigid=members.filter(m=>m.type==='wood'||m.type==='steel'),cables=members.filter(m=>m.type==='cable');
     const path=(start,goal,pieces)=>{const reached=new Set([key(start)]),queue=[start];while(queue.length){const p=queue.shift();if(goal(p))return true;for(const m of pieces){let next=key(m.a)===key(p)?m.b:key(m.b)===key(p)?m.a:null;if(next&&!reached.has(key(next))){reached.add(key(next));queue.push(next);}}}return false;};
-    if(type==='girder')return rigid.some(m=>m.type==='steel'&&m.a.y>DECK&&m.b.y>DECK&&m.a.x!==m.b.x)&&!cables.length;
+    if(type==='girder'){
+      const lower=rigid.filter(m=>m.type==='steel'&&m.a.y>=DECK&&m.b.y>=DECK&&(m.a.y>DECK||m.b.y>DECK));
+      return !cables.length&&path({x:LEFT,y:DECK},p=>p.x===RIGHT&&p.y===DECK,lower);
+    }
     if(type==='truss'){
       const all=members.filter(m=>m.type!=='cable'),adj=new Map(),triangles=new Set();
       for(const m of all)for(const [a,b]of [[m.a,m.b],[m.b,m.a]]){if(!adj.has(key(a)))adj.set(key(a),new Map());adj.get(key(a)).set(key(b),b);}
@@ -103,12 +106,13 @@
       return triangles.size>=4;
     }
     if(type==='arch'){
-      const upper=rigid.filter(m=>m.a.y<=DECK&&m.b.y<=DECK);
+      const upper=rigid.filter(m=>m.type==='steel'&&m.a.y<=DECK&&m.b.y<=DECK&&(m.a.y<DECK||m.b.y<DECK));
       return path({x:LEFT,y:DECK},p=>p.x===RIGHT&&p.y===DECK,upper)&&path({x:LEFT,y:DECK},p=>p.y===DECK-2*STEP,upper);
     }
     if(type==='suspension'){
       const towers=[];for(let x=LEFT+STEP;x<RIGHT;x+=STEP){const vertical=rigid.filter(m=>m.type==='steel'&&m.a.x===x&&m.b.x===x);if(path({x,y:DECK},p=>p.y===DECK-2*STEP,vertical))towers.push({x,y:DECK-2*STEP});}
-      return towers.length>=2&&[LEFT,RIGHT].every(x=>cables.some(m=>(m.a.x===x&&m.a.y===DECK&&m.b.y<DECK)||(m.b.x===x&&m.b.y===DECK&&m.a.y<DECK)))&&path(towers[0],p=>key(p)===key(towers[towers.length-1]),cables.filter(m=>m.a.y<DECK&&m.b.y<DECK))&&cables.some(m=>m.a.y===DECK||m.b.y===DECK);
+      const hangers=cables.filter(m=>m.a.x===m.b.x&&m.a.x>LEFT&&m.a.x<RIGHT&&((m.a.y===DECK&&m.b.y<DECK)||(m.b.y===DECK&&m.a.y<DECK)));
+      return towers.length>=2&&[LEFT,RIGHT].every(x=>cables.some(m=>(m.a.x===x&&m.a.y===DECK&&m.b.y<DECK)||(m.b.x===x&&m.b.y===DECK&&m.a.y<DECK)))&&path(towers[0],p=>key(p)===key(towers[towers.length-1]),cables.filter(m=>m.a.y<DECK&&m.b.y<DECK))&&hangers.length>=3;
     }
     return false;
   }

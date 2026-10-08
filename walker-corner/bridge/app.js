@@ -18,6 +18,10 @@
     sandbox:{name:'Free build',vehicle:null,budget:Infinity,text:'Your canyon, your experiment. Choose any vehicle and try an idea.'}
   };
   const challenges={...legacyChallenges,...P.challenges};
+  $('challenge').replaceChildren();
+  for(const [id,label]of [...P.levels.map((level,index)=>[level.id,`Level ${index+1} · ${level.name}`]),['sandbox','Free build']]){
+    const option=document.createElement('option');option.value=id;option.textContent=label;$('challenge').append(option);
+  }
   let saved=null;try{saved=JSON.parse(localStorage.getItem(STORE));if(saved){E.validate(saved.members);if(!challenges[saved.challenge]||!E.vehicles[saved.vehicle])saved=null;}}catch{saved=null;}
   const validLoad=p=>Number.isFinite(p)&&p>=50&&p<=200&&p%10===0;
   const initial=P.bootstrap(saved,E.starter('beam'));
@@ -39,23 +43,31 @@
   function setEditing(enabled){document.querySelectorAll('[data-tool],#challenge,#newBridgeBtn,#examplesBtn,#undoBtn,#saveBtn,#loadBtn,#wind,#connectBtn,#removeBtn').forEach(b=>b.disabled=!enabled);if(enabled)$('undoBtn').disabled=!state.history.length;updateProgressControls();}
   function refresh(){
     state.gaps=E.roadGaps(state.members);state.bridgeType=E.inferType(state.members);
-    const c=challenges[state.challenge],cost=E.cost(state.members);$('challenge').value=state.challenge;$('wind').value=String(state.wind);$('cost').textContent='$'+cost.toLocaleString();$('budgetLimit').textContent=Number.isFinite(c.budget)?' / $'+c.budget.toLocaleString():' / unlimited';$('budgetFill').style.width=(Number.isFinite(c.budget)?Math.min(100,cost/c.budget*100):20)+'%';document.querySelector('.budget').classList.toggle('over',cost>c.budget);$('missionText').textContent=c.text;$('pieces').textContent=state.members.length+' pieces';$('trialCount').textContent=state.trials.length;$('undoBtn').disabled=!state.history.length||busy();
-    document.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===state.tool));document.querySelectorAll('[data-vehicle]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.vehicle===state.vehicle));
+    const c=challenges[state.challenge],cost=E.cost(state.members);state.wind=c.wind??state.wind;$('challenge').value=state.challenge;$('wind').value=String(state.wind);$('cost').textContent='$'+cost.toLocaleString();$('budgetLimit').textContent=Number.isFinite(c.budget)?' / $'+c.budget.toLocaleString():' / unlimited';$('budgetFill').style.width=(Number.isFinite(c.budget)?Math.min(100,cost/c.budget*100):20)+'%';document.querySelector('.budget').classList.toggle('over',cost>c.budget);$('missionText').textContent=c.text;$('pieces').textContent=state.members.length+' pieces';$('trialCount').textContent=state.trials.length;$('undoBtn').disabled=!state.history.length||busy();
+    document.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===state.tool));document.querySelectorAll('[data-vehicle]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.level?b.dataset.level===state.challenge:state.challenge==='sandbox'&&b.dataset.vehicle===state.vehicle));
     $('loadValue').textContent=loadLabel();$('selectedVehicle').textContent=E.vehicles[state.vehicle].name+' · '+loadLabel();$('axleInfo').textContent=E.vehicles[state.vehicle].tracked?'Weight spread along the tracks.':E.axlesFor(state.vehicle).length+' axles carry the load.';$('budgetStatus').textContent=cost>c.budget?'$'+(cost-c.budget).toLocaleString()+' over · challenge not met':Number.isFinite(c.budget)?'Within budget · needed to complete':'Free build · no budget goal';$('bridgeName').textContent=E.bridgeTypes[state.bridgeType].name+' design';$('bridgeTip').textContent=E.bridgeTypes[state.bridgeType].tip;
     $('designDescription').textContent=`Driving surface: ${8-state.gaps.length} of 8 Road sections. Wood beams: ${state.members.filter(m=>m.type==='wood').length}; Steel beams: ${state.members.filter(m=>m.type==='steel').length}; Cables: ${state.members.filter(m=>m.type==='cable').length}. Cost: $${cost}. ${state.gaps.length?'Add Road along the highlighted gaps; beams and cables support it.':E.bridgeTypes[state.bridgeType].tip}`;
-    updateProgressControls();updateHint();persist();resize();
+    updateProgressControls();updateDesignHints();updateHint();persist();resize();
   }
   function updateProgressControls(){
     const sandbox=state.challenge==='sandbox',index=P.levelIndex(state.challenge);
     $('levelProgress').textContent=sandbox?'Free build · any vehicle':`Level ${index+1} of ${P.levels.length} · ${state.progress.completed} completed`;
     $('fleetHeading').textContent=sandbox?'CHOOSE YOUR VEHICLE':'YOUR CHALLENGE JOURNEY';
-    $('loadHelp').textContent=sandbox?'Relative classroom units. Choose any vehicle to test capacity.':'Relative classroom units. Complete this crossing within budget to unlock the next vehicle.';
+    $('loadHelp').textContent=sandbox?'Relative classroom units. Choose any vehicle to test capacity.':'Relative classroom units. Meet the crossing, budget and design goals to unlock the next mission.';
+    $('wind').disabled=busy()||P.challenges[state.challenge].wind!==undefined;$('wind').title=P.challenges[state.challenge].wind!==undefined?'Wind is fixed for this mission':'Choose wind conditions';
     for(const option of $('challenge').options)option.disabled=!P.isUnlocked(option.value,state.progress);
     document.querySelectorAll('[data-vehicle]').forEach(button=>{
-      const level=P.levels.find(l=>l.vehicle===button.dataset.vehicle),unlocked=P.isUnlocked(level.id,state.progress),levelIndex=P.levelIndex(level.id);
+      const id=button.dataset.level;button.hidden=sandbox?Boolean(id):!id;
+      const unlocked=id?P.isUnlocked(id,state.progress):true,levelIndex=P.levelIndex(id);
       button.disabled=busy()||!sandbox&&!unlocked;button.classList.toggle('locked',!sandbox&&!unlocked);
-      button.querySelector('.fleet-stage').textContent=sandbox?'':levelIndex<state.progress.completed?'✓ Completed':level.id===state.challenge?'Current challenge':unlocked?'Unlocked':`Level ${levelIndex+1} · locked`;
+      button.querySelector('.fleet-stage').textContent=!id?'':`${levelIndex+1} · `+(id===state.challenge?'Current challenge':levelIndex<state.progress.completed?'✓ Completed':unlocked?'Unlocked':'Locked');
     });
+  }
+  function updateDesignHints(){
+    const c=P.challenges[state.challenge];$('hintHeading').textContent=c.name;
+    const goal=[c.bridgeType?E.bridgeTypes[c.bridgeType].name+' structure required':null,c.wind!==undefined?(c.wind===0?'Calm':'Gusty')+' wind fixed':null].filter(Boolean).join(' · ');
+    $('designGoal').textContent=goal;$('designGoal').hidden=!goal;$('designHint').textContent=c.hints[0];$('hintList').replaceChildren();
+    for(const hint of c.hints.slice(1)){const item=document.createElement('li');item.textContent=hint;$('hintList').append(item);}
   }
   function captureDraft(){return {members:clone(state.members),bridgeType:state.bridgeType,challenge:state.challenge,vehicle:state.vehicle,loadPercent:state.loadPercent,wind:state.wind};}
   function validDraft(draft){try{if(!draft||!E.vehicles[draft.vehicle])return null;return {...draft,members:E.validate(draft.members),bridgeType:E.bridgeTypes[draft.bridgeType]?draft.bridgeType:E.inferType(draft.members),loadPercent:validLoad(draft.loadPercent)?draft.loadPercent:100,wind:[0,12,28].includes(draft.wind)?draft.wind:0};}catch{return null;}}
@@ -66,9 +78,9 @@
     }else if(id!=='sandbox'&&state.challenge==='sandbox'){
       state.freeBuildDraft=captureDraft();const draft=validDraft(state.campaignDraft);if(draft)Object.assign(state,draft);else {state.members=E.starter('beam');state.bridgeType='custom';state.wind=0;}
     }
-    state.challenge=id;if(id!=='sandbox'){state.vehicle=P.challenges[id].vehicle;state.loadPercent=100;}
+    state.challenge=id;if(id!=='sandbox'){state.vehicle=P.challenges[id].vehicle;state.loadPercent=100;state.wind=P.challenges[id].wind??state.wind;}
     state.history=[];state.tool=E.roadComplete(state.members)?'wood':'road';resetView();refresh();
-    status(id==='sandbox'?'Free build: choose any vehicle. Your challenge bridge and progress are saved.':`Level ${P.levelIndex(id)+1}: ${E.vehicles[state.vehicle].name}. ${id==='first'?'Build supports for your car crossing.':'Keep your bridge and improve it for this heavier load.'}`);
+    status(id==='sandbox'?'Free build: choose any vehicle. Your challenge bridge and progress are saved.':`Level ${P.levelIndex(id)+1}: ${P.challenges[id].name}. ${P.challenges[id].text} See the design hints below the tools.`);
   }
   function updateHint(){if(busy()||state.mode==='result')return;if(state.selected)$('sceneHint').textContent='Choose the next point. Escape cancels.';else if(state.tool==='erase')$('sceneHint').textContent='Tap a piece to remove it. Undo brings it back.';else if(state.gaps.length)$('sceneHint').textContent='Road first: fill the highlighted gaps. Beams and cables support it.';else if(state.tool==='road')$('sceneHint').textContent='Road connected. Choose beams or cables to support the load.';else if(state.tool==='cable')$('sceneHint').textContent='Cable: connect two points. Cables pull; they go slack if compressed.';else $('sceneHint').textContent=`${E.materials[state.tool].name}: connect two points. Triangles help distribute the load.`;}
   function setTool(tool){if(busy())return;state.tool=tool;state.selected=null;refresh();}
@@ -93,11 +105,11 @@
   for(const id of['fromPoint','toPoint'])for(const p of points){const option=document.createElement('option');option.value=E.key(p);option.textContent=pointName(p);$(id).append(option);}$('fromPoint').value=E.key({x:E.LEFT,y:E.DECK});$('toPoint').value=E.key({x:E.LEFT+E.STEP,y:E.DECK});
   const readPoint=id=>{const [x,y]=$(id).value.split(',').map(Number);return {x,y};};
   $('connectBtn').onclick=()=>{if(state.tool==='erase')setTool('wood');addPiece(readPoint('fromPoint'),readPoint('toPoint'));};$('removeBtn').onclick=()=>removeBetween(readPoint('fromPoint'),readPoint('toPoint'));
-  for(const [key,v] of Object.entries(E.vehicles)){
-    const button=document.createElement('button');button.dataset.vehicle=key;button.setAttribute('aria-pressed','false');button.setAttribute('aria-label',`${v.name}, ${v.load} load units`);
+  for(const {key,level} of [...P.levels.map(level=>({key:level.vehicle,level})),...Object.keys(E.vehicles).map(key=>({key}))]){
+    const v=E.vehicles[key],button=document.createElement('button');button.dataset.vehicle=key;if(level)button.dataset.level=level.id;button.setAttribute('aria-pressed','false');button.setAttribute('aria-label',`${level?`Level ${P.levelIndex(level.id)+1}: ${level.name}, `:''}${v.name}, ${v.load} load units`);
     const thumb=document.createElement('canvas');thumb.width=240;thumb.height=88;thumb.setAttribute('aria-hidden','true');thumb.className='fleet-thumb';button.append(thumb);
-    const label=document.createElement('strong');label.textContent=v.name;button.append(label);const weight=document.createElement('small');weight.textContent=v.load+' load units';button.append(weight);const stage=document.createElement('span');stage.className='fleet-stage';button.append(stage);$('fleetChoices').append(button);
-    if(v.asset){images[key]=new Image();images[key].src='assets/'+v.asset;}
+    const label=document.createElement('strong');label.textContent=level?.name||v.name;button.append(label);const weight=document.createElement('small');weight.textContent=(level&&P.levelIndex(level.id)>=7?v.name+' · ':'')+v.load+' load units';button.append(weight);const stage=document.createElement('span');stage.className='fleet-stage';button.append(stage);$('fleetChoices').append(button);
+    if(v.asset&&!images[key]){images[key]=new Image();images[key].src='assets/'+v.asset;}
   }
   function paintFleet(){document.querySelectorAll('[data-vehicle]').forEach(button=>{
     const key=button.dataset.vehicle,v=E.vehicles[key],source=v.asset?images[key]:images.vehicles,s=v.asset?{x:0,y:0,w:source.naturalWidth,h:source.naturalHeight}:sprite[key],c=button.querySelector('canvas'),g=c.getContext('2d');g.clearRect(0,0,c.width,c.height);
@@ -105,13 +117,14 @@
   });}
   for(const source of Object.values(images))source.addEventListener('load',paintFleet);paintFleet();
   document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
-  document.querySelectorAll('[data-vehicle]').forEach(b=>b.onclick=()=>{if(busy())return;if(state.challenge!=='sandbox'){selectChallenge(P.levels.find(level=>level.vehicle===b.dataset.vehicle).id);return;}state.vehicle=b.dataset.vehicle;state.loadPercent=100;resetView();refresh();status(`Ready to test the ${E.vehicles[state.vehicle].name.toLowerCase()}.`);});
+  document.querySelectorAll('[data-vehicle]').forEach(b=>b.onclick=()=>{if(busy())return;if(b.dataset.level){selectChallenge(b.dataset.level);return;}state.vehicle=b.dataset.vehicle;state.loadPercent=100;resetView();refresh();status(`Ready to test the ${E.vehicles[state.vehicle].name.toLowerCase()}.`);});
   $('challenge').onchange=()=>selectChallenge($('challenge').value);
   $('nextChallengeBtn').onclick=()=>{if(state.nextChallenge)selectChallenge(state.nextChallenge,true);};
   $('wind').onchange=()=>{state.wind=Number($('wind').value);resetView();refresh();status('Wind changed. Keep your design and vehicle the same to compare conditions.');};
   $('undoBtn').onclick=()=>{if(state.history.length&&!busy()){const previous=state.history.pop();state.members=previous.members;state.bridgeType=previous.bridgeType;changed('Last design change undone.');}};
   $('newBridgeBtn').onclick=()=>{if(busy())return;remember();state.members=E.starter('beam');state.bridgeType='custom';state.tool='wood';resetView();refresh();status('Road-only deck ready. Add your own supports. Undo restores the previous bridge.');};
-  $('examplesBtn').onclick=()=>{openDialog('examplesDialog');drawExample();};$('exampleType').onchange=drawExample;
+  function showExamples(){const type=P.challenges[state.challenge].bridgeType;if(type)$('exampleType').value=type;openDialog('examplesDialog');drawExample();}
+  $('examplesBtn').onclick=showExamples;$('hintExamplesBtn').onclick=showExamples;$('exampleType').onchange=drawExample;
   function drawExample(){
     const type=$('exampleType').value,members=E.starter(type),c=$('exampleCanvas'),g=c.getContext('2d');g.clearRect(0,0,c.width,c.height);g.fillStyle='#77a4a2';g.fillRect(0,0,c.width,c.height);
     if(images.valley.complete&&images.valley.naturalWidth)g.drawImage(images.valley,0,0,1200,675);
@@ -122,6 +135,7 @@
     const nodes=new Map();for(const m of members)for(const p of [m.a,m.b])nodes.set(E.key(p),p);
     for(const p of nodes.values()){g.beginPath();g.arc(p.x,p.y,5,0,Math.PI*2);g.fillStyle='#dbbc76';g.fill();g.strokeStyle='#5e533a';g.lineWidth=2;g.stroke();}
     $('exampleName').textContent=E.bridgeTypes[type].name+' bridge';$('exampleTip').textContent=E.bridgeTypes[type].tip;c.setAttribute('aria-label',`Completed ${E.bridgeTypes[type].name.toLowerCase()} bridge example, view only. ${E.bridgeTypes[type].tip}`);
+    $('exampleSteps').replaceChildren();for(const hint of P.challenges[{truss:'efficientTruss',girder:'steelBeam',arch:'archCrossing',suspension:'cableCrossing'}[type]].hints){const item=document.createElement('li');item.textContent=hint;$('exampleSteps').append(item);}
   }
   images.valley.addEventListener('load',()=>{if($('examplesDialog').open)drawExample();});
   $('gridBtn').onclick=()=>{state.grid=!state.grid;$('gridBtn').setAttribute('aria-pressed',state.grid);};$('stressBtn').onclick=()=>{state.stress=!state.stress;$('stressBtn').setAttribute('aria-pressed',state.stress);if(state.stress&&!state.response)status('Stress colours appear during a test. Green is low; red is at the failure limit.');};
@@ -132,9 +146,8 @@
     const actualPoints=state.members.flatMap(m=>[m.a,m.b]);if(state.keyboard)actualPoints.push(state.cursor);if(state.selected)actualPoints.push(state.selected);
     const topY=Math.min(E.DECK-80,...actualPoints.map(p=>p.y)),bottomY=Math.max(E.DECK+24,...actualPoints.map(p=>p.y));
     const topPad=Math.max(window.innerWidth<=650?40:55,document.querySelector('.scene-top').offsetHeight+20),bottomPad=Math.max(35,document.querySelector('.scene-bottom').offsetHeight+22);
-    const overlayHeight=document.querySelector('.scene-top').offsetHeight+document.querySelector('.scene-bottom').offsetHeight+($('testMeter').hidden?70:$('testMeter').offsetHeight+40);
-    document.documentElement.style.setProperty('--meter-top',(document.querySelector('.scene-top').offsetHeight+(window.innerWidth<=650?20:32))+'px');
-    const available=window.innerHeight-(shell.getBoundingClientRect().top+window.scrollY)-dock.offsetHeight-bench.offsetHeight-$('fleetDock').offsetHeight-$('experimentBar').offsetHeight-$('resultCard').offsetHeight-45;
+    const overlayHeight=document.querySelector('.scene-top').offsetHeight+document.querySelector('.scene-bottom').offsetHeight+70;
+    const available=window.innerHeight-(shell.getBoundingClientRect().top+window.scrollY)-dock.offsetHeight-bench.offsetHeight-$('fleetDock').offsetHeight-$('experimentBar').offsetHeight-$('resultCard').offsetHeight-$('testMeter').offsetHeight-document.querySelector('.design-coach').offsetHeight-45;
     const geometryHeight=(bottomY-topY)*scale+topPad+bottomPad;
     const desired=Math.max(geometryHeight,overlayHeight,Math.min(width*.5625,Math.max(window.innerWidth<=650?260:235,available)));
     document.documentElement.style.setProperty('--scene-height',Math.round(desired)+'px');
@@ -168,12 +181,12 @@
     $('modeBadge').textContent='BRIDGE FAILED';$('sceneHint').textContent=reason==='gap'?'Road is missing at the highlighted section.':reason==='unstable'?'Part of the structure has no stable support.':reason==='sag'?'The road bent too far under the load.':'A beam reached its strength limit.';
   }
   function finish(pass){
-    state.mode='result';const c=challenges[state.challenge],cost=E.cost(state.members),budgetOk=cost<=c.budget,vehicleOk=!c.vehicle||c.vehicle===state.vehicle,loadOk=!c.minLoad||E.loadFor(state.vehicle,state.loadPercent)>=c.minLoad,typeOk=!c.bridgeType||E.matchesType(state.members,c.bridgeType),win=P.recordWin(state.progress,state.challenge,{pass,cost,vehicle:state.vehicle,loadPercent:state.loadPercent}),mission=state.challenge==='sandbox'?pass:win.earned;
+    state.mode='result';const c=challenges[state.challenge],cost=E.cost(state.members),budgetOk=cost<=c.budget,vehicleOk=!c.vehicle||c.vehicle===state.vehicle,loadOk=!c.minLoad||E.loadFor(state.vehicle,state.loadPercent)>=c.minLoad,typeOk=!c.bridgeType||E.matchesType(state.members,c.bridgeType),win=P.recordWin(state.progress,state.challenge,{pass,cost,vehicle:state.vehicle,loadPercent:state.loadPercent,designOk:typeOk,wind:state.wind}),mission=state.challenge==='sandbox'?pass:win.earned;
     state.progress=win.progress;state.nextChallenge=win.next;$('nextChallengeBtn').hidden=!win.next;$('nextChallengeBtn').textContent=win.next==='sandbox'?'Explore free build →':'Next challenge →';
     const stress=Number.isFinite(state.peakStress)?Math.round(state.peakStress*100):null,deflection=Number.isFinite(state.peakDeflection)?Math.round(state.peakDeflection*10)/10:null;
     const trial={id:Date.now(),campaignVersion:state.challenge==='sandbox'?undefined:P.VERSION,challenge:state.challenge,bridgeType:state.bridgeType,vehicle:state.vehicle,loadPercent:state.loadPercent,wind:state.wind,cost,pass,mission:state.challenge==='sandbox'?false:mission,reason:pass?'crossed':state.failedReason,stress,deflection,members:clone(state.members)};state.trials.push(trial);if(state.trials.length>40)state.trials.shift();state.lastTrial=trial;
-    const card=$('resultCard');card.classList.toggle('failed',!mission);$('resultIcon').textContent=mission?'✓':pass&&!budgetOk?'$':'!';$('resultKicker').textContent=mission?state.challenge==='sandbox'?'CROSSING COMPLETE':'CHALLENGE COMPLETE':pass&&!budgetOk?'OVER BUDGET · CHALLENGE NOT MET':pass?'CROSSING COMPLETE':'TEST SAVED';$('resultTitle').textContent=mission?win.next==='sandbox'?'All seven challenges complete!':'Your bridge held!':pass&&!budgetOk?'It crossed. Budget goal missed.':pass?'It crossed. Keep improving!':'Back to the drawing board.';
-    let feedback;if(pass)feedback=!budgetOk?`Crossing passed; budget goal failed. Build cost $${cost.toLocaleString()} / $${c.budget.toLocaleString()}: $${(cost-c.budget).toLocaleString()} over. Reduce the cost and cross again to complete this challenge.`:!vehicleOk?`Good crossing. This challenge needs the ${E.vehicles[c.vehicle].name.toLowerCase()}; try that vehicle next.`:!loadOk?`It crossed at ${loadLabel()}. This challenge needs at least ${c.minLoad} load units. Increase the load and test again.`:!typeOk?`It crossed. This challenge needs a ${E.bridgeTypes[c.bridgeType].name.toLowerCase()} structure. Load that starting design or add its supporting features.`:`The ${E.vehicles[state.vehicle].name.toLowerCase()} crossed at ${loadLabel()}. Peak stress: ${stress}%. ${win.next==='sandbox'?'You completed all seven challenges!':win.next?'Next up: '+E.vehicles[P.challenges[win.next].vehicle].name.toLowerCase()+'. Keep your bridge and strengthen it.':'Try another vehicle to compare.'}`;
+    const card=$('resultCard');card.classList.toggle('failed',!mission);$('resultIcon').textContent=mission?'✓':pass&&!budgetOk?'$':'!';$('resultKicker').textContent=mission?state.challenge==='sandbox'?'CROSSING COMPLETE':'CHALLENGE COMPLETE':pass&&!budgetOk?'OVER BUDGET · CHALLENGE NOT MET':pass?'CROSSING COMPLETE · DESIGN GOAL NOT MET':'TEST SAVED';$('resultTitle').textContent=mission?win.next==='sandbox'?`All ${P.levels.length} challenges complete!`:'Your bridge held!':pass&&!budgetOk?'It crossed. Budget goal missed.':pass?'It crossed. Keep improving!':'Back to the drawing board.';
+    let feedback;if(pass)feedback=!budgetOk?`Crossing passed; budget goal failed. Build cost $${cost.toLocaleString()} / $${c.budget.toLocaleString()}: $${(cost-c.budget).toLocaleString()} over. Reduce the cost and cross again to complete this challenge.`:!vehicleOk?`Good crossing. This challenge needs the ${E.vehicles[c.vehicle].name.toLowerCase()}; try that vehicle next.`:!loadOk?`It crossed at ${loadLabel()}. This challenge needs at least ${c.minLoad} load units. Increase the load and test again.`:!typeOk?`It crossed, but this mission needs a ${E.bridgeTypes[c.bridgeType].name.toLowerCase()} structure. ${c.hints[0]} Use the design hints and view-only example to improve your own bridge.`:`The ${E.vehicles[state.vehicle].name.toLowerCase()} crossed at ${loadLabel()}. Peak stress: ${stress}%. ${win.next==='sandbox'?`You completed all ${P.levels.length} challenges!`:win.next?'Next up: '+P.challenges[win.next].name+'. Your bridge carries over; check the new design goal.':'Try another vehicle to compare.'}`;
     else if(state.failedReason==='gap'){const gap=state.gapHit||state.gaps[0];feedback=`Road is missing${gap?' between points '+gap.section+' and '+(gap.section+1):''}. Choose Road and connect the highlighted points. Wood and steel beams provide bracing; they are not the driving surface.`;}
     else if(state.failedReason==='unstable')feedback='Connect every part of your structure to a supported bridge. Separate pieces cannot carry the load.';
     else if(state.failedReason==='sag')feedback='The deck bent too far. Add triangular bracing to give the load another path to the banks.';

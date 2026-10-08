@@ -4,8 +4,9 @@ const road=E.starter('beam'),truss=E.starter('truss'),steel=truss.map(m=>m.type=
 const reinforced=truss.map(m=>m.type==='wood'&&(m.a.x===E.LEFT||m.b.x===E.RIGHT||(m.a.y===166&&m.b.y===166))?{...m,type:'steel'}:m);
 const fresh=P.bootstrap(null,road);
 assert.equal(fresh.challenge,'first');assert.equal(fresh.vehicle,'car');assert.deepEqual(fresh.members,road);assert.equal(fresh.progress.completed,0);
-assert.deepEqual(P.levels.map(l=>l.vehicle),['car','truck','trailer','bus','semi','tanker','tank']);
-assert(P.levels.every((l,i)=>!i||E.vehicles[l.vehicle].load>E.vehicles[P.levels[i-1].vehicle].load),'Each level must use a heavier vehicle');
+assert.deepEqual(P.levels.slice(0,7).map(l=>l.vehicle),['car','truck','trailer','bus','semi','tanker','tank']);
+assert(P.levels.slice(0,7).every((l,i)=>!i||E.vehicles[l.vehicle].load>E.vehicles[P.levels[i-1].vehicle].load),'The original vehicle levels stay in order');
+assert.equal(P.levels.length,12);assert(P.levels.every(l=>l.hints.length===3));
 const p=P.readProgress();
 assert(P.isUnlocked('first',p)&&!P.isUnlocked('supply',p)&&!P.isUnlocked('tankTrial',p));
 assert(P.isUnlocked('sandbox',p));
@@ -19,15 +20,30 @@ assert(!attempt('first',{cost:NaN}).earned&&!attempt('first',{cost:-1}).earned,'
 assert(!attempt('heavy').earned&&!attempt('sandbox').earned,'Locked levels and Free build cannot unlock progress');
 let progress=p;
 for(const level of P.levels){
-  const members=['car','truck'].includes(level.vehicle)?truss:['trailer','bus'].includes(level.vehicle)?reinforced:steel;
-  const result=E.scan(members,level.vehicle);
+  const members=level.bridgeType?E.starter(level.bridgeType):['car','truck'].includes(level.vehicle)?truss:['trailer','bus'].includes(level.vehicle)?reinforced:steel;
+  const result=E.scan(members,level.vehicle,level.wind||0),designOk=!level.bridgeType||E.matchesType(members,level.bridgeType);
   assert(result.pass&&result.cost<=level.budget,'Every level must be achievable with a student-built design within budget: '+level.vehicle);
-  const win=P.recordWin(progress,level.id,{...result,vehicle:level.vehicle,loadPercent:100});
+  assert(designOk,'The achievable design must meet the structural goal: '+level.id);
+  const run={...result,vehicle:level.vehicle,loadPercent:100,designOk,wind:level.wind||0};
+  if(level.bridgeType)assert(!P.recordWin(progress,level.id,{...run,designOk:false}).earned,'A successful crossing with the wrong structure must not advance');
+  if(level.wind!==undefined)assert(!P.recordWin(progress,level.id,{...run,wind:level.wind===0?28:0}).earned,'A different wind cannot earn a fixed-wind mission');
+  const win=P.recordWin(progress,level.id,run);
   assert(win.earned);assert.equal(win.progress.completed,P.levelIndex(level.id)+1);assert.equal(win.next,P.nextFor(level.id));progress=win.progress;
 }
-assert.equal(progress.completed,7);assert.equal(P.nextFor('tankTrial'),'sandbox');
+assert.equal(progress.completed,12);assert.equal(P.nextFor('tankTrial'),'efficientTruss');assert.equal(P.nextFor('stormCrossing'),'sandbox');
 const replay=P.recordWin(progress,'first',{pass:true,vehicle:'car',loadPercent:100,cost:961});
-assert(replay.earned&&replay.progress.completed===7,'Replaying a completed level must not duplicate progress');
+assert(replay.earned&&replay.progress.completed===12,'Replaying a completed level must not duplicate progress');
+assert.equal(P.readProgress({version:1,completed:7}).completed,7,'The previous seven-level completion is preserved');
+assert(P.isUnlocked('efficientTruss',{version:1,completed:7})&&!P.isUnlocked('steelBeam',{version:1,completed:7}),'Existing players can continue into the new missions');
+const previousFinisher=P.bootstrap({members:steel,challenge:'sandbox',vehicle:'tank',wind:0,progress:{version:1,completed:7}},road);
+assert.equal(previousFinisher.progress.completed,7);assert.deepEqual(previousFinisher.members,steel);
+const storm=P.bootstrap({members:steel,challenge:'stormCrossing',vehicle:'tank',wind:0,progress:{version:1,completed:11}},road);
+assert.equal(storm.wind,28,'The final mission restores its fixed gusty wind');
+const decorativeLower=[...truss,{type:'steel',a:{x:E.LEFT+E.STEP,y:E.DECK+E.STEP},b:{x:E.LEFT+2*E.STEP,y:E.DECK+E.STEP}}];
+assert(!E.matchesType(decorativeLower,'girder'),'One disconnected lower beam is not a beam frame');
+const disconnectedArch=[...truss,{type:'steel',a:{x:E.LEFT+3*E.STEP,y:E.DECK-E.STEP},b:{x:E.LEFT+3*E.STEP,y:E.DECK-2*E.STEP}}];
+assert(!E.matchesType(disconnectedArch,'arch'),'One raised piece is not a bank-to-bank steel arch');
+assert(!E.matchesType(E.starter('suspension').filter(m=>m.type!=='cable'||m.a.x!==m.b.x),'suspension'),'Backstays alone cannot replace suspension hangers');
 assert.equal(P.readProgress({version:1,completed:999}).completed,0);
 assert.equal(P.readProgress({version:1,completed:1.5}).completed,0);
 const old={members:steel,challenge:'tankTrial',vehicle:'tank',loadPercent:100,wind:12,trials:[{pass:true,mission:true}]};
