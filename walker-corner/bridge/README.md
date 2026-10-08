@@ -55,3 +55,11 @@ Run `node verification/progression.test.js` to verify sequential gating, budget 
 ## Design guidance and test readings
 
 Peak stress, its colour legend and the taut/slack cable count sit in a wrapping strip outside the canvas, directly below the scene. They remain visible after a test and never cover the bridge or vehicle. Each mission has a visible design hint and two more tips in an expandable panel below the construction tools. View-only examples add build-order suggestions and an expandable explanation of triangles, frame depth, tension/compression and shared joints. No example can be loaded into a player’s bridge.
+
+## Canyon workspace and placement
+
+The larger canvas uses the available space above the building tools. Bigger view expands the canyon to the window with materials and test controls kept below it. Returning to the page restores the scroll position. Smooth zoom ranges from 100% to 400%, with pinch, +/−, Fit and Ctrl+wheel support. Two fingers move the view; Pan mode enables a one-finger or mouse drag. Gesture releases and cancelled touches never place pieces. Zoom and pan survive resizing, and the bridge and earned levels use the existing save format.
+
+Bright grid points mark possible endpoints, a dotted local example numbers its two taps, and selecting a start point highlights valid destinations. The live preview shows the selected material and cost, or explains an invalid connection. Examples remain view-only. Escape cancels a selected endpoint before closing Bigger view.
+
+Run `node verification/canyon.test.cjs` with Playwright installed to check the six required screen sizes, real touch pinch, panning, zoomed placement and erasing, saved designs, large text and a crossing that advances the journey. `BRIDGE_SCREENSHOTS=1` saves rendered screenshots. Optional `BRIDGE_BROWSER_PATH` and `BRIDGE_CHROMIUM_MODULE` support an externally supplied Chromium runtime.

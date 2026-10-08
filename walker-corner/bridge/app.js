@@ -32,7 +32,8 @@
   state.wind=[0,12,28].includes(state.wind)?state.wind:0;
   const loadLabel=()=>`${E.loadFor(state.vehicle,state.loadPercent)} load units${state.loadPercent===100?'':` (saved ${state.loadPercent}% load)`}`;
   const sprite={car:{x:413,y:12,w:707,h:305},truck:{x:265,y:315,w:965,h:343},bus:{x:185,y:660,w:1165,h:354}};
-  let width=1000,height=450,scale=1,ox=0,oy=0,dpr=1,resizeFrame=0,statusTimer=0,assetWarning=false;
+  let width=0,height=0,scale=1,baseScale=1,ox=0,oy=0,dpr=1,resizeFrame=0,statusTimer=0,assetWarning=false;
+  state.zoom=1;state.pan=false;state.guides=true;state.expanded=false;
   const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
   const busy=()=>state.mode==='testing'||state.mode==='fall';
   function persist(){try{localStorage.setItem(STORE,JSON.stringify({members:state.members,bridgeType:state.bridgeType,challenge:state.challenge,vehicle:state.vehicle,loadPercent:state.loadPercent,wind:state.wind,trials:state.trials,progress:state.progress,campaignDraft:state.campaignDraft,freeBuildDraft:state.freeBuildDraft,reflection:$('reflection').value}));}catch{status('Browser storage is unavailable. Use Save bridge or Export trials to keep your work.');}}
@@ -83,8 +84,8 @@
     state.history=[];state.tool=E.roadComplete(state.members)?'wood':'road';resetView();refresh();
     status(id==='sandbox'?'Free build: choose any vehicle. Your challenge bridge and progress are saved.':`Level ${P.levelIndex(id)+1}: ${P.challenges[id].name}. ${P.challenges[id].text} See the design hints below the tools.`);
   }
-  function updateHint(){if(busy()||state.mode==='result')return;if(state.selected)$('sceneHint').textContent='Choose the next point. Escape cancels.';else if(state.tool==='erase')$('sceneHint').textContent='Tap a piece to remove it. Undo brings it back.';else if(state.gaps.length)$('sceneHint').textContent='Road first: fill the highlighted gaps. Beams and cables support it.';else if(state.tool==='road')$('sceneHint').textContent='Road connected. Choose beams or cables to support the load.';else if(state.tool==='cable')$('sceneHint').textContent='Cable: connect two points. Cables pull; they go slack if compressed.';else $('sceneHint').textContent=`${E.materials[state.tool].name}: connect two points. Triangles help distribute the load.`;}
-  function setTool(tool){if(busy())return;state.tool=tool;state.selected=null;refresh();}
+  function updateHint(){if(busy()||state.mode==='result')return;if(state.pan)$('sceneHint').textContent='Move view: drag the canyon. Switch ↔ off to place pieces.';else if(state.selected)$('sceneHint').textContent=`Start: ${pointName(state.selected)}. Tap a bright point to finish. Escape cancels.`;else if(state.tool==='erase')$('sceneHint').textContent='Tap a piece to remove it. Undo brings it back.';else if(state.gaps.length)$('sceneHint').textContent='Road first: tap the two highlighted points in a gap.';else if(state.tool==='road')$('sceneHint').textContent='Road connected. Choose Wood or Steel to add supports.';else if(state.tool==='cable')$('sceneHint').textContent='Cable: tap two points. Cables pull; use Steel for the towers.';else $('sceneHint').textContent=`${E.materials[state.tool].name}: tap a grid point, then another. Diagonals make triangles.`;}
+  function setTool(tool){if(busy())return;state.tool=tool;state.selected=null;state.pan=false;$('panBtn').setAttribute('aria-pressed','false');canvas.classList.remove('panning');refresh();}
   function changed(text){state.response=null;state.display=[];$('resultCard').hidden=true;if(state.mode==='result')resetView();state.selected=null;refresh();status(text);}
   function addPiece(a,b){
     if(busy())return;if(E.key(a)===E.key(b)){state.selected=null;updateHint();return;}
@@ -140,33 +141,62 @@
   }
   images.valley.addEventListener('load',()=>{if($('examplesDialog').open)drawExample();});
   $('gridBtn').onclick=()=>{state.grid=!state.grid;$('gridBtn').setAttribute('aria-pressed',state.grid);};$('stressBtn').onclick=()=>{state.stress=!state.stress;$('stressBtn').setAttribute('aria-pressed',state.stress);if(state.stress&&!state.response)status('Stress colours appear during a test. Green is low; red is at the failure limit.');};
-  $('zoomBtn').onclick=()=>{state.zoom=!state.zoom;$('zoomBtn').textContent=state.zoom?'−':'＋';$('zoomBtn').setAttribute('aria-label',state.zoom?'Show whole canyon':'Zoom construction grid');resize();};
-  function resize(){
-    const scene=$('scene'),shell=document.querySelector('.workspace'),dock=document.querySelector('.build-dock'),bench=document.querySelector('.workbench');
-    width=scene.clientWidth;scale=width/(state.zoom?850:1200);
-    const actualPoints=state.members.flatMap(m=>[m.a,m.b]);if(state.keyboard)actualPoints.push(state.cursor);if(state.selected)actualPoints.push(state.selected);
-    const topY=Math.min(E.DECK-80,...actualPoints.map(p=>p.y)),bottomY=Math.max(E.DECK+24,...actualPoints.map(p=>p.y));
-    const topPad=Math.max(window.innerWidth<=650?40:55,document.querySelector('.scene-top').offsetHeight+20),bottomPad=Math.max(35,document.querySelector('.scene-bottom').offsetHeight+22);
-    const overlayHeight=document.querySelector('.scene-top').offsetHeight+document.querySelector('.scene-bottom').offsetHeight+70;
-    const available=window.innerHeight-(shell.getBoundingClientRect().top+window.scrollY)-dock.offsetHeight-bench.offsetHeight-$('fleetDock').offsetHeight-$('experimentBar').offsetHeight-$('resultCard').offsetHeight-$('testMeter').offsetHeight-document.querySelector('.design-coach').offsetHeight-45;
-    const geometryHeight=(bottomY-topY)*scale+topPad+bottomPad;
-    const desired=Math.max(geometryHeight,overlayHeight,Math.min(width*.5625,Math.max(window.innerWidth<=650?260:235,available)));
-    document.documentElement.style.setProperty('--scene-height',Math.round(desired)+'px');
-    height=scene.clientHeight;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);
-    ox=(width-1200*scale)/2;const minY=topPad-topY*scale,maxY=height-bottomPad-bottomY*scale;oy=Math.max(minY,Math.min(maxY,Math.min(0,height*.45-E.DECK*scale)));
-
+  function constrainCamera(){
+    ox=1200*scale>width?Math.max(width-1200*scale,Math.min(0,ox)):(width-1200*scale)/2;
+    oy=675*scale>height?Math.max(height-675*scale,Math.min(0,oy)):(height-675*scale)/2;
+    $('zoomLevel').textContent=Math.round(state.zoom*100)+'%';$('zoomOutBtn').disabled=state.zoom<=1.001;$('zoomBtn').disabled=state.zoom>=3.999;
   }
-  window.addEventListener('resize',()=>{cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(resize);});new ResizeObserver(()=>{if(width!==$('scene').clientWidth||height!==$('scene').clientHeight)resize();}).observe($('scene'));document.fonts?.ready.then(resize);
+  function fitCamera(){state.zoom=1;scale=baseScale;ox=(width-1200*scale)/2;oy=height*.46-E.DECK*scale;constrainCamera();}
+  function zoomAt(zoom,x=width/2,y=height/2){const anchor={x:(x-ox)/scale,y:(y-oy)/scale};state.zoom=Math.max(1,Math.min(4,zoom));scale=baseScale*state.zoom;ox=x-anchor.x*scale;oy=y-anchor.y*scale;constrainCamera();}
+  $('zoomBtn').onclick=()=>zoomAt(state.zoom*1.25);$('zoomOutBtn').onclick=()=>zoomAt(state.zoom/1.25);$('fitBtn').onclick=()=>{fitCamera();status('Bridge fitted to the canyon. Pinch or press + to see the joints closer.');};
+  $('panBtn').onclick=()=>{state.pan=!state.pan;state.hover=null;$('panBtn').setAttribute('aria-pressed',state.pan);canvas.classList.toggle('panning',state.pan);updateHint();};
+  $('guideBtn').onclick=()=>{state.guides=!state.guides;$('guideBtn').setAttribute('aria-pressed',state.guides);status(state.guides?'Placement guide on: the dotted piece is one possible next step. Tap its numbered points to build it yourself.':'Placement guide off. Build your own design.');};
+  let pageScroll=0;
+  function expandWorkspace(expand){state.expanded=expand;const shell=document.querySelector('.workspace');if(expand)pageScroll=window.scrollY;shell.classList.toggle('expanded',expand);document.body.classList.toggle('canyon-expanded',expand);$('expandBtn').setAttribute('aria-pressed',expand);$('expandBtn').setAttribute('aria-label',expand?'Return to page':'Expand canyon workspace');$('expandBtn').querySelector('span').textContent=expand?'Back to page':'Bigger view';resize();if(!expand)window.scrollTo(0,pageScroll);}
+  $('expandBtn').onclick=()=>expandWorkspace(!state.expanded);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&state.expanded&&!state.selected&&!document.querySelector('dialog[open]'))expandWorkspace(false);});
+  function resize(){
+    const scene=$('scene'),dock=document.querySelector('.build-dock'),oldWidth=width,oldHeight=height,center={x:(width/2-ox)/scale,y:(height/2-oy)/scale};
+    width=scene.clientWidth;const narrow=width<=650,topPad=document.querySelector('.scene-top').offsetHeight+22,bottomPad=Math.max(46,document.querySelector('.scene-bottom').offsetHeight+24);
+    const available=window.innerHeight-(scene.getBoundingClientRect().top+window.scrollY)-dock.offsetHeight-20;
+    const geometryHeight=4*E.STEP*width/(narrow?900:1200)+topPad+bottomPad;
+    const desired=state.expanded?Math.max(140,window.innerHeight-document.querySelector('.viewport-bar').offsetHeight-dock.offsetHeight-$('testMeter').offsetHeight-$('resultCard').offsetHeight-2):Math.max(narrow?310:320,geometryHeight,Math.min(width*.66,available));
+    document.documentElement.style.setProperty('--scene-height',Math.round(desired)+'px');height=scene.clientHeight;
+    baseScale=Math.min(width/(narrow?900:1200),Math.max(40,height-topPad-bottomPad)/(4*E.STEP));
+    dpr=Math.min(devicePixelRatio||1,2);if(canvas.width!==Math.round(width*dpr))canvas.width=Math.round(width*dpr);if(canvas.height!==Math.round(height*dpr))canvas.height=Math.round(height*dpr);
+    if(!oldWidth||state.zoom===1)fitCamera();else {scale=baseScale*state.zoom;ox=width/2-center.x*scale;oy=height/2-center.y*scale;constrainCamera();}
+    if(oldWidth!==width||oldHeight!==height)state.hover=null;
+  }
+  function scheduleResize(){cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(resize);}
+  window.addEventListener('resize',scheduleResize);new ResizeObserver(scheduleResize).observe(document.querySelector('.workspace'));document.fonts?.ready.then(resize);
   function position(event){const r=canvas.getBoundingClientRect();return {x:(event.clientX-r.left-ox)/scale,y:(event.clientY-r.top-oy)/scale};}
   function nearest(p){const x=Math.max(E.LEFT,Math.min(E.RIGHT,E.LEFT+Math.round((p.x-E.LEFT)/E.STEP)*E.STEP)),y=Math.max(E.DECK-2*E.STEP,Math.min(E.DECK+2*E.STEP,E.DECK+Math.round((p.y-E.DECK)/E.STEP)*E.STEP));return Math.hypot((p.x-x)*scale,(p.y-y)*scale)<=Math.max(24,E.STEP*scale*.45)?{x,y}:null;}
   function nearestMember(p){let index=-1,distance=18/scale;state.members.forEach((m,i)=>{const dx=m.b.x-m.a.x,dy=m.b.y-m.a.y,t=Math.max(0,Math.min(1,((p.x-m.a.x)*dx+(p.y-m.a.y)*dy)/(dx*dx+dy*dy))),d=Math.hypot(p.x-m.a.x-t*dx,p.y-m.a.y-t*dy);if(d<distance){distance=d;index=i;}});return index;}
-  canvas.addEventListener('pointermove',e=>{if(!busy()){state.hover=nearest(position(e));state.keyboard=false;}});canvas.addEventListener('pointerleave',()=>state.hover=null);
-  canvas.addEventListener('pointerdown',e=>{if(busy())return;e.preventDefault();canvas.focus({preventScroll:true});state.keyboard=false;const p=position(e);if(state.mode==='result')resetView();if(state.tool==='erase'){const i=nearestMember(p);if(i>=0)removeAt(i);else status('Tap close to a beam to erase it.');}else {const n=nearest(p);if(n)choosePoint(n);else status('Choose a construction grid point. Zoom in or use the point controls below.');}});
+  const pointers=new Map();let gesture=null;
+  function localPoint(e){const r=canvas.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
+  function beginGesture(){
+    const ps=[...pointers.values()];if(ps.length>=2){for(const p of ps)p.suppress=true;const a=ps[0],b=ps[1],mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};gesture={distance:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)),zoom:state.zoom,anchor:{x:(mid.x-ox)/scale,y:(mid.y-oy)/scale}};state.hover=null;}else gesture=null;
+  }
+  canvas.addEventListener('pointerdown',e=>{if(e.button!==0&&e.button!==1)return;e.preventDefault();canvas.focus({preventScroll:true});state.keyboard=false;const p=localPoint(e);pointers.set(e.pointerId,{...p,startX:p.x,startY:p.y,ox,oy,pan:state.pan||e.button===1||busy(),suppress:false});try{canvas.setPointerCapture(e.pointerId);}catch{}beginGesture();});
+  canvas.addEventListener('pointermove',e=>{
+    const p=pointers.get(e.pointerId),at=localPoint(e);if(p){Object.assign(p,at);if(Math.hypot(p.x-p.startX,p.y-p.startY)>8)p.suppress=true;
+      if(gesture&&pointers.size>=2){const[a,b]=[...pointers.values()],mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};state.zoom=Math.max(1,Math.min(4,gesture.zoom*Math.hypot(a.x-b.x,a.y-b.y)/gesture.distance));scale=baseScale*state.zoom;ox=mid.x-gesture.anchor.x*scale;oy=mid.y-gesture.anchor.y*scale;constrainCamera();return;}
+      if(p.pan||p.suppress){ox=p.ox+p.x-p.startX;oy=p.oy+p.y-p.startY;constrainCamera();state.hover=null;return;}
+    }
+    if(!busy()&&!state.pan){state.hover=nearest(position(e));state.keyboard=false;}
+  });
+  function releasePointer(e,cancelled=false){const p=pointers.get(e.pointerId);if(!p)return;const tap=!cancelled&&!p.suppress&&!p.pan&&pointers.size===1;pointers.delete(e.pointerId);try{canvas.releasePointerCapture(e.pointerId);}catch{}
+    for(const remaining of pointers.values()){remaining.suppress=true;remaining.startX=remaining.x;remaining.startY=remaining.y;remaining.ox=ox;remaining.oy=oy;}beginGesture();
+    if(!tap||busy())return;const at=position(e);if(state.mode==='result')resetView();if(state.tool==='erase'){const i=nearestMember(at);if(i>=0)removeAt(i);else status('Tap close to a beam to erase it.');}else {const n=nearest(at);if(n){state.hover=n;choosePoint(n);}else status('Tap a bright grid point. Pinch to zoom in, or press +.');}
+  }
+  canvas.addEventListener('pointerup',e=>releasePointer(e));canvas.addEventListener('pointercancel',e=>releasePointer(e,true));canvas.addEventListener('lostpointercapture',e=>releasePointer(e,true));canvas.addEventListener('pointerleave',()=>{if(!pointers.size)state.hover=null;});
+  canvas.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();const p=localPoint(e);zoomAt(state.zoom*Math.exp(-e.deltaY*.008),p.x,p.y);},{passive:false});
+  function revealPoint(p){const x=ox+p.x*scale,y=oy+p.y*scale,pad=38;if(x<pad)ox+=pad-x;if(x>width-pad)ox-=x-width+pad;if(y<pad)oy+=pad-y;if(y>height-pad)oy-=y-height+pad;constrainCamera();}
   canvas.addEventListener('keydown',e=>{
     if(busy())return;const moves={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
-    if(moves[e.key]){e.preventDefault();state.keyboard=true;const [x,y]=moves[e.key];state.cursor.x=Math.max(E.LEFT,Math.min(E.RIGHT,state.cursor.x+x*E.STEP));state.cursor.y=Math.max(E.DECK-2*E.STEP,Math.min(E.DECK+2*E.STEP,state.cursor.y+y*E.STEP));state.hover=state.cursor;resize();status(`Point ${pointName(state.cursor)}${state.selected?'. Enter connects.':'. Enter starts a piece.'}`);}
+    if(moves[e.key]){e.preventDefault();state.keyboard=true;const [x,y]=moves[e.key];state.cursor.x=Math.max(E.LEFT,Math.min(E.RIGHT,state.cursor.x+x*E.STEP));state.cursor.y=Math.max(E.DECK-2*E.STEP,Math.min(E.DECK+2*E.STEP,state.cursor.y+y*E.STEP));state.hover=state.cursor;revealPoint(state.cursor);status(`Point ${pointName(state.cursor)}${state.selected?'. Enter connects.':'. Enter starts a piece.'}`);}
     else if(e.key==='Enter'||e.key===' '){e.preventDefault();state.keyboard=true;choosePoint(state.cursor);}
-    else if(e.key==='Escape'){state.selected=null;updateHint();status('Connection cancelled.');}
+    else if(e.key==='Escape'){const hadSelection=Boolean(state.selected);state.selected=null;updateHint();status('Connection cancelled.');if(hadSelection)e.stopPropagation();}
     else if(['1','2','3','4','5'].includes(e.key)){e.preventDefault();setTool(['road','wood','steel','erase','cable'][Number(e.key)-1]);}
     else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();const i=nearestMember(state.cursor);if(i>=0)removeAt(i);}
   });
@@ -227,14 +257,37 @@
   }
   function drawVehicle(x,y,angle=0){const v=E.vehicles[state.vehicle],source=v.asset?images[state.vehicle]:images.vehicles,s=v.asset?{x:0,y:0,w:source.naturalWidth,h:source.naturalHeight}:sprite[state.vehicle],h=v.width*(s.h||1)/(s.w||1);ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.shadowColor='#17372b80';ctx.shadowBlur=7;ctx.shadowOffsetY=4;if(source.complete&&source.naturalWidth)ctx.drawImage(source,s.x,s.y,s.w,s.h,-v.width/2,-h+2,v.width,h);else{ctx.fillStyle='#dfae38';ctx.fillRect(-v.width/2,-30,v.width,24);ctx.fillStyle='#273932';for(const [offset] of E.axlesFor(state.vehicle)){ctx.beginPath();ctx.arc(offset,-2,8,0,Math.PI*2);ctx.fill();}}ctx.restore();}
   function roadY(x){if(x<E.LEFT||x>E.RIGHT||!state.model||!state.display.length)return E.DECK;const i=Math.max(0,Math.min(7,Math.floor((x-E.LEFT)/E.STEP))),a=drawPoint({x:E.LEFT+i*E.STEP,y:E.DECK}),b=drawPoint({x:E.LEFT+(i+1)*E.STEP,y:E.DECK});return a.y+(b.y-a.y)*(x-a.x)/E.STEP;}
+  function connectionAllowed(a,b){
+    if(!a||!b||E.key(a)===E.key(b)||Math.hypot(b.x-a.x,b.y-a.y)>E.STEP*3.01)return false;
+    if(state.tool==='road'&&(a.y!==E.DECK||b.y!==E.DECK||Math.abs(a.x-b.x)!==E.STEP))return false;
+    return !state.members.some(m=>((E.key(m.a)===E.key(a)&&E.key(m.b)===E.key(b))||(E.key(m.b)===E.key(a)&&E.key(m.a)===E.key(b)))&&(state.tool!=='road'||m.type==='road'));
+  }
+  function placementGuide(){
+    if(!state.guides||state.selected||state.pan||state.tool==='erase')return null;
+    if(state.tool==='road')return state.gaps[0]||null;
+    const below=P.challenges[state.challenge].bridgeType==='girder',row=E.DECK+(below?E.STEP:-E.STEP);
+    // A local triangle demonstrates placement; it does not prescribe a complete bridge.
+    for(const [bank,inner]of [[E.LEFT,E.LEFT+E.STEP],[E.RIGHT,E.RIGHT-E.STEP]]){
+      const a={x:bank,y:E.DECK},b={x:inner,y:row},c={x:inner,y:E.DECK};
+      if(state.tool==='cable'){const top={x:inner,y:E.DECK-2*E.STEP};if(connectionAllowed(a,top))return {a,b:top,label:'Cable pulls · brace the tower with Steel'};}
+      else for(const [from,to]of [[a,b],[b,c]])if(connectionAllowed(from,to))return {a:from,b:to,triangle:[a,b,c],label:'Try a diagonal · close the triangle'};
+    }
+    return null;
+  }
+  function cuePoint(p,number,color='#ffe4a0'){
+    ctx.beginPath();ctx.arc(p.x,p.y,11/scale,0,Math.PI*2);ctx.fillStyle='#183c32';ctx.fill();ctx.strokeStyle=color;ctx.lineWidth=2/scale;ctx.stroke();ctx.fillStyle=color;ctx.font=`900 ${12/scale}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(number,p.x,p.y);
+  }
+  function pieceLabel(a,b,text,color='#243b37'){
+    ctx.save();ctx.font=`800 ${11/scale}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';const w=ctx.measureText(text).width+16/scale,x=(a.x+b.x)/2,y=(a.y+b.y)/2-24/scale;ctx.fillStyle='#faf7eef2';ctx.fillRect(x-w/2,y-11/scale,w,22/scale);ctx.fillStyle=color;ctx.fillText(text,x,y);ctx.restore();
+  }
   function draw(){
     ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);ctx.fillStyle='#629796';ctx.fillRect(0,0,width,height);ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);ctx.lineCap='round';ctx.lineJoin='round';
     if(images.valley.complete&&images.valley.naturalWidth)ctx.drawImage(images.valley,0,0,1200,675);else{const g=ctx.createLinearGradient(0,0,0,675);g.addColorStop(0,'#accdd6');g.addColorStop(.6,'#62998b');g.addColorStop(1,'#315e58');ctx.fillStyle=g;ctx.fillRect(0,0,1200,675);}
     // A narrow approach joins the painted roads exactly to the fixed anchors.
     for(const [a,b]of[[{x:0,y:E.DECK},{x:E.LEFT,y:E.DECK}],[{x:E.RIGHT,y:E.DECK},{x:1200,y:E.DECK}]]){line(a,b,'#766452',11);line({x:a.x,y:a.y-2},{x:b.x,y:b.y-2},'#d5c5a0',3);}
-    if(state.grid&&state.mode==='build'){
+    if((state.grid||state.selected||state.guides)&&state.mode==='build'&&!state.pan){
       ctx.save();line({x:E.LEFT,y:E.DECK},{x:E.RIGHT,y:E.DECK},'#f6e4ab90',1.5,[6,7]);
-      for(const p of points){const occupied=state.members.some(m=>E.key(m.a)===E.key(p)||E.key(m.b)===E.key(p));if(!occupied){ctx.beginPath();ctx.arc(p.x,p.y,2.5/Math.max(.7,scale),0,Math.PI*2);ctx.fillStyle='#fff4ce85';ctx.fill();}}ctx.restore();
+      for(const p of points){const bright=state.selected?connectionAllowed(state.selected,p):state.tool!=='road'||p.y===E.DECK;ctx.beginPath();ctx.arc(p.x,p.y,(bright?5:2.5)/scale,0,Math.PI*2);ctx.fillStyle=bright?'#fff0bfe6':'#fff4ce55';ctx.fill();if(bright){ctx.strokeStyle='#234a3adb';ctx.lineWidth=1.5/scale;ctx.stroke();}}ctx.restore();
     }
     const debrisIndices=new Set(state.debris.map(d=>d.index));
     // Draw supports, then the road, so the driving surface remains visible.
@@ -248,8 +301,13 @@
       ctx.save();ctx.font=`800 ${12/scale}px "Nunito Sans",system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';const w=ctx.measureText(label).width+14/scale;ctx.fillStyle='#fff0cdef';ctx.fillRect(x-w/2,y-11/scale,w,22/scale);ctx.fillStyle='#813c25';ctx.fillText(label,x,y);ctx.restore();
     }
     if(state.mode==='build'){
-      if(state.selected&&state.hover&&E.key(state.selected)!==E.key(state.hover))beam({type:state.tool==='erase'?'wood':state.tool},state.selected,state.hover,-1,true);
+      const guide=placementGuide();if(guide){if(guide.triangle){const[a,b,c]=guide.triangle;line(a,b,'#ffe4a070',2/scale,[6/scale,6/scale]);line(b,c,'#ffe4a070',2/scale,[6/scale,6/scale]);line(c,a,'#ffe4a070',2/scale,[6/scale,6/scale]);}line(guide.a,guide.b,'#ffe4a0',3/scale,[7/scale,5/scale]);cuePoint(guide.a,'1');cuePoint(guide.b,'2');if(width>650)pieceLabel(guide.a,guide.b,guide.label||'Tap 1, then 2 · add Road');}
+      if(state.selected&&state.hover&&E.key(state.selected)!==E.key(state.hover)&&state.tool!=='erase'){
+        const valid=connectionAllowed(state.selected,state.hover);if(valid)beam({type:state.tool},state.selected,state.hover,-1,true);else line(state.selected,state.hover,'#ff896c',3/scale,[6/scale,5/scale]);
+        const label=valid?`${E.materials[state.tool].name} · $${E.cost([{type:state.tool,a:state.selected,b:state.hover}])}`:state.tool==='road'?'Road: neighbouring points on the road line':Math.hypot(state.selected.x-state.hover.x,state.selected.y-state.hover.y)>E.STEP*3.01?'Too far · use shorter pieces':'Already joined';pieceLabel(state.selected,state.hover,label,valid?'#243b37':'#95391e');
+      }
       for(const [p,color]of[[state.hover,'#fff2b4'],[state.selected,'#efac43']])if(p){ctx.beginPath();ctx.arc(p.x,p.y,10/scale,0,Math.PI*2);ctx.fillStyle=color+'45';ctx.fill();ctx.strokeStyle=color;ctx.lineWidth=2/scale;ctx.stroke();}
+      if(state.selected)cuePoint(state.selected,'1','#efac43');
       drawVehicle(155,E.DECK);
     }else if(state.mode==='testing'||(state.mode==='result'&&!state.failedReason)){
       const range=E.contactRange(state.vehicle),y1=roadY(state.carX+range.rear),y2=roadY(state.carX+range.front),angle=Math.atan2(y2-y1,range.front-range.rear);drawVehicle(state.carX,y1+(y2-y1)*(-range.rear)/(range.front-range.rear),angle);
