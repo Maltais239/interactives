@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>STRATA — Alberta Field Excavation</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -202,7 +202,7 @@
   }
   @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.05ms!important;}}
 </style>
-<link rel="stylesheet" href="field-study.css?v=20261005"></head>
+<link rel="stylesheet" href="field-study.css?v=20261008-excavation"></head>
 <body>
 <div class="wrap">
   <header>
@@ -232,7 +232,7 @@
     </aside>
 
     <div class="stage-wrap">
-      <div class="pit-frame" id="pit">
+      <div class="pit-frame" id="pit" aria-label="Excavation workspace. Drag to clear the rock, or use Clear next section below.">
         <span class="stake tl"></span><span class="stake tr"></span><span class="stake bl"></span><span class="stake br"></span>
         <div class="specimen" id="specimen">
           <img id="photo" alt="" class="hide" referrerpolicy="no-referrer" />
@@ -242,18 +242,9 @@
         <canvas class="layer" id="cRock"></canvas>
         <canvas class="layer" id="cOver"></canvas>
         <canvas class="layer" id="cFx"></canvas>
-        <div class="cursor" id="cursor"></div>
-        <div class="hint" id="hint">Use the shovel to clear the loose overburden</div>
-        <div class="discovery" id="discovery">
-          <span class="tag">Specimen<br>registered</span>
-          <div class="body"><div class="nm" id="dNm"></div><div class="meta" id="dMeta"></div><div class="fact" id="dFact"></div></div>
-          <div class="life-card" id="lifeCard">
-            <span class="life-k">In life</span>
-            <img id="lifeImg" alt="Life restoration" referrerpolicy="no-referrer" />
-            <span class="life-caption" id="lifeCaption"></span>
-          </div>
-          <button class="tool" id="dNext">Next site →</button>
-        </div>
+        <div class="cursor" id="cursor" aria-hidden="true"></div>
+        <div class="hint" id="hint" role="status">Use the shovel to clear the loose overburden</div>
+
       </div>
 
       <div class="dock">
@@ -268,6 +259,17 @@
         <button class="ghost" id="bMute">Sound: off</button>
         <button class="ghost" id="bReset">Re-bury</button><button class="tool" id="clearSection">Clear next section</button>
       </div>
+        <div class="discovery" id="discovery">
+          <span class="tag">Specimen<br>registered</span>
+          <div class="body"><div class="nm" id="dNm"></div><div class="meta" id="dMeta"></div><div class="fact" id="dFact"></div></div>
+          <div class="life-card" id="lifeCard">
+            <span class="life-k">In life</span>
+            <img id="lifeImg" alt="Life restoration" referrerpolicy="no-referrer" />
+            <span class="life-caption" id="lifeCaption"></span>
+          </div>
+          <button class="tool" id="dNext">Next site →</button>
+        </div>
+      <p class="reconstruction-note">Excavation images are generated reconstructions, not site photographs.</p>
     </div>
   </div>
 
@@ -278,9 +280,9 @@
     <div class="cards" id="cards"></div>
   </section>
 
-  <div class="colophon" id="colophon">An educational simulation by Darren Maltais. Map pins are approximate locations, not directions to access or excavate a site. Layers and depths are illustrative. Fossil photographs and museum casts are reference specimens; life restorations are interpretations, not photographs of living dinosaurs.
+  <div class="colophon" id="colophon">An educational simulation by Darren Maltais. Map pins are approximate locations, not directions to access or excavate a site. Layers and depths are illustrative. The dig images are AI-generated excavation reconstructions inspired by fossil anatomy, not photographs or exact records of these sites. The evidence descriptions refer to scientific findings; image details alone cannot establish those findings. Life restorations are artists’ interpretations.
 <br><br>In Alberta, real fossils must be protected: photograph a find, record its location, leave it in place and tell an adult. <a href="https://www.tyrrellmuseum.com/research/found_a_fossil" target="_blank" rel="noopener">Royal Tyrrell Museum: found a fossil?</a>
-<br><br><a href="image-credits.html" target="_blank" rel="noopener">Photograph and restoration credits</a> · <a href="https://www.tyrrellmuseum.com/whats_on/exhibits/cretaceous_alberta" target="_blank" rel="noopener">Albertosaurus evidence</a> · <a href="https://www.devilscoulee.com/about/" target="_blank" rel="noopener">Devil’s Coulee nesting evidence</a>
+<br><br><a href="image-credits.html" target="_blank" rel="noopener">Image sources and reconstruction notes</a> · <a href="https://www.tyrrellmuseum.com/whats_on/exhibits/cretaceous_alberta" target="_blank" rel="noopener">Albertosaurus evidence</a> · <a href="https://www.devilscoulee.com/about/" target="_blank" rel="noopener">Devil’s Coulee nesting evidence</a>
   </div>
 </div>
 
@@ -290,7 +292,7 @@
 "use strict";
 
 /* ============================================================
-   REAL SPECIMEN PHOTOS — one image per site code.
+   EXCAVATION RECONSTRUCTIONS — one generated rock-embedded fossil per site code.
    Use a direct image URL (a GitHub raw link is ideal because it
    can be embedded so it shows everywhere, including this preview).
    Leave null to show the neutral "specimen block" placeholder.
@@ -299,29 +301,17 @@ const COMMONS_FILE_BASE = "https://commons.wikimedia.org/wiki/Special:FilePath/"
 function commonsFile(fileName){ return COMMONS_FILE_BASE + encodeURIComponent(fileName); }
 
 const PHOTOS = {
-  // Field-safe fossil/specimen images: chosen to avoid obvious people/reflections in the dig view.
-  // DPP now uses Darren's clean Smithsonian/NMNH delivery image instead of the museum display photo with people/reflections.
-  DPP: "https://ids.si.edu/ids/deliveryService?id=ark%3A%2F65665%2Fm35a524282f5b24b3f807cca99c0625304&max=1600",
-  DRY: "images/image-02.jpg",
-  // Suncor/Borealopelta uses a cleaner close specimen photo, not the previous display-room shot.
-  MAC: "images/image-12.jpg",
-  PIP: "images/image-14.jpg",
-  HSC: "images/image-06.jpg",
-  DEV: "images/image-09.jpg",
-  MAN: "images/image-08.jpg",
-  COR: "images/image-05.jpg"
+  DPP: "images/excavation-centrosaurus.webp",
+  DRY: "images/excavation-albertosaurus.webp",
+  MAC: "images/excavation-borealopelta.webp",
+  PIP: "images/excavation-pachyrhinosaurus.webp",
+  HSC: "images/excavation-edmontosaurus.webp",
+  DEV: "images/excavation-hypacrosaurus-nest.webp",
+  MAN: "images/excavation-euoplocephalus.webp",
+  COR: "images/excavation-corythosaurus.webp"
 };
 
-const PHOTO_CREDITS = {
-  "DRY": "Etemenanki3 · CC BY-SA 4.0 · Albertosaurus skull Royal Tyrrell 1.jpg",
-  "MAC": "ケラトプスユウタ · CC BY-SA 4.0 · Nodosaur.jpg",
-  "PIP": "IJReid · CC BY 4.0 · Pachyrhinosaurus lakustai RTMP (cropped).jpg",
-  "HSC": "Daderot · CC0 · Edmontosaurus regalis skull and jaws, Near Drumheller, Alberta, Canada, Late Cretaceous - Royal Ontario Museum - DSC00020.JPG",
-  "DEV": "Roland Tanglao from Vancouver, Canada · CC BY 2.0 · Hypacrosaurus stebingeri nest.jpg",
-  "MAN": "IJReid · CC BY 4.0 · Euoplocephalus tutus RTMP.jpg",
-  "COR": "Barnum Brown · Public domain · Corythosaurus.jpg",
-  "DPP": "Smithsonian / National Museum of Natural History · existing Centrosaurus reference image"
-};
+const PHOTO_CREDITS = Object.fromEntries(Object.keys(PHOTOS).map(code=>[code,"AI-generated excavation reconstruction · illustrative, not a photograph of this site"]));
 
 /* ============================================================
    LIFE RESTORATION IMAGES — shown in the discovery panel after
@@ -354,35 +344,35 @@ const LIFE_CREDITS = {
 const SITES = [
   { grid:"DPP", site:"Dinosaur Provincial Park", region:"Red Deer River badlands · SE Alberta", lat:50.77, lon:-111.49,
     formation:"Dinosaur Park Fm.", age:"~76 mya", note:"UNESCO World Heritage badlands", palette:"clay",
-    name:"Centrosaurus apertus", common:"single-horned face", cat:"Reference fossil",
+    name:"Centrosaurus apertus", common:"single-horned face", cat:"Excavation reconstruction",
     fact:"Centrosaurus had a nose horn and a bony frill. Some bonebeds contain many individuals. Scientists study both the bones and surrounding sediment to investigate how they accumulated." },
   { grid:"DRY", site:"Dry Island Buffalo Jump", region:"Red Deer River valley · central Alberta", lat:51.95, lon:-112.97,
     formation:"Horseshoe Canyon Fm.", age:"~69 mya", note:"Bonebed re-found by P. Currie, 1997", palette:"sand",
-    name:"Albertosaurus sarcophagus", common:"Alberta's tyrannosaur", cat:"Reference fossil",
+    name:"Albertosaurus sarcophagus", common:"Alberta's tyrannosaur", cat:"Excavation reconstruction",
     fact:"A relative of Tyrannosaurus. At least 12 Albertosaurus skeletons were found together at Dry Island. Their presence together is evidence; pack hunting remains an interpretation to investigate." },
   { grid:"MAC", site:"Suncor Millennium Mine", region:"Athabasca oil sands · NE Alberta (Fort McMurray)", lat:57.00, lon:-111.52,
     formation:"Clearwater Fm. (Wabiskaw Mbr.)", age:"~110 mya", note:"Found by miner Shawn Funk, 21 Mar 2011", palette:"iron",
-    name:"Borealopelta markmitchelli", common:"the \u2018Suncor nodosaur\u2019", cat:"Reference fossil",
+    name:"Borealopelta markmitchelli", common:"the \u2018Suncor nodosaur\u2019", cat:"Excavation reconstruction",
     fact:"Borealopelta preserves armour, skin and stomach contents. Researchers used preserved pigment evidence to infer colour patterns; camouflage is a possible explanation of those patterns." },
   { grid:"PIP", site:"Pipestone Creek Bonebed", region:"\u2018River of Death\u2019 · NW Alberta (Grande Prairie)", lat:55.13, lon:-119.18,
     formation:"Wapiti Fm.", age:"~72.5 mya", note:"Found 1974 by teacher Al Lakusta", palette:"sand",
-    name:"Pachyrhinosaurus lakustai", common:"thick-nosed lizard", cat:"Reference fossil",
+    name:"Pachyrhinosaurus lakustai", common:"thick-nosed lizard", cat:"Excavation reconstruction",
     fact:"Instead of a nose horn it grew a thick bony pad, or boss. The bonebed contains many bones from multiple individuals, including young and adults. A catastrophic event is one interpretation of this evidence." },
   { grid:"HSC", site:"Horseshoe Canyon", region:"Drumheller badlands · central Alberta", lat:51.46, lon:-112.79,
     formation:"Horseshoe Canyon Fm.", age:"~72 mya", note:"Classic Drumheller hadrosaur grounds", palette:"shale",
-    name:"Edmontosaurus regalis", common:"duck-billed, named for Edmonton", cat:"Reference fossil",
-    fact:"A duck-billed plant-eater with many teeth used to process vegetation. This skull is a reference specimen: it illustrates the animal, rather than proving it came from the exact map pin." },
+    name:"Edmontosaurus regalis", common:"duck-billed, named for Edmonton", cat:"Excavation reconstruction",
+    fact:"A duck-billed plant-eater with many teeth used to process vegetation. The reconstruction illustrates its skull; it does not document an individual from the exact map pin." },
   { grid:"DEV", site:"Devil's Coulee", region:"Milk River uplands · far S Alberta (Warner)", lat:49.13, lon:-112.00,
     formation:"Oldman Fm.", age:"~75 mya", note:"Egg site found 1987 by W. Sloboda", palette:"clay",
-    name:"Hypacrosaurus stebingeri", common:"nests, eggs & embryos", cat:"Reference fossil",
+    name:"Hypacrosaurus stebingeri", common:"nests, eggs & embryos", cat:"Excavation reconstruction",
     fact:"In 1987 this hillside gave up nests, eggshell and even unhatched embryos — evidence of dinosaur nesting in southern Alberta. Questions about parental care need additional evidence." },
   { grid:"MAN", site:"Manyberries badlands", region:"Milk River area · SE corner of Alberta", lat:49.30, lon:-110.70,
     formation:"Dinosaur Park Fm.", age:"~76 mya", note:"Classic Euoplocephalus ground; CMN 0210 type", palette:"sand",
-    name:"Euoplocephalus tutus", common:"club-tailed tank", cat:"Reference fossil",
+    name:"Euoplocephalus tutus", common:"club-tailed tank", cat:"Excavation reconstruction",
     fact:"Body armour and a tail club are preserved structures. Scientists study their shape and strength to investigate how the animal may have used them; a defensive role is an interpretation." },
   { grid:"COR", site:"Dinosaur Provincial Park (E)", region:"Steveville · SE Alberta", lat:50.81, lon:-111.55,
     formation:"Dinosaur Park Fm.", age:"~76 mya", note:"Lambeosaurine duckbill grounds", palette:"clay",
-    name:"Corythosaurus casuarius", common:"helmet-crested duckbill", cat:"Reference fossil",
+    name:"Corythosaurus casuarius", common:"helmet-crested duckbill", cat:"Excavation reconstruction",
     fact:"A duckbill crowned with a tall, hollow helmet of bone. The crest looped its nasal passages — it may have worked like a trumpet to call across the floodplain." }
 ];
 
@@ -553,18 +543,6 @@ function showDiscovery(){ const s=SITES[current];
   document.getElementById("discovery").classList.add("show"); }
 function hideDiscovery(){ document.getElementById("discovery").classList.remove("show"); }
 
-/* ---------------- pointer ---------------- */
-function pos(e){ const r=cOver.getBoundingClientRect(); return {x:(e.touches?e.touches[0].clientX:e.clientX)-r.left, y:(e.touches?e.touches[0].clientY:e.clientY)-r.top}; }
-function down(e){ if(revealed){ moveCursor(e); return; } e.preventDefault(); isDown=true; audio();
-  const p=pos(e); lastX=p.x; lastY=p.y; eraseAt(CTX[stage],p.x,p.y); spawnFx(p.x,p.y,.6); scrub(.4); moveCursor(e); sampleProgress(); }
-function move(e){ moveCursor(e); if(!isDown||revealed) return; e.preventDefault(); const p=pos(e); strokeLine(lastX,lastY,p.x,p.y); lastX=p.x; lastY=p.y; sampleProgress(); }
-function up(){ if(isDown){ isDown=false; sampleProgress(); } }
-function moveCursor(e){ const r=pit.getBoundingClientRect(); const cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left, cy=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
-  const rad=TOOLS[tool].r; cursor.style.display=revealed?"none":"block"; cursor.style.width=rad*2+"px"; cursor.style.height=rad*2+"px"; cursor.style.left=cx+"px"; cursor.style.top=cy+"px"; }
-cOver.addEventListener("mousedown",down); window.addEventListener("mousemove",move); window.addEventListener("mouseup",up);
-cOver.addEventListener("mouseleave",()=>{cursor.style.display="none";});
-cOver.addEventListener("touchstart",down,{passive:false}); cOver.addEventListener("touchmove",move,{passive:false}); window.addEventListener("touchend",up);
-
 /* ---------------- tools ---------------- */
 function setTool(t,silent){ // only the current stage's tool is active; others locked
   const wanted=TOOL_OF[stage];
@@ -595,16 +573,16 @@ function loadSite(i,redig=false){ current=i; revealed=false; stage="over"; parts
   // specimen photo or fallback placeholder
   const url=PHOTOS[s.grid];
   document.getElementById("phCode").textContent=s.grid+" · "+s.region.split(" · ")[0];
-  document.getElementById("phNote").textContent="Loading real fossil image…";
+  document.getElementById("phNote").textContent="Loading excavation reconstruction…";
   ph.style.display="flex";
   photo.classList.add("hide");
   photo.onload=()=>{ photo.classList.remove("hide"); ph.style.display="none"; };
   photo.onerror=()=>{
     photo.classList.add("hide");
     ph.style.display="flex";
-    document.getElementById("phNote").textContent="The real image link did not load. Try another specimen or use the field description.";
+    document.getElementById("phNote").textContent="The excavation image did not load. Try reloading or use the field description.";
   };
-  if(url){ photo.alt=s.name+" fossil image"; photo.src=url; }
+  if(url){ photo.alt=s.name+" excavation reconstruction embedded in rock"; photo.src=url; }
   else {
     photo.removeAttribute("src");
     document.getElementById("phNote").textContent="Add a photo URL for "+s.name+" in the PHOTOS block to reveal it here.";
@@ -615,13 +593,13 @@ function loadSite(i,redig=false){ current=i; revealed=false; stage="over"; parts
     revealed=true; stage="done"; stageProg.over=stageProg.rock=stageProg.dust=1; pit.classList.add("revealed"); setHint(""); updateDossier();
   } else { stage="over"; tool="shovel"; setHint("Use the shovel to clear the loose overburden"); refreshToolLocks(); updateDossier(); }
   document.getElementById("toolOut").textContent="Tool: "+tool;
-  updateGauge(); updateMap();
+  updateGauge(); updateMap(); if(revealed) showDiscovery();
 }
 
 /* ---------------- catalog ---------------- */
 function renderCards(){ cardsEl.innerHTML="";
   SITES.forEach((s,i)=>{ const url=PHOTOS[s.grid]; const c=document.createElement("button"); c.type="button"; c.setAttribute("aria-label","Open "+s.site); c.className="card "+(found[i]?"found":"locked");
-    const thumb = found[i] ? (url?'<img src="'+url+'" alt="'+s.name+' fossil image" loading="lazy" referrerpolicy="no-referrer">':'<span class="qmark">'+s.grid+'</span>') : '<span class="qmark">?</span>';
+    const thumb = found[i] ? (url?'<img src="'+url+'" alt="'+s.name+' excavation reconstruction" loading="lazy" referrerpolicy="no-referrer">':'<span class="qmark">'+s.grid+'</span>') : '<span class="qmark">?</span>';
     c.innerHTML='<div class="thumb">'+thumb+'</div><div class="info"><span class="cn">'+(found[i]?s.cat:'Site '+s.grid+' · sealed')+'</span>'+
       '<span class="nm">'+(found[i]?'<i>'+s.name+'</i>':'Unidentified')+'</span><span class="pd">'+(found[i]?s.site:s.region.split(" · ")[0])+'</span></div>';
     c.addEventListener("click",()=>{ loadSite(i); window.scrollTo({top:0,behavior:"smooth"}); }); cardsEl.appendChild(c); }); }
@@ -697,16 +675,11 @@ function initMap(){
   }catch(e){ /* stay on offline map */ }
 }
 
-/* ---------------- resize ---------------- */
-let rT; window.addEventListener("resize",()=>{ clearTimeout(rT); rT=setTimeout(()=>{
-  fitFallbackMap();
-  try{ if(map) map.invalidateSize(); }catch(e){}
-  const snapshots=[cOver,cRock,cDust].map(c=>{const copy=document.createElement("canvas");copy.width=c.width;copy.height=c.height;copy.getContext("2d").drawImage(c,0,0);return copy;});
-  sizeCanvases(); [oCtx,rCtx,sCtx].forEach((ctx,i)=>{ctx.globalCompositeOperation="source-over";ctx.drawImage(snapshots[i],0,0,W,H);}); updateGauge(); },180); });
-
 /* ---------------- init ---------------- */
 initMap(); renderCards(); updateCount(); loadSite(0);
 </script>
-<script src="field-study.js?v=20261005"></script></body>
+<script src="excavation.js?v=20261008"></script>
+<script src="field-study.js?v=20261008-excavation"></script></body>
 </html>
+
 
