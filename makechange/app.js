@@ -26,6 +26,7 @@ let solved=false,roundCount=0,independent=0,hadAttempt=false,usedHint=false;
             if (money.type === 'coin') img.classList.add('coin');
             img.onerror = () => { div.innerHTML = money.label; };
             div.appendChild(img);
+            const denomination = document.createElement('span'); denomination.className='money-label'; denomination.textContent=money.label; denomination.setAttribute('aria-hidden','true'); div.appendChild(denomination);
             div.addEventListener('dragstart', handleDragStart); div.addEventListener('dragend', handleDragEnd);
             div.addEventListener('touchstart', handleTouchStart, { passive: false });
             if (isClone) { div.addEventListener('click', handleItemClick); }
