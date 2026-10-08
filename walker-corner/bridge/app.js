@@ -53,6 +53,7 @@
     const sandbox=state.challenge==='sandbox',index=P.levelIndex(state.challenge);
     $('levelProgress').textContent=sandbox?'Free build · any vehicle':`Level ${index+1} of ${P.levels.length} · ${state.progress.completed} completed`;
     $('fleetHeading').textContent=sandbox?'CHOOSE YOUR VEHICLE':'YOUR CHALLENGE JOURNEY';
+    $('fleetChoices').classList.toggle('mission-choices',!sandbox);
     $('loadHelp').textContent=sandbox?'Relative classroom units. Choose any vehicle to test capacity.':'Relative classroom units. Meet the crossing, budget and design goals to unlock the next mission.';
     $('wind').disabled=busy()||P.challenges[state.challenge].wind!==undefined;$('wind').title=P.challenges[state.challenge].wind!==undefined?'Wind is fixed for this mission':'Choose wind conditions';
     for(const option of $('challenge').options)option.disabled=!P.isUnlocked(option.value,state.progress);
@@ -306,5 +307,5 @@
     download('bridge-test-notebook.csv','text/csv',rows.map(row=>row.map(csv).join(',')).join('\r\n'));
   };$('printBtn').onclick=()=>window.print();
   for(const image of Object.values(images))image.onerror=()=>{if(!assetWarning){assetWarning=true;status('The artwork could not load. Building and bridge tests are still available.');}};
-  resize();refresh();status(state.gaps.length?'Road is selected. Fill the highlighted Road sections first, then add Wood or Steel bracing.':state.challenge==='sandbox'?'Free build restored. Your challenge journey is saved.':'Start with the car and the road-only deck. View bridge examples, then build your own supports.');requestAnimationFrame(loop);
+  resize();refresh();status(state.gaps.length?'Road is selected. Fill the highlighted Road sections first, then add Wood or Steel bracing.':state.challenge==='sandbox'?'Free build restored. Your challenge journey is saved.':state.challenge==='first'?'Start with the car and build your own supports. View bridge examples and use the design hints below the tools.':`Level ${P.levelIndex(state.challenge)+1} · ${P.challenges[state.challenge].name} restored. Your bridge, completed levels and notebook are saved. Check this mission’s design hints.`);requestAnimationFrame(loop);
 })();
