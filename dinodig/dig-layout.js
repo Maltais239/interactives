@@ -1,6 +1,7 @@
 'use strict';
 // Keep the dig on one screen. Maps, writing and collections open independently.
 const digHeader=document.querySelector('header');
+const digBrand=document.createElement('div');digBrand.className='dig-brand';digBrand.append(digHeader.querySelector('h1'),document.getElementById('quadReadout'));digHeader.prepend(digBrand);
 const digNav=document.createElement('nav');digNav.className='dig-nav';digNav.setAttribute('aria-label','Field tools');digHeader.append(digNav);
 const digDialogs=[];
 function makeDigDialog(id,title,node){
