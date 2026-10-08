@@ -7,7 +7,7 @@ const digDialogs=[];
 function makeDigDialog(id,title,node){
  const d=document.createElement('dialog');d.id=id;d.className='dig-dialog';
  const bar=document.createElement('div');bar.className='dialog-heading';
- const h=document.createElement('h2');h.textContent=title;const close=document.createElement('button');close.className='study-button';close.textContent='Back to dig';close.onclick=()=>d.close();
+ const h=document.createElement('h2');h.id=id+'-title';h.textContent=title;d.setAttribute('aria-labelledby',h.id);const close=document.createElement('button');close.className='study-button';close.textContent='Back to dig';close.onclick=()=>d.close();
  bar.append(h,close);d.append(bar);if(node)d.append(node);document.body.append(d);digDialogs.push(d);return d;
 }
 function openDigDialog(dialog){digDialogs.forEach(d=>{if(d.open&&d!==dialog)d.close();});if(!dialog.open)dialog.showModal();}
@@ -16,7 +16,7 @@ const notebookDialog=makeDigDialog('notebook-dialog','Your field notebook',docum
 notebookDialog.append(document.querySelector('.colophon'));
 const catalogDialog=makeDigDialog('catalog-dialog','Your fossil collection',document.querySelector('.catalog'));
 const specimenDialog=makeDigDialog('specimen-dialog','Your discovery',document.getElementById('discovery'));
-const settings=document.createElement('div');settings.className='discovery-settings';settings.append(document.getElementById('bMute'),document.getElementById('bReset'));specimenDialog.append(settings);
+const settings=document.createElement('div');settings.className='discovery-settings';settings.append(document.getElementById('bMute'),document.getElementById('bReset'));mapDialog.append(settings);
 function navButton(text,dialog){const b=document.createElement('button');b.className='study-button';b.textContent=text;b.onclick=()=>{openDigDialog(dialog);if(dialog===mapDialog)requestAnimationFrame(()=>{fitFallbackMap();try{if(map)map.invalidateSize();}catch(e){}});};digNav.append(b);return b;}
 navButton('Sites',mapDialog);navButton('Notebook',notebookDialog);navButton('Collection',catalogDialog);
 const infoButton=navButton('Fossil info',specimenDialog);infoButton.disabled=!found[current];
@@ -55,7 +55,7 @@ function identifyDig(){
  identificationBody.querySelector('.id-hint').onclick=()=>{identificationBody.querySelector('.id-feedback').textContent=fossilClues[s.grid];};
  identificationBody.querySelectorAll('[data-identify]').forEach(b=>b.onclick=()=>{
   if(b.dataset.identify!==s.grid){identificationBody.querySelector('.id-feedback').textContent='Try another picture. '+fossilClues[s.grid];return;}
-  waitingForIdentification=false;identificationDialog.close();revealed=false;registerDigDiscovery();infoButton.disabled=false;saveField();renderStudy();
+  waitingForIdentification=false;identificationDialog.close();revealed=false;registerDigDiscovery();infoButton.disabled=false;infoButton.textContent='Fossil info';saveField();renderStudy();
  });
  openDigDialog(identificationDialog);
 }
