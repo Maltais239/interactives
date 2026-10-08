@@ -90,10 +90,12 @@
     width=scene.clientWidth;scale=width/(state.zoom?850:1200);
     const actualPoints=state.members.flatMap(m=>[m.a,m.b]);if(state.keyboard)actualPoints.push(state.cursor);if(state.selected)actualPoints.push(state.selected);
     const topY=Math.min(E.DECK-80,...actualPoints.map(p=>p.y)),bottomY=Math.max(E.DECK+24,...actualPoints.map(p=>p.y));
-    const topPad=window.innerWidth<=650?40:55,bottomPad=Math.max(35,document.querySelector('.scene-bottom').offsetHeight+22);
+    const topPad=Math.max(window.innerWidth<=650?40:55,document.querySelector('.scene-top').offsetHeight+20),bottomPad=Math.max(35,document.querySelector('.scene-bottom').offsetHeight+22);
+    const overlayHeight=document.querySelector('.scene-top').offsetHeight+document.querySelector('.scene-bottom').offsetHeight+($('testMeter').hidden?70:$('testMeter').offsetHeight+40);
+    document.documentElement.style.setProperty('--meter-top',(document.querySelector('.scene-top').offsetHeight+(window.innerWidth<=650?20:32))+'px');
     const available=window.innerHeight-(shell.getBoundingClientRect().top+window.scrollY)-dock.offsetHeight-bench.offsetHeight-$('fleetDock').offsetHeight-$('experimentBar').offsetHeight-$('resultCard').offsetHeight-45;
     const geometryHeight=(bottomY-topY)*scale+topPad+bottomPad;
-    const desired=Math.max(geometryHeight,Math.min(width*.5625,Math.max(window.innerWidth<=650?260:235,available)));
+    const desired=Math.max(geometryHeight,overlayHeight,Math.min(width*.5625,Math.max(window.innerWidth<=650?260:235,available)));
     document.documentElement.style.setProperty('--scene-height',Math.round(desired)+'px');
     height=scene.clientHeight;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);
     ox=(width-1200*scale)/2;const minY=topPad-topY*scale,maxY=height-bottomPad-bottomY*scale;oy=Math.max(minY,Math.min(maxY,Math.min(0,height*.45-E.DECK*scale)));
