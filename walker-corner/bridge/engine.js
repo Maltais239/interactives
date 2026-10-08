@@ -114,10 +114,11 @@
   }
   function inferType(members){return ['suspension','arch','truss','girder'].find(type=>matchesType(members,type))||'custom';}
   function readDesign(data){
-    if(!data||data.format!=='bridge-test-lab'||![1,2,3].includes(data.version))throw new Error('Choose a Bridge Test Lab design file.');
+    if(!data||data.format!=='bridge-test-lab'||![1,2,3,4].includes(data.version))throw new Error('Choose a Bridge Test Lab design file.');
     const members=validate(data.members),loadPercent=data.loadPercent===undefined?100:data.loadPercent;
     if(!vehicles[data.vehicle]||![0,12,28].includes(data.wind)||!Number.isFinite(loadPercent)||loadPercent<50||loadPercent>200||loadPercent%10!==0||typeof data.challenge!=='string'||(data.bridgeType!==undefined&&!bridgeTypes[data.bridgeType]))throw new Error('This file has invalid test settings.');
-    return {members,vehicle:data.vehicle,wind:data.wind,challenge:data.challenge,loadPercent,bridgeType:data.bridgeType||inferType(members)};
+    if(data.campaignVersion!==undefined&&data.campaignVersion!==1)throw new Error('This file has invalid challenge settings.');
+    return {members,vehicle:data.vehicle,wind:data.wind,challenge:data.challenge,loadPercent,bridgeType:data.bridgeType||inferType(members),campaignVersion:data.version===4?data.campaignVersion:undefined};
   }
   function element(m,ia,ib){
     const dx=(m.b.x-m.a.x)/STEP,dy=(m.a.y-m.b.y)/STEP,L=Math.hypot(dx,dy),c=dx/L,s=dy/L,p=materials[m.type];
