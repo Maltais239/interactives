@@ -22,6 +22,7 @@ navButton('Sites',mapDialog);navButton('Notebook',notebookDialog);navButton('Col
 const infoButton=navButton('Fossil info',specimenDialog);infoButton.disabled=!found[current];
 const field=document.querySelector('.field'),gauge=document.querySelector('.gauge'),workspace=document.querySelector('.stage-wrap');
 gauge.querySelector('h2').textContent='Dig progress';
+gauge.querySelectorAll('.stage-row').forEach(row=>{const label=row.querySelector('.lab>span');label.lastChild.textContent={over:'Soil',rock:'Rock',dust:'Dust'}[row.dataset.s];});
 document.getElementById('tPick').childNodes[document.getElementById('tPick').childNodes.length-1].textContent='Chisel';
 document.getElementById('tAir').childNodes[document.getElementById('tAir').childNodes.length-1].textContent='Brush';
 document.getElementById('clearSection').textContent='Help dig';
