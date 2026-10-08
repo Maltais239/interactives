@@ -4,15 +4,17 @@
   const E=BridgeEngine,$=id=>document.getElementById(id),canvas=$('bridgeCanvas'),ctx=canvas.getContext('2d');
   const STORE='bgsd-walker-bridge-game-v1';
   const challenges={
-    supply:{name:'Supply run',vehicle:'truck',minLoad:25,budget:1400,text:'Carry the truck at 25 load units or more. Stay within budget.'},
-    first:{name:'First crossing',vehicle:'car',minLoad:10,budget:1100,text:'Carry the car at 10 load units or more. Try a well-braced design.'},
-    school:{name:'School run',vehicle:'bus',minLoad:45,budget:1900,text:'Carry the bus at 45 load units or more. Reinforce the weak members.'},
-    heavy:{name:'Heavy haul',vehicle:'truck',minLoad:37.5,loadPercent:150,budget:1500,text:'Carry a truck loaded to 150%: at least 37.5 load units.'},
-    beamTrial:{name:'Beam challenge',vehicle:'truck',minLoad:25,bridgeType:'girder',budget:1250,text:'Use a steel beam frame below the road to carry the 25-unit truck.'},
-    trussTrial:{name:'Truss challenge',vehicle:'truck',minLoad:25,bridgeType:'truss',budget:1100,text:'Use a network of triangles to carry the 25-unit truck.'},
-    archTrial:{name:'Arch challenge',vehicle:'truck',minLoad:37.5,loadPercent:150,bridgeType:'arch',budget:1300,text:'Build a raised arch and carry a truck loaded to 150%.'},
+    supply:{name:'Supply run',vehicle:'truck',minLoad:25,budget:1400,text:'Carry the 25-unit pickup. Stay within budget.'},
+    first:{name:'First crossing',vehicle:'car',minLoad:10,budget:1100,text:'Carry the 10-unit car. Try a well-braced design.'},
+    school:{name:'School run',vehicle:'bus',minLoad:45,budget:1900,text:'Carry the 45-unit school bus. Reinforce the weak members.'},
+    heavy:{name:'Heavy haul',vehicle:'semi',minLoad:60,budget:1900,text:'Carry the 60-unit freight semi. Spread its axle loads with a strong design.'},
+    tankerTrial:{name:'Tanker crossing',vehicle:'tanker',minLoad:75,budget:1900,text:'Carry the 75-unit tanker semi. Can you keep the extra strength affordable?'},
+    tankTrial:{name:'Tank crossing',vehicle:'tank',minLoad:90,budget:2200,text:'Carry the 90-unit tank. Its tracks spread the weight, but this is a serious load.'},
+    beamTrial:{name:'Beam challenge',vehicle:'truck',minLoad:25,bridgeType:'girder',budget:1250,text:'Use a steel beam frame below the road to carry the 25-unit pickup.'},
+    trussTrial:{name:'Truss challenge',vehicle:'truck',minLoad:25,bridgeType:'truss',budget:1100,text:'Use a network of triangles to carry the 25-unit pickup.'},
+    archTrial:{name:'Arch challenge',vehicle:'trailer',minLoad:37.5,bridgeType:'arch',budget:1300,text:'Build a raised arch and carry the pickup with its loaded trailer.'},
     suspensionTrial:{name:'Suspension challenge',vehicle:'car',minLoad:10,bridgeType:'suspension',budget:1300,text:'Use towers, backstays and cable hangers to carry the 10-unit car.'},
-    lean:{name:'Lean build',vehicle:'truck',minLoad:25,budget:900,text:'Carry the 25-unit truck for $900 or less. Where can you use fewer pieces?'},
+    lean:{name:'Lean build',vehicle:'truck',minLoad:25,budget:900,text:'Carry the 25-unit pickup for $900 or less. Where can you use fewer pieces?'},
     sandbox:{name:'Free build',vehicle:null,budget:Infinity,text:'Your canyon, your experiment. Choose any vehicle and try an idea.'}
   };
   let saved=null;try{saved=JSON.parse(localStorage.getItem(STORE));if(saved){E.validate(saved.members);if(!challenges[saved.challenge]||!E.vehicles[saved.vehicle])saved=null;}}catch{saved=null;}
@@ -22,7 +24,7 @@
   state.loadPercent=validLoad(saved?.loadPercent)?saved.loadPercent:100;
   state.bridgeType=E.bridgeTypes[saved?.bridgeType]?saved.bridgeType:E.inferType(state.members);
   state.wind=[0,12,28].includes(state.wind)?state.wind:0;
-  const loadLabel=()=>`${E.loadFor(state.vehicle,state.loadPercent)} load units (${state.loadPercent}%)`;
+  const loadLabel=()=>`${E.loadFor(state.vehicle,state.loadPercent)} load units${state.loadPercent===100?'':` (saved ${state.loadPercent}% load)`}`;
   const sprite={car:{x:413,y:12,w:707,h:305},truck:{x:265,y:315,w:965,h:343},bus:{x:185,y:660,w:1165,h:354}};
   let width=1000,height=450,scale=1,ox=0,oy=0,dpr=1,resizeFrame=0,statusTimer=0,assetWarning=false;
   const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -32,12 +34,12 @@
   function clone(m){return m.map(e=>({type:e.type,a:{...e.a},b:{...e.b}}));}
   function remember(){state.history.push({members:clone(state.members),bridgeType:state.bridgeType});if(state.history.length>35)state.history.shift();}
   function resetView(){state.mode='build';state.selected=null;state.gapHit=null;state.response=null;state.display=[];state.debris=[];state.particles=[];$('resultCard').hidden=true;$('testMeter').hidden=true;$('modeBadge').textContent='BUILD MODE';$('testBtn').hidden=false;$('resetTestBtn').hidden=true;setEditing(true);}
-  function setEditing(enabled){document.querySelectorAll('[data-tool],[data-vehicle],#challenge,#starter,#starterBtn,#undoBtn,#saveBtn,#loadBtn,#wind,#loadPercent,#connectBtn,#removeBtn').forEach(b=>b.disabled=!enabled);if(enabled)$('undoBtn').disabled=!state.history.length;}
+  function setEditing(enabled){document.querySelectorAll('[data-tool],[data-vehicle],#challenge,#starter,#starterBtn,#undoBtn,#saveBtn,#loadBtn,#wind,#connectBtn,#removeBtn').forEach(b=>b.disabled=!enabled);if(enabled)$('undoBtn').disabled=!state.history.length;}
   function refresh(){
     state.gaps=E.roadGaps(state.members);
     const c=challenges[state.challenge],cost=E.cost(state.members);$('challenge').value=state.challenge;$('wind').value=String(state.wind);$('cost').textContent='$'+cost.toLocaleString();$('budgetLimit').textContent=Number.isFinite(c.budget)?' / $'+c.budget.toLocaleString():' / unlimited';$('budgetFill').style.width=(Number.isFinite(c.budget)?Math.min(100,cost/c.budget*100):20)+'%';document.querySelector('.budget').classList.toggle('over',cost>c.budget);$('missionText').textContent=c.text;$('pieces').textContent=state.members.length+' pieces';$('trialCount').textContent=state.trials.length;$('undoBtn').disabled=!state.history.length||busy();
     document.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===state.tool));document.querySelectorAll('[data-vehicle]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.vehicle===state.vehicle));
-    $('loadPercent').value=state.loadPercent;$('loadValue').textContent=loadLabel();$('bridgeName').textContent=E.bridgeTypes[state.bridgeType].name+' design';$('bridgeTip').textContent=E.bridgeTypes[state.bridgeType].tip;
+    $('loadValue').textContent=loadLabel();$('selectedVehicle').textContent=E.vehicles[state.vehicle].name+' · '+loadLabel();$('axleInfo').textContent=E.vehicles[state.vehicle].tracked?'Weight spread along the tracks.':E.axlesFor(state.vehicle).length+' axles carry the load.';$('budgetStatus').textContent=cost>c.budget?'$'+(cost-c.budget).toLocaleString()+' over · challenge not met':Number.isFinite(c.budget)?'Within budget · needed to complete':'Free build · no budget goal';$('bridgeName').textContent=E.bridgeTypes[state.bridgeType].name+' design';$('bridgeTip').textContent=E.bridgeTypes[state.bridgeType].tip;
     $('designDescription').textContent=`Driving surface: ${8-state.gaps.length} of 8 Road sections. Wood beams: ${state.members.filter(m=>m.type==='wood').length}; Steel beams: ${state.members.filter(m=>m.type==='steel').length}; Cables: ${state.members.filter(m=>m.type==='cable').length}. Cost: $${cost}. ${state.gaps.length?'Add Road along the highlighted gaps; beams and cables support it.':E.bridgeTypes[state.bridgeType].tip}`;
     updateHint();persist();resize();
   }
@@ -64,10 +66,20 @@
   for(const id of['fromPoint','toPoint'])for(const p of points){const option=document.createElement('option');option.value=E.key(p);option.textContent=pointName(p);$(id).append(option);}$('fromPoint').value=E.key({x:E.LEFT,y:E.DECK});$('toPoint').value=E.key({x:E.LEFT+E.STEP,y:E.DECK});
   const readPoint=id=>{const [x,y]=$(id).value.split(',').map(Number);return {x,y};};
   $('connectBtn').onclick=()=>{if(state.tool==='erase')setTool('wood');addPiece(readPoint('fromPoint'),readPoint('toPoint'));};$('removeBtn').onclick=()=>removeBetween(readPoint('fromPoint'),readPoint('toPoint'));
+  for(const [key,v] of Object.entries(E.vehicles)){
+    const button=document.createElement('button');button.dataset.vehicle=key;button.setAttribute('aria-pressed','false');button.setAttribute('aria-label',`${v.name}, ${v.load} load units`);
+    const thumb=document.createElement('canvas');thumb.width=240;thumb.height=88;thumb.setAttribute('aria-hidden','true');thumb.className='fleet-thumb';button.append(thumb);
+    const label=document.createElement('strong');label.textContent=v.name;button.append(label);const weight=document.createElement('small');weight.textContent=v.load+' load units';button.append(weight);$('fleetChoices').append(button);
+    if(v.asset){images[key]=new Image();images[key].src='assets/'+v.asset;}
+  }
+  function paintFleet(){document.querySelectorAll('[data-vehicle]').forEach(button=>{
+    const key=button.dataset.vehicle,v=E.vehicles[key],source=v.asset?images[key]:images.vehicles,s=v.asset?{x:0,y:0,w:source.naturalWidth,h:source.naturalHeight}:sprite[key],c=button.querySelector('canvas'),g=c.getContext('2d');g.clearRect(0,0,c.width,c.height);
+    if(source.complete&&source.naturalWidth){const ratio=Math.min((c.width-8)/s.w,(c.height-4)/s.h),w=s.w*ratio,h=s.h*ratio;g.drawImage(source,s.x,s.y,s.w,s.h,(c.width-w)/2,(c.height-h)/2,w,h);}
+  });}
+  for(const source of Object.values(images))source.addEventListener('load',paintFleet);paintFleet();
   document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
-  document.querySelectorAll('[data-vehicle]').forEach(b=>b.onclick=()=>{if(busy())return;state.vehicle=b.dataset.vehicle;resetView();refresh();const target=challenges[state.challenge].vehicle;status(target&&target!==state.vehicle?`You can compare this ${E.vehicles[state.vehicle].name.toLowerCase()} test. The challenge still needs the ${E.vehicles[target].name.toLowerCase()}.`:`Ready to test the ${E.vehicles[state.vehicle].name.toLowerCase()}.`);});
-  $('challenge').onchange=()=>{state.challenge=$('challenge').value;state.vehicle=challenges[state.challenge].vehicle||state.vehicle;state.loadPercent=challenges[state.challenge].loadPercent||100;resetView();refresh();status('New challenge selected. Your bridge is still here.'+(challenges[state.challenge].bridgeType?' Load the '+E.bridgeTypes[challenges[state.challenge].bridgeType].name.toLowerCase()+' starting design, or build one yourself.':''));};
-  $('loadPercent').oninput=()=>{if(busy())return;state.loadPercent=Number($('loadPercent').value);resetView();refresh();status(`Load changed to ${loadLabel()}. Keep the bridge and wind the same to compare.`);};
+  document.querySelectorAll('[data-vehicle]').forEach(b=>b.onclick=()=>{if(busy())return;state.vehicle=b.dataset.vehicle;state.loadPercent=100;resetView();refresh();const target=challenges[state.challenge].vehicle;status(target&&target!==state.vehicle?`You can compare this ${E.vehicles[state.vehicle].name.toLowerCase()} test. The challenge still needs the ${E.vehicles[target].name.toLowerCase()}.`:`Ready to test the ${E.vehicles[state.vehicle].name.toLowerCase()}.`);});
+  $('challenge').onchange=()=>{state.challenge=$('challenge').value;state.vehicle=challenges[state.challenge].vehicle||state.vehicle;state.loadPercent=100;resetView();refresh();status('New challenge selected. Your bridge is still here.'+(challenges[state.challenge].bridgeType?' Load the '+E.bridgeTypes[challenges[state.challenge].bridgeType].name.toLowerCase()+' starting design, or build one yourself.':''));};
   $('wind').onchange=()=>{state.wind=Number($('wind').value);resetView();refresh();status('Wind changed. Keep your design and vehicle the same to compare conditions.');};
   $('undoBtn').onclick=()=>{if(state.history.length&&!busy()){const previous=state.history.pop();state.members=previous.members;state.bridgeType=previous.bridgeType;changed('Last design change undone.');}};
   $('starterBtn').onclick=()=>{if(busy())return;remember();const kind=$('starter').value;state.members=E.starter(kind);state.bridgeType=E.bridgeTypes[kind]?kind:'custom';state.tool=kind==='blank'?'road':kind==='suspension'?'cable':kind==='girder'||kind==='arch'?'steel':'wood';resetView();refresh();status(kind==='blank'?'Empty canyon loaded. Road is selected: connect the highlighted sections first.':kind==='beam'?'Road-only design loaded. Add bracing before increasing the load.':kind==='frame'?'Unbraced frame loaded. Test first, then add triangles.':`${E.bridgeTypes[state.bridgeType].name} design loaded. ${E.bridgeTypes[state.bridgeType].tip}`);};
@@ -75,11 +87,17 @@
   $('zoomBtn').onclick=()=>{state.zoom=!state.zoom;$('zoomBtn').textContent=state.zoom?'−':'＋';$('zoomBtn').setAttribute('aria-label',state.zoom?'Show whole canyon':'Zoom construction grid');resize();};
   function resize(){
     const scene=$('scene'),shell=document.querySelector('.workspace'),dock=document.querySelector('.build-dock'),bench=document.querySelector('.workbench');
-    const available=window.innerHeight-shell.getBoundingClientRect().top-dock.offsetHeight-bench.offsetHeight-$('experimentBar').offsetHeight-$('resultCard').offsetHeight-45;
-    const desired=Math.min(scene.clientWidth*.5625,Math.max(window.innerWidth<=650?260:235,available));
-    document.documentElement.style.setProperty('--scene-height',Math.round(Math.min(660,desired))+'px');
-    width=scene.clientWidth;height=scene.clientHeight;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);
-    scale=width/(state.zoom?850:1200);ox=(width-1200*scale)/2;oy=Math.min(0,height*.45-E.DECK*scale);
+    width=scene.clientWidth;scale=width/(state.zoom?850:1200);
+    const actualPoints=state.members.flatMap(m=>[m.a,m.b]);if(state.keyboard)actualPoints.push(state.cursor);if(state.selected)actualPoints.push(state.selected);
+    const topY=Math.min(E.DECK-80,...actualPoints.map(p=>p.y)),bottomY=Math.max(E.DECK+24,...actualPoints.map(p=>p.y));
+    const topPad=window.innerWidth<=650?40:55,bottomPad=Math.max(35,document.querySelector('.scene-bottom').offsetHeight+22);
+    const available=window.innerHeight-(shell.getBoundingClientRect().top+window.scrollY)-dock.offsetHeight-bench.offsetHeight-$('fleetDock').offsetHeight-$('experimentBar').offsetHeight-$('resultCard').offsetHeight-45;
+    const geometryHeight=(bottomY-topY)*scale+topPad+bottomPad;
+    const desired=Math.max(geometryHeight,Math.min(width*.5625,Math.max(window.innerWidth<=650?260:235,available)));
+    document.documentElement.style.setProperty('--scene-height',Math.round(desired)+'px');
+    height=scene.clientHeight;dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);
+    ox=(width-1200*scale)/2;const minY=topPad-topY*scale,maxY=height-bottomPad-bottomY*scale;oy=Math.max(minY,Math.min(maxY,Math.min(0,height*.45-E.DECK*scale)));
+
   }
   window.addEventListener('resize',()=>{cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(resize);});new ResizeObserver(()=>{if(width!==$('scene').clientWidth||height!==$('scene').clientHeight)resize();}).observe($('scene'));document.fonts?.ready.then(resize);
   function position(event){const r=canvas.getBoundingClientRect();return {x:(event.clientX-r.left-ox)/scale,y:(event.clientY-r.top-oy)/scale};}
@@ -89,7 +107,7 @@
   canvas.addEventListener('pointerdown',e=>{if(busy())return;e.preventDefault();canvas.focus({preventScroll:true});state.keyboard=false;const p=position(e);if(state.mode==='result')resetView();if(state.tool==='erase'){const i=nearestMember(p);if(i>=0)removeAt(i);else status('Tap close to a beam to erase it.');}else {const n=nearest(p);if(n)choosePoint(n);else status('Choose a construction grid point. Zoom in or use the point controls below.');}});
   canvas.addEventListener('keydown',e=>{
     if(busy())return;const moves={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
-    if(moves[e.key]){e.preventDefault();state.keyboard=true;const [x,y]=moves[e.key];state.cursor.x=Math.max(E.LEFT,Math.min(E.RIGHT,state.cursor.x+x*E.STEP));state.cursor.y=Math.max(E.DECK-2*E.STEP,Math.min(E.DECK+2*E.STEP,state.cursor.y+y*E.STEP));state.hover=state.cursor;status(`Point ${pointName(state.cursor)}${state.selected?'. Enter connects.':'. Enter starts a piece.'}`);}
+    if(moves[e.key]){e.preventDefault();state.keyboard=true;const [x,y]=moves[e.key];state.cursor.x=Math.max(E.LEFT,Math.min(E.RIGHT,state.cursor.x+x*E.STEP));state.cursor.y=Math.max(E.DECK-2*E.STEP,Math.min(E.DECK+2*E.STEP,state.cursor.y+y*E.STEP));state.hover=state.cursor;resize();status(`Point ${pointName(state.cursor)}${state.selected?'. Enter connects.':'. Enter starts a piece.'}`);}
     else if(e.key==='Enter'||e.key===' '){e.preventDefault();state.keyboard=true;choosePoint(state.cursor);}
     else if(e.key==='Escape'){state.selected=null;updateHint();status('Connection cancelled.');}
     else if(['1','2','3','4','5'].includes(e.key)){e.preventDefault();setTool(['road','wood','steel','erase','cable'][Number(e.key)-1]);}
@@ -110,8 +128,8 @@
     state.mode='result';const c=challenges[state.challenge],cost=E.cost(state.members),budgetOk=cost<=c.budget,vehicleOk=!c.vehicle||c.vehicle===state.vehicle,loadOk=!c.minLoad||E.loadFor(state.vehicle,state.loadPercent)>=c.minLoad,typeOk=!c.bridgeType||E.matchesType(state.members,c.bridgeType),mission=pass&&budgetOk&&vehicleOk&&loadOk&&typeOk;
     const stress=Number.isFinite(state.peakStress)?Math.round(state.peakStress*100):null,deflection=Number.isFinite(state.peakDeflection)?Math.round(state.peakDeflection*10)/10:null;
     const trial={id:Date.now(),challenge:state.challenge,bridgeType:state.bridgeType,vehicle:state.vehicle,loadPercent:state.loadPercent,wind:state.wind,cost,pass,mission,reason:pass?'crossed':state.failedReason,stress,deflection,members:clone(state.members)};state.trials.push(trial);if(state.trials.length>40)state.trials.shift();state.lastTrial=trial;
-    const card=$('resultCard');card.classList.toggle('failed',!mission);$('resultIcon').textContent=mission?'✓':pass?'$':'!';$('resultKicker').textContent=mission?'CHALLENGE COMPLETE':pass?'CROSSING COMPLETE':'TEST SAVED';$('resultTitle').textContent=mission?'Your bridge held!':pass?'It crossed. Keep improving!':'Back to the drawing board.';
-    let feedback;if(pass)feedback=!budgetOk?`It crossed, but the $${cost} design is over the $${c.budget} budget. Can you make it lighter?`:!vehicleOk?`Good crossing. This challenge needs the ${E.vehicles[c.vehicle].name.toLowerCase()}; try that vehicle next.`:!loadOk?`It crossed at ${loadLabel()}. This challenge needs at least ${c.minLoad} load units. Increase the load and test again.`:!typeOk?`It crossed. This challenge needs a ${E.bridgeTypes[c.bridgeType].name.toLowerCase()} structure. Load that starting design or add its supporting features.`:`The ${E.vehicles[state.vehicle].name.toLowerCase()} crossed at ${loadLabel()}. Peak stress: ${stress}%. Can it carry more?`;
+    const card=$('resultCard');card.classList.toggle('failed',!mission);$('resultIcon').textContent=mission?'✓':pass&&!budgetOk?'$':'!';$('resultKicker').textContent=mission?'CHALLENGE COMPLETE':pass&&!budgetOk?'OVER BUDGET · CHALLENGE NOT MET':pass?'CROSSING COMPLETE':'TEST SAVED';$('resultTitle').textContent=mission?'Your bridge held!':pass&&!budgetOk?'It crossed. Budget goal missed.':pass?'It crossed. Keep improving!':'Back to the drawing board.';
+    let feedback;if(pass)feedback=!budgetOk?`Crossing passed; budget goal failed. Build cost $${cost.toLocaleString()} / $${c.budget.toLocaleString()}: $${(cost-c.budget).toLocaleString()} over. Reduce the cost and cross again to complete this challenge.`:!vehicleOk?`Good crossing. This challenge needs the ${E.vehicles[c.vehicle].name.toLowerCase()}; try that vehicle next.`:!loadOk?`It crossed at ${loadLabel()}. This challenge needs at least ${c.minLoad} load units. Increase the load and test again.`:!typeOk?`It crossed. This challenge needs a ${E.bridgeTypes[c.bridgeType].name.toLowerCase()} structure. Load that starting design or add its supporting features.`:`The ${E.vehicles[state.vehicle].name.toLowerCase()} crossed at ${loadLabel()}. Peak stress: ${stress}%. Can it carry more?`;
     else if(state.failedReason==='gap'){const gap=state.gapHit||state.gaps[0];feedback=`Road is missing${gap?' between points '+gap.section+' and '+(gap.section+1):''}. Choose Road and connect the highlighted points. Wood and steel beams provide bracing; they are not the driving surface.`;}
     else if(state.failedReason==='unstable')feedback='Connect every part of your structure to a supported bridge. Separate pieces cannot carry the load.';
     else if(state.failedReason==='sag')feedback='The deck bent too far. Add triangular bracing to give the load another path to the banks.';
@@ -121,9 +139,9 @@
   function tick(dt){
     if(state.mode==='testing'){
       state.carX+=dt*($('slow').checked?42:140);
-      const v=E.vehicles[state.vehicle];
-      if(state.carX+v.wheelbase/2>=E.LEFT&&state.carX-v.wheelbase/2<=E.RIGHT){
-        if(!state.model.complete){const front=state.carX+v.wheelbase/2;const gap=state.model.gaps.find(g=>front>=g.a.x&&front<g.b.x);if(gap){state.gapHit=gap;fail('gap',null);return;}}
+      const v=E.vehicles[state.vehicle],range=E.contactRange(state.vehicle);
+      if(state.carX+range.front>=E.LEFT&&state.carX+range.rear<=E.RIGHT){
+        if(!state.model.complete){const front=state.carX+range.front;const gap=state.model.gaps.find(g=>front>=g.a.x&&front<g.b.x);if(gap){state.gapHit=gap;fail('gap',null);return;}}
         const r=E.solve(state.model,state.vehicle,state.carX,state.wind,state.loadPercent);state.response=r;
         if(r.unstable){state.peakStress=Infinity;state.peakDeflection=Infinity;fail('unstable',r);return;}
         state.peakStress=Math.max(state.peakStress,r.maxStress);state.peakDeflection=Math.max(state.peakDeflection,r.maxDeflection);
@@ -149,7 +167,7 @@
     if((state.stress||busy()||state.mode==='result')&&state.response?.stress[index]&&state.response.stress[index].active!==false){ctx.globalAlpha=ghost?.25:.65;line({x:2,y:0},{x:L-2,y:0},stressColor(state.response.stress[index].ratio),m.type==='road'?7:m.type==='cable'?2:6);}
     ctx.restore();
   }
-  function drawVehicle(x,y,angle=0){const v=E.vehicles[state.vehicle],s=sprite[state.vehicle],h=v.width*s.h/s.w;ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.shadowColor='#17372b80';ctx.shadowBlur=7;ctx.shadowOffsetY=4;if(images.vehicles.complete&&images.vehicles.naturalWidth)ctx.drawImage(images.vehicles,s.x,s.y,s.w,s.h,-v.width/2,-h+2,v.width,h);else{ctx.fillStyle='#dfae38';ctx.fillRect(-v.width/2,-30,v.width,24);ctx.fillStyle='#273932';for(const offset of[-v.wheelbase/2,v.wheelbase/2]){ctx.beginPath();ctx.arc(offset,-2,8,0,Math.PI*2);ctx.fill();}}ctx.restore();}
+  function drawVehicle(x,y,angle=0){const v=E.vehicles[state.vehicle],source=v.asset?images[state.vehicle]:images.vehicles,s=v.asset?{x:0,y:0,w:source.naturalWidth,h:source.naturalHeight}:sprite[state.vehicle],h=v.width*(s.h||1)/(s.w||1);ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.shadowColor='#17372b80';ctx.shadowBlur=7;ctx.shadowOffsetY=4;if(source.complete&&source.naturalWidth)ctx.drawImage(source,s.x,s.y,s.w,s.h,-v.width/2,-h+2,v.width,h);else{ctx.fillStyle='#dfae38';ctx.fillRect(-v.width/2,-30,v.width,24);ctx.fillStyle='#273932';for(const [offset] of E.axlesFor(state.vehicle)){ctx.beginPath();ctx.arc(offset,-2,8,0,Math.PI*2);ctx.fill();}}ctx.restore();}
   function roadY(x){if(x<E.LEFT||x>E.RIGHT||!state.model||!state.display.length)return E.DECK;const i=Math.max(0,Math.min(7,Math.floor((x-E.LEFT)/E.STEP))),a=drawPoint({x:E.LEFT+i*E.STEP,y:E.DECK}),b=drawPoint({x:E.LEFT+(i+1)*E.STEP,y:E.DECK});return a.y+(b.y-a.y)*(x-a.x)/E.STEP;}
   function draw(){
     ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);ctx.fillStyle='#629796';ctx.fillRect(0,0,width,height);ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);ctx.lineCap='round';ctx.lineJoin='round';
@@ -176,7 +194,7 @@
       for(const [p,color]of[[state.hover,'#fff2b4'],[state.selected,'#efac43']])if(p){ctx.beginPath();ctx.arc(p.x,p.y,10/scale,0,Math.PI*2);ctx.fillStyle=color+'45';ctx.fill();ctx.strokeStyle=color;ctx.lineWidth=2/scale;ctx.stroke();}
       drawVehicle(155,E.DECK);
     }else if(state.mode==='testing'||(state.mode==='result'&&!state.failedReason)){
-      const v=E.vehicles[state.vehicle],y1=roadY(state.carX-v.wheelbase/2),y2=roadY(state.carX+v.wheelbase/2);drawVehicle(state.carX,(y1+y2)/2,Math.atan2(y2-y1,v.wheelbase));
+      const range=E.contactRange(state.vehicle),y1=roadY(state.carX+range.rear),y2=roadY(state.carX+range.front),angle=Math.atan2(y2-y1,range.front-range.rear);drawVehicle(state.carX,y1+(y2-y1)*(-range.rear)/(range.front-range.rear),angle);
     }
     if(state.mode==='fall'||(state.mode==='result'&&state.failedReason)){
       for(const d of state.debris){ctx.save();const mx=(d.a.x+d.b.x)/2,my=(d.a.y+d.b.y)/2;ctx.translate(mx+d.x,my+d.y);ctx.rotate(d.angle);beam({type:d.type},{x:d.a.x-mx,y:d.a.y-my},{x:d.b.x-mx,y:d.b.y-my},-1);ctx.restore();}
@@ -200,8 +218,8 @@
       const load=validLoad(t.loadPercent)?t.loadPercent:100,type=E.bridgeTypes[t.bridgeType]?t.bridgeType:E.inferType(t.members);
       const article=document.createElement('article');article.className='trial';
       const body=document.createElement('div'),title=document.createElement('strong');title.textContent=`Trial ${state.trials.length-i} · ${E.vehicles[t.vehicle]?.name||'Vehicle'}`;
-      const outcome=document.createElement('span');outcome.className='trial-status'+(t.pass?'':' failed');outcome.textContent=t.pass?' · crossed':' · failed';title.append(outcome);body.append(title);
-      const desc=document.createElement('p');desc.textContent=`${E.bridgeTypes[type].name} · ${E.loadFor(t.vehicle,load)} load units (${load}%) · ${t.wind===0?'Calm':t.wind===12?'Breezy':'Gusty'} · ${t.members.length} pieces`;body.append(desc);
+      const outcome=document.createElement('span');outcome.className='trial-status'+(t.pass?'':' failed');outcome.textContent=t.mission?' · challenge complete':t.pass?' · crossed · goal not met':' · failed';title.append(outcome);body.append(title);
+      const desc=document.createElement('p');desc.textContent=`${E.bridgeTypes[type].name} · ${E.loadFor(t.vehicle,load)} load units${load===100?'':` (saved ${load}% load)`} · ${t.wind===0?'Calm':t.wind===12?'Breezy':'Gusty'} · ${t.members.length} pieces`;body.append(desc);
       const metrics=document.createElement('div');metrics.className='trial-metrics';metrics.textContent=`Cost $${t.cost}   ·   Peak stress ${t.stress===null?'unsupported':t.stress+'%'}   ·   Bend ${t.deflection===null?'—':t.deflection+' px'}`;body.append(metrics);article.append(body);
       const restore=document.createElement('button');restore.className='quiet';restore.textContent='Restore design';restore.disabled=busy();restore.onclick=()=>{
         remember();state.members=clone(E.validate(t.members));state.bridgeType=type;state.loadPercent=load;state.challenge=t.challenge;state.vehicle=t.vehicle;state.wind=t.wind;state.tool=E.roadComplete(state.members)?type==='suspension'?'cable':'wood':'road';resetView();refresh();$('notebookDialog').close();status('Trial design, load and wind restored. Ready to repeat or improve.');
@@ -211,7 +229,7 @@
   $('reflection').value=state.reflection;$('reflection').addEventListener('input',()=>{clearTimeout(statusTimer);statusTimer=setTimeout(persist,400);});
   function download(name,type,content){const url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
   $('saveBtn').onclick=()=>{
-    download('my-bridge.json','application/json',JSON.stringify({format:'bridge-test-lab',version:2,members:state.members,bridgeType:state.bridgeType,challenge:state.challenge,vehicle:state.vehicle,loadPercent:state.loadPercent,wind:state.wind},null,2));status('Bridge file saved with its load and wind settings. Open it later to continue.');
+    download('my-bridge.json','application/json',JSON.stringify({format:'bridge-test-lab',version:3,members:state.members,bridgeType:state.bridgeType,challenge:state.challenge,vehicle:state.vehicle,loadPercent:state.loadPercent,wind:state.wind},null,2));status('Bridge file saved with its load and wind settings. Open it later to continue.');
   };
   $('loadBtn').onclick=()=>$('bridgeFile').click();$('bridgeFile').onchange=async()=>{
     const file=$('bridgeFile').files[0];if(!file)return;
@@ -231,5 +249,5 @@
     download('bridge-test-notebook.csv','text/csv',rows.map(row=>row.map(csv).join(',')).join('\r\n'));
   };$('printBtn').onclick=()=>window.print();
   for(const image of Object.values(images))image.onerror=()=>{if(!assetWarning){assetWarning=true;status('The artwork could not load. Building and bridge tests are still available.');}};
-  resize();refresh();status(state.gaps.length?'Road is selected. Fill the highlighted Road sections first, then add Wood or Steel bracing.':'Road connected. Try a bridge design, choose a load, and test your idea.');requestAnimationFrame(loop);
+  resize();refresh();status(state.gaps.length?'Road is selected. Fill the highlighted Road sections first, then add Wood or Steel bracing.':'Road connected. Try a bridge design, choose a vehicle, and test your idea.');requestAnimationFrame(loop);
 })();

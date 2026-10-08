@@ -11,7 +11,17 @@
     steel:{name:'Steel',EA:14000,EI:110,axial:240,moment:45,cost:58,weight:.23},
     cable:{name:'Cable',EA:7000,EI:0,axial:180,moment:0,cost:26,weight:.04,pretension:.003}
   };
-  const vehicles={car:{name:'Car',load:10,width:88,wheelbase:55},truck:{name:'Truck',load:25,width:126,wheelbase:78},bus:{name:'School bus',load:45,width:168,wheelbase:110}};
+  const vehicles={
+    car:{name:'Car',load:10,width:88,wheelbase:55},
+    truck:{name:'Pickup',load:25,width:126,wheelbase:78},
+    trailer:{name:'Pickup + trailer',load:37.5,width:210,wheelbase:159,axles:[[-74,.35],[7,.30],[85,.35]],asset:'trailer.webp'},
+    bus:{name:'School bus',load:45,width:168,wheelbase:110},
+    semi:{name:'Freight semi',load:60,width:250,wheelbase:210,axles:[[-108,.15],[-86,.15],[18,.225],[40,.225],[102,.25]],asset:'semi.webp'},
+    tanker:{name:'Tanker semi',load:75,width:270,wheelbase:222,axles:[[-112,.15],[-88,.15],[-62,.15],[19,.175],[43,.175],[110,.20]],asset:'tanker.webp'},
+    tank:{name:'Tank',load:90,width:175,wheelbase:95,axles:[[-61,1/6],[-42,1/6],[-23,1/6],[-4,1/6],[15,1/6],[34,1/6]],asset:'tank.webp',tracked:true}
+  };
+  const axlesFor=vehicle=>vehicles[vehicle].axles||[[-vehicles[vehicle].wheelbase/2,.5],[vehicles[vehicle].wheelbase/2,.5]];
+  const contactRange=vehicle=>{const a=axlesFor(vehicle);return {rear:Math.min(...a.map(x=>x[0])),front:Math.max(...a.map(x=>x[0]))};};
   const bridgeTypes={
     girder:{name:'Beam',tip:'A deep steel frame resists bending. How much load can it carry without diagonals?'},
     truss:{name:'Truss',tip:'Triangles distribute forces through the wood beams. Reinforce the weak members to carry more.'},
@@ -104,7 +114,7 @@
   }
   function inferType(members){return ['suspension','arch','truss','girder'].find(type=>matchesType(members,type))||'custom';}
   function readDesign(data){
-    if(!data||data.format!=='bridge-test-lab'||![1,2].includes(data.version))throw new Error('Choose a Bridge Test Lab design file.');
+    if(!data||data.format!=='bridge-test-lab'||![1,2,3].includes(data.version))throw new Error('Choose a Bridge Test Lab design file.');
     const members=validate(data.members),loadPercent=data.loadPercent===undefined?100:data.loadPercent;
     if(!vehicles[data.vehicle]||![0,12,28].includes(data.wind)||!Number.isFinite(loadPercent)||loadPercent<50||loadPercent>200||loadPercent%10!==0||typeof data.challenge!=='string'||(data.bridgeType!==undefined&&!bridgeTypes[data.bridgeType]))throw new Error('This file has invalid test settings.');
     return {members,vehicle:data.vehicle,wind:data.wind,challenge:data.challenge,loadPercent,bridgeType:data.bridgeType||inferType(members)};
@@ -189,12 +199,12 @@
     if(!model.cables.length&&!model.L)return unstable();
     for(const el of model.elements){const w=materials[el.m.type].weight*el.L/2;F[el.ia*3+1]-=w;F[el.ib*3+1]-=w;}
     for(const [i,p]of model.nodes.entries())F[i*3]+=wind*.045*(p.y!==DECK?1:.25);
-    const wheels=[centre-vehicle.wheelbase/2,centre+vehicle.wheelbase/2];
-    for(const x of wheels){if(x<LEFT||x>RIGHT)continue;
+    const wheels=axlesFor(vehicleName).map(([offset,fraction])=>({x:centre+offset,load:load*fraction}));
+    for(const {x,load:axleLoad} of wheels){if(x<LEFT||x>RIGHT)continue;
       const ix=Math.min(7,Math.floor((x-LEFT)/STEP)),t=(x-LEFT-ix*STEP)/STEP;
       const ia=model.map.get(`${LEFT+ix*STEP},${DECK}`),ib=model.map.get(`${LEFT+(ix+1)*STEP},${DECK}`);
-      if(ia!==undefined)F[ia*3+1]-=load/2*(1-t);
-      if(ib!==undefined)F[ib*3+1]-=load/2*t;
+      if(ia!==undefined)F[ia*3+1]-=axleLoad*(1-t);
+      if(ib!==undefined)F[ib*3+1]-=axleLoad*t;
     }
     if(model.cables.length){const u=nonlinearSolve(model,F);if(!u)return unstable();displacements.set(u);}
     else {const u=solveFactor(model.L,model.free.map(i=>F[i]));for(let i=0;i<model.free.length;i++)displacements[model.free[i]]=u[i];}
@@ -209,7 +219,7 @@
       const force=el.K.map(row=>row.reduce((v,k,j)=>v+k*local[j],0));
       const p=materials[el.m.type],axial=force[3];
       let moment=Math.max(Math.abs(force[2]),Math.abs(force[5]));
-      if(el.m.type==='road')for(const x of wheels){const lo=Math.min(el.m.a.x,el.m.b.x),hi=Math.max(el.m.a.x,el.m.b.x);if(x>lo&&x<hi){const t=(x-lo)/STEP;moment+=load/2*el.L*t*(1-t);}}
+      if(el.m.type==='road')for(const {x,load:axleLoad} of wheels){const lo=Math.min(el.m.a.x,el.m.b.x),hi=Math.max(el.m.a.x,el.m.b.x);if(x>lo&&x<hi){const t=(x-lo)/STEP;moment+=axleLoad*el.L*t*(1-t);}}
       // Compression capacity decreases for a longer, unbraced member (buckling).
       const capacity=axial<0?Math.min(p.axial,Math.PI**2*p.EI/el.L**2):p.axial;
       const ratio=Math.abs(axial)/capacity+moment/p.moment;
@@ -222,8 +232,9 @@
   function scan(members,vehicle='truck',wind=0,loadPercent=100){
     loadFor(vehicle,loadPercent);const model=prepare(members);let worst=null,peakBend=0;
     if(!model.complete)return {pass:false,reason:'gap',cost:model.cost};
-    for(let x=LEFT-vehicles[vehicle].wheelbase/2;x<=RIGHT+vehicles[vehicle].wheelbase/2;x+=7){const r=solve(model,vehicle,x,wind,loadPercent);if(!worst||r.maxStress>worst.maxStress)worst=r;peakBend=Math.max(peakBend,r.maxDeflection);if(r.unstable)return {pass:false,reason:'unstable',cost:model.cost,...r};}
+    const range=contactRange(vehicle);
+    for(let x=LEFT-range.front;x<=RIGHT-range.rear;x+=7){const r=solve(model,vehicle,x,wind,loadPercent);if(!worst||r.maxStress>worst.maxStress)worst=r;peakBend=Math.max(peakBend,r.maxDeflection);if(r.unstable)return {pass:false,reason:'unstable',cost:model.cost,...r};}
     return {...worst,maxDeflection:peakBend,pass:worst.maxStress<=1&&peakBend<=45,reason:peakBend>45?'sag':worst.maxStress>1?'stress':'crossed',cost:model.cost};
   }
-  return {LEFT,RIGHT,DECK,STEP,materials,vehicles,bridgeTypes,loadFor,key,length,cost,starter,validate,roadGaps,roadComplete,matchesType,inferType,readDesign,prepare,cableResponse,solve,scan};
+  return {LEFT,RIGHT,DECK,STEP,materials,vehicles,axlesFor,contactRange,bridgeTypes,loadFor,key,length,cost,starter,validate,roadGaps,roadComplete,matchesType,inferType,readDesign,prepare,cableResponse,solve,scan};
 });

@@ -32,7 +32,7 @@ const wind=E.scan(truss,'truck',28);assert(wind.maxStress>truck.maxStress,'Wind 
 const light=E.scan(truss,'truck',0,50),heavy=E.scan(truss,'truck',0,150);
 assert(light.pass&&!heavy.pass&&heavy.maxStress>truck.maxStress&&truck.maxStress>light.maxStress,'The same truss must reach its strength limit as load increases');
 assert.equal(E.loadFor('truck',150),37.5,'Cargo percentage must scale the actual moving axle load');
-assert.equal(E.loadFor('bus',200),90,'The bus at 200% must provide the heaviest selectable load');
+assert.equal(E.loadFor('bus',200),90,'Legacy bus load scaling must remain reproducible');
 assert.throws(()=>E.loadFor('truck',201),/50% to 200%/);
 assert.throws(()=>E.loadFor('truck',NaN),/50% to 200%/);
 const starters=['girder','truss','arch','suspension'];
@@ -74,4 +74,24 @@ assert.throws(()=>E.readDesign({...modern,loadPercent:0}),/invalid test settings
 assert.throws(()=>E.readDesign({...modern,loadPercent:55}),/invalid test settings/);
 assert.throws(()=>E.readDesign({...modern,vehicle:'airplane'}),/invalid test settings/);
 assert.throws(()=>E.readDesign({...modern,bridgeType:'unknown'}),/invalid test settings/);
-console.log(JSON.stringify({checks:50,trussTruck:{stress:truck.maxStress,bend:truck.maxDeflection,cost:truck.cost},heavyTruck:{stress:heavy.maxStress,pass:heavy.pass},suspensionCar:{stress:suspended.maxStress,bend:suspended.maxDeflection,pass:suspended.pass},withoutBackstays:{bend:unanchored.maxDeflection,pass:unanchored.pass},reinforcedBus:E.scan(upgraded,'bus').pass},null,2));
+// Fleet load paths: each axle/track contact contributes its share of the total weight.
+for(const [vehicle,v]of Object.entries(E.vehicles)){
+  const axles=E.axlesFor(vehicle);
+  assert(Math.abs(axles.reduce((sum,a)=>sum+a[1],0)-1)<1e-12,'Contact loads must sum to the total weight for '+vehicle);
+  assert(axles.every(([x,f])=>Math.abs(x)<v.width/2&&f>0),'Load contacts must sit inside the vehicle for '+vehicle);
+  const run=E.solve(model,vehicle,600);let reactions=0,bankWeight=0;
+  for(const [i,p]of model.nodes.entries())if(p.y===E.DECK&&(p.x===E.LEFT||p.x===E.RIGHT)){
+    reactions+=model.K[i*3+1].reduce((sum,k,j)=>sum+k*run.displacements[j],0);
+    for(const m of truss)if(E.key(m.a)===E.key(p)||E.key(m.b)===E.key(p))bankWeight+=E.materials[m.type].weight*E.length(m)/2;
+  }
+  const bridgeWeight=truss.reduce((sum,m)=>sum+E.materials[m.type].weight*E.length(m),0);
+  assert(Math.abs(reactions+bankWeight-bridgeWeight-v.load)<1e-6,'Bank reactions must balance every vehicle weight for '+vehicle);
+}
+assert(E.scan(E.starter('arch'),'trailer').pass,'The arch mission must carry the pickup and trailer');
+assert(E.scan(E.starter('girder'),'semi').pass,'The steel beam must carry the freight semi');
+assert(!E.scan(truss,'semi').pass,'The wood starter must need strengthening for a semi');
+const steelTruss=truss.map(m=>m.type==='wood'?{...m,type:'steel'}:m);
+assert(E.scan(steelTruss,'tank').pass&&E.cost(steelTruss)<=2200,'The tank mission must be achievable under budget by reinforcing the truss');
+const fleetFile={...modern,version:3,vehicle:'tanker',loadPercent:100};
+assert.equal(E.readDesign(fleetFile).vehicle,'tanker','Version 3 must preserve the selected fleet vehicle');
+console.log(JSON.stringify({checks:76,vehicles:Object.keys(E.vehicles).length,originalTruck:truck.pass,suspensionCar:suspended.pass,semiOnWood:E.scan(truss,'semi').pass,tankOnSteel:E.scan(steelTruss,'tank').pass},null,2));

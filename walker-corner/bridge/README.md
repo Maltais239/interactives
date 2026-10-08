@@ -4,7 +4,7 @@ An illustrated bridge builder based on Tyler Walker’s Bridge Tester idea. The 
 
 ## Play
 
-Connect endpoints on the construction grid. Road members join neighbouring points along the road line. Wood and steel support the deck above or below it. All joints transfer rotation and force. Crossing beams do not join unless they share an endpoint. Test a car, truck or school bus; compare saved trials in the field notebook. Challenges require the named vehicle and budget. Free build has no budget limit.
+Connect endpoints on the construction grid. Road members join neighbouring points along the road line. Wood and steel support the deck above or below it. All joints transfer rotation and force. Crossing beams do not join unless they share an endpoint. Choose a car, pickup, pickup with a loaded trailer, school bus, freight semi, tanker semi or tank; compare saved trials in the field notebook. Challenges require the named vehicle and budget. Free build has no budget limit.
 
 The driving surface needs eight Road sections. Missing sections are highlighted in the scene, and a gap result names the two points that need Road. An empty or incomplete restored design starts with Road selected. To convert a wood or steel beam on the road line, select Road and connect the same two neighbouring points; Undo restores the previous material. Road alone allows the vehicle to move but can bend too far without triangular bracing.
 
@@ -14,9 +14,9 @@ Pointer and keyboard construction are supported, with equivalent labelled point 
 
 Four starting structures are available: a deep steel beam frame, the original wood truss, a raised steel arch with vertical ties, and a suspension design with braced steel towers, bank-anchored backstays, a segmented main cable and cable hangers. Road-only, unbraced and empty designs remain available. Cable is a fourth construction material, at $26 per grid unit; keyboard shortcut 5 selects it while the existing shortcut 4 continues to select Erase.
 
-Vehicle load ranges from 50% to 200% in steps of 10%. At 100%, Car is 10 relative load units, Truck is 25, and Bus is 45. The same percentage scales both moving axle loads and interior deck bending. These are classroom units, not tonnes. Heavy haul requires a truck at 150% or more. Beam, truss, arch and suspension challenges also require structural features, a minimum load and a budget: changing the label or reducing the load does not satisfy them.
+The illustrated fleet replaces the load slider: Car 10, Pickup 25, Pickup + trailer 37.5, School bus 45, Freight semi 60, Tanker semi 75, and Tank 90 relative load units. Pickup and trailer use three contacts, freight semis five, tankers six, and tanks six distributed track contacts. Contact fractions sum to the vehicle weight; each load is distributed to adjacent deck joints and contributes local road bending. These are classroom units, not tonnes. Heavy haul requires the freight semi; separate tanker and tank challenges reward heavier crossings. Beam, truss, arch and suspension challenges also require structural features, a minimum load and a budget: changing the label or reducing the load does not satisfy them.
 
-The notebook and CSV record bridge design, vehicle, load percentage, load units, wind, cost, outcome, stress and maximum deck bending. Restoring a trial restores its load and wind. JSON version 2 exports these settings; version 1 designs and older browser trials open at their original 100% load. The existing browser storage key is retained so current work is preserved. Undo also restores the previous starting-design label.
+The notebook and CSV record bridge design, vehicle, load percentage, load units, wind, cost, outcome, stress and maximum deck bending. Restoring a trial restores its load and wind. JSON version 3 exports these settings. Version 1 and 2 designs remain supported, including old percentage loads; restored historical tests keep that weight and show it as a saved load. Choosing a fleet vehicle returns to its fixed weight. The existing browser storage key is retained so current work is preserved. Undo also restores the previous starting-design label.
 
 ## Model
 
@@ -32,6 +32,14 @@ Cable formulation references: [OpenSees corotational truss](https://opensees.git
 
 ## Verify
 
-Run `node verification/engine.test.js` for 50 assertions covering original frame behavior, load scaling, structural features, tension and slack, suspension weight equilibrium, backstay removal, and old/new design import settings. Browser verification covers editing, undo, load controls, supported and failed crossings, trial restoration, state-preserving resize and small/short viewport layouts.
+Run `node verification/engine.test.js` for 76 assertions covering original frame behavior, load scaling, structural features, tension and slack, suspension weight equilibrium, backstay removal, and old/new design import settings. Browser verification covers editing, undo, fleet choices, over-budget goals, supported and failed crossings, trial restoration, state-preserving resize and small/short viewport layouts.
 
 Original source snapshots in `../sources/` remain unchanged. This edition replaces only the live `bridge/` game and its preview.
+
+## Vehicle artwork
+
+New transparent sprites were created with the built-in imagegen tool from the original vehicle artwork as a style reference. The shared prompt requested a detailed hand-painted, flat left-side vehicle facing right, all contact points on a horizontal baseline, full silhouette, genuine alpha transparency, and no text, logos, scenery or motion trails. Subjects were an orange pickup towing timber, a red freight semi, a navy silver-tanker semi, and an olive tracked tank. Final cropped game assets are `assets/trailer.webp`, `assets/semi.webp`, `assets/tanker.webp`, and `assets/tank.webp`.
+
+## Budget goals
+
+Tests are allowed above budget so students can compare strength and cost. Completing a challenge requires a successful crossing, the required vehicle and load, any required bridge structure, and a cost at or below its budget. The build-cost panel and over-budget crossing result explicitly identify the missing budget goal. Free build has no budget limit. Notebook entries distinguish crossing success from challenge completion.
