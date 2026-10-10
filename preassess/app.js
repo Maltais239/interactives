@@ -31,15 +31,15 @@ function stageModel(p){
  // to numbered counters when thousands are added.
  const styles=['ten-thousand','thousand','hundred','ten','one'];
  const containers=['ten-thousands','thousands','hundreds','tens','ones'];
- const labels=['Ten thousands','Thousands','Hundreds','Tens','Ones'];
- const caption=p.map((count,i)=>count?count+' '+labels[i]:'').filter(Boolean).join(', ')||'No blocks';
+ const labels=['ten thousand','thousand','hundred','ten','one'];
+ const caption=p.map((count,i)=>count?count+' '+labels[i]+(count!==1?'s':''):'').filter(Boolean).join(', ')||'No blocks';
  const groups=p.map((count,i)=>{
   if(!count)return '';
   const shown=Math.min(count,20),remaining=count-shown;
-  const pieces='<i class="'+styles[i]+'" aria-hidden="true"></i>'.repeat(shown);
+  const pieces=('<i class="'+styles[i]+'" aria-hidden="true"></i>').repeat(shown);
   const overflow=remaining?'<span class="more-blocks">+'+remaining+'</span>':'';
   // Only label higher places and crowded groups, avoiding text-heavy early practice.
-  const heading=i<2||count>9?'<span class="group-label">'+count+' '+labels[i]+'</span>':'';
+  const heading=i<2||count>9?'<span class="group-label">'+count+' '+labels[i]+(count!==1?'s':'')+'</span>':'';
   return '<div class="model-group model-'+containers[i]+'"><div class="model-pieces">'+pieces+overflow+'</div>'+heading+'</div>';
  }).join('');
  return '<div class="blocks" role="img" aria-label="'+caption+'">'+groups+'</div>';
