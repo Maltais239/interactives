@@ -11,9 +11,38 @@ const shortHelp={bonds:'Count on from the known part to the whole.',build:'Look 
 function persist(){record.version=2;if(!Studio.save(key,record))$('storage-status').textContent='Saving is unavailable here. You can download your record from Progress.'}
 function rememberSession(){record.session={skill,round,q,answered,wrong,assisted,adjustment,practiceParts:[...practiceParts],adaptive:$('adaptive').checked};persist()}
 const number=n=>n.toLocaleString();
+const onesWords=['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
+const tensWords=['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
+function underThousand(n){
+ if(n<20)return n?onesWords[n]:'';
+ if(n<100)return tensWords[Math.floor(n/10)]+(n%10?'-'+onesWords[n%10]:'');
+ const remainder=n%100;
+ return onesWords[Math.floor(n/100)]+' hundred'+(remainder?' '+underThousand(remainder):'');
+}
+function numberWords(n){
+ // The five adaptive ranges stop at 99,999.
+ if(!Number.isSafeInteger(n)||n<0||n>99999)return number(n);
+ if(n===0)return 'zero';
+ if(n<1000)return underThousand(n);
+ return underThousand(Math.floor(n/1000))+' thousand'+(n%1000?' '+underThousand(n%1000):'');
+}
 function stageModel(p){
- if(p[0]||p[1])return '<div class="counters" role="img" aria-label="'+N.places.map((n,i)=>p[i]+' '+n).join(', ')+'">'+p.map((c,i)=>c?'<div class="counter-group"><b>'+N.places[i]+'</b>'+Array.from({length:Math.min(c,30)},()=>'<span class="counter">'+number(N.values[i])+'</span>').join('')+'</div>':'').join('')+'</div>';
- return '<div class="blocks" role="img" aria-label="'+p[2]+' hundreds, '+p[3]+' tens and '+p[4]+' ones"><div class="block-group">'+ '<i class="hundred"></i>'.repeat(p[2])+'</div><div class="block-group">'+ '<i class="ten"></i>'.repeat(p[3])+'</div><div class="ones">'+ '<i class="one"></i>'.repeat(p[4])+'</div></div>';
+ // Keep every place as a tangible base-ten model; don't suddenly switch
+ // to numbered counters when thousands are added.
+ const styles=['ten-thousand','thousand','hundred','ten','one'];
+ const containers=['ten-thousands','thousands','hundreds','tens','ones'];
+ const labels=['Ten thousands','Thousands','Hundreds','Tens','Ones'];
+ const caption=p.map((count,i)=>count?count+' '+labels[i]:'').filter(Boolean).join(', ')||'No blocks';
+ const groups=p.map((count,i)=>{
+  if(!count)return '';
+  const shown=Math.min(count,20),remaining=count-shown;
+  const pieces='<i class="'+styles[i]+'" aria-hidden="true"></i>'.repeat(shown);
+  const overflow=remaining?'<span class="more-blocks">+'+remaining+'</span>':'';
+  // Only label higher places and crowded groups, avoiding text-heavy early practice.
+  const heading=i<2||count>9?'<span class="group-label">'+count+' '+labels[i]+'</span>':'';
+  return '<div class="model-group model-'+containers[i]+'"><div class="model-pieces">'+pieces+overflow+'</div>'+heading+'</div>';
+ }).join('');
+ return '<div class="blocks" role="img" aria-label="'+caption+'">'+groups+'</div>';
 }
 function indices(level){
  // Include a tens column even in Within 10, since 10 must be buildable.
@@ -51,7 +80,7 @@ function renderPractice(){
  $('help-text').textContent=shortHelp[skill];
  $('help-panel').open=false;
  if(skill==='build'){
-  prompt.innerHTML='<h2>Build '+number(q.n)+'</h2>';
+  prompt.innerHTML='<h2>Build '+numberWords(q.n)+'</h2>';
   stage.innerHTML=N.total(practiceParts)?stageModel(practiceParts):'<div class="stage-empty">Tap + to add blocks</div>';
   answer.innerHTML=placeChart(practiceParts,'practice',q.level);
  } else if(skill==='bonds'){
@@ -96,7 +125,20 @@ function updateBuild(i,delta){
  if(answered||skill!=='build'||!indices(q.level).includes(i))return;
  practiceParts[i]=Math.min(9,Math.max(0,practiceParts[i]+delta));
  $('stage-content').innerHTML=N.total(practiceParts)?stageModel(practiceParts):'<div class="stage-empty">Tap + to add blocks</div>';
- $('answer-area').innerHTML=placeChart(practiceParts,'practice',q.level);
+ const chart=$('answer-area');
+ // Update the existing controls in place so repeated taps don't rebuild buttons
+ // or steal focus as the learner changes a number.
+ chart.querySelectorAll('.place-column').forEach(column=>{
+  const plus=column.querySelector('[data-delta="1"]');
+  const minus=column.querySelector('[data-delta="-1"]');
+  if(!plus||!minus)return;
+  const place=Number(plus.dataset.place);
+  const digit=practiceParts[place];
+  const count=column.querySelector('.place-value');
+  if(count){count.textContent=String(digit);count.setAttribute('aria-label',digit+' '+N.places[place]);}
+  plus.disabled=digit>=9;
+  minus.disabled=digit<=0;
+ });
  rememberSession();
 }
 function hint(){
