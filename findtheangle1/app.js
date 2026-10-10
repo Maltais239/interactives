@@ -21,6 +21,7 @@ if(state.mode==='build'&&$('measure').checked){state.supported=true;$('target').
 function resetVisual(){state.locked=false;state.attempts=0;state.supported=false;state.answer='';$('answer').value='';$('angle-slider').disabled=false;checkButton.disabled=false;nextButton.hidden=true;checkButton.hidden=false;hintButton.hidden=false;setFeedback('Try for a first-try star!');}
 function start(){resetVisual();const step=state.level==='starter'?10:1;const mode=state.mode;
 $('protractor').classList.toggle('mode-estimate',mode==='estimate');
+$('reference-arm').hidden=mode!=='missing';$('missing-wedge').hidden=mode!=='missing';
 $('protractor').classList.remove('reveal-scale');
 $('hint-strip').hidden=mode!=='estimate';
 $('target-pill').hidden=mode!=='build';
@@ -43,6 +44,11 @@ if(mode==='triangle'){const a=random(3,8)*10,b=random(3,Math.floor((160-a)/10))*
 state.angle=0; // visual display is updated directly to support read-only question modes
 const displayed=mode==='build'?0:state.target;
 state.locked=false;updateAngle(displayed); if(mode!=='build')state.angle=displayed;
+if(mode==='missing'){
+ const total=state.target+state.correct, end=point(total), innerStart=point(state.target,88), innerEnd=point(total,88);
+ $('reference-arm').setAttribute('x2',end.x);$('reference-arm').setAttribute('y2',end.y);
+ $('missing-wedge').setAttribute('d',`M320 305 L${innerStart.x} ${innerStart.y} A88 88 0 0 0 ${innerEnd.x} ${innerEnd.y} Z`);
+}
 $('angle-slider').disabled=mode!=='build';
 $('arm').setAttribute('opacity','1');
 }
@@ -60,7 +66,7 @@ function drawTriangle(a,b){
 }
 function selectMode(mode){if(!modes.includes(mode))return;state.mode=mode;state.round=0;state.score=0;
 document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===mode)));start()}
-function finish(correct,text){if(correct){if(state.attempts===0&&!state.supported)state.score++;state.locked=true;$('score').textContent=state.score+' ★';if(state.mode==='estimate'){$('protractor').classList.add('reveal-scale');$('target').textContent=state.target+'°';}setFeedback(text,'good');checkButton.hidden=true;hintButton.hidden=true;nextButton.hidden=false;nextButton.textContent=state.round===7?'See results →':'Next challenge →';$('angle-slider').disabled=true;
+function finish(correct,text){if(correct){if(state.attempts===0&&!state.supported)state.score++;state.locked=true;$('score').textContent=state.score+' ★';if(state.mode==='estimate'){$('protractor').classList.add('reveal-scale');$('target').textContent=state.target+'°';}if(state.mode==='estimate')$('hint-strip').hidden=true;setFeedback(text,'good');checkButton.hidden=true;hintButton.hidden=true;nextButton.hidden=false;nextButton.textContent=state.round===7?'See results →':'Next challenge →';$('angle-slider').disabled=true;
 }else{state.attempts++;setFeedback(text,'warn')}}
 function check(){if(state.locked)return;const m=state.mode;if(m==='classify')return;let response=m==='build'?state.angle:Number($('answer').value);if(m!=='build'&&$('answer').value.trim()===''){setFeedback('Enter your answer in degrees first.','warn');$('answer').focus();return}
 if(!Number.isFinite(response)||response<0||response>180){setFeedback('Enter an angle from 0° to 180°.','warn');return}
