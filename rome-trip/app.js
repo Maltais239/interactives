@@ -37,7 +37,7 @@
     document.querySelectorAll('[data-tab]').forEach(a=>{if(a.dataset.tab===current)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
     if(current==='stories')renderStories();
     if(current==='tips')renderTickets();
-    if(current==='italian'){if(location.hash.split('/')[1]==='menus'&&!D.scenarios.find(s=>s.id===scenario)?.menu){scenario=D.scenarios.find(s=>s.menu).id;phraseHidden=false;replyIndex=0;replyRevealed=false;}renderPractice();}
+    if(current==='italian'){if(location.hash.split('/')[1]==='menus'&&!D.scenarios.find(s=>s.id===scenario)?.menu){scenario=D.scenarios.find(s=>s.menu).id;practiceMode='builder';phraseHidden=false;replyIndex=0;replyRevealed=false;}renderPractice();}
   }
   function renderDay(){
     const day=D.days.find(d=>d.date===state.day)||D.days[0];
@@ -58,6 +58,7 @@
   function fieldValue(s,f){const v=choices[s.id]?.[f.id];return f.options.find(o=>o[0]===v)||f.options[0];}
   function order(){
     const s=D.scenarios.find(s=>s.id===scenario),v={};s.fields.forEach(f=>v[f.id]=fieldValue(s,f));
+    if(s.builder)return window.ROME_MENU_ORDER(s,v);
     if(v.request)return {it:v.request[0],en:v.request[1]};
     if(s.id==='cafe')return {it:`Buongiorno. Vorrei ${v.drink[0]}${v.pastry[0]?' e '+v.pastry[0]:''}, per favore.`,en:`Good morning. I’d like ${v.drink[1]}${v.pastry[0]?' and '+v.pastry[1]:''}, please.`};
     if(s.id==='gelato')return {it:`Vorrei ${v.serve[0]} ${v.flavour[0]}, per favore.`,en:`I’d like ${v.serve[1]} of ${v.flavour[1]} gelato, please.`};
@@ -67,13 +68,22 @@
   }
   function updatePhrase(){const p=order();$('order-italian').textContent=p.it;$('order-italian').hidden=phraseHidden;$('order-hidden').hidden=!phraseHidden;$('order-english').textContent=p.en;$('hide-italian').textContent=phraseHidden?'Show Italian':'Hide Italian & try';$('order-slow').dataset.say=p.it;$('order-normal').dataset.say=p.it;}
   function menuDetails(menu){
-    return `<details class="venue-menu"><summary>Menu items & place info</summary><h4>${esc(menu.venue)}</h4><p class="small">${esc(menu.address)}</p><ul class="menu-items">${menu.items.map(([it,en])=>`<li><div><strong lang="it">${esc(it)}</strong><span>${esc(en)}</span></div><button data-say="${esc(it)}" data-rate="0.65" aria-label="Hear ${esc(it)} slowly">Hear</button></li>`).join('')}</ul><div class="actions">${link(menu.url,menu.sourceLabel+' ↗')}${link(map(menu.venue+' '+menu.address),'Map ↗')}</div><p class="small menu-source">Published menu checked ${esc(menu.checked)}. These are practice conversations using listed items; daily availability can change.</p></details>`;
+    return `<details class="venue-menu"><summary>Menu items & place info</summary><h4>${esc(menu.venue)}</h4><p class="small">${esc(menu.address)}</p><ul class="menu-items">${menu.items.map(([it,en])=>`<li><div><strong lang="it">${esc(it)}</strong><span>${esc(en)}</span></div><button data-say="${esc(it)}" data-rate="0.65" aria-label="Hear ${esc(it)} slowly">Hear</button></li>`).join('')}</ul><div class="actions">${link(menu.url,menu.sourceLabel+' ↗')}${link(map(menu.venue+' '+menu.address),'Map ↗')}</div><p class="small menu-source">Published menu checked ${esc(menu.checked)}. Food names use the linked published menu. Drinks and service choices are practice requests; ask what is available today.</p></details>`;
+  }
+  function menuRequests(s){
+    const selected=choices[s.id]?.usefulRequest||s.requests[0][0];
+    return `<details class="useful-requests"><summary>Useful requests</summary><label for="menu-request">Choose a request<select id="menu-request">${s.requests.map(([it,en])=>`<option value="${esc(it)}"${selected===it?' selected':''}>${esc(en)}</option>`).join('')}</select></label><p id="request-italian" class="dialogue-italian" lang="it"></p><p id="request-english" class="translation"></p><div class="actions"><button id="request-slow" data-say="" data-rate="0.65">Listen slowly</button><button id="request-normal" data-say="" data-rate="0.95">Natural speed</button></div></details>`;
+  }
+  function updateRequest(){
+    const s=D.scenarios.find(s=>s.id===scenario),p=s.requests.find(p=>p[0]===choices[s.id]?.usefulRequest)||s.requests[0];
+    $('request-italian').textContent=p[0];$('request-english').textContent=p[1];$('request-slow').dataset.say=p[0];$('request-normal').dataset.say=p[0];
   }
   function renderPractice(){
     const s=D.scenarios.find(s=>s.id===scenario);
     $('scenarios').innerHTML=`<label for="scenario-select"><span class="picker-label">Situation</span><select id="scenario-select">${[false,true].map(isMenu=>`<optgroup label="${isMenu?'Menus in Prati':'Everyday Italian'}">${D.scenarios.filter(x=>!!x.menu===isMenu).map(x=>`<option value="${x.id}"${x.id===scenario?' selected':''}>${esc(x.label)}</option>`).join('')}</optgroup>`).join('')}</select></label><div class="practice-modes scenario-tabs" aria-label="Speaking practice mode"><button data-practice-mode="reply" aria-pressed="${practiceMode==='reply'}">Try a reply</button><button data-practice-mode="builder" aria-pressed="${practiceMode==='builder'}">Build a phrase</button></div>`;
-    $('practice').innerHTML=`<section id="phrase-builder"${practiceMode==='builder'?'':' hidden'}><h3>${esc(s.title)}</h3><p class="scenario-context">${esc(s.context)}</p><div class="order-builder">${s.fields.map(f=>`<label for="choice-${f.id}">${esc(f.label)}<select id="choice-${f.id}" data-field="${f.id}">${f.options.map(o=>`<option value="${esc(o[0])}"${fieldValue(s,f)[0]===o[0]?' selected':''}>${esc(o[1])}</option>`).join('')}</select></label>`).join('')}</div><div class="phrase-stage"><p id="order-italian" class="italian-text" lang="it"></p><p id="order-hidden" class="phrase-hidden" hidden>Your turn. Say it aloud.</p><p id="order-english" class="translation"></p></div><div class="actions"><button id="order-slow" data-say="" data-rate="0.65" class="primary">Listen slowly</button><button id="order-normal" data-say="" data-rate="0.95">Natural speed</button><button id="hide-italian">Hide Italian & try</button></div><p class="practice-cue">This is self-practice: listen and compare. The app doesn’t record or score your voice.</p></section><section id="reply-practice"${practiceMode==='reply'?'':' hidden'} class="reply-practice" aria-labelledby="reply-heading"><div class="reply-heading"><div><span class="eyebrow">YOUR TURN TO SPEAK</span><h4 id="reply-heading">${s.menu?esc(s.title):'Try a reply.'}</h4></div><span id="reply-position" class="small"></span></div><div id="reply-stage"></div></section>${s.menu?menuDetails(s.menu):''}<details class="conversation"><summary>${s.menu?'A conversation at the counter or table':'What you might hear next'}</summary>${s.dialogue.map(row=>`<div class="dialogue-row"><span class="dialogue-label">${esc(row.who.toUpperCase())}</span><div class="dialogue-italian" lang="it">${esc(row.it)}</div><div class="dialogue-translation">${esc(row.en)}</div><button data-say="${esc(row.it)}" data-rate="0.65">Hear this slowly</button></div>`).join('')}<p class="notice" style="margin-top:22px;margin-bottom:0">${esc(s.tip)}</p></details>`;
+    $('practice').innerHTML=`<section id="phrase-builder"${practiceMode==='builder'?'':' hidden'}><h3>${esc(s.title)}</h3><p class="scenario-context">${esc(s.context)}</p><div class="order-builder${s.builder?' menu-order-builder':''}">${s.fields.map(f=>`<label for="choice-${f.id}">${esc(f.label)}<select id="choice-${f.id}" data-field="${f.id}">${f.options.map(o=>`<option value="${esc(o[0])}"${fieldValue(s,f)[0]===o[0]?' selected':''}>${esc(o[1])}</option>`).join('')}</select></label>`).join('')}</div><div class="phrase-stage"><p id="order-italian" class="italian-text" lang="it"></p><p id="order-hidden" class="phrase-hidden" hidden>Your turn. Say it aloud.</p><p id="order-english" class="translation"></p></div><div class="actions"><button id="order-slow" data-say="" data-rate="0.65" class="primary">Listen slowly</button><button id="order-normal" data-say="" data-rate="0.95">Natural speed</button><button id="hide-italian">Hide Italian & try</button></div><p class="practice-cue">This is self-practice: listen and compare. The app doesn’t record or score your voice.</p></section><section id="reply-practice"${practiceMode==='reply'?'':' hidden'} class="reply-practice" aria-labelledby="reply-heading"><div class="reply-heading"><div><span class="eyebrow">YOUR TURN TO SPEAK</span><h4 id="reply-heading">${s.menu?esc(s.title):'Try a reply.'}</h4></div><span id="reply-position" class="small"></span></div><div id="reply-stage"></div></section>${s.menu?menuRequests(s)+menuDetails(s.menu):''}<details class="conversation"><summary>${s.menu?'A conversation at the counter or table':'What you might hear next'}</summary>${s.dialogue.map(row=>`<div class="dialogue-row"><span class="dialogue-label">${esc(row.who.toUpperCase())}</span><div class="dialogue-italian" lang="it">${esc(row.it)}</div><div class="dialogue-translation">${esc(row.en)}</div><button data-say="${esc(row.it)}" data-rate="0.65">Hear this slowly</button></div>`).join('')}<p class="notice" style="margin-top:22px;margin-bottom:0">${esc(s.tip)}</p></details>`;
     updatePhrase();
+    if(s.requests)updateRequest();
     renderReply();
   }
   function renderReply(){
@@ -112,7 +122,7 @@
     if(b.dataset.story){openStory(b.dataset.story);return;}
     if(b.dataset.ticket){openTicket(b.dataset.ticket);return;}
     if(b.dataset.scenario){scenario=b.dataset.scenario;phraseHidden=false;replyIndex=0;replyRevealed=false;renderPractice();return;}
-    if(b.dataset.pratiMenus){scenario=D.scenarios.find(s=>s.menu).id;practiceMode='reply';phraseHidden=false;replyIndex=0;replyRevealed=false;renderPractice();$('scenario-select').focus({preventScroll:true});return;}
+    if(b.dataset.pratiMenus){scenario=D.scenarios.find(s=>s.menu).id;practiceMode='builder';phraseHidden=false;replyIndex=0;replyRevealed=false;renderPractice();$('scenario-select').focus({preventScroll:true});return;}
     if(b.dataset.practiceMode){practiceMode=b.dataset.practiceMode;$('phrase-builder').hidden=practiceMode!=='builder';$('reply-practice').hidden=practiceMode!=='reply';$('scenarios').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.practiceMode===practiceMode)));return;}
     if(b.dataset.filter){storyFilter=b.dataset.filter;renderStories();return;}
     if(b.hasAttribute('data-say')){say(b.dataset.say,b.dataset.rate);return;}
@@ -121,7 +131,7 @@
     if(b.id==='reply-next'){const drills=D.scenarios.find(s=>s.id===scenario).drills;replyIndex=(replyIndex+1)%drills.length;replyRevealed=false;renderReply();$('reply-reveal').focus({preventScroll:true});return;}
   });
   $('scenarios').addEventListener('change',e=>{if(e.target.id!=='scenario-select'||!D.scenarios.some(s=>s.id===e.target.value))return;scenario=e.target.value;phraseHidden=false;replyIndex=0;replyRevealed=false;renderPractice();$('scenario-select').focus({preventScroll:true});});
-  $('practice').addEventListener('change',e=>{if(e.target.dataset.field){choices[scenario]??={};choices[scenario][e.target.dataset.field]=e.target.value;phraseHidden=false;updatePhrase();}});
+  $('practice').addEventListener('change',e=>{if(e.target.id==='menu-request'){choices[scenario]??={};choices[scenario].usefulRequest=e.target.value;updateRequest();return;}if(e.target.dataset.field){choices[scenario]??={};choices[scenario][e.target.dataset.field]=e.target.value;phraseHidden=false;updatePhrase();}});
   $('save-day-note').addEventListener('click',()=>{state.notes[state.day]=$('day-note').value.slice(0,6000);if(persist())toast('Day note saved on this device.');});
   $('day-note').addEventListener('change',()=>{state.notes[state.day]=$('day-note').value.slice(0,6000);persist();});
   $('ticket-form').addEventListener('submit',e=>{e.preventDefault();const url=$('ticket-url').value.trim();if(url&&!validUrl(url)){toast('Use a full http or https link.');return;}const id=$('ticket-id').value;if(!D.tickets.some(t=>t.id===id))return;state.tickets[id]={url,time:$('ticket-time').value.trim().slice(0,180)};const saved=persist();closeTicket();renderTickets();renderDay();if(saved)toast('Ticket details saved on this device.');});
@@ -132,7 +142,7 @@
   if('speechSynthesis' in window){window.speechSynthesis.addEventListener('voiceschanged',findVoice);findVoice();}
   renderDay();renderPhrasebook();renderNearby();renderStories();renderPractice();renderTickets();setTab();
   if(!storageAvailable)setTimeout(()=>toast('Local saving may be unavailable. Use Export to keep a backup.'),500);
-  const OFFLINE_CACHE='darrens-rome-public-menus5';
+  const OFFLINE_CACHE='darrens-rome-public-orders6';
   function offlineStatus(status){
     const ready=status==='ready',pending=status==='saving';
     $('offline-badge').textContent=ready?'Ready offline':pending?'Saving offline…':'Online only';
@@ -144,7 +154,7 @@
     // addAll commits the complete offline set together; also check this build's scripts.
     const names=await caches.keys();if(!names.includes(OFFLINE_CACHE))return false;
     const cache=await caches.open(OFFLINE_CACHE);
-    const saved=await Promise.all(['./index.html','./styles.css?v=menus5','./app.js?v=menus5','./buildings.js?v=menus5','./menu-data.js?v=menus5'].map(url=>cache.match(url)));
+    const saved=await Promise.all(['./index.html','./styles.css?v=orders6','./app.js?v=orders6','./buildings.js?v=orders6','./menu-data.js?v=orders6','./ordering-data.js?v=orders6'].map(url=>cache.match(url)));
     if(saved.every(Boolean)){offlineStatus('ready');return true;}return false;
   }
   async function prepareOffline(){

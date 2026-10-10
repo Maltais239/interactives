@@ -23,17 +23,17 @@
     {
       id:'menu-archetto',label:'L’Archetto · pizza',title:'Pizza at L’Archetto.',
       context:'Practise ordering pizza, a fried starter, water, and dessert.',
-      menu:{venue:'L’Archetto',address:'Via Germanico 105, Roma',url:'https://www.larchetto.it/menu-al-tavolo/',locationSource:'https://www.larchetto.it/',sourceLabel:'Official dine-in menu',checked:'9 October 2026',items:[['Margherita','Tomato and mozzarella pizza'],['Marinara','Tomato, garlic and oregano pizza'],['Supplì','A fried rice croquette'],['Tiramisù','Coffee and mascarpone dessert']]},
+      menu:{venue:'L’Archetto',address:'Via Germanico 105, Roma',url:'https://www.larchetto.it/menu-al-tavolo/',locationSource:'https://www.larchetto.it/',sourceLabel:'Official dine-in menu',checked:'10 October 2026',items:[['Margherita','Tomato and mozzarella pizza'],['Bufalina','Tomato and buffalo mozzarella pizza'],['Supplì','A fried rice croquette'],['Tiramisù','Coffee and mascarpone dessert']]},
       options:[
         ['Una margherita e un supplì, per favore.','A margherita pizza and a rice croquette, please.'],
-        ['Una marinara, per favore.','A marinara pizza, please.'],
+        ['Una bufalina, per favore.','A buffalo mozzarella pizza, please.'],
         ['Due margherite da portare via, per favore.','Two margherita pizzas to take away, please.'],
         ['Una bottiglia d’acqua frizzante, per favore.','A bottle of sparkling water, please.'],
         ['Un tiramisù da dividere, per favore.','One tiramisu to share, please.'],
         ['Il conto, per favore.','The bill, please.']
       ],
       dialogue:[row('Staff','Buonasera, avete prenotato?','Good evening, have you booked?'),row('You','No. Avete un tavolo per due?','No. Do you have a table for two?'),row('Staff','Che pizza desidera?','What pizza would you like?'),row('You','Una margherita e un supplì, per favore.','A margherita and a rice croquette, please.'),row('Staff','E da bere?','And to drink?'),row('You','Una bottiglia d’acqua frizzante, grazie.','A bottle of sparkling water, thank you.'),row('Staff','Desiderate un dolce?','Would you like a dessert?'),row('You','Un tiramisù da dividere, per favore.','One tiramisu to share, please.')],
-      drills:[reply('Che pizza desidera?','What pizza would you like?','Una margherita, per favore.','A margherita pizza, please.'),reply('Desidera un antipasto?','Would you like a starter?','Un supplì, per favore.','A rice croquette, please.'),reply('E per l’altra persona?','And for the other person?','Una marinara, grazie.','A marinara pizza, thank you.'),reply('Naturale o frizzante?','Still or sparkling?','Frizzante, per favore.','Sparkling, please.'),reply('Desiderate un dolce?','Would you like a dessert?','Un tiramisù da dividere, grazie.','One tiramisu to share, thank you.')],
+      drills:[reply('Che pizza desidera?','What pizza would you like?','Una margherita, per favore.','A margherita pizza, please.'),reply('Desidera un antipasto?','Would you like a starter?','Un supplì, per favore.','A rice croquette, please.'),reply('E per l’altra persona?','And for the other person?','Una bufalina, grazie.','A buffalo mozzarella pizza, thank you.'),reply('Naturale o frizzante?','Still or sparkling?','Frizzante, per favore.','Sparkling, please.'),reply('Desiderate un dolce?','Would you like a dessert?','Un tiramisù da dividere, grazie.','One tiramisu to share, thank you.')],
       tip:'The published dine-in menu lists fried starters for dinner and pasta for lunch. “Da dividere” means “to share”.'
     },
     {
@@ -55,17 +55,17 @@
     {
       id:'menu-gracchi',label:'Gracchi · gelato',title:'Gelato at Gracchi.',
       context:'Choose a cup, name two flavours, and order a second gelato.',
-      menu:{venue:'Gelateria dei Gracchi',address:'Via dei Gracchi 272, Roma',url:'https://gelateriadeigracchi.it/gusti/',locationSource:'https://gelateriadeigracchi.it/contatti/',sourceLabel:'Official flavour list',checked:'9 October 2026',items:[['Pistacchio di Bronte','Bronte pistachio'],['Cioccolato fondente','Dark chocolate'],['Limone','Lemon'],['Nocciola','Hazelnut']]},
+      menu:{venue:'Gelateria dei Gracchi',address:'Via dei Gracchi 272, Roma',url:'https://gelateriadeigracchi.it/gusti/',locationSource:'https://gelateriadeigracchi.it/contatti/',sourceLabel:'Official flavour list',checked:'10 October 2026',items:[['Pistacchio di Bronte','Bronte pistachio'],['Cioccolato al latte','Milk chocolate'],['Fiordilatte alla vaniglia','Vanilla milk gelato'],['Nocciola','Hazelnut']]},
       options:[
-        ['Una coppetta con pistacchio di Bronte e cioccolato fondente, per favore.','A cup with Bronte pistachio and dark chocolate, please.'],
-        ['Una coppetta al limone, per favore.','A cup of lemon gelato, please.'],
+        ['Una coppetta con pistacchio di Bronte e cioccolato al latte, per favore.','A cup with Bronte pistachio and milk chocolate, please.'],
+        ['Una coppetta alla vaniglia, per favore.','A cup of vanilla milk gelato, please.'],
         ['Una coppetta alla nocciola, per favore.','A cup of hazelnut gelato, please.'],
         ['Avete il pistacchio oggi?','Do you have pistachio today?'],
         ['Una coppetta piccola per lei, per favore.','A small cup for her, please.'],
         ['Quanto costa una coppetta piccola?','How much is a small cup?']
       ],
-      dialogue:[row('Staff','Buonasera! Cono o coppetta?','Good evening! Cone or cup?'),row('You','Una coppetta, per favore.','A cup, please.'),row('Staff','Che gusti desidera?','What flavours would you like?'),row('You','Pistacchio di Bronte e cioccolato fondente, grazie.','Bronte pistachio and dark chocolate, thank you.'),row('Staff','Altro?','Anything else?'),row('You','Una coppetta piccola al limone per lei, per favore.','A small cup of lemon gelato for her, please.')],
-      drills:[reply('Cono o coppetta?','Cone or cup?','Una coppetta, per favore.','A cup, please.'),reply('Che gusti desidera?','What flavours would you like?','Pistacchio di Bronte e cioccolato fondente, grazie.','Bronte pistachio and dark chocolate, thank you.'),reply('Vuole un altro gusto?','Would you like another flavour?','Nocciola, per favore.','Hazelnut, please.'),reply('Desidera un gusto alla frutta?','Would you like a fruit flavour?','Limone, grazie.','Lemon, thank you.'),reply('Altro?','Anything else?','Una coppetta piccola al limone per lei, per favore.','A small cup of lemon gelato for her, please.')],
+      dialogue:[row('Staff','Buonasera! Cono o coppetta?','Good evening! Cone or cup?'),row('You','Una coppetta, per favore.','A cup, please.'),row('Staff','Che gusti desidera?','What flavours would you like?'),row('You','Pistacchio di Bronte e cioccolato al latte, grazie.','Bronte pistachio and milk chocolate, thank you.'),row('Staff','Altro?','Anything else?'),row('You','Una coppetta piccola alla vaniglia per lei, per favore.','A small cup of vanilla milk gelato for her, please.')],
+      drills:[reply('Cono o coppetta?','Cone or cup?','Una coppetta, per favore.','A cup, please.'),reply('Che gusti desidera?','What flavours would you like?','Pistacchio di Bronte e cioccolato al latte, grazie.','Bronte pistachio and milk chocolate, thank you.'),reply('Vuole un altro gusto?','Would you like another flavour?','Nocciola, per favore.','Hazelnut, please.'),reply('Desidera un gusto alla vaniglia?','Would you like a vanilla flavour?','Fiordilatte alla vaniglia, grazie.','Vanilla milk gelato, thank you.'),reply('Altro?','Anything else?','Una coppetta piccola alla vaniglia per lei, per favore.','A small cup of vanilla milk gelato for her, please.')],
       tip:'Gusti means flavours. Coppetta is a cup. Ask which flavours are available today before you choose.'
     }
   ];
