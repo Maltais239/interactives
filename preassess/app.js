@@ -2,7 +2,7 @@
 const N=NumberLab,$=id=>document.getElementById(id),key='bgsd-number-studio-v2';
 const stored=Studio.read(key,null);let record={progress:N.fresh(),history:[],session:null};
 if(stored&&stored.version===2&&N.skills.every(s=>stored.progress?.[s]&&Number.isInteger(stored.progress[s].level)&&stored.progress[s].level>=0&&stored.progress[s].level<=4&&Array.isArray(stored.progress[s].window))&&Array.isArray(stored.history))record=stored;
-let skill='bonds',view='practice',round=0,answered=false,wrong=false,assisted=false,adjustment='',q,lab=[0,0,3,5,2];
+let skill='build',view='practice',round=0,answered=false,wrong=false,assisted=false,adjustment='',q,lab=[0,0,3,5,2];
 function persist(){record.version=2;if(!Studio.save(key,record))$('storage-status').textContent='Browser storage is unavailable; use Download CSV to keep your record.';}
 function model(p){
  if(p[0]||p[1])return '<div class="counters" aria-label="Place-value counters">'+p.map((c,i)=>c?`<div class="counter-group"><b>${N.places[i]}</b>${Array.from({length:Math.min(c,30)},()=>`<span class="counter">${N.values[i].toLocaleString()}</span>`).join('')}</div>`:'').join('')+'</div>';
@@ -13,15 +13,29 @@ function updateTabs(){$('skill-tabs').innerHTML=N.skills.map(s=>`<button class="
 function newQuestion(){answered=false;wrong=false;assisted=false;adjustment='';q=N.makeQuestion(skill,record.progress[skill].level,Math.floor(Math.random()*0x7fffffff));rememberSession();renderQuestion();}
 function renderQuestion(){
  updateTabs();$('skill-title').textContent=N.names[skill];$('level-tag').textContent=N.levels[q.level];$('question-count').textContent=`Question ${round+1} of 10`;
- $('session-bar').style.width=round*10+'%';$('session-status').textContent=`${round} questions completed in this round.`;
+ $('session-bar').style.width=round*10+'%';$('session-status').textContent=`${round} of 10 complete · ${N.levels[q.level]}`;if($('aside-level'))$('aside-level').textContent='Level '+(q.level+1);
  let h=`<h3 style="margin-top:22px">${q.prompt}</h3>`;
  if(skill==='bonds'||skill==='trade'&&q.level===0)h+=`<div class="equation"><span>${q.n.toLocaleString()}</span><span>=</span><span>${q.first.toLocaleString()}</span><span>+</span><label class="sr-only" for="answer">Missing part</label><input id="answer" type="number" min="0" step="1" inputmode="numeric"></div>`;
- else if(skill==='build'){const from=q.level===4?0:q.level===3?2:q.level>0?3:4;h+=`<p class="big-number">${q.n.toLocaleString()}</p><div class="place-chart" style="--places:${5-from}">`+N.places.map((name,i)=>i<from?`<input id="place-${i}" type="hidden" value="0">`:`<div class="place"><label for="place-${i}">${name}</label><input id="place-${i}" type="number" min="0" max="9" step="1" inputmode="numeric" placeholder="0"></div>`).join('')+'</div><p class="small muted">Use one digit in every place, including zero.</p>';}
+ else if(skill==='build'){const from=q.level===4?0:q.level===3?2:q.level>0?3:4;h+=`<p class="big-number">${q.n.toLocaleString()}</p><div class="place-chart" style="--places:${5-from}">`+N.places.map((name,i)=>i<from?`<input id="place-${i}" type="hidden" value="0">`:`<div class="place"><label for="place-${i}">${name}</label><input id="place-${i}" type="number" min="0" max="9" step="1" inputmode="numeric" placeholder="0"></div>`).join('')+'</div><p class="small muted">Use one digit in every place, including zero.</p><div id="build-preview" class="build-preview" role="region" aria-label="Your base-ten blocks"></div>';}
  else h+=model(q.parts)+`<label for="answer">Total value</label><input id="answer" type="number" min="0" step="1" inputmode="numeric">`;
  $('question').innerHTML=h+'<div id="support" hidden></div>';$('feedback').textContent='';$('feedback').classList.remove('error');$('check').hidden=answered;$('hint').hidden=answered;$('reveal').hidden=answered;$('next').hidden=!answered;
  if(answered){$('feedback').textContent=N.explanation(q)+' '+adjustment;$('question').querySelectorAll('input').forEach(e=>e.disabled=true);}
  else if(assisted)showModel(false);
+ if(skill==='build'&&!answered)renderBuildPreview();
  $('start-level').value=record.progress[skill].level;
+}
+function renderBuildPreview(){
+ const container=$('build-preview');if(!container)return;
+ const entered=N.values.map((_,i)=>$('place-'+i)?.value??'');
+ const digits=entered.map(v=>String(v).trim()===''?0:Number(v));
+ if(digits.some(v=>!Number.isInteger(v)||v<0||v>9)){
+  container.innerHTML='<p class="small muted">Use digits from 0 to 9.</p>';return;
+ }
+ if(!entered.some(v=>String(v).trim()!=='')){
+  container.innerHTML='<p class="build-preview-label">Your blocks will appear as you fill the chart.</p>';return;
+ }
+ const value=N.total(digits);
+ container.innerHTML='<div class="build-preview-label">Your model · '+value.toLocaleString()+'</div>'+(value?model(digits):'<p class="small muted">Zero blocks so far.</p>');
 }
 function showModel(mark=true){if(mark){assisted=true;rememberSession();}const support=$('support');support.hidden=false;support.innerHTML=skill==='bonds'||skill==='trade'&&q.level===0?`<div class="rule-card" style="margin-top:20px"><strong>Whole − known part = missing part.</strong><p>Start at ${q.first.toLocaleString()}. How much more gets you to ${q.n.toLocaleString()}?</p><p>${q.n.toLocaleString()} − ${q.first.toLocaleString()} = ?</p></div>`:model(N.parts(q.n))+`<p class="small">Read each place separately. A zero holds an empty place.</p>`;}
 function finish(correct){if(answered)return;answered=true;const clean=correct&&!wrong&&!assisted;adjustment=N.adapt(record.progress,skill,clean,assisted||wrong,$('adaptive').checked);record.history.push({skill,level:q.level,number:q.n,firstTry:clean,supported:assisted||wrong,date:new Date().toISOString().slice(0,10)});record.history=record.history.slice(-100);rememberSession();$('feedback').classList.remove('error');$('feedback').textContent=(correct?'Yes. ':'Let’s connect the model to the number. ')+N.explanation(q)+' '+adjustment;$('question').querySelectorAll('input').forEach(e=>e.disabled=true);$('check').hidden=true;$('hint').hidden=true;$('reveal').hidden=true;$('next').hidden=false;updateTabs();}
@@ -35,6 +49,7 @@ document.querySelector('.tabs').addEventListener('click',e=>{if(e.target.closest
 $('skill-tabs').addEventListener('click',e=>{const b=e.target.closest('[data-skill]');if(!b||b.dataset.skill===skill)return;skill=b.dataset.skill;round=0;newQuestion();});
 $('check').onclick=checkAnswer;$('hint').onclick=()=>showModel();$('reveal').onclick=()=>{assisted=true;finish(false);};$('start').onclick=startRound;
 $('question').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();checkAnswer();}});
+$('question').addEventListener('input',e=>{if(skill==='build'&&e.target?.id?.startsWith('place-')&&!answered)renderBuildPreview();});
 $('next').onclick=()=>{round++;if(round>=10){$('question-count').textContent='Round complete';$('question').innerHTML=`<div class="summary-banner" style="margin-top:22px"><h2>Ten questions. More connections.</h2><p>You practised ${N.names[skill].toLowerCase()}.</p><p>Your current range: <strong>${N.levels[record.progress[skill].level]}</strong>.</p><button class="btn primary" id="again">Start another round</button></div>`;$('feedback').textContent='Open Progress to see your independent and supported practice.';$('next').hidden=true;record.session=null;persist();$('again').onclick=()=>{round=0;newQuestion();};}else{newQuestion();Studio.focus(skill==='build'?'place-'+(q.level===4?0:q.level===3?2:q.level>0?3:4):'answer');}};
 $('lab-load').onclick=()=>{const n=N.validNumber($('lab-number').value);if(n===null||n>99999){$('lab-feedback').textContent='Use a whole number from 0 to 99,999.';return;}lab=N.parts(n);$('lab-feedback').textContent='Now trade a group of ten. Watch the total stay the same.';renderLab();};
 $('lab-controls').onclick=e=>{const b=e.target.closest('[data-adjust]');if(!b)return;const[i,d]=b.dataset.adjust.split(',').map(Number);lab[i]=Math.min(30,Math.max(0,lab[i]+d));$('lab-feedback').textContent='Adding or removing a counter changes the value.';renderLab();};
