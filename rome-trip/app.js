@@ -9,7 +9,7 @@
   const link=(url,label,cls='button')=>`<a class="${cls}" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label)}</a>`;
   const validUrl=value=>{try{const u=new URL(value);return ['https:','http:'].includes(u.protocol)&&!u.username&&!u.password;}catch{return false;}};
   const stopIds=new Set(D.days.flatMap(d=>d.stops.map(s=>s.id)));
-  let storageAvailable=true,toastTimer,scenario='cafe',storyFilter='All',phraseHidden=false;
+  let storageAvailable=true,toastTimer,scenario='cafe',storyFilter='All',phraseHidden=false,practiceMode='reply';
   const choices={};
   let replyIndex=0,replyRevealed=false;
   function clean(raw){
@@ -68,8 +68,8 @@
   function updatePhrase(){const p=order();$('order-italian').textContent=p.it;$('order-italian').hidden=phraseHidden;$('order-hidden').hidden=!phraseHidden;$('order-english').textContent=p.en;$('hide-italian').textContent=phraseHidden?'Show Italian':'Hide Italian & try';$('order-slow').dataset.say=p.it;$('order-normal').dataset.say=p.it;}
   function renderPractice(){
     const s=D.scenarios.find(s=>s.id===scenario);
-    $('scenarios').innerHTML=D.scenarios.map(x=>`<button data-scenario="${x.id}" aria-pressed="${x.id===scenario}">${esc(x.label)}</button>`).join('');
-    $('practice').innerHTML=`<h3>${esc(s.title)}</h3><p class="scenario-context">${esc(s.context)}</p><div class="order-builder">${s.fields.map(f=>`<label for="choice-${f.id}">${esc(f.label)}<select id="choice-${f.id}" data-field="${f.id}">${f.options.map(o=>`<option value="${esc(o[0])}"${fieldValue(s,f)[0]===o[0]?' selected':''}>${esc(o[1])}</option>`).join('')}</select></label>`).join('')}</div><div class="phrase-stage"><p id="order-italian" class="italian-text" lang="it"></p><p id="order-hidden" class="phrase-hidden" hidden>Your turn. Say it aloud.</p><p id="order-english" class="translation"></p></div><div class="actions"><button id="order-slow" data-say="" data-rate="0.65" class="primary">Listen slowly</button><button id="order-normal" data-say="" data-rate="0.95">Natural speed</button><button id="hide-italian">Hide Italian & try</button></div><p class="practice-cue">This is self-practice: listen and compare. The app doesn’t record or score your voice.</p><section class="reply-practice" aria-labelledby="reply-heading"><div class="reply-heading"><div><span class="eyebrow">YOUR TURN TO SPEAK</span><h4 id="reply-heading">Try a reply.</h4></div><span id="reply-position" class="small"></span></div><div id="reply-stage"></div></section><section class="conversation"><h4>What you might hear next</h4>${s.dialogue.map(row=>`<div class="dialogue-row"><span class="dialogue-label">${esc(row.who.toUpperCase())}</span><div class="dialogue-italian" lang="it">${esc(row.it)}</div><div class="dialogue-translation">${esc(row.en)}</div><button data-say="${esc(row.it)}" data-rate="0.65">Hear this slowly</button></div>`).join('')}<p class="notice" style="margin-top:22px;margin-bottom:0">${esc(s.tip)}</p></section>`;
+    $('scenarios').innerHTML=`<label for="scenario-select"><span class="picker-label">Situation</span><select id="scenario-select">${D.scenarios.map(x=>`<option value="${x.id}"${x.id===scenario?' selected':''}>${esc(x.label)}</option>`).join('')}</select></label><div class="practice-modes scenario-tabs" aria-label="Speaking practice mode"><button data-practice-mode="reply" aria-pressed="${practiceMode==='reply'}">Try a reply</button><button data-practice-mode="builder" aria-pressed="${practiceMode==='builder'}">Build a phrase</button></div>`;
+    $('practice').innerHTML=`<section id="phrase-builder"${practiceMode==='builder'?'':' hidden'}><h3>${esc(s.title)}</h3><p class="scenario-context">${esc(s.context)}</p><div class="order-builder">${s.fields.map(f=>`<label for="choice-${f.id}">${esc(f.label)}<select id="choice-${f.id}" data-field="${f.id}">${f.options.map(o=>`<option value="${esc(o[0])}"${fieldValue(s,f)[0]===o[0]?' selected':''}>${esc(o[1])}</option>`).join('')}</select></label>`).join('')}</div><div class="phrase-stage"><p id="order-italian" class="italian-text" lang="it"></p><p id="order-hidden" class="phrase-hidden" hidden>Your turn. Say it aloud.</p><p id="order-english" class="translation"></p></div><div class="actions"><button id="order-slow" data-say="" data-rate="0.65" class="primary">Listen slowly</button><button id="order-normal" data-say="" data-rate="0.95">Natural speed</button><button id="hide-italian">Hide Italian & try</button></div><p class="practice-cue">This is self-practice: listen and compare. The app doesn’t record or score your voice.</p></section><section id="reply-practice"${practiceMode==='reply'?'':' hidden'} class="reply-practice" aria-labelledby="reply-heading"><div class="reply-heading"><div><span class="eyebrow">YOUR TURN TO SPEAK</span><h4 id="reply-heading">Try a reply.</h4></div><span id="reply-position" class="small"></span></div><div id="reply-stage"></div></section><details class="conversation"><summary>What you might hear next</summary>${s.dialogue.map(row=>`<div class="dialogue-row"><span class="dialogue-label">${esc(row.who.toUpperCase())}</span><div class="dialogue-italian" lang="it">${esc(row.it)}</div><div class="dialogue-translation">${esc(row.en)}</div><button data-say="${esc(row.it)}" data-rate="0.65">Hear this slowly</button></div>`).join('')}<p class="notice" style="margin-top:22px;margin-bottom:0">${esc(s.tip)}</p></details>`;
     updatePhrase();
     renderReply();
   }
@@ -109,12 +109,14 @@
     if(b.dataset.story){openStory(b.dataset.story);return;}
     if(b.dataset.ticket){openTicket(b.dataset.ticket);return;}
     if(b.dataset.scenario){scenario=b.dataset.scenario;phraseHidden=false;replyIndex=0;replyRevealed=false;renderPractice();return;}
+    if(b.dataset.practiceMode){practiceMode=b.dataset.practiceMode;$('phrase-builder').hidden=practiceMode!=='builder';$('reply-practice').hidden=practiceMode!=='reply';$('scenarios').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.practiceMode===practiceMode)));return;}
     if(b.dataset.filter){storyFilter=b.dataset.filter;renderStories();return;}
     if(b.hasAttribute('data-say')){say(b.dataset.say,b.dataset.rate);return;}
     if(b.id==='hide-italian'){phraseHidden=!phraseHidden;updatePhrase();return;}
     if(b.id==='reply-reveal'){replyRevealed=!replyRevealed;renderReply();$(replyRevealed?'reply-answer':'reply-reveal').focus({preventScroll:true});return;}
     if(b.id==='reply-next'){const drills=D.scenarios.find(s=>s.id===scenario).drills;replyIndex=(replyIndex+1)%drills.length;replyRevealed=false;renderReply();$('reply-reveal').focus({preventScroll:true});return;}
   });
+  $('scenarios').addEventListener('change',e=>{if(e.target.id!=='scenario-select'||!D.scenarios.some(s=>s.id===e.target.value))return;scenario=e.target.value;phraseHidden=false;replyIndex=0;replyRevealed=false;renderPractice();$('scenario-select').focus({preventScroll:true});});
   $('practice').addEventListener('change',e=>{if(e.target.dataset.field){choices[scenario]??={};choices[scenario][e.target.dataset.field]=e.target.value;phraseHidden=false;updatePhrase();}});
   $('save-day-note').addEventListener('click',()=>{state.notes[state.day]=$('day-note').value.slice(0,6000);if(persist())toast('Day note saved on this device.');});
   $('day-note').addEventListener('change',()=>{state.notes[state.day]=$('day-note').value.slice(0,6000);persist();});
@@ -126,6 +128,34 @@
   if('speechSynthesis' in window){window.speechSynthesis.addEventListener('voiceschanged',findVoice);findVoice();}
   renderDay();renderPhrasebook();renderNearby();renderStories();renderPractice();renderTickets();setTab();
   if(!storageAvailable)setTimeout(()=>toast('Local saving may be unavailable. Use Export to keep a backup.'),500);
-  function offlineStatus(ready){$('offline-status').textContent=ready?'Text and images are saved for offline reopening in this browser. Map and ticket websites need internet; audio needs an installed Italian voice.':'Use this app online. Offline reopening isn’t available in this browser yet. Map and ticket websites need internet.';}
-  if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').then(()=>navigator.serviceWorker.ready).then(()=>offlineStatus(true)).catch(()=>offlineStatus(false));}else offlineStatus(false);
+  const OFFLINE_CACHE='darrens-rome-public-phone4';
+  function offlineStatus(status){
+    const ready=status==='ready',pending=status==='saving';
+    $('offline-badge').textContent=ready?'Ready offline':pending?'Saving offline…':'Online only';
+    $('offline-badge').dataset.ready=String(ready);
+    $('offline-status').textContent=ready?'Text and all landmark photos are saved for offline reopening in this browser. Before your flight, test Italian audio in airplane mode; it needs a downloaded Italian voice. Maps and ticket websites need internet.':pending?'Saving text and all landmark photos. Keep this page open online until the badge says “Ready offline”.':'Offline saving is not available yet. Reopen online to try again. Maps and ticket websites need internet.';
+  }
+  async function checkOffline(){
+    if(!('caches' in window))return false;
+    // addAll commits the complete offline set together; also check this build's scripts.
+    const names=await caches.keys();if(!names.includes(OFFLINE_CACHE))return false;
+    const cache=await caches.open(OFFLINE_CACHE);
+    const saved=await Promise.all(['./index.html','./styles.css?v=phone4','./app.js?v=phone4','./buildings.js?v=phone4'].map(url=>cache.match(url)));
+    if(saved.every(Boolean)){offlineStatus('ready');return true;}return false;
+  }
+  async function prepareOffline(){
+    if(!('serviceWorker' in navigator)||!('caches' in window)){offlineStatus('unavailable');return;}
+    offlineStatus('saving');
+    try{
+      const registration=await navigator.serviceWorker.register('./sw.js');
+      const watch=worker=>{if(!worker)return;worker.addEventListener('statechange',()=>{if(worker.state==='activated')checkOffline().catch(()=>offlineStatus('unavailable'));else if(worker.state==='redundant')offlineStatus('unavailable');});};
+      watch(registration.installing);registration.addEventListener('updatefound',()=>watch(registration.installing));
+      navigator.serviceWorker.addEventListener('controllerchange',()=>checkOffline().catch(()=>offlineStatus('unavailable')));
+      await navigator.serviceWorker.ready;
+      await checkOffline();
+      // Detect a stalled or failed download without claiming an older cache is ready.
+      setTimeout(()=>checkOffline().then(ready=>{if(!ready)offlineStatus('unavailable');}).catch(()=>offlineStatus('unavailable')),90000);
+    }catch{offlineStatus('unavailable');}
+  }
+  prepareOffline();
 })();
