@@ -14,10 +14,17 @@ const moneyTypes = [
 ];
 const $ = id => document.getElementById(id);
 const till=$('moneyTill'), tray=$('changeGivenBox'), check=$('checkButton');
-const next=$('nextButton'), newTargetButton=$('newTarget'), reset=$('resetButton'), hint=$('hintButton');
+const next=$('nextButton'), newTargetButton=$('newTarget'), reset=$('resetButton'), hint=$('hintButton'), totalToggle=$('toggleTotal');
 const dollars = cents => '$'+(cents/100).toFixed(2);
 let difficulty='practice',targetCents=0,solved=false,tries=0;
-let dragTouch=null,ignoreClickUntil=0;
+let dragTouch=null,ignoreClickUntil=0,showTotal=false;
+function setTotalVisibility(visible){
+  showTotal=visible;
+  $('currentTotal').hidden=!visible;
+  $('totalPlaceholder').hidden=visible;
+  totalToggle.textContent=visible?'Hide total':'Show total';
+  totalToggle.setAttribute('aria-pressed',String(visible));
+}
 
 function feedback(message,type='info'){
   const el=$('feedback');el.textContent=message;el.dataset.type=type;
@@ -105,6 +112,7 @@ function newAmount(){
     candidate=(Math.floor(Math.random()*((max-min)/5+1))*5)+min;
   }
   targetCents=candidate;solved=false;tries=0;
+  setTotalVisibility(false);
   tray.replaceChildren(); $('targetAmount').textContent=dollars(targetCents);
   $('round-status').textContent='Canadian money · Place value in action';
   next.disabled=true;hint.disabled=false;reset.disabled=false;
@@ -155,6 +163,7 @@ document.querySelectorAll('[data-difficulty]').forEach(btn=>btn.addEventListener
   });
   newAmount();
 }));
+totalToggle.addEventListener('click',()=>setTotalVisibility(!showTotal));
 check.addEventListener('click',checkAnswer);
 reset.addEventListener('click',clearTray);
 hint.addEventListener('click',giveHint);
