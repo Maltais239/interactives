@@ -204,7 +204,11 @@
     if(busy())return;resetView();state.selected=null;state.model=E.prepare(state.members);state.response=null;state.display=[];state.peakStress=0;state.peakDeflection=0;state.carX=100;state.critical=-1;state.gapHit=null;state.mode='testing';state.failedReason='';state.fallTime=0;setEditing(false);$('modeBadge').textContent='TEST RUN';$('testMeter').hidden=false;$('testBtn').hidden=true;$('resetTestBtn').hidden=false;$('sceneHint').textContent='Watch the load move. Where does the stress build?';$('stressReadout').textContent='0%';$('stressFill').style.left='0%';$('cableReadout').hidden=!state.model.cables.length;$('cableReadout').textContent='Cables: settling';status(`Testing the ${E.vehicles[state.vehicle].name.toLowerCase()} at ${loadLabel()} in ${state.wind===0?'calm':state.wind===12?'breezy':'gusty'} conditions. Your design is saved.`);resize();
   }
   $('testBtn').onclick=startTest;$('resetTestBtn').onclick=()=>{resetView();refresh();status('Test stopped. Edit your bridge and test again.');};$('editBtn').onclick=()=>{resetView();refresh();status('Change one thing, then repeat the test to compare.');};
-  function fail(reason,r){state.mode='fall';state.failedReason=reason;state.critical=r?.critical??-1;state.fallTime=0;const critical=state.members[state.critical];state.debris=[];
+  function fail(reason,r){
+    // Continue from the loaded deck pose instead of snapping back to the flat road.
+    const pose=vehiclePose(),speed=$('slow').checked?42:140;
+    state.fallStart={...pose,vx:speed,vy:speed*Math.tan(pose.angle)};
+    state.mode='fall';state.failedReason=reason;state.critical=r?.critical??-1;state.fallTime=0;const critical=state.members[state.critical];state.debris=[];
     for(let i=0;i<state.members.length;i++){const m=state.members[i];if(i===state.critical||(m.type==='road'&&Math.abs((m.a.x+m.b.x)/2-state.carX)<150)){
       const a=drawPoint(m.a),b=drawPoint(m.b);state.debris.push({a,b,type:m.type,index:i,x:0,y:0,vy:0,vx:((m.a.x+m.b.x)/2-state.carX)*.25,angle:0,spin:(i%2?1:-1)*.5});
     }}
@@ -257,6 +261,7 @@
   }
   function drawVehicle(x,y,angle=0){const v=E.vehicles[state.vehicle],source=v.asset?images[state.vehicle]:images.vehicles,s=v.asset?{x:0,y:0,w:source.naturalWidth,h:source.naturalHeight}:sprite[state.vehicle],h=v.width*(s.h||1)/(s.w||1);ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.shadowColor='#17372b80';ctx.shadowBlur=7;ctx.shadowOffsetY=4;if(source.complete&&source.naturalWidth)ctx.drawImage(source,s.x,s.y,s.w,s.h,-v.width/2,-h+2,v.width,h);else{ctx.fillStyle='#dfae38';ctx.fillRect(-v.width/2,-30,v.width,24);ctx.fillStyle='#273932';for(const [offset] of E.axlesFor(state.vehicle)){ctx.beginPath();ctx.arc(offset,-2,8,0,Math.PI*2);ctx.fill();}}ctx.restore();}
   function roadY(x){if(x<E.LEFT||x>E.RIGHT||!state.model||!state.display.length)return E.DECK;const i=Math.max(0,Math.min(7,Math.floor((x-E.LEFT)/E.STEP))),a=drawPoint({x:E.LEFT+i*E.STEP,y:E.DECK}),b=drawPoint({x:E.LEFT+(i+1)*E.STEP,y:E.DECK});return a.y+(b.y-a.y)*(x-a.x)/E.STEP;}
+  function vehiclePose(){const range=E.contactRange(state.vehicle),y1=roadY(state.carX+range.rear),y2=roadY(state.carX+range.front);return {x:state.carX,y:y1+(y2-y1)*(-range.rear)/(range.front-range.rear),angle:Math.atan2(y2-y1,range.front-range.rear)};}
   function connectionAllowed(a,b){
     if(!a||!b||E.key(a)===E.key(b)||Math.hypot(b.x-a.x,b.y-a.y)>E.STEP*3.01)return false;
     if(state.tool==='road'&&(a.y!==E.DECK||b.y!==E.DECK||Math.abs(a.x-b.x)!==E.STEP))return false;
@@ -310,13 +315,13 @@
       if(state.selected)cuePoint(state.selected,'1','#efac43');
       drawVehicle(155,E.DECK);
     }else if(state.mode==='testing'||(state.mode==='result'&&!state.failedReason)){
-      const range=E.contactRange(state.vehicle),y1=roadY(state.carX+range.rear),y2=roadY(state.carX+range.front),angle=Math.atan2(y2-y1,range.front-range.rear);drawVehicle(state.carX,y1+(y2-y1)*(-range.rear)/(range.front-range.rear),angle);
+      const pose=vehiclePose();drawVehicle(pose.x,pose.y,pose.angle);
     }
     if(state.mode==='fall'||(state.mode==='result'&&state.failedReason)){
       for(const d of state.debris){ctx.save();const mx=(d.a.x+d.b.x)/2,my=(d.a.y+d.b.y)/2;ctx.translate(mx+d.x,my+d.y);ctx.rotate(d.angle);beam({type:d.type},{x:d.a.x-mx,y:d.a.y-my},{x:d.b.x-mx,y:d.b.y-my},-1);ctx.restore();}
-      const ft=Math.min(state.fallTime,1.6),drop=165*ft*ft;drawVehicle(state.carX+ft*40,E.DECK+drop,ft*.42);
+      const ft=Math.min(state.fallTime,1.6),start=state.fallStart,x=start.x+start.vx*ft,y=start.y+start.vy*ft+165*ft*ft;drawVehicle(x,y,start.angle+.21*ft*ft);
       for(const p of state.particles)if(p.life>0){ctx.globalAlpha=Math.min(1,p.life);ctx.fillStyle='#deb46d';ctx.fillRect(p.x,p.y,p.size,p.size);}ctx.globalAlpha=1;
-      if(ft>1.25){ctx.strokeStyle='#ecf8eaaa';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(state.carX+ft*40,E.DECK+265,(ft-1.25)*110,8+(ft-1.25)*15,0,0,Math.PI*2);ctx.stroke();}
+      if(ft>1.25){ctx.strokeStyle='#ecf8eaaa';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(x,E.DECK+265,(ft-1.25)*110,8+(ft-1.25)*15,0,0,Math.PI*2);ctx.stroke();}
     }
     // Gentle glints follow the painted river; reduced-motion users get a still scene.
     if(!reducedMotion){const phase=performance.now()/1400;ctx.globalAlpha=.18;ctx.strokeStyle='#e9f5dc';ctx.lineWidth=1.3;for(let i=0;i<5;i++){const x=480+i*47+Math.sin(phase+i)*12,y=525+i*20;line({x,y},{x:x+15,y:y-3},'#eff9eb',1.3);}ctx.globalAlpha=1;}
@@ -367,3 +372,4 @@
   for(const image of Object.values(images))image.onerror=()=>{if(!assetWarning){assetWarning=true;status('The artwork could not load. Building and bridge tests are still available.');}};
   resize();refresh();status(state.gaps.length?'Road is selected. Fill the highlighted Road sections first, then add Wood or Steel bracing.':state.challenge==='sandbox'?'Free build restored. Your challenge journey is saved.':state.challenge==='first'?'Start with the car and build your own supports. View bridge examples and use the design hints below the tools.':`Level ${P.levelIndex(state.challenge)+1} · ${P.challenges[state.challenge].name} restored. Your bridge, completed levels and notebook are saved. Check this mission’s design hints.`);requestAnimationFrame(loop);
 })();
+
