@@ -785,8 +785,8 @@ function buildCard(word,i,pool) {
       ? {...word,ex:'mcq',promptLabel:'Multiple choice: Spanish → English',taskText:'Choose the correct English meaning.',prompt:word.spanish,answer:word.english||'',speak:word.spanish,choices:sampleChoices(word.english,p,'english')}
       : {...word,ex:'mcq',promptLabel:'Multiple choice: English → Spanish',taskText:'Choose the correct Spanish word.',prompt:word.english,answer:word.spanish||'',speak:word.spanish,choices:sampleChoices(word.spanish,p,'spanish')};
   }
-  if(ex==='listen')    return {...word,ex,promptLabel:'Listening recognition',taskText:'Tap Play Spanish, then choose the English meaning.',prompt:'Listen to the Spanish word.',answer:word.english||'',speak:word.spanish,choices:sampleChoices(word.english,p,'english')};
-  if(ex==='dictation') return {...word,ex,promptLabel:'Dictation',taskText:'Tap Play Spanish, then type what you hear.',prompt:word.english||'',answer:word.spanish||'',speak:word.spanish,ph:'Type the Spanish you hear.'};
+  if(ex==='listen')    return {...word,ex,promptLabel:'Listening recognition',taskText:'Listen, then choose the English meaning. Replay if needed.',prompt:'Listen to the Spanish word.',answer:word.english||'',speak:word.spanish,choices:sampleChoices(word.english,p,'english')};
+  if(ex==='dictation') return {...word,ex,promptLabel:'Dictation',taskText:'Listen, then type the Spanish you hear. Replay if needed.',prompt:word.english||'',answer:word.spanish||'',speak:word.spanish,ph:'Type the Spanish you hear.'};
   if(ex==='mcq') return dir==='es-en'
     ? {...word,ex,promptLabel:'Multiple choice: Spanish → English',taskText:'Choose the correct English meaning.',prompt:word.spanish,answer:word.english||'',speak:word.spanish,choices:sampleChoices(word.english,p,'english')}
     : {...word,ex,promptLabel:'Multiple choice: English → Spanish',taskText:'Choose the correct Spanish word.',prompt:word.english,answer:word.spanish||'',speak:word.spanish,choices:sampleChoices(word.spanish,p,'spanish')};
@@ -805,6 +805,40 @@ function buildQueue() {
 
 const curCard  = () => state.rev.queue[state.rev.idx]||null;
 const nextCard = () => { state.rev.idx++; state.rev.reveal=false; state.rev.typed=''; state.rev.lastResult=''; renderReview(); requestAnimationFrame(()=>{ const r=document.getElementById('reviewArea'); if(r&&window.innerWidth<680) r.scrollIntoView({behavior:'smooth',block:'start'}); }); };
+
+// Play each listening turn once, including number drills. The queue and index
+// identify the turn, so re-rendering the same question never queues it twice.
+let listeningQueue=null, listeningIndex=-1, listeningTimer=null;
+function stopListeningAutoplay() {
+  clearTimeout(listeningTimer); listeningTimer=null;
+  if(listeningQueue && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+  listeningQueue=null; listeningIndex=-1;
+}
+function playPracticeSpanish(text) {
+  clearTimeout(listeningTimer); listeningTimer=null;
+  if(!text || !('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(text),{lang:'es-ES'}));
+}
+function currentListeningTurn() {
+  if(state.tab!=='practice') return null;
+  const review=state.numDrill.active?state.numDrill:(state.started?state.rev:null);
+  const card=review?.queue?.[review.idx];
+  if(!card?.speak || review.reveal || review.showPraise || !['listen','dictation'].includes(card.ex)) return null;
+  return {review,card};
+}
+function syncListeningAutoplay() {
+  const turn=currentListeningTurn();
+  if(!turn){ stopListeningAutoplay(); return; }
+  if(listeningQueue===turn.review.queue && listeningIndex===turn.review.idx) return;
+  stopListeningAutoplay();
+  listeningQueue=turn.review.queue; listeningIndex=turn.review.idx;
+  listeningTimer=setTimeout(()=>{
+    listeningTimer=null;
+    const current=currentListeningTurn();
+    if(current?.review.queue===listeningQueue && current.review.idx===listeningIndex && current.card===turn.card) playPracticeSpanish(turn.card.speak);
+  },150);
+}
 
 // ── Render ────────────────────────────────────────────────────────────────────
 // ── Praise messages ──────────────────────────────────────────────────────────
@@ -1002,9 +1036,9 @@ function buildNumQueue(gi) {
     const word = real
       ? {...real, lessonTitle:'Numbers'}
       : {id:'num_'+gi+'_'+i, spanish:sp, english:en, lessonTitle:'Numbers'};
-    if(ex==='listen')    return {...word,ex,promptLabel:'Listening',taskText:'Tap Play, choose the English meaning.',
+    if(ex==='listen')    return {...word,ex,promptLabel:'Listening',taskText:'Listen, then choose the English meaning. Replay if needed.',
       prompt:'Listen to the number.',answer:word.english||en,speak:word.spanish||sp,choices:sampleChoices(word.english||en,pool,'english')};
-    if(ex==='dictation') return {...word,ex,promptLabel:'Dictation',taskText:'Tap Play, type what you hear.',
+    if(ex==='dictation') return {...word,ex,promptLabel:'Dictation',taskText:'Listen, then type what you hear. Replay if needed.',
       prompt:word.english||en,answer:word.spanish||sp,speak:word.spanish||sp,ph:'Type the Spanish number…'};
     if(ex==='mcq')       return {...word,ex,promptLabel:'Multiple choice',taskText:'Choose the correct English.',
       prompt:word.spanish||sp,answer:word.english||en,speak:word.spanish||sp,choices:sampleChoices(word.english||en,pool,'english')};
@@ -1020,6 +1054,7 @@ function buildNumQueue(gi) {
 function renderNumDrill() {
   const host = document.getElementById('numDrillArea');
   if(!host) return;
+  syncListeningAutoplay();
   const nd = state.numDrill;
   if(!nd.active){ host.innerHTML=''; return; }
 
@@ -1062,7 +1097,7 @@ function renderNumDrill() {
     </div>
     <div class="task-hint">${esc(card.taskText)}</div>
     <div class="prompt" style="font-size:clamp(1.5rem,5vw,2.4rem);">${esc(card.prompt)}</div>
-    ${card.speak?'<div class="speak-row"><button class="speak-btn" id="nSpeakBtn">🔊 Play</button></div>':''}
+    ${card.speak?`<div class="speak-row"><button class="speak-btn" id="nSpeakBtn">${['listen','dictation'].includes(card.ex)?'🔊 Replay Spanish':'🔊 Play Spanish'}</button></div>`:''}
     ${isInput?`<div class="ans-wrap"><input id="nAns" placeholder="${esc(card.ph||'Type your answer…')}" autocomplete="off" autocorrect="off" spellcheck="false"/></div>`:''}
     ${isChoice?`<div class="choices">${card.choices.map(c=>`<button class="choice" data-nc="${esc(c)}">${esc(c)}</button>`).join('')}</div>`:''}
     ${isInput?`<div class="action-row"><button class="btn primary" id="nCheckBtn">Check ✓</button><button class="btn" id="nRevealBtn">Show</button></div>`:''}
@@ -1073,7 +1108,7 @@ function renderNumDrill() {
   const nNextCard=()=>{ nd.idx++; nd.reveal=false; renderNumDrill(); renderPractice(); requestAnimationFrame(()=>{ const el=document.getElementById('nAns'); if(el) el.focus(); }); };
   document.getElementById('nStopBtn')?.addEventListener('click',()=>{ nd.active=false; renderNumDrill(); renderPractice(); });
   document.getElementById('nSpeakBtn')?.addEventListener('click',()=>{
-    if('speechSynthesis'in window){window.speechSynthesis.cancel();window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(card.speak),{lang:'es-ES'}));}
+    playPracticeSpanish(card.speak);
   });
   const nInp=document.getElementById('nAns');
   if(nInp){ nInp.focus(); nInp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();document.getElementById('nCheckBtn')?.click();}}); }
@@ -1106,6 +1141,7 @@ function renderNumDrill() {
 function renderReview() {
   const host=document.getElementById('reviewArea');
   if(!host) return;
+  syncListeningAutoplay();
   const rev=state.rev;
 
   if(!rev.queue.length){
@@ -1153,7 +1189,7 @@ function renderReview() {
   const isChoice=['mcq','listen'].includes(card.ex);
   const exColors={typed:'blue',mcq:'purple',listen:'yellow',dictation:'blue',cloze:'green'};
 
-  const speakHTML=card.speak?`<div class="speak-row"><button class="speak-btn" id="speakBtn">🔊 Play Spanish</button></div>`:'';
+  const speakHTML=card.speak?`<div class="speak-row"><button class="speak-btn" id="speakBtn">${['listen','dictation'].includes(card.ex)?'🔊 Replay Spanish':'🔊 Play Spanish'}</button></div>`:'';
   const inputHTML=isInput?`<div class="ans-wrap"><input id="ans" placeholder="${esc(card.ph||'Type your answer…')}" value="${esc(rev.typed)}" autocomplete="off" autocorrect="off" spellcheck="false"/></div>`:'';
   const hintHTML=card.hint?`<div class="cloze-hint">💡 ${esc(card.hint)}</div>`:'';
   const choicesHTML=isChoice?`<div class="choices">${card.choices.map(c=>`<button class="choice" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>`:'';
@@ -1197,7 +1233,7 @@ function renderReview() {
   }
 
   document.getElementById('speakBtn')?.addEventListener('click',()=>{
-    if('speechSynthesis'in window){window.speechSynthesis.cancel();window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(card.speak),{lang:'es-ES'}));}
+    playPracticeSpanish(card.speak);
   });
 
   document.getElementById('checkBtn')?.addEventListener('click',()=>{
