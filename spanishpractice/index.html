@@ -274,7 +274,7 @@ body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;background:var(--bg
       <div class="journal-eyebrow">YOUR SPANISH PRACTICE JOURNAL</div>
       <h1>A little Spanish.<br><em>A little more you.</em></h1>
       <p>Small, steady practice for the conversations ahead.</p>
-      <div class="journal-courses"><span>3 Minute Spanish</span><span>Coffee Break Spanish · 1–10</span></div>
+      <div class="journal-courses"><span>3 Minute Spanish</span><span>Coffee Break Spanish · 1–10</span><span>Audio: Latin American Spanish</span></div>
     </div>
     <div class="journal-stamp" aria-hidden="true"><span>ES</span><small>UN POCO<br>CADA DÍA</small></div>
   </div>
@@ -814,11 +814,27 @@ function stopListeningAutoplay() {
   if(listeningQueue && 'speechSynthesis' in window) window.speechSynthesis.cancel();
   listeningQueue=null; listeningIndex=-1;
 }
+function latinAmericanVoice(voices) {
+  const locale=v=>String(v.lang||'').replace(/_/g,'-').toLowerCase();
+  for(const tag of ['es-mx','es-419','es-us']) {
+    const voice=voices.find(v=>locale(v)===tag);
+    if(voice) return voice;
+  }
+  return voices.find(v=>/^es-(ar|bo|bz|cl|co|cr|cu|do|ec|gt|hn|ni|pa|pe|pr|py|sv|uy|ve)(?:-|$)/.test(locale(v)))||null;
+}
+function spanishUtterance(text) {
+  const utterance=new SpeechSynthesisUtterance(text);
+  // Re-read the list on every play: some browsers populate voices after load.
+  const voice=latinAmericanVoice(window.speechSynthesis.getVoices?.()||[]);
+  utterance.lang=voice?.lang||'es-MX';
+  if(voice) utterance.voice=voice;
+  return utterance;
+}
 function playPracticeSpanish(text) {
   clearTimeout(listeningTimer); listeningTimer=null;
   if(!text || !('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(text),{lang:'es-ES'}));
+  window.speechSynthesis.speak(spanishUtterance(text));
 }
 function currentListeningTurn() {
   if(state.tab!=='practice') return null;
@@ -1466,7 +1482,7 @@ function renderPhrases() {
   // Speak button
   const sp=pr.queue[pr.idx]!==undefined?PHRASES[pr.queue[pr.idx]]?.[0]:'';
   document.getElementById('pSpeakBtn')?.addEventListener('click',()=>{
-    if('speechSynthesis'in window&&sp){window.speechSynthesis.cancel();window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(sp),{lang:'es-ES'}));}
+    playPracticeSpanish(sp);
   });
 
   // Reveal
@@ -2191,10 +2207,7 @@ function renderBuild() {
       const sp = chip.dataset.sp;
       bs[targetSlot] = {sp, en: chip.dataset.en};
       // Speak the Spanish word so learners hear pronunciation
-      if('speechSynthesis' in window && sp){
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(sp),{lang:'es-ES'}));
-      }
+      playPracticeSpanish(sp);
       // Auto-advance active slot
       const order = ['q','c','i','e'];
       const next = order[order.indexOf(targetSlot)+1];
@@ -2206,10 +2219,7 @@ function renderBuild() {
   d.querySelector('#negToggle')?.addEventListener('click', () => { bs.neg = !bs.neg; renderBuild(); });
   // Speak
   d.querySelector('#bSpeakBtn')?.addEventListener('click', () => {
-    if('speechSynthesis' in window && sentence) {
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(sentence), {lang:'es-ES'}));
-    }
+    playPracticeSpanish(sentence);
   });
   // Shuffle
   d.querySelector('#shuffleBtn')?.addEventListener('click', () => {
@@ -2275,10 +2285,7 @@ function renderBuild() {
       if(!chip || bsC.challengeSelected.includes(chip)) return;
       bsC.challengeSelected.push(chip);
       // Speak the chip so the learner hears how it sounds
-      if('speechSynthesis' in window && chip.sp){
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(chip.sp),{lang:'es-ES'}));
-      }
+      playPracticeSpanish(chip.sp);
       renderBuild();
     });
   });
@@ -2302,10 +2309,7 @@ function renderBuild() {
   const speakChallenge = () => {
     if(!('speechSynthesis' in window) || !bsC.challengeTokens?.length) return;
     const text = bsC.challengeTokens.map(t=>t.sp).join(' ');
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'es-ES';
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
+    playPracticeSpanish(text);
   };
 
   d.querySelector('#chCheckBtn')?.addEventListener('click', () => {
@@ -2331,10 +2335,7 @@ function renderBuild() {
   // ── Generate & Read events ────────────────────────────────────────────────
   const bs3=buildState;
   const speakGen = () => {
-    if('speechSynthesis' in window && bs3.genSentence){
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance(bs3.genSentence.sp),{lang:'es-ES'}));
-    }
+    if(bs3.genSentence) playPracticeSpanish(bs3.genSentence.sp);
   };
   // Autoplay when a new sentence is shown but not yet revealed.
   // Uses a short delay so the UI paints first, and guards against double-fire on re-renders.
