@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Melody Lab · Interactive Music Studio</title>
+<style>
+:root{--ink:#203348;--muted:#627689;--line:#dbe6ec;--teal:#087f84;--teal2:#dcf5f2;--blue:#eaf1ff;--gold:#f3b748;--paper:#fff;--bg:#f4f7fa;--shadow:0 12px 32px #1a365012}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,Segoe UI,sans-serif}
+button,select,input{font:inherit}button{cursor:pointer;border:1px solid #d7e2ea;background:white;color:var(--ink);border-radius:11px;padding:10px 13px;font-weight:650}button:hover{border-color:var(--teal)}button:focus-visible,[tabindex]:focus-visible{outline:3px solid #e7ab46;outline-offset:2px}
+button.primary{background:var(--teal);color:white;border-color:var(--teal)}button.primary:hover{background:#086a70}button.active{background:var(--teal2);border-color:#82cbc5;color:#075e61}
+header{background:#17364b;color:#fff;padding:14px max(20px,calc((100vw - 1280px)/2));display:flex;align-items:center;gap:15px;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:12px;font-weight:850;font-size:23px;letter-spacing:-.7px}.brand-mark{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:#2caca5;color:white;font-size:25px}
+header small{display:block;color:#bdd2df;font-weight:450;font-size:12px;letter-spacing:.2px}
+main{max-width:1320px;margin:auto;padding:24px 20px 38px}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:20px}.top h1{font-size:clamp(24px,3vw,34px);margin:0;letter-spacing:-.9px}.top p{margin:5px 0 0;color:var(--muted)}
+.pill{border-radius:100px;padding:6px 11px;background:#e8f4ed;color:#26725b;font-size:13px;font-weight:750}
+.tabs{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 18px}.tabs button{border-radius:12px;background:#edf2f7;padding:12px 20px}.tabs button[aria-selected=true]{background:white;color:var(--teal);box-shadow:inset 0 -3px var(--teal)}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 294px;align-items:start;gap:18px}.panel{background:var(--paper);border:1px solid #e0e8ee;border-radius:18px;box-shadow:var(--shadow);padding:20px}.panel h2{font-size:18px;letter-spacing:-.3px;margin:0 0 5px}.hint{color:var(--muted);font-size:13px;margin:0 0 15px}
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.toolbar label{font-weight:700;font-size:13px}.toolbar select{padding:8px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.staff-shell{position:relative;background:linear-gradient(180deg,#fafdfd,#f8fafb);border:1px solid #e0e8ef;border-radius:15px;overflow:hidden;margin-top:16px;touch-action:none}
+#staff{width:100%;height:auto;display:block;min-height:220px;user-select:none;touch-action:none}
+#staff .note{cursor:grab}#staff .note:active{cursor:grabbing}
+#staff .note circle{stroke:#176f77;stroke-width:2;fill:#2b9999}#staff .note.selected circle{fill:#e4a83e;stroke:#a36d17}
+.staff-foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;color:var(--muted);font-size:12px;margin-top:10px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.keyboard{display:flex;position:relative;height:128px;max-width:660px;margin:12px auto 0;border:1px solid #cbd7df;border-radius:8px;overflow:hidden;background:#cbd7df;gap:2px}
+.key{position:relative;flex:1;border-radius:0 0 6px 6px;border:0;background:#fff;padding:0;display:flex;align-items:flex-end;justify-content:center;padding-bottom:10px;color:#576a76;font-size:11px;min-width:0}
+.key.black{position:absolute;z-index:2;top:0;width:7.7%;height:62%;border-radius:0 0 5px 5px;background:#26394b;color:#fff;font-size:0;transform:translateX(-50%);box-shadow:2px 3px 4px #0003}.key.playing{background:#9cddd3}.key.black.playing{background:#338c91}
+.side-box{border-radius:13px;background:#edf7f6;padding:15px;margin:16px 0}.side-box b{display:block;margin-bottom:5px}.side-box p{margin:0;font-size:13px;color:#41656b}.legend{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.legend button{padding:12px 8px;text-align:center;font-weight:700}.legend button.active{background:#daf2ef}
+#notesLabel{font-size:13px;word-break:break-word;color:#455d6c;min-height:48px}.count{font-variant-numeric:tabular-nums;color:var(--muted)}
+#rhythmArea{display:none}.rhythm-card{background:#f0f6ff;border-radius:15px;padding:20px;text-align:center;margin-top:16px}.rhythm-beats{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:24px 0}.beat{height:70px;min-width:68px;padding:10px;border:2px solid #a8b9d9;border-radius:14px;background:#fff;font-size:26px;font-weight:850;display:flex;align-items:center;justify-content:center}.beat.now{background:#ffe8af;border-color:#d7962c}.beat.hit{background:#bee9da;border-color:#27805f}.beat.miss{background:#ffdbd8;border-color:#d56b61}.tap{min-width:220px;padding:20px 35px;font-size:24px;background:#147d87;color:white;border-color:#147d87;touch-action:manipulation}
+#feedback{min-height:28px;margin-top:12px;font-weight:720}.meter{height:8px;background:#dfebee;border-radius:9px;overflow:hidden;margin-top:12px}.meter span{display:block;width:0;height:100%;background:#27a18d}
+footer{text-align:center;color:#788995;font-size:12px;margin-top:20px}
+@media(max-width:860px){.layout{grid-template-columns:1fr}.side{order:2}.panel{padding:16px}main{padding:16px 12px}header{padding:12px 16px}.keyboard{height:110px}}@media(max-width:460px){.top{align-items:start}.beat{min-width:54px;height:60px}.tabs button{flex:1;padding:10px 8px}.brand{font-size:19px}.pill{font-size:11px}}
+</style>
+</head>
+<body>
+<header><div class="brand"><span class="brand-mark">♫</span><span>Melody Lab<small>Play · Compose · Learn</small></span></div><span class="pill">Interactive Music Studio</span></header>
+<main><div class="top"><div><h1>Make music, one note at a time.</h1><p>Build melodies on the staff, hear every pitch, and practise keeping the beat.</p></div><span class="pill" id="modeStatus">Key of F major</span></div>
+<div class="tabs" role="tablist" aria-label="Music studio sections"><button id="tab-build" role="tab" aria-selected="true">♪ Melody Builder</button><button id="tab-song" role="tab" aria-selected="false">♫ Carol Pattern</button><button id="tab-rhythm" role="tab" aria-selected="false">◉ Rhythm Trainer</button></div>
+<div class="layout"><section class="panel">
+<div id="melodyArea">
+<div class="toolbar"><div><h2 id="editorTitle">Your melody</h2><p class="hint" id="editorHint">Tap the staff to add a note. Drag notes up or down to change pitch, or sideways to reorder.</p></div></div>
+<div class="toolbar"><label for="keySelect">Key</label><select id="keySelect"><option value="F">F major</option><option value="C">C major</option><option value="G">G major</option></select><label for="tempo">Tempo</label><input id="tempo" type="range" min="60" max="160" value="104" aria-label="Tempo in beats per minute"><span id="bpm">104 BPM</span></div>
+<div class="staff-shell"><svg id="staff" viewBox="0 0 860 260" role="img" aria-label="Interactive treble clef music staff. Tap to add or drag notes to change their pitches"></svg></div>
+<div class="staff-foot"><span>Treble clef · quarter notes · 4/4</span><span id="selection">No note selected</span></div>
+<div class="controls"><button class="primary" id="play">▶ Play melody</button><button id="add">＋ Add note</button><button id="delete">Remove selected</button><button id="undo">↶ Undo</button><button id="clear">Clear</button><button id="save">Save melody</button></div>
+<div class="side-box"><b>Hear the pitches</b><p>Tap the piano keys to try a sound, then place the notes on the staff.</p><div class="keyboard" id="keyboard"></div></div>
+</div>
+<div id="rhythmArea"><h2>Rhythm Trainer</h2><p class="hint">Listen to four steady beats, then tap along. The trainer scores how close each tap is to the beat.</p>
+<div class="toolbar"><label for="rhythmTempo">Beat speed</label><input type="range" id="rhythmTempo" min="55" max="150" value="90"><span id="rhythmBpm">90 BPM</span><label for="rhythmLevel">Level</label><select id="rhythmLevel"><option value="4">4 beats</option><option value="8">8 beats</option><option value="12">12 beats</option></select></div>
+<div class="rhythm-card"><p id="rhythmInstruction">Press Start to hear a 4-beat count-in.</p><div id="rhythmBeats" class="rhythm-beats"></div><button class="primary" id="rhythmStart">▶ Start practice</button> <button class="tap" id="rhythmTap" disabled>🥁 TAP</button><div id="feedback" role="status"></div><div class="meter"><span id="scoreMeter"></span></div><p class="hint" style="margin-top:14px">You can also press the space bar to tap.</p></div></div>
+</section>
+<aside class="panel side"><h2 id="sideTitle">Note values</h2><p class="hint" id="sideIntro">Choose a note length for the next note.</p><div class="legend" id="lengths"><button class="active" data-length="1">♩ Quarter</button><button data-length="2">𝅗𝅥 Half</button><button data-length="4">𝅝 Whole</button><button data-length=".5">♪ Eighth</button></div>
+<div class="side-box"><b id="guideTitle">Music tip</b><p id="guide">The five lines of a treble staff, from bottom to top, are E, G, B, D and F. The spaces are F, A, C and E.</p></div>
+<h2>Notes in your melody</h2><p id="notesLabel">No notes yet.</p><p class="count" id="noteCount">0 notes</p><button id="resetCarol" style="display:none">↺ Restore opening pattern</button>
+</aside></div><footer>Melody Lab · First-run prototype · Works with mouse, touchscreen and keyboard · Melodies save locally on this device</footer></main>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id);
+const SCALE={F:['F','G','A','Bb','C','D','E'],C:['C','D','E','F','G','A','B'],G:['G','A','B','C','D','E','F#']};
+const chromatic=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const staffSteps=['C4','D4','E4','F4','G4','A4','B4','C5','D5','E5','F5','G5','A5'];
+const posFor=p=>staffSteps.indexOf(p.replace('Bb','A#').replace('F#','F#')); // fallback below uses diatonic staff position
+const yOf=p=>{let s=p[0]+p.slice(-1);let i=staffSteps.indexOf(s);return 202-Math.max(0,i)*13};
+const pOf=y=>staffSteps[Math.max(0,Math.min(staffSteps.length-1,Math.round((202-y)/13)))];
+const normPitch=(p,key)=>{let l=p[0],o=p.slice(-1);if(key==='F'&&l==='B')return 'Bb'+o;if(key==='G'&&l==='F')return 'F#'+o;return l+o};
+const freq=p=>{let name=p.slice(0,-1).replace('Bb','A#'),oct=Number(p.slice(-1));let n=(oct+1)*12+chromatic.indexOf(name);return 440*Math.pow(2,(n-69)/12)};
+let audio=null;function ctx(){audio=audio||new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume();return audio}
+function tone(p,d=.27,at=0){const a=ctx(),o=a.createOscillator(),g=a.createGain(),t=a.currentTime+at;o.type='triangle';o.frequency.value=freq(p);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.17,t+.025);g.gain.exponentialRampToValueAtTime(.0001,t+Math.max(.08,d));o.connect(g).connect(a.destination);o.start(t);o.stop(t+Math.max(.1,d)+.03)}
+function clickSound(at=0,accent=false){let a=ctx(),o=a.createOscillator(),g=a.createGain(),t=a.currentTime+at;o.type='sine';o.frequency.setValueAtTime(accent?1050:740,t);o.frequency.exponentialRampToValueAtTime(400,t+.055);g.gain.setValueAtTime(.2,t);g.gain.exponentialRampToValueAtTime(.0001,t+.09);o.connect(g).connect(a.destination);o.start(t);o.stop(t+.1)}
+let mode='build',key='F',length=1,selected=-1,playing=false,playTimer=null,notes=[],history=[],drag=null;
+let carol=[{p:'A4',d:1},{p:'G4',d:1},{p:'A4',d:1},{p:'F4',d:1},{p:'A4',d:1},{p:'G4',d:1},{p:'A4',d:1},{p:'F4',d:1}];
+try{notes=JSON.parse(localStorage.getItem('melody-lab-v1')||'null')||[{p:'F4',d:1},{p:'A4',d:1},{p:'C5',d:1},{p:'A4',d:1}]}catch(e){notes=[{p:'F4',d:1},{p:'A4',d:1},{p:'C5',d:1}]}
+function snapshot(){history.push(JSON.stringify(notes));if(history.length>30)history.shift()}
+function saveLocal(){try{localStorage.setItem('melody-lab-v1',JSON.stringify(notes))}catch(e){}}
+function current(){return mode==='song'?carol:notes}
+function draw(){let list=current(),svg=$('staff'),out='';for(let i=0;i<5;i++){let y=98+i*26;out+='<line x1="75" y1="'+y+'" x2="838" y2="'+y+'" stroke="#8fa7b6" stroke-width="1.8"/>'}
+out+='<text x="22" y="184" font-family="Georgia,serif" font-size="120" fill="#203e50">𝄞</text>';
+for(let i=0;i<=staffSteps.length-1;i++){let y=202-i*13;if(i%2===0)out+='<line x1="72" x2="838" y1="'+y+'" y2="'+y+'" stroke="#e1ecee" stroke-dasharray="3 9"/>'}
+const start=120,step=Math.min(87,Math.max(36,680/Math.max(1,list.length))),m=Math.max(1,list.length);
+list.forEach((n,i)=>{let x=start+i*step,y=yOf(n.p),sel=i===selected; if(y>202||y<98){out+='<line x1="'+(x-17)+'" y1="'+y+'" x2="'+(x+17)+'" y2="'+y+'" stroke="#526c7b" stroke-width="2"/>'}
+out+='<g class="note '+(sel?'selected':'')+'" data-index="'+i+'" tabindex="0" aria-label="Note '+(i+1)+', '+n.p+', select or drag" role="button"><ellipse cx="'+x+'" cy="'+y+'" rx="13" ry="9" transform="rotate(-18 '+x+' '+y+')" fill="'+(sel?'#e9ad43':'#258f95')+'" stroke="'+(sel?'#af7c22':'#1e6f77')+'" stroke-width="2"/>';
+if(n.d!==4)out+='<line x1="'+(x+12)+'" y1="'+y+'" x2="'+(x+12)+'" y2="'+(y-60)+'" stroke="#27616c" stroke-width="3"/>';
+if(n.d===.5)out+='<path d="M '+(x+12)+' '+(y-60)+' q 31 12 17 34" fill="none" stroke="#27616c" stroke-width="3"/>';
+if(n.d>=2)out+='<ellipse cx="'+x+'" cy="'+y+'" rx="6" ry="4" fill="#fff"/>';
+out+='<text x="'+x+'" y="234" fill="#577083" font-size="12" text-anchor="middle">'+n.p+'</text></g>'});
+out+='<text x="792" y="38" fill="#91a5b3" font-size="14" text-anchor="end">'+(mode==='song'?'Opening pattern':'Your composition')+'</text>';svg.innerHTML=out;
+$('selection').textContent=selected>=0&&list[selected]?'Selected: '+list[selected].p+' · '+(selected+1)+' of '+list.length:'No note selected';
+$('notesLabel').textContent=list.length?list.map(n=>n.p).join('  ·  '):'No notes yet.';
+$('noteCount').textContent=list.length+' note'+(list.length===1?'':'s');$('modeStatus').textContent='Key of '+key+' major'}
+function pointer(e){let r=$('staff').getBoundingClientRect(),x=(e.clientX-r.left)/r.width*860,y=(e.clientY-r.top)/r.height*260;return{x,y}}
+$('staff').addEventListener('pointerdown',e=>{if(mode==='rhythm')return;let target=e.target.closest('.note'),i=target?Number(target.dataset.index):-1,pt=pointer(e);if(i>=0){selected=i;drag={i,originX:pt.x,originY:pt.y,moved:false};$('staff').setPointerCapture(e.pointerId);draw()}else if(mode==='build'&&notes.length<16){snapshot();let p=normPitch(pOf(pt.y),key);notes.push({p,d:length});selected=notes.length-1;tone(p);saveLocal();draw()}});
+$('staff').addEventListener('pointermove',e=>{if(!drag)return;let pt=pointer(e);if(Math.abs(pt.x-drag.originX)>8||Math.abs(pt.y-drag.originY)>8){if(!drag.moved){snapshot();drag.moved=true}let arr=current(),p=normPitch(pOf(pt.y),key);if(arr[drag.i].p!==p){arr[drag.i].p=p;draw()}if(mode==='build'){let newI=Math.max(0,Math.min(arr.length-1,Math.round((pt.x-120)/Math.min(87,Math.max(36,680/arr.length)))));if(newI!==drag.i){let n=arr.splice(drag.i,1)[0];arr.splice(newI,0,n);drag.i=newI;selected=newI;draw()}}}});
+$('staff').addEventListener('pointerup',e=>{if(drag){if(drag.moved){tone(current()[drag.i].p);saveLocal()}drag=null;draw()}});
+$('staff').addEventListener('keydown',e=>{let n=e.target.closest('.note');if(!n)return;let i=Number(n.dataset.index),arr=current();if(e.key==='Enter'||e.key===' '){selected=i;draw();e.preventDefault()}else if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();if(mode==='build')snapshot();let old=yOf(arr[i].p);arr[i].p=normPitch(pOf(old+(e.key==='ArrowUp'?-13:13)),key);selected=i;tone(arr[i].p);saveLocal();draw()}});
+$('lengths').addEventListener('click',e=>{let b=e.target.closest('button[data-length]');if(!b)return;length=Number(b.dataset.length);document.querySelectorAll('#lengths button').forEach(x=>x.classList.toggle('active',x===b));if(selected>=0&&mode==='build'){snapshot();notes[selected].d=length;saveLocal();draw()}});
+$('add').onclick=()=>{if(mode!=='build'||notes.length>=16)return;snapshot();let p=normPitch('A4',key);notes.push({p,d:length});selected=notes.length-1;tone(p);saveLocal();draw()};
+$('delete').onclick=()=>{if(mode!=='build'||selected<0)return;snapshot();notes.splice(selected,1);selected=-1;saveLocal();draw()};
+$('undo').onclick=()=>{if(mode!=='build'||!history.length)return;notes=JSON.parse(history.pop());selected=-1;saveLocal();draw()};
+$('clear').onclick=()=>{if(mode!=='build'||!notes.length)return;snapshot();notes=[];selected=-1;saveLocal();draw()};
+$('save').onclick=()=>{saveLocal();let data=JSON.stringify({title:'My Melody',key,tempo:Number($('tempo').value),notes},null,2),blob=new Blob([data],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='my-melody.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)};
+$('keySelect').onchange=e=>{key=e.target.value;if(mode==='build'){notes=notes.map(n=>({...n,p:normPitch(n.p.replace('Bb','B').replace('F#','F'),key)}));saveLocal()}draw();buildKeyboard()};
+$('tempo').oninput=e=>$('bpm').textContent=e.target.value+' BPM';
+$('play').onclick=()=>{if(playing){clearTimeout(playTimer);playing=false;$('play').textContent='▶ Play melody';return}let list=current();if(!list.length)return;playing=true;$('play').textContent='■ Stop';let beat=60/Number($('tempo').value),offset=0;list.forEach(n=>{tone(n.p,beat*n.d*.86,offset);offset+=beat*n.d});playTimer=setTimeout(()=>{playing=false;$('play').textContent='▶ Play melody'},offset*1000+100)};
+function buildKeyboard(){let div=$('keyboard'),white=['C4','D4','E4','F4','G4','A4','B4','C5','D5','E5','F5','G5','A5','B5'];div.innerHTML='';white.forEach(p=>{let b=document.createElement('button');b.className='key';b.textContent=p.replace(/[0-9]/g,'');b.setAttribute('aria-label','Play '+p);b.onclick=()=>{tone(normPitch(p,key));b.classList.add('playing');setTimeout(()=>b.classList.remove('playing'),190)};div.appendChild(b)});const blacks=[['C#4',1],['D#4',2],['F#4',4],['G#4',5],['A#4',6],['C#5',8],['D#5',9],['F#5',11],['G#5',12],['A#5',13]];blacks.forEach(([p,n])=>{let b=document.createElement('button');b.className='key black';b.style.left=(n/14*100)+'%';b.setAttribute('aria-label','Play '+p);b.title=p;b.onclick=()=>{tone(p);b.classList.add('playing');setTimeout(()=>b.classList.remove('playing'),190)};div.appendChild(b)})}
+function tab(m){mode=m;selected=-1;let rhythm=m==='rhythm';$('melodyArea').style.display=rhythm?'none':'block';$('rhythmArea').style.display=rhythm?'block':'none';['build','song','rhythm'].forEach(t=>$('tab-'+t).setAttribute('aria-selected',String(t===m)));$('editorTitle').textContent=m==='song'?'Carol of the Bells · F-major study':'Your melody';$('editorHint').textContent=m==='song'?'Explore the A–G–A–F opening motif. Drag pitches, play it, or compare it with your own melody.':'Tap the staff to add notes. Drag vertically to change pitch and horizontally to reorder.';$('keySelect').disabled=m==='song';if(m==='song')key='F';else key=$('keySelect').value;$('lengths').querySelectorAll('button').forEach(b=>b.disabled=m!=='build');['add','delete','undo','clear','save'].forEach(id=>$(id).disabled=m!=='build');$('resetCarol').style.display=m==='song'?'block':'none';$('sideTitle').textContent=rhythm?'How to play':'Note values';$('guideTitle').textContent=rhythm?'Timing tip':m==='song'?'F-major motif':'Music tip';$('guide').textContent=rhythm?'Listen for the steady pulse, then tap once per beat. The closer you tap to the beat, the higher your score.':m==='song'?'This eight-note study repeats the A–G–A–F opening pattern. It is a short practice excerpt, not a full arrangement.':'The five lines of a treble staff, from bottom to top, are E, G, B, D and F. The spaces are F, A, C and E.';draw()}
+$('resetCarol').onclick=()=>{carol=[{p:'A4',d:1},{p:'G4',d:1},{p:'A4',d:1},{p:'F4',d:1},{p:'A4',d:1},{p:'G4',d:1},{p:'A4',d:1},{p:'F4',d:1}];selected=-1;draw()};
+['build','song','rhythm'].forEach(m=>$('tab-'+m).onclick=()=>tab(m));
+let rhythm={running:false,beatTimes:[],hits:[],timers:[],startAt:0,beatMs:666};
+$('rhythmTempo').oninput=e=>$('rhythmBpm').textContent=e.target.value+' BPM';
+function beatsUI(){let count=Number($('rhythmLevel').value);$('rhythmBeats').innerHTML=Array.from({length:count},(_,i)=>'<div class="beat" id="beat'+i+'">'+(i+1)+'</div>').join('')}
+beatsUI();$('rhythmLevel').onchange=beatsUI;
+function endRhythm(){rhythm.running=false;$('rhythmTap').disabled=true;$('rhythmStart').textContent='▶ Try again';let valid=rhythm.hits.filter(h=>h.error!==null),accuracy=valid.length?Math.round(valid.reduce((s,h)=>s+Math.max(0,100-h.error/1.8),0)/rhythm.beatTimes.length):0;$('feedback').textContent='Score: '+accuracy+'% · '+valid.length+' of '+rhythm.beatTimes.length+' beats tapped';$('scoreMeter').style.width=accuracy+'%';rhythm.beatTimes.forEach((t,i)=>{let el=$('beat'+i);if(el&&!rhythm.hits.some(h=>h.index===i))el.classList.add('miss')})}
+$('rhythmStart').onclick=()=>{rhythm.timers.forEach(clearTimeout);rhythm={running:false,beatTimes:[],hits:[],timers:[],startAt:0,beatMs:60000/Number($('rhythmTempo').value)};beatsUI();$('scoreMeter').style.width='0';$('feedback').textContent='';$('rhythmTap').disabled=true;$('rhythmInstruction').textContent='Listen: 1, 2, 3, 4…';$('rhythmStart').textContent='Restart';let count=Number($('rhythmLevel').value),base=performance.now()+180;for(let i=0;i<4;i++){rhythm.timers.push(setTimeout(()=>{clickSound(0,i===0);$('rhythmInstruction').textContent='Count in: '+(i+1)},i*rhythm.beatMs+180))}rhythm.startAt=base+4*rhythm.beatMs;for(let i=0;i<count;i++){rhythm.beatTimes.push(rhythm.startAt+i*rhythm.beatMs);rhythm.timers.push(setTimeout(()=>{if(i===0){rhythm.running=true;$('rhythmTap').disabled=false;$('rhythmInstruction').textContent='Tap each beat!'}clickSound(0,i%4===0);$('beat'+i)?.classList.add('now');},4*rhythm.beatMs+i*rhythm.beatMs+180))}rhythm.timers.push(setTimeout(endRhythm,(4+count)*rhythm.beatMs+350))};
+function tapBeat(){if(!rhythm.running)return;let now=performance.now(),best=-1,err=Infinity;rhythm.beatTimes.forEach((t,i)=>{let e=Math.abs(t-now);if(e<err&&!rhythm.hits.some(h=>h.index===i)){best=i;err=e}});if(best<0||err>rhythm.beatMs*.5)return;rhythm.hits.push({index:best,error:err});let el=$('beat'+best);el.classList.remove('now');el.classList.add('hit');$('feedback').textContent=err<90?'Excellent timing!':err<175?'Good beat!':'Keep listening to the pulse';$('scoreMeter').style.width=Math.round(rhythm.hits.length/rhythm.beatTimes.length*100)+'%'}
+$('rhythmTap').onclick=tapBeat;document.addEventListener('keydown',e=>{if(e.code==='Space'&&mode==='rhythm'&&e.target.tagName!=='BUTTON'&&e.target.tagName!=='SELECT'&&e.target.tagName!=='INPUT'){e.preventDefault();tapBeat()}});
+buildKeyboard();tab('build');
+})();
+</script></body></html>
