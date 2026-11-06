@@ -50,10 +50,11 @@ function stepLink(lesson, number) {
 function renderChapters(chapter) {
   chaptersNav.innerHTML = chapters.map((item, index) => {
     const selected = item === chapter ? ' aria-current="true"' : "";
+    const number = String(index + 1).padStart(2, "0");
     return '<a class="chapter-tile ' + item.color + '" href="#step-' + item.first +
-      '" data-step="' + item.first + '"' + selected + '><span><span class="tile-no">CHAPTER ' +
-      String(index + 1).padStart(2, "0") + '</span><b>' + escape(item.title) +
-      '</b></span><small>' + escape(item.summary) + '</small></a>';
+      '" data-step="' + item.first + '" aria-description="' + escape(item.summary) + '"' + selected +
+      '><span class="tile-top" aria-hidden="true"><span class="tile-no">' + number +
+      '</span><span class="tile-arrow">→</span></span><b>' + escape(item.title) + '</b></a>';
   }).join("");
   $("#chapter-heading").textContent = chapter.title;
 }
