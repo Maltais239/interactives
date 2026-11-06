@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en-CA">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fffaf1">
+  <meta name="description" content="Tools and setup guides from the Assistive Tech Walkthrough, grouped by chapter.">
+  <title>List of all links | Assistive Tech Walkthrough</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900;1000&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css?v=6">
+</head>
+<body>
+  <main class="wrap resource-page">
+    <header class="resource-header">
+      <a class="button outline" href="./"><span aria-hidden="true">←</span> Back to walkthrough</a>
+      <p class="eyebrow">ASSISTIVE TECH WALKTHROUGH</p>
+      <h1>List of all links</h1>
+      <p>Tools, teaching resources and setup guides from every chapter.</p>
+    </header>
+    <div class="resource-chapters" id="resource-chapters"></div>
+    <noscript><p>Turn on JavaScript to view the workshop links.</p></noscript>
+  </main>
+  <script type="module">
+    import { chapters, lessons } from "./lessons.js?v=5";
+
+    const resourceChapters = document.querySelector("#resource-chapters");
+    const seen = new Set();
+
+    for (const chapter of chapters) {
+      const list = document.createElement("ul");
+      for (const lesson of lessons.slice(chapter.first - 1, chapter.last)) {
+        const links = [lesson.featuredLink, ...(lesson.links ?? []), lesson.extraGuide?.link];
+        for (const link of links.filter(Boolean)) {
+          const [label, url] = link;
+          if (seen.has(url)) continue;
+          seen.add(url);
+
+          const anchor = document.createElement("a");
+          anchor.textContent = label;
+          anchor.href = url;
+          anchor.target = "_blank";
+          anchor.rel = "noopener noreferrer";
+          const item = document.createElement("li");
+          item.append(anchor);
+          list.append(item);
+        }
+      }
+
+      if (!list.childElementCount) continue;
+      const section = document.createElement("section");
+      section.className = "lesson resource-chapter";
+      const heading = document.createElement("h2");
+      heading.textContent = chapter.title;
+      section.append(heading, list);
+      resourceChapters.append(section);
+    }
+  </script>
+</body>
+</html>
