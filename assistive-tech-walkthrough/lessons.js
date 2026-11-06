@@ -1,3 +1,5 @@
+import relevelerPrompt from "./text-releveler-prompt.js?v=3";
+
 export const chapters = [
   { title: "Start with access", summary: "Universal design and Chromebook access", color: "mint", first: 1, last: 7 },
   { title: "Translate & caption", summary: "Docs, slides, PDFs, captions and more", color: "gold", first: 8, last: 13 },
@@ -14,6 +16,11 @@ const classroom = "https://support.google.com/edu/classroom/answer/";
 const gemini = "https://support.google.com/gemini/answer/";
 const texthelp = "https://support.texthelp.com/help/readwrite-for-google-chrome";
 const engage = "https://sites.google.com/gshare.blackgold.ca/engagingstudents/home";
+
+const eal = "https://sites.google.com/gshare.blackgold.ca/engagingstudents/english-as-an-additional-language";
+const gemLink = (id) => "https://gemini.google.com/gem/" + id + "?usp=sharing";
+const releveler = ["Text Releveler with Copy to Docs and Save as PDF", gemLink("1xoWxA6WnVLkZvgxGYWZmfkyno9417X24")];
+const thinkingRoutines = ["Text Releveler with Thinking Routines", gemLink("1_YnRTemO3HMvOEbF0ExC41M2dTNtGSDN")];
 
 export const lessons = [
   { title: "Assistive Tech & Differentiation", intro: "Work through the same tools from the workshop, then pick one to try in your classroom.",
@@ -55,7 +62,8 @@ export const lessons = [
     steps: ["Open the presentation in Google Slides. Make a copy first if you want to keep the original language version.", "Click Ask Gemini in the top-right corner of Slides, next to Share.", "Paste the whole-deck prompt below into the Gemini side panel. Review the translation on the slides and check that the text still fits."],
     note: "Ask Gemini edits the presentation itself. Chrome’s page translation only changes the page you see. For words embedded in a picture, use the Google Pics workflow below.",
     prompt: "Translate this entire presentation into [language]. Apply the translation directly to every slide. Keep the existing slide order, layout, and images.",
-    image: "ask-gemini-in-slides.webp", alt: "The Ask Gemini button in the top-right corner of Google Slides, beside Share",
+    alt: "Full workshop slide showing an English and a Spanish slide side by side",
+    noteImage: { file: "ask-gemini-in-slides.webp", alt: "The Ask Gemini button in the top-right corner of Google Slides, beside Share" },
     links: [["Edit all slides with Gemini in Google Slides", docs + "16961475"]],
     extraGuide: {
       title: "Edit images in Slides with Google Pics",
@@ -63,37 +71,49 @@ export const lessons = [
       image: "google-pics-selection.webp", alt: "Google Pics highlights one object in a diagram and shows how to select an area to edit",
       link: ["Google Pics in Slides setup and editing steps", docs + "17499039"]
     } },
-  { title: "Translate a PDF", intro: "Choose a PDF translation tool that suits your file and the layout you need to preserve.",
-    steps: ["On desktop, open Google Translate and select Documents.", "Choose the target language, upload the PDF and download the translation.", "Check diagrams, reading order and text boxes. Try Canva’s PDF workflow if layout needs more work."],
-    note: "In Google Translate’s document workflow, scanned page images can remain untranslated. If that happens, start with an editable or OCR version and check the output.",
-    links: [["Google Translate document help", "https://support.google.com/translate/answer/2534559"], ["Canva PDF Translator", "https://www.canva.com/features/pdf-translator/"]], alt: "Workshop examples of Google Translate, Canva and Acrobat PDF translation workflows" },
+  { title: "Translate a PDF", intro: "Google Translate and Canva run in your browser. Adobe Acrobat has a desktop workflow that opens the file in Adobe Express for translation.",
+    steps: ["Open Google Translate in your browser and choose Documents.", "Select the target language, upload the PDF, then download the translation.", "To work with the layout, try Canva’s PDF Translator. In the Adobe Acrobat desktop app, open the PDF and choose Convert → Translate this PDF to continue in Adobe Express."],
+    note: "Review diagrams, text boxes and reading order after translating. If the PDF is a scan and its words remain untranslated, start with a text-selectable or OCR version.",
+    links: [["Google Translate document help", "https://support.google.com/translate/answer/2534559"], ["Canva PDF Translator", "https://www.canva.com/features/pdf-translator/"], ["Translate a PDF from Adobe Acrobat", "https://helpx.adobe.com/ca/acrobat/using/translate-pdf.html"]], alt: "Full workshop slide comparing Google Translate, Canva and Adobe Acrobat PDF translation" },
   { title: "Turn on translated live captions", intro: "In a supported ChromeOS Class Tools session, students can follow the teacher’s speech with translated captions.",
     steps: ["Start a Class Tools session and have students join.", "Open Captions after the session starts.", "Allow students to use captions and translate, then test the language selector from a student device."],
     note: "Captioning works best when the teacher microphone is clear. Put names, instructions and specialist vocabulary in writing as well.",
     links: [["Class Tools caption and translation setup", "https://support.google.com/chrome/a/answer/16058637"]], alt: "Class Tools workshop screenshot showing how to open captions and turn on translation" },
-  { title: "Use Google Translate on a phone", intro: "Camera translation can help with printed instructions and labels.",
-    steps: ["Open the Google Translate app and pick the source and target languages.", "Select Camera and aim at the printed text, or open a photo.", "Compare the result with the original and check key terms."],
-    note: "Choose a clean, well-lit example. For longer handouts, share a reviewed document or PDF translation that students can reread.",
-    links: [["Translate text in images", "https://support.google.com/translate/answer/6142483"]], alt: "Cropped workshop screenshots of Google Translate on the web and on a phone" },
+  { title: "Translate on the web, in the app, and in Meet", intro: "Use Google Translate on the web for quick text and documents, the app for camera translation, live audio and language practice, and Google Meet for translated audio in meetings.",
+    steps: ["Google Translate web: paste or type text, or select Documents to translate a file.", "Google Translate app: tap Camera for printed text, Live translate for conversation or listening with headphones, or Practice for speaking and listening exercises.", "Google Meet: in a supported meeting, open Captions and translation, then turn on Speech translation and choose your languages."],
+    note: "Practice and Live translate depend on the language and app availability. Meet’s Speech translation provides translated audio. Use translated captions when you want on-screen text.",
+    links: [["Google Translate on the web", "https://translate.google.com/"], ["Translate text with the camera", "https://support.google.com/translate/answer/6142483"], ["Listen to live translations", "https://support.google.com/translate/answer/6142474"], ["Practise a language in the app", "https://support.google.com/translate/answer/16475590"], ["Use speech translation in Google Meet", "https://support.google.com/meet/answer/16221730"]], alt: "Full Translation workshop slide showing Google Translate web, the app’s Live translate, Camera and Practice buttons, and translated audio in Google Meet" },
   { title: "Try a scanning pen", intro: "A scanning pen can read or capture short stretches of printed text at the desk.",
     steps: ["Choose a short sample with clear print.", "Practise scanning one line at a steady pace.", "Test the exact model’s offline features and school Wi-Fi compatibility if it needs a connection."],
     note: "Check supported Wi-Fi bands for the specific model. Test a real book page before choosing a device for everyday use.",
     example: "Compare a pen and a built-in read-aloud tool on the same task to see which is easier for the student to use.", alt: "Scanning pen workshop example with a device photo and specifications" },
-  { title: "Build a reusable Gemini Gem", intro: "Use a Gem to save a set of instructions you use repeatedly when adapting material.",
-    steps: ["Open Gems in the Gemini web app and create a new Gem.", "Write reusable instructions and test them with a short source passage.", "Review the test output and refine the instructions before saving."],
-    note: "Specify what must stay, such as the learning goal, technical terms and source facts. Choose an editable output so you can refine it.",
-    prompt: "Adapt the supplied text for [grade or reading needs]. Keep the learning goal, facts and key vocabulary. Define each key term in plain language. Return an editable student passage and three quick checks for understanding.",
-    links: [["Create and manage Gems", gemini + "15146780"]], alt: "Workshop diagram showing a source article, instructions in a Gem and an editable grade-level draft" },
-  { title: "Create a bilingual version", intro: "Give learners the original and a home-language version they can refer to together.",
-    steps: ["Provide the source text, target language and intended audience.", "Ask for matched sections with English first and the translation underneath.", "Check the language, subject terms and classroom directions before sharing."],
-    note: "Match headings and examples across both versions. For unfamiliar terminology, use a short bilingual glossary.",
+  { title: "Build a reusable Gemini Gem", intro: "Use a Gem to save instructions you use repeatedly when adapting material. Try one of Darren’s classroom Gems or use the same instructions to create a Gemini skill.",
+    steps: ["Open a Gem from the links below or open Gems in the Gemini web app and create one.", "Test the instructions with a short source passage.", "Review the output and refine the instructions. For Darren’s full Text Releveler instructions, go to step 16."],
+    note: "Specify what must stay, such as the learning goal, technical terms and source facts. Google is moving from Gems to skills on a schedule that varies by account type.",
+    alt: "Full Homemade Goodness slide showing a source article, instructions in a Gem and an editable grade-level Canvas draft",
+    extraGuide: {
+      title: "Recreate a Gem as a Gemini skill",
+      steps: ["Open your Gem for editing and copy its name, description and instructions. Download any attached files you want to transfer.", "In the Gemini web app, choose Skills from Customize or the settings menu, depending on your layout. The screenshot shows Skills under Preferences.", "Choose Create → Create manually. Paste the details, save the skill and test it with a short example. For a Gem with knowledge files, follow Google’s guide to add them."],
+      image: "gemini-skills-menu.webp", alt: "Gemini’s settings menu showing Skills under Preferences",
+      link: ["Google’s guide to recreating a Gem as a skill", gemini + "18560919"]
+    },
+    linkTitle: "Darren’s Gems and setup guides",
+    links: [releveler, thinkingRoutines, ["Darren’s English as an Additional Language page", eal], ["Open Gemini Skills", "https://gemini.google.com/skills"], ["Create and manage Gems", gemini + "15146780"]] },
+  { title: "Create a bilingual version", intro: "Use one of Darren’s bilingual Gems to give learners an English and home-language version they can refer to together.",
+    steps: ["Open the Gem for your target language under Darren’s bilingual Gems below.", "Provide the source text and intended audience. For the math sheet generator, give the curriculum outcome and target language.", "Compare the versions and check subject terms and directions before sharing."],
+    note: "Match headings and examples across both versions. For unfamiliar terminology, add a short bilingual glossary.",
     prompt: "Make a bilingual handout in English and [language]. Keep the learning goal and all facts. Pair each English section with its translation. Add a five-term bilingual glossary and flag wording that may need a fluent speaker’s review.",
-    links: [["Use Gems in Gemini", gemini + "15146780"], ["Engaging Students resources", engage]], alt: "English as an Additional Language resource hub and sample bilingual Gem output" },
-  { title: "Relevel text in Gemini Canvas", intro: "Change the reading load while keeping the science idea and vocabulary students need.",
-    steps: ["Open Gemini Canvas and paste a short source passage you can share.", "Ask for shorter sentences and plain-language explanations of key terms.", "Compare the draft with the source. Fix any lost meaning or added claims and export when ready."],
-    note: "Readability is one part of access. Check the sequence of ideas, the vocabulary and the question students will answer afterward.",
-    prompt: "Rewrite this wetland paragraph for [grade or reading needs]. Keep the words wetland, habitat and shoreline. Explain each in plain language and preserve the main idea that wetlands support many plants and animals. Use only facts from the source. Then add one question that checks understanding of that idea.",
-    links: [["Create and edit in Gemini Canvas", gemini + "16047321"]], alt: "Workshop comparison of leveled text and student activities made from the same source" },
+    linkTitle: "Darren’s bilingual Gems",
+    links: [["Text Releveler + Spanish", gemLink("1rwcv7OB2IJwkm-0q1_XrILI0XPAVTeuM")], ["Text Releveler + Mandarin", gemLink("1uQxRLZmGBczgZvUFzrwby9HpiGr2DnWF")], ["Text Releveler + Punjabi", gemLink("1olSUkqE-pAXr2X39xKShnmQg4iUEjs1f")], ["Text Releveler + Portuguese", gemLink("1Rv1QAmh5nYf9zfDU6p_5ugYXwLqrAsQj")], ["Multilingual Math Sheet Generator · Alberta grades 7–9", gemLink("1AoVVhH1hSYlGRd5xg3ULoqUz0Jsx6bfo")], ["Darren’s English as an Additional Language page", eal]],
+    alt: "Full Translation Gems and More slide with Darren’s EAL page and a sample Gem output" },
+  { title: "Relevel text and export to Docs or PDF", intro: "Darren’s Text Releveler Gem takes a source passage and a target reading level, then builds a formatted handout in Gemini Canvas.",
+    steps: ["Open Darren’s Text Releveler Gem from the links below. Paste the source text or share its URL and give the grade or reading level you want.", "Review the handout in Canvas Preview. Check the facts, key vocabulary and any vocabulary or Did You Know? boxes.", "Choose Copy for Google Docs and paste into a Google Doc, or choose Save as PDF to download the handout."],
+    note: "The full prompt below is the Gem’s instruction text, including the HTML template and export logic. Copy it into a new Gem or use it to recreate the workflow as a skill. Step 14 shows where to find Skills.",
+    promptTitle: "Darren’s full Text Releveler Gem prompt",
+    prompt: relevelerPrompt,
+    linkTitle: "Open Darren’s Text Releveler Gems",
+    links: [releveler, thinkingRoutines, ["Create and edit in Gemini Canvas", gemini + "16047321"]],
+    alt: "Full Text Releveling slide showing Darren’s Text Releveler Gem, leveled text, and student activity examples" },
   { title: "Read text aloud with Read&Write", intro: "Model listening to a sentence and following the highlighted text.",
     steps: ["Open Read&Write on an accessible document or webpage.", "Select a short passage and start playback from the toolbar.", "Open the speech settings and preview a voice and speed with the learner."],
     note: "If the extension is unavailable, try Chromebook Select-to-speak. A scanned image may need a text-recognition tool before it can be read.",

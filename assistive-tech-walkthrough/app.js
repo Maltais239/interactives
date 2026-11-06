@@ -1,4 +1,4 @@
-import { chapters, lessons } from "./lessons.js?v=2";
+import { chapters, lessons } from "./lessons.js?v=3";
 
 const $ = (selector) => document.querySelector(selector);
 const chaptersNav = $("#chapters");
@@ -91,24 +91,26 @@ function helpLink([label, url]) {
 function renderLesson(lesson) {
   const links = lesson.links?.map((link) => "<li>" + helpLink(link) + "</li>").join("");
   const guide = lesson.extraGuide;
+  const noteImage = lesson.noteImage;
   const extras = [
-    accordion("Help & teaching notes", "<p>" + escape(lesson.note) + "</p>"),
+    accordion("Help & teaching notes", "<p>" + escape(lesson.note) + "</p>" +
+      (noteImage ? screenshot("./images/" + noteImage.file, noteImage.alt) : "")),
     lesson.example && accordion("Classroom example", "<p>" + escape(lesson.example) + "</p>"),
-    lesson.prompt && accordion("Copyable prompt", '<p class="prompt" id="sample-prompt">' +
-      escape(lesson.prompt) + '</p><button class="copy" id="copy-prompt" type="button">Copy prompt</button>'),
+    lesson.prompt && accordion(escape(lesson.promptTitle ?? "Copyable prompt"),
+      '<button class="copy" id="copy-prompt" type="button">Copy prompt</button>' +
+      '<pre class="prompt" id="sample-prompt" tabindex="0">' + escape(lesson.prompt) + '</pre>'),
     guide && accordion(escape(guide.title), '<div class="lesson-grid"><div>' + stepList(guide.steps) +
       "<p>" + helpLink(guide.link) + "</p></div>" +
       screenshot("./images/" + guide.image, guide.alt) + "</div>"),
-    links && accordion("Links & setup guides", "<ul>" + links + "</ul>")
+    links && accordion(escape(lesson.linkTitle ?? "Links & setup guides"), "<ul>" + links + "</ul>")
   ].filter(Boolean).join("");
 
-  const imagePath = lesson.image ? "./images/" + lesson.image : shotPath(current);
   lessonContent.innerHTML =
     '<header class="lesson-header"><div><p class="eyebrow">STEP ' + String(current).padStart(2, "0") +
     ' / ' + lessons.length + '</p><h3 id="lesson-title" tabindex="-1">' + escape(lesson.title) +
     '</h3></div><button class="done-button" id="done" type="button" aria-pressed="false">Mark done</button></header>' +
     '<p class="intro">' + escape(lesson.intro) + '</p><div class="lesson-grid">' + stepList(lesson.steps) +
-    screenshot(imagePath, lesson.alt) + '</div><div class="more">' + extras + '</div>';
+    screenshot(shotPath(current), lesson.alt) + '</div><div class="more">' + extras + '</div>';
 }
 
 function updateProgress() {
@@ -206,13 +208,14 @@ lessonContent.addEventListener("click", async (event) => {
     const thumbnail = button.querySelector("img");
     $("#enlarged").src = thumbnail.src;
     $("#enlarged").alt = thumbnail.alt;
+    $("#full-image").href = thumbnail.src;
     $("#image-title").textContent = "Step " + current + " · Screenshot";
     imageDialog.showModal();
   }
   if (button.id === "copy-prompt") {
     const prompt = $("#sample-prompt");
     try {
-      await navigator.clipboard.writeText(prompt.textContent);
+      await navigator.clipboard.writeText(lessons[current - 1].prompt);
       button.textContent = "Copied!";
       status.textContent = "Prompt copied.";
     } catch {
