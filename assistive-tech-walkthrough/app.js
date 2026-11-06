@@ -1,4 +1,4 @@
-import { chapters, lessons } from "./lessons.js?v=4";
+import { chapters, lessons } from "./lessons.js?v=5";
 
 const $ = (selector) => document.querySelector(selector);
 const chaptersNav = $("#chapters");
@@ -15,7 +15,7 @@ const storageKey = "engaging-students-assistive-tech-v1";
 
 const validStep = (number) => Number.isInteger(number) && number >= 1 && number <= lessons.length;
 const hashStep = () => Number(location.hash.match(/^#step-(\d+)$/)?.[1]);
-const shotPath = (number) => "./images/" + String(number).padStart(2, "0") + ".webp";
+const shotPath = (number) => "./images/" + String(number).padStart(2, "0") + ".webp?v=5";
 const entities = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const escape = (value) => value.replace(/[&<>"']/g, (character) => entities[character]);
 
