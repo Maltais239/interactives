@@ -1,4 +1,4 @@
-import { chapters, lessons } from "./lessons.js";
+import { chapters, lessons } from "./lessons.js?v=2";
 
 const $ = (selector) => document.querySelector(selector);
 const chaptersNav = $("#chapters");
@@ -71,27 +71,44 @@ function accordion(label, body) {
   return '<details><summary>' + label + '</summary><div class="details-body">' + body + '</div></details>';
 }
 
+function stepList(steps) {
+  return '<ol class="steps" role="list">' + steps.map((step, index) =>
+    '<li><span class="task-number" aria-hidden="true">' + (index + 1) +
+    '</span><span>' + escape(step) + '</span></li>').join("") + '</ol>';
+}
+
+function screenshot(src, alt) {
+  return '<figure><button type="button" class="shot" data-zoom aria-label="Enlarge screenshot: ' +
+    escape(alt) + '"><img src="' + escape(src) + '" alt="' + escape(alt) +
+    '"><span class="zoom" aria-hidden="true">Enlarge →</span></button><figcaption>' +
+    escape(alt) + '.</figcaption></figure>';
+}
+
+function helpLink([label, url]) {
+  return '<a href="' + escape(url) + '" target="_blank" rel="noopener noreferrer">' + escape(label) + '</a>';
+}
+
 function renderLesson(lesson) {
-  const links = lesson.links?.map(([label, url]) => '<li><a href="' + escape(url) +
-    '" target="_blank" rel="noopener noreferrer">' + escape(label) + '</a></li>').join("");
+  const links = lesson.links?.map((link) => "<li>" + helpLink(link) + "</li>").join("");
+  const guide = lesson.extraGuide;
   const extras = [
     accordion("Help & teaching notes", "<p>" + escape(lesson.note) + "</p>"),
     lesson.example && accordion("Classroom example", "<p>" + escape(lesson.example) + "</p>"),
     lesson.prompt && accordion("Copyable prompt", '<p class="prompt" id="sample-prompt">' +
       escape(lesson.prompt) + '</p><button class="copy" id="copy-prompt" type="button">Copy prompt</button>'),
+    guide && accordion(escape(guide.title), '<div class="lesson-grid"><div>' + stepList(guide.steps) +
+      "<p>" + helpLink(guide.link) + "</p></div>" +
+      screenshot("./images/" + guide.image, guide.alt) + "</div>"),
     links && accordion("Links & setup guides", "<ul>" + links + "</ul>")
   ].filter(Boolean).join("");
 
+  const imagePath = lesson.image ? "./images/" + lesson.image : shotPath(current);
   lessonContent.innerHTML =
     '<header class="lesson-header"><div><p class="eyebrow">STEP ' + String(current).padStart(2, "0") +
     ' / ' + lessons.length + '</p><h3 id="lesson-title" tabindex="-1">' + escape(lesson.title) +
     '</h3></div><button class="done-button" id="done" type="button" aria-pressed="false">Mark done</button></header>' +
-    '<p class="intro">' + escape(lesson.intro) + '</p><div class="lesson-grid"><ol class="steps" role="list">' +
-    lesson.steps.map((step, index) => '<li><span class="task-number" aria-hidden="true">' + (index + 1) +
-      '</span><span>' + escape(step) + '</span></li>').join("") +
-    '</ol><figure><button type="button" class="shot" id="show-image" aria-label="Enlarge workshop screenshot"><img src="' +
-    shotPath(current) + '" alt="' + escape(lesson.alt) + '"><span class="zoom" aria-hidden="true">Enlarge →</span></button>' +
-    '<figcaption>' + escape(lesson.alt) + '.</figcaption></figure></div><div class="more">' + extras + '</div>';
+    '<p class="intro">' + escape(lesson.intro) + '</p><div class="lesson-grid">' + stepList(lesson.steps) +
+    screenshot(imagePath, lesson.alt) + '</div><div class="more">' + extras + '</div>';
 }
 
 function updateProgress() {
@@ -132,7 +149,7 @@ function renderIndex() {
   const groups = chapters.map((chapter) => {
     const matching = lessons.slice(chapter.first - 1, chapter.last).flatMap((lesson, index) => {
       const number = chapter.first + index;
-      const searchable = [number, lesson.title, lesson.intro, chapter.title, ...lesson.steps].join(" ").toLowerCase();
+      const searchable = [number, lesson.title, lesson.intro, chapter.title, lesson.extraGuide?.title, ...lesson.steps].join(" ").toLowerCase();
       return words.every((word) => searchable.includes(word)) ? [stepLink(lesson, number)] : [];
     });
     return matching.length ? "<section><h3>" + escape(chapter.title) + "</h3>" + matching.join("") + "</section>" : "";
@@ -185,10 +202,11 @@ lessonContent.addEventListener("click", async (event) => {
     renderStepNav(chapters.find(({ first, last }) => current >= first && current <= last));
     status.textContent = completed.has(current) ? "Step marked complete." : "Step marked incomplete.";
   }
-  if (button.id === "show-image") {
-    $("#enlarged").src = shotPath(current);
-    $("#enlarged").alt = lessons[current - 1].alt;
-    $("#image-title").textContent = "Step " + current + " · Workshop screenshot";
+  if (button.hasAttribute("data-zoom")) {
+    const thumbnail = button.querySelector("img");
+    $("#enlarged").src = thumbnail.src;
+    $("#enlarged").alt = thumbnail.alt;
+    $("#image-title").textContent = "Step " + current + " · Screenshot";
     imageDialog.showModal();
   }
   if (button.id === "copy-prompt") {
