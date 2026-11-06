@@ -1,4 +1,6 @@
 import relevelerPrompt from "./text-releveler-prompt.js?v=3";
+import { spanishReleveler, thinkingRoutinesReleveler } from "./gem-prompts.js?v=4";
+import { sourceMap, storyStoryboard, moonGraphicNovel, studioSlides, translateNotebookSlides, sourceOverview } from "./notebook-prompts.js?v=4";
 
 export const chapters = [
   { title: "Start with access", summary: "Universal design and Chromebook access", color: "mint", first: 1, last: 7 },
@@ -20,7 +22,11 @@ const engage = "https://sites.google.com/gshare.blackgold.ca/engagingstudents/ho
 const eal = "https://sites.google.com/gshare.blackgold.ca/engagingstudents/english-as-an-additional-language";
 const gemLink = (id) => "https://gemini.google.com/gem/" + id + "?usp=sharing";
 const releveler = ["Text Releveler with Copy to Docs and Save as PDF", gemLink("1xoWxA6WnVLkZvgxGYWZmfkyno9417X24")];
-const thinkingRoutines = ["Text Releveler with Thinking Routines", gemLink("1_YnRTemO3HMvOEbF0ExC41M2dTNtGSDN")];
+const thinkingRoutines = ["Text Releveler with Copy to Docs, Save PDF and Thinking Routines 3.0", gemLink("1_YnRTemO3HMvOEbF0ExC41M2dTNtGSDN")];
+
+const notebookHelp = "https://support.google.com/gemininotebook/answer/";
+const styleGuide = ["Open Darren’s full Notebook Style Prompt Guide", "https://docs.google.com/document/d/1cs-QVqIyuh7bxL3GnELzZn51uAALb0w6pDLpYY2scOI"];
+const copyable = (title, text) => ({ title, text });
 
 export const lessons = [
   { title: "Assistive Tech & Differentiation", intro: "Work through the same tools from the workshop, then pick one to try in your classroom.",
@@ -61,7 +67,9 @@ export const lessons = [
   { title: "Translate an entire deck with Gemini in Slides", intro: "Use Ask Gemini directly inside Google Slides to translate the entire presentation with one prompt, where whole-deck editing is available.",
     steps: ["Open the presentation in Google Slides. Make a copy first if you want to keep the original language version.", "Click Ask Gemini in the top-right corner of Slides, next to Share.", "Paste the whole-deck prompt below into the Gemini side panel. Review the translation on the slides and check that the text still fits."],
     note: "Ask Gemini edits the presentation itself. Chrome’s page translation only changes the page you see. For words embedded in a picture, use the Google Pics workflow below.",
-    prompt: "Translate this entire presentation into [language]. Apply the translation directly to every slide. Keep the existing slide order, layout, and images.",
+    prompts: [copyable("Copyable whole-deck translation prompt", `Translate this entire presentation into [language] for [grade or audience]. Apply the translation directly to every slide. Preserve the slide order, layout, images, and teaching sequence.
+
+Translate the editable titles, instructions, labels, captions, and body text. Keep names, dates, numbers, equations, and units accurate. Use the same translation for repeated terms and keep the wording short enough to fit the original text boxes. Leave the meaning and level of difficulty intact. After applying the edits, flag any text embedded in images that I should translate with Google Pics.`)],
     alt: "Full workshop slide showing an English and a Spanish slide side by side",
     noteImage: { file: "ask-gemini-in-slides.webp", alt: "The Ask Gemini button in the top-right corner of Google Slides, beside Share" },
     links: [["Edit all slides with Gemini in Google Slides", docs + "16961475"]],
@@ -99,18 +107,20 @@ export const lessons = [
     },
     linkTitle: "Darren’s Gems and setup guides",
     links: [releveler, thinkingRoutines, ["Darren’s English as an Additional Language page", eal], ["Open Gemini Skills", "https://gemini.google.com/skills"], ["Create and manage Gems", gemini + "15146780"]] },
-  { title: "Create a bilingual version", intro: "Use one of Darren’s bilingual Gems to give learners an English and home-language version they can refer to together.",
+  { title: "Create a bilingual or translated document", intro: "Use Darren’s language Gems to build classroom materials. The Spanish Releveler creates a Spanish-language handout at the reading level you choose.",
     steps: ["Open the Gem for your target language under Darren’s bilingual Gems below.", "Provide the source text and intended audience. For the math sheet generator, give the curriculum outcome and target language.", "Compare the versions and check subject terms and directions before sharing."],
-    note: "Match headings and examples across both versions. For unfamiliar terminology, add a short bilingual glossary.",
-    prompt: "Make a bilingual handout in English and [language]. Keep the learning goal and all facts. Pair each English section with its translation. Add a five-term bilingual glossary and flag wording that may need a fluent speaker’s review.",
+    note: "Match headings and examples across both versions when using a bilingual Gem. The full Spanish prompt below is Darren’s Spanish-only output workflow. It first adapts the source to the requested reading level, then translates it and builds the Canvas document.",
+    prompts: [copyable("Darren’s full Spanish Releveler and Document Creator Gem prompt", spanishReleveler)],
     linkTitle: "Darren’s bilingual Gems",
     links: [["Text Releveler + Spanish", gemLink("1rwcv7OB2IJwkm-0q1_XrILI0XPAVTeuM")], ["Text Releveler + Mandarin", gemLink("1uQxRLZmGBczgZvUFzrwby9HpiGr2DnWF")], ["Text Releveler + Punjabi", gemLink("1olSUkqE-pAXr2X39xKShnmQg4iUEjs1f")], ["Text Releveler + Portuguese", gemLink("1Rv1QAmh5nYf9zfDU6p_5ugYXwLqrAsQj")], ["Multilingual Math Sheet Generator · Alberta grades 7–9", gemLink("1AoVVhH1hSYlGRd5xg3ULoqUz0Jsx6bfo")], ["Darren’s English as an Additional Language page", eal]],
     alt: "Full Translation Gems and More slide with Darren’s EAL page and a sample Gem output" },
   { title: "Relevel text and export to Docs or PDF", intro: "Darren’s Text Releveler Gem takes a source passage and a target reading level, then builds a formatted handout in Gemini Canvas.",
     steps: ["Open Darren’s Text Releveler Gem from the links below. Paste the source text or share its URL and give the grade or reading level you want.", "Review the handout in Canvas Preview. Check the facts, key vocabulary and any vocabulary or Did You Know? boxes.", "Choose Copy for Google Docs and paste into a Google Doc, or choose Save as PDF to download the handout."],
-    note: "The full prompt below is the Gem’s instruction text, including the HTML template and export logic. Copy it into a new Gem or use it to recreate the workflow as a skill. Step 14 shows where to find Skills.",
-    promptTitle: "Darren’s full Text Releveler Gem prompt",
-    prompt: relevelerPrompt,
+    note: "Both prompts below contain Darren’s complete instructions and HTML templates. Thinking Routines 3.0 suggests routines based on the kind of thinking the reading invites, then adds the one you choose to the handout. Step 14 shows where to find Skills.",
+    prompts: [
+      copyable("Darren’s full Text Releveler Gem prompt", relevelerPrompt),
+      copyable("Darren’s full Thinking Routines 3.0 Gem prompt", thinkingRoutinesReleveler)
+    ],
     linkTitle: "Open Darren’s Text Releveler Gems",
     links: [releveler, thinkingRoutines, ["Create and edit in Gemini Canvas", gemini + "16047321"]],
     alt: "Full Text Releveling slide showing Darren’s Text Releveler Gem, leveled text, and student activity examples" },
@@ -130,27 +140,37 @@ export const lessons = [
     steps: ["On a Chromebook, open Settings → Accessibility and turn on Dictation. In Google Docs, you can also use Tools → Voice typing.", "Place the cursor where the words should go and start the microphone.", "Say one sentence, stop recording, then check punctuation and recognition errors."],
     note: "Practise in a quiet spot and model editing after dictation. Read the draft back to check that it says what the learner meant.",
     links: [["Chromebook dictation", chrome + "12001244"], ["Google Docs voice typing", docs + "4492226"]], alt: "Voice-to-text options in Google Docs, Google Slides and Chromebook settings" },
-  { title: "Set up a source-based notebook", intro: "Use a notebook to explore class material from a small set of trusted sources.",
-    steps: ["Open NotebookLM or the notebook entry point your school provides.", "Create a notebook and add a teacher-selected source you can share.", "Ask a question and open a cited source to verify the answer."],
-    note: "A short, well-chosen source helps you spot when the output is incomplete or overstates a claim.",
-    links: [["NotebookLM Help", "https://support.google.com/notebooklm/"]], alt: "Source-based notebook with source list, chat and Studio panels" },
-  { title: "Turn source material into a story", intro: "Use a source-based draft to give students another entry point to the same content.",
-    steps: ["Choose one source and decide what idea students should remember.", "Ask for a short story or visual explanation anchored to the source.", "Compare the draft with the source and label any imagined dialogue or characters."],
-    note: "In social studies, preserve context and perspective. Use a map, timeline or vocabulary note when it helps students connect the story to the material.",
-    prompt: "Using only these sources, outline a short story for [grade]. Keep the dates and places accurate. Label any imagined dialogue. End with two questions that send students back to the source.",
-    links: [["NotebookLM Help", "https://support.google.com/notebooklm/"]], alt: "Workshop examples of a social studies storybook and a visual explainer" },
-  { title: "Draft a source-based slide deck", intro: "Use a draft deck to pull out the key ideas from your selected source.",
-    steps: ["Select the source and choose the slide deck option in Studio, if available.", "Specify the audience and list the ideas you want one per slide.", "Check the order, facts, contrast and amount of text in the draft."],
-    note: "Plan the outline first if exact sequence matters. Keep the source nearby so you can spot omissions.",
-    links: [["NotebookLM Help", "https://support.google.com/notebooklm/"]], alt: "Workshop screenshot of an English NotebookLM slide deck built from a science source" },
-  { title: "Compare the same ideas in two languages", intro: "Make a second-language slide version that follows the original outline.",
-    steps: ["Keep the English slide titles and sequence as a reference.", "Ask for translated content with the same slide structure.", "Compare the decks slide by slide and check terms, numbers and text fit."],
-    note: "If an automated draft changes the illustrations or slide order, copy the reviewed translation into a duplicate of the original deck.",
-    links: [["NotebookLM Help", "https://support.google.com/notebooklm/"]], alt: "English and translated science slide versions arranged side by side" },
-  { title: "Offer an audio or video version", intro: "A short audio or video overview can help learners revisit a text.",
-    steps: ["Choose a source and identify the key points you want learners to hear.", "Generate a short overview with an approved tool, then listen or watch all the way through.", "Provide captions or a transcript where you can, along with the original source."],
-    note: "Give students one question to think about while listening. Check pronunciations and examples before sharing.",
-    links: [["NotebookLM Help", "https://support.google.com/notebooklm/"]], alt: "Workshop examples of audio or video overviews and classroom resource tools" },
+  { title: "Set up a source-based notebook", intro: "Use Gemini Notebook (NotebookLM) to explore class material from a small set of trusted sources.",
+    steps: ["Open Gemini Notebook or the notebook entry point your school provides.", "Create a notebook and add teacher-selected sources you can share.", "Paste the source-mapping prompt into Chat, then open the citations to verify the ideas before building a resource."],
+    note: "Start with sources students can inspect and name the learning outcome up front. The source map helps you choose what to teach and what evidence to show.",
+    prompts: [copyable("Copyable source-mapping prompt", sourceMap)],
+    featuredLink: styleGuide,
+    links: [["Gemini Notebook Help", "https://support.google.com/gemininotebook/"]], alt: "Source-based notebook with source list, chat and Studio panels" },
+  { title: "Turn source material into a visual story", intro: "Use a visual style from Darren’s guide and a clear learning goal to turn a reading into a story students can follow.",
+    steps: ["Select the sources and choose one visual style from Darren’s guide. Try an investigative graphic novel, brick-built diorama, or textured storybook.", "Paste a storyboard prompt into Notebook Chat. Fill in the grade, outcome and visual style, or use the ready-to-paste Moon phases example.", "Check the storyboard against its source citations. Use the approved sequence and style when customizing a Slide Deck or Video Overview in Studio."],
+    note: "Give each page a job. Use the visuals to show relationships, sequence or evidence, and keep characters, labels and contrast consistent. The prompts below ask for student-facing copy and a separate teacher source check.",
+    prompts: [
+      copyable("Copyable visual-story storyboard template", storyStoryboard),
+      copyable("Ready-to-paste example · Moon phases graphic novel", moonGraphicNovel)
+    ],
+    featuredLink: styleGuide,
+    links: [["Customize a Slide Deck", notebookHelp + "16757456"], ["Customize a Video Overview", notebookHelp + "16454555"]], alt: "Workshop examples of a social studies storybook and a visual explainer" },
+  { title: "Draft a source-based slide deck", intro: "Build a slide sequence that moves from an opening question to evidence and application.",
+    steps: ["Select the sources and open the Slide Deck customization options in Studio.", "Paste the prompt below. Add your learning outcome and one visual brief from Darren’s style guide.", "Compare the draft with the sources and check that students can read the labels and explain the main idea on each slide."],
+    note: "Specify a slide sequence instead of leaving the structure to chance. Read from the back of the room and verify facts, diagrams and labels against the selected sources.",
+    prompts: [copyable("Copyable Studio slide-deck prompt", studioSlides)],
+    featuredLink: styleGuide,
+    links: [["Customize Slide Decks in Gemini Notebook", notebookHelp + "16757456"]], alt: "Workshop screenshot of an English NotebookLM slide deck built from a science source" },
+  { title: "Compare the same ideas in two languages", intro: "Make a second-language deck that follows the original teaching sequence and visual brief.",
+    steps: ["Add a copy of the original deck as a source and keep its slide titles and order handy.", "In Studio’s Slide Deck customization, choose the output language and paste the translation prompt with the reference name and visual brief.", "Compare the decks slide by slide. Check terms, diagram labels, numbers and text fit."],
+    note: "Treat the generated deck as a draft. If you need an exact visual match and the illustrations or order change, copy the reviewed translation into a duplicate of the original deck.",
+    prompts: [copyable("Copyable Notebook slide translation prompt", translateNotebookSlides)],
+    links: [["Choose a Slide Deck output language", notebookHelp + "16757456"]], alt: "English and translated science slide versions arranged side by side" },
+  { title: "Offer an audio or video version", intro: "Give students a short source-based overview with a clear reason to listen or watch.",
+    steps: ["Choose the sources and one learning goal.", "Open Audio Overview or Video Overview in Studio and adapt the steering prompt to your topic and audience.", "Listen or watch all the way through, then share it with the original source and an accessible text version where you can."],
+    note: "Check pronunciations, pacing and examples. When using a video style, choose one that makes the relationships or diagrams easier to follow.",
+    prompts: [copyable("Copyable audio or video steering prompt", sourceOverview)],
+    links: [["Customize Audio Overviews", notebookHelp + "16212820"], ["Customize Video Overviews", notebookHelp + "16454555"]], alt: "Workshop examples of audio or video overviews and classroom resource tools" },
   { title: "Pause and choose your next move", intro: "Use this checkpoint to decide what to try first or which section to open next.",
     steps: ["Name one barrier you can address this week.", "Choose one tool you have explored and plan a small test.", "Continue to reading practice or jump straight to showing learning."],
     note: "Look for a visible change, such as a learner completing the same reading task more independently or explaining more of their thinking.",

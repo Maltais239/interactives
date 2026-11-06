@@ -1,4 +1,4 @@
-import { chapters, lessons } from "./lessons.js?v=3";
+import { chapters, lessons } from "./lessons.js?v=4";
 
 const $ = (selector) => document.querySelector(selector);
 const chaptersNav = $("#chapters");
@@ -63,7 +63,7 @@ function renderStepNav(chapter) {
     .map((lesson, index) => stepLink(lesson, chapter.first + index)).join("");
   const selected = stepNav.querySelector('[aria-current="step"]');
   if (selected && stepNav.scrollWidth > stepNav.clientWidth) {
-    stepNav.scrollLeft = Math.max(0, selected.offsetLeft - stepNav.offsetLeft - 4);
+    stepNav.scrollLeft += selected.getBoundingClientRect().left - stepNav.getBoundingClientRect().left - 6;
   }
 }
 
@@ -96,9 +96,12 @@ function renderLesson(lesson) {
     accordion("Help & teaching notes", "<p>" + escape(lesson.note) + "</p>" +
       (noteImage ? screenshot("./images/" + noteImage.file, noteImage.alt) : "")),
     lesson.example && accordion("Classroom example", "<p>" + escape(lesson.example) + "</p>"),
-    lesson.prompt && accordion(escape(lesson.promptTitle ?? "Copyable prompt"),
-      '<button class="copy" id="copy-prompt" type="button">Copy prompt</button>' +
-      '<pre class="prompt" id="sample-prompt" tabindex="0">' + escape(lesson.prompt) + '</pre>'),
+    ...(lesson.prompts ?? []).map(({ title, text }, index) => {
+      const id = "sample-prompt-" + index;
+      return accordion(escape(title),
+        '<button class="copy" type="button" data-copy-prompt="' + index + '" aria-controls="' + id +
+        '">Copy prompt</button><pre class="prompt" id="' + id + '" tabindex="0">' + escape(text) + '</pre>');
+    }),
     guide && accordion(escape(guide.title), '<div class="lesson-grid"><div>' + stepList(guide.steps) +
       "<p>" + helpLink(guide.link) + "</p></div>" +
       screenshot("./images/" + guide.image, guide.alt) + "</div>"),
@@ -109,7 +112,9 @@ function renderLesson(lesson) {
     '<header class="lesson-header"><div><p class="eyebrow">STEP ' + String(current).padStart(2, "0") +
     ' / ' + lessons.length + '</p><h3 id="lesson-title" tabindex="-1">' + escape(lesson.title) +
     '</h3></div><button class="done-button" id="done" type="button" aria-pressed="false">Mark done</button></header>' +
-    '<p class="intro">' + escape(lesson.intro) + '</p><div class="lesson-grid">' + stepList(lesson.steps) +
+    '<p class="intro">' + escape(lesson.intro) + '</p>' +
+    (lesson.featuredLink ? '<p class="featured-resource">' + helpLink(lesson.featuredLink) + '</p>' : "") +
+    '<div class="lesson-grid">' + stepList(lesson.steps) +
     screenshot(shotPath(current), lesson.alt) + '</div><div class="more">' + extras + '</div>';
 }
 
@@ -212,10 +217,11 @@ lessonContent.addEventListener("click", async (event) => {
     $("#image-title").textContent = "Step " + current + " · Screenshot";
     imageDialog.showModal();
   }
-  if (button.id === "copy-prompt") {
-    const prompt = $("#sample-prompt");
+  if (button.hasAttribute("data-copy-prompt")) {
+    const prompt = document.getElementById(button.getAttribute("aria-controls"));
+    const { text } = lessons[current - 1].prompts[Number(button.dataset.copyPrompt)];
     try {
-      await navigator.clipboard.writeText(lessons[current - 1].prompt);
+      await navigator.clipboard.writeText(text);
       button.textContent = "Copied!";
       status.textContent = "Prompt copied.";
     } catch {
