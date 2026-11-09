@@ -264,6 +264,10 @@ body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;background:var(--bg
 .lvl-chip:hover{border-color:#a99baa;background:#f3eee8}
 .lvl-chip.active{border-color:#243e64;background:#243e64;color:#fff}
 
+.drive-sync:not([hidden]){display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin-bottom:16px}
+.drive-sync .btn{min-height:44px}
+.drive-sync .btn:disabled{opacity:.65;cursor:wait}
+.drive-sync p{flex:1 1 15rem;margin:0;color:var(--muted);font-size:.9rem;line-height:1.45}
 </style>
 <link rel="stylesheet" href="journal.css?v=20261101-1">
 </head>
@@ -287,11 +291,18 @@ body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;background:var(--bg
       <section class="section" id="verbsSection"></section>
       <section class="section" id="phrasesSection"></section>
       <section class="section" id="buildSection"></section>
-      <section class="section" id="statsSection"></section>
+      <section class="section" id="statsSection">
+        <div class="drive-sync" id="driveSyncPanel" hidden>
+          <button class="btn soft" id="driveSyncButton" type="button">Sync with Drive</button>
+          <p id="driveSyncStatus" role="status">Practice saves here as you go. Sync when you switch devices.</p>
+        </div>
+        <div id="statsContent"></div>
+      </section>
     </div>
   </div>
 </main>
 <script src="coffee-break-data.js?v=20261030-1"></script>
+<script src="drive-progress.js?v=1"></script>
 <script>
 // ── Vocab Data ────────────────────────────────────────────────────────────────
 // Format: [lessonId, [[spanish, english], ...coreWords], {packLabel: [[sp, en], ...]}? ]
@@ -665,6 +676,7 @@ const state = {
   verbDrill:{queue:[],idx:0,reveal:false,correct:0,total:0}, // simple drill, no SRS
   numDrill:{active:false,group:0,idx:0,reveal:false,correct:0,total:0,queue:null}, // sequential number drill
   challengeProgress:[], // {correct, attempts} per CHALLENGES index; 3 correct = star
+  challengeResetAt:0,
 };
 
 function initPhraseProgress(saved=[]) {
@@ -675,7 +687,7 @@ function initChallengeProgress(saved=[]) {
   return CHALLENGES.map((_,i)=>saved[i]||{correct:0,attempts:0});
 }
 
-function saveState() { localStorage.setItem(STORAGE_KEY,JSON.stringify({lessons:state.lessons,selLessons:state.selLessons,selPacks:state.selPacks,phraseProgress:state.phraseProgress,challengeProgress:state.challengeProgress})); }
+function saveState() { localStorage.setItem(STORAGE_KEY,JSON.stringify({lessons:state.lessons,selLessons:state.selLessons,selPacks:state.selPacks,phraseProgress:state.phraseProgress,challengeProgress:state.challengeProgress,challengeResetAt:state.challengeResetAt})); }
 
 function loadState() {
   const seeded = buildSeeded();
@@ -688,6 +700,7 @@ function loadState() {
     state.selPacks         = p.selPacks||[];
     state.phraseProgress   = initPhraseProgress(p.phraseProgress||[]);
     state.challengeProgress= initChallengeProgress(p.challengeProgress||[]);
+    state.challengeResetAt = Number.isSafeInteger(p.challengeResetAt) && p.challengeResetAt > 0 ? p.challengeResetAt : 0;
   } catch { state.lessons=seeded; state.selLessons=defaultLessonIds(seeded); state.selPacks=[]; state.phraseProgress=initPhraseProgress(); state.challengeProgress=initChallengeProgress(); }
 }
 
@@ -1386,7 +1399,7 @@ function renderVerbs() {
 
 // ── Phrases ───────────────────────────────────────────────────────────────────
 function reviewPhrase(idx,rating) {
-  const p=state.phraseProgress[idx], now=todayISO(), n={...p,attempts:(p.attempts||0)+1};
+  const p=state.phraseProgress[idx], now=todayISO(), n={...p,attempts:(p.attempts||0)+1,lastReviewedAt:now};
   if(rating==='got')   { n.correct=(n.correct||0)+1; n.level=Math.min(6,n.level+3); n.dueAt=addDays(now,(INTERVALS[Math.min(6,n.level)]||7)); }
   if(rating==='almost'){ n.correct=(n.correct||0)+1; n.level=Math.min(6,n.level+1); n.dueAt=addDays(now,INTERVALS[Math.max(1,n.level)]||1); }
   if(rating==='nope')  { n.level=Math.max(0,n.level-1); n.dueAt=todayISO(); }
@@ -2275,6 +2288,7 @@ function renderBuild() {
   d.querySelector('#chResetStarsBtn')?.addEventListener('click', () => {
     if(confirm('Reset all Challenge stars? Your vocab progress will not be affected.')){
       state.challengeProgress = initChallengeProgress();
+      state.challengeResetAt = Math.max(Date.now(), state.challengeResetAt + 1);
       saveState();
       renderBuild();
     }
@@ -2394,7 +2408,7 @@ function renderStats() {
     <div class="stat-count">${m}/${tot}</div>
     <div class="stat-bar-wrap"><div class="stat-bar${m===tot?' full':''}" style="width:${pct}%"></div></div>
   </div>`;
-  document.getElementById('statsSection').innerHTML=`
+  document.getElementById('statsContent').innerHTML=`
     <div class="summary-grid" style="margin-bottom:16px;">
       <div class="summary-box"><div class="value">${words.length}</div><div class="label">Total words</div></div>
       <div class="summary-box"><div class="value" style="color:var(--gd)">${mastered}</div><div class="label">Mastered ⭐</div></div>
@@ -2407,7 +2421,47 @@ function renderStats() {
     </div>`;
 }
 
+// Match progress by content because the vocabulary IDs are generated per browser.
+function driveProgressEntries() {
+  const key = parts => JSON.stringify(parts.map(part => String(part).normalize('NFC')));
+  return {
+    words: state.lessons.flatMap(lesson => lesson.vocab.map(word =>
+      [key([lesson.id, word.spanish, word.english]), word])),
+    phrases: PHRASES.map(([sp, en], i) => [key([sp, en]), state.phraseProgress[i]]),
+    challenges: CHALLENGES.map((challenge, i) =>
+      [key([challenge.en, ...challenge.tokens.map(([word]) => word)]), state.challengeProgress[i]]),
+  };
+}
+
+function readDriveProgress() {
+  const progress = { challengeResetAt: state.challengeResetAt };
+  for (const [group, entries] of Object.entries(driveProgressEntries())) {
+    progress[group] = Object.fromEntries(entries.filter(([, row]) => row.attempts > 0).map(([key, row]) => {
+      const { attempts, correct, level, dueAt, lastReviewedAt, mastered } = row;
+      return [key, group === 'challenges'
+        ? { attempts, correct }
+        : { attempts, correct, level, dueAt, lastReviewedAt, mastered }];
+    }));
+  }
+  return progress;
+}
+
+function applyDriveProgress(progress) {
+  if (progress.challengeResetAt > state.challengeResetAt) {
+    state.challengeProgress = initChallengeProgress();
+    state.challengeResetAt = progress.challengeResetAt;
+  }
+  for (const [group, entries] of Object.entries(driveProgressEntries())) {
+    for (const [key, row] of entries) {
+      if (Object.hasOwn(progress[group], key)) Object.assign(row, progress[group][key]);
+    }
+  }
+  saveState();
+  renderStats();
+}
+
 loadState(); saveState(); render();
+window.SpanishDriveProgress?.mount({ readProgress: readDriveProgress, applyProgress: applyDriveProgress });
 </script>
 </body>
 </html>
