@@ -1053,6 +1053,66 @@ const COFFEE_BREAK_EPISODES = [
         "spanish": "¡Feliz Navidad!",
         "english": "Merry Christmas!",
         "note": ""
+      },
+      {
+        "original": "¿Quieres chocolate caliente?",
+        "spanish": "¿Quieres chocolate caliente?",
+        "english": "Would you like some hot chocolate? / Do you want some hot chocolate?",
+        "note": "Lucía offers Petra a drink in the Christmas clip."
+      },
+      {
+        "original": "Esta tarjeta es para ti.",
+        "spanish": "Esta tarjeta es para ti.",
+        "english": "This card is for you.",
+        "note": "Petra gives Lucía a card in the Christmas clip."
+      },
+      {
+        "original": "¡Feliz Navidad y próspero Año Nuevo!",
+        "spanish": "¡Feliz Navidad y próspero Año Nuevo!",
+        "english": "Merry Christmas and a happy New Year!",
+        "note": "The combined holiday greeting from the Christmas clip."
+      },
+      {
+        "original": "¡Igualmente!",
+        "spanish": "¡Igualmente!",
+        "english": "Same to you! / Likewise! / You too!",
+        "note": "Petra returns the holiday greeting."
+      },
+      {
+        "original": "Se me cayó el café.",
+        "spanish": "Se me cayó el café.",
+        "english": "I dropped my coffee. / I dropped the coffee.",
+        "note": "From Episode 1. Se me cayó describes accidentally dropping something."
+      },
+      {
+        "original": "la gorra",
+        "spanish": "la gorra",
+        "english": "the cap / the baseball cap",
+        "note": "From the family photo in Episode 6."
+      },
+      {
+        "original": "el boleto",
+        "spanish": "el boleto",
+        "english": "the ticket",
+        "note": "From Episode 11. Los boletos is the plural used in the concert scene."
+      },
+      {
+        "original": "por adelantado",
+        "spanish": "por adelantado",
+        "english": "in advance / ahead of time",
+        "note": "From the concert ticket scene in Episode 11."
+      },
+      {
+        "original": "con tilde",
+        "spanish": "con tilde",
+        "english": "with an accent mark",
+        "note": "From spelling canción in Episode 11."
+      },
+      {
+        "original": "el presupuesto",
+        "spanish": "el presupuesto",
+        "english": "the budget",
+        "note": "From planning the fair in Episode 12."
       }
     ],
     "components": [
@@ -1075,6 +1135,26 @@ const COFFEE_BREAK_EPISODES = [
       [
         "Navidad",
         "Christmas"
+      ],
+      [
+        "quieres",
+        "you want"
+      ],
+      [
+        "chocolate caliente",
+        "hot chocolate"
+      ],
+      [
+        "caliente",
+        "hot"
+      ],
+      [
+        "la tarjeta",
+        "the card"
+      ],
+      [
+        "para ti",
+        "for you"
       ]
     ]
   }
