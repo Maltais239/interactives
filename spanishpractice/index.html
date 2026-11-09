@@ -264,6 +264,10 @@ body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;background:var(--bg
 .lvl-chip:hover{border-color:#a99baa;background:#f3eee8}
 .lvl-chip.active{border-color:#243e64;background:#243e64;color:#fff}
 
+.progress-backup{margin-bottom:16px}
+.progress-backup-actions{display:flex;flex-wrap:wrap;gap:8px}
+.progress-backup .btn{min-height:44px}
+.progress-backup p{margin:8px 0 0;color:var(--muted);font-size:.9rem;line-height:1.45}
 </style>
 <link rel="stylesheet" href="journal.css?v=20261101-1">
 </head>
@@ -287,7 +291,17 @@ body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;background:var(--bg
       <section class="section" id="verbsSection"></section>
       <section class="section" id="phrasesSection"></section>
       <section class="section" id="buildSection"></section>
-      <section class="section" id="statsSection"></section>
+      <section class="section" id="statsSection">
+        <div class="progress-backup">
+          <div class="progress-backup-actions">
+            <button class="btn soft" id="saveProgressButton" type="button">Save Progress</button>
+            <button class="btn" id="loadProgressButton" type="button">Load Progress</button>
+            <input id="progressBackupFile" type="file" accept=".json,application/json" hidden>
+          </div>
+          <p id="progressBackupStatus" role="status">Keep the backup file in Drive and load it on another device.</p>
+        </div>
+        <div id="statsContent"></div>
+      </section>
     </div>
   </div>
 </main>
@@ -665,6 +679,7 @@ const state = {
   verbDrill:{queue:[],idx:0,reveal:false,correct:0,total:0}, // simple drill, no SRS
   numDrill:{active:false,group:0,idx:0,reveal:false,correct:0,total:0,queue:null}, // sequential number drill
   challengeProgress:[], // {correct, attempts} per CHALLENGES index; 3 correct = star
+  challengeResetAt:0,
 };
 
 function initPhraseProgress(saved=[]) {
@@ -675,7 +690,10 @@ function initChallengeProgress(saved=[]) {
   return CHALLENGES.map((_,i)=>saved[i]||{correct:0,attempts:0});
 }
 
-function saveState() { localStorage.setItem(STORAGE_KEY,JSON.stringify({lessons:state.lessons,selLessons:state.selLessons,selPacks:state.selPacks,phraseProgress:state.phraseProgress,challengeProgress:state.challengeProgress})); }
+function saveState(progress = state) {
+  const { lessons, selLessons, selPacks, phraseProgress, challengeProgress, challengeResetAt } = progress;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ lessons, selLessons, selPacks, phraseProgress, challengeProgress, challengeResetAt }));
+}
 
 function loadState() {
   const seeded = buildSeeded();
@@ -688,6 +706,7 @@ function loadState() {
     state.selPacks         = p.selPacks||[];
     state.phraseProgress   = initPhraseProgress(p.phraseProgress||[]);
     state.challengeProgress= initChallengeProgress(p.challengeProgress||[]);
+    state.challengeResetAt = progressCount(p.challengeResetAt);
   } catch { state.lessons=seeded; state.selLessons=defaultLessonIds(seeded); state.selPacks=[]; state.phraseProgress=initPhraseProgress(); state.challengeProgress=initChallengeProgress(); }
 }
 
@@ -1386,7 +1405,7 @@ function renderVerbs() {
 
 // ── Phrases ───────────────────────────────────────────────────────────────────
 function reviewPhrase(idx,rating) {
-  const p=state.phraseProgress[idx], now=todayISO(), n={...p,attempts:(p.attempts||0)+1};
+  const p=state.phraseProgress[idx], now=todayISO(), n={...p,attempts:(p.attempts||0)+1,lastReviewedAt:now};
   if(rating==='got')   { n.correct=(n.correct||0)+1; n.level=Math.min(6,n.level+3); n.dueAt=addDays(now,(INTERVALS[Math.min(6,n.level)]||7)); }
   if(rating==='almost'){ n.correct=(n.correct||0)+1; n.level=Math.min(6,n.level+1); n.dueAt=addDays(now,INTERVALS[Math.max(1,n.level)]||1); }
   if(rating==='nope')  { n.level=Math.max(0,n.level-1); n.dueAt=todayISO(); }
@@ -2275,6 +2294,7 @@ function renderBuild() {
   d.querySelector('#chResetStarsBtn')?.addEventListener('click', () => {
     if(confirm('Reset all Challenge stars? Your vocab progress will not be affected.')){
       state.challengeProgress = initChallengeProgress();
+      state.challengeResetAt = Math.max(Date.now(), state.challengeResetAt + 1);
       saveState();
       renderBuild();
     }
@@ -2394,7 +2414,7 @@ function renderStats() {
     <div class="stat-count">${m}/${tot}</div>
     <div class="stat-bar-wrap"><div class="stat-bar${m===tot?' full':''}" style="width:${pct}%"></div></div>
   </div>`;
-  document.getElementById('statsSection').innerHTML=`
+  document.getElementById('statsContent').innerHTML=`
     <div class="summary-grid" style="margin-bottom:16px;">
       <div class="summary-box"><div class="value">${words.length}</div><div class="label">Total words</div></div>
       <div class="summary-box"><div class="value" style="color:var(--gd)">${mastered}</div><div class="label">Mastered ⭐</div></div>
@@ -2407,7 +2427,112 @@ function renderStats() {
     </div>`;
 }
 
+// Progress files carry review data keyed by content, independent of each browser's word IDs.
+const PROGRESS_FORMAT = 'spanish-practice-progress';
+const progressKey = parts => JSON.stringify(parts.map(part => String(part).normalize('NFC')));
+const wordProgressKey = (lesson, word) => progressKey([lesson.id, word.spanish, word.english]);
+const challengeProgressKey = challenge => progressKey([challenge.en, ...challenge.tokens.map(([word]) => word)]);
+const progressCount = value => Number.isSafeInteger(value) && value >= 0 ? value : 0;
+const progressTime = value => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : '';
+
+function progressRow(row, challenge = false) {
+  const attempts = progressCount(row.attempts);
+  const correct = Math.min(attempts, progressCount(row.correct));
+  if (challenge) return { attempts, correct };
+  const level = Math.min(6, progressCount(row.level));
+  return {
+    attempts, correct, level, mastered: row.mastered === true || level === 6,
+    dueAt: progressTime(row.dueAt), lastReviewedAt: progressTime(row.lastReviewedAt),
+  };
+}
+
+function exportProgress() {
+  const practiced = (entries, challenge = false) => Object.fromEntries(
+    entries.filter(([, row]) => row.attempts > 0).map(([key, row]) => [key, progressRow(row, challenge)])
+  );
+  return {
+    format: PROGRESS_FORMAT, version: 1, challengeResetAt: state.challengeResetAt,
+    words: practiced(state.lessons.flatMap(lesson => lesson.vocab.map(word => [wordProgressKey(lesson, word), word]))),
+    phrases: practiced(PHRASES.map((pair, i) => [progressKey(pair), state.phraseProgress[i]])),
+    challenges: practiced(CHALLENGES.map((challenge, i) => [challengeProgressKey(challenge), state.challengeProgress[i]]), true),
+  };
+}
+
+function combineProgress(current, rows, key, challenge = false) {
+  if (!Object.hasOwn(rows, key)) return current;
+  const incoming = progressRow(rows[key], challenge);
+  if (!incoming.attempts) return current;
+  const currentTime = Date.parse(current.lastReviewedAt) || 0;
+  const incomingTime = Date.parse(incoming.lastReviewedAt) || 0;
+  const newer = incomingTime !== currentTime ? incomingTime > currentTime
+    : incoming.attempts > current.attempts || (incoming.attempts === current.attempts && incoming.level > current.level);
+  return {
+    ...current,
+    ...(newer ? incoming : {}),
+    attempts: Math.max(progressCount(current.attempts), incoming.attempts),
+    correct: Math.max(progressCount(current.correct), incoming.correct),
+  };
+}
+
+function importProgress(backup) {
+  const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+  if (backup?.format !== PROGRESS_FORMAT || backup.version !== 1
+    || !['words', 'phrases', 'challenges'].every(group =>
+      isRecord(backup[group]) && Object.values(backup[group]).every(isRecord))) {
+    throw new Error('Choose a Spanish Practice progress file saved from Stats.');
+  }
+  const reset = progressCount(backup.challengeResetAt);
+  const currentChallenges = reset > state.challengeResetAt ? initChallengeProgress() : state.challengeProgress;
+  const progress = {
+    ...state,
+    lessons: state.lessons.map(lesson => ({
+      ...lesson,
+      vocab: lesson.vocab.map(word => combineProgress(word, backup.words, wordProgressKey(lesson, word))),
+    })),
+    phraseProgress: PHRASES.map((pair, i) => combineProgress(state.phraseProgress[i], backup.phrases, progressKey(pair))),
+    challengeProgress: reset < state.challengeResetAt ? state.challengeProgress : CHALLENGES.map((challenge, i) =>
+      combineProgress(currentChallenges[i], backup.challenges, challengeProgressKey(challenge), true)),
+    challengeResetAt: Math.max(reset, state.challengeResetAt),
+  };
+  saveState(progress);
+  Object.assign(state, progress);
+  renderStats();
+}
+
 loadState(); saveState(); render();
+const progressFile = document.getElementById('progressBackupFile');
+const progressStatus = document.getElementById('progressBackupStatus');
+document.getElementById('saveProgressButton').addEventListener('click', () => {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(exportProgress())], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  const now = new Date();
+  link.download = 'spanish-practice-progress-' + now.toLocaleDateString('sv-SE') + '.json';
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  progressStatus.textContent = 'Backup downloaded. You can put it in Drive or keep it on this device.';
+});
+const loadProgressButton = document.getElementById('loadProgressButton');
+loadProgressButton.addEventListener('click', () => progressFile.click());
+progressFile.addEventListener('change', async () => {
+  const file = progressFile.files[0];
+  progressFile.value = '';
+  if (!file) return;
+  loadProgressButton.disabled = true;
+  try {
+    if (file.size > 2 * 1024 * 1024) throw new Error('This file is too large for a Spanish Practice backup.');
+    importProgress(JSON.parse(await file.text()));
+    progressStatus.textContent = 'Progress loaded and merged with this device’s save.';
+  } catch (error) {
+    progressStatus.textContent = error instanceof SyntaxError
+      ? 'Choose a Spanish Practice progress file saved from Stats.'
+      : error.name === 'QuotaExceededError' ? 'This browser is out of storage. Your previous progress is still here.' : error.message;
+  } finally {
+    loadProgressButton.disabled = false;
+  }
+});
 </script>
 </body>
 </html>
