@@ -713,11 +713,9 @@ function loadState() {
 // ── Data helpers ──────────────────────────────────────────────────────────────
 const getLesson       = id  => state.lessons.find(l=>l.id===+id);
 const allWords        = ()  => state.lessons.flatMap(l=>l.vocab.map(w=>({...w,lessonTitle:l.title})));
-// Episode 9 reviews the existing episode 1–8 word objects, so their progress
-// is reused rather than creating a second set of review-only words.
-const coreWords = id => +id === CBE_ID_OFFSET + 9
-  ? state.lessons.filter(l=>l.course==='CBE'&&l.id<=CBE_ID_OFFSET+9).flatMap(l=>l.vocab.filter(w=>!w.pack))
-  : getLesson(id)?.vocab.filter(w=>!w.pack)||[];
+// Each episode practices its own vocabulary. Earlier episodes remain selectable
+// for optional review without inflating Episode 9's mastery target.
+const coreWords = id => getLesson(id)?.vocab.filter(w=>!w.pack)||[];
 const defaultLessonIds= (lessons=state.lessons) => lessons.filter(l=>coreWords(l.id).length && (l.course||'3MS')==='3MS').map(l=>l.id);
 const selLessons      = ()  => [...new Set(state.selLessons.map(Number))].sort((a,b)=>a-b);
 const selPacks        = ()  => [...new Set((state.selPacks||[]).filter(Boolean))];
@@ -921,7 +919,7 @@ function renderPractice() {
   const noteCount = COFFEE_BREAK_EPISODES.reduce((sum,e)=>sum+e.notes.length,0);
   const audit = `<details class="vocab-audit" data-disclosure="audit" ${openAttr('audit',false)}>
     <summary>Vocabulary check <span>${noteCount} note entries covered</span></summary>
-    <p class="muted small">Your notes, matched to the practice bank. Whole phrases and their useful individual words are included. Episode 9 also reviews episodes 1–8.</p>
+    <p class="muted small">Your notes, matched to the practice bank. Whole phrases and their useful individual words are included. Episode 9 focuses on its own vocabulary; select earlier episodes for extra review.</p>
     ${COFFEE_BREAK_EPISODES.map(e=>`<details class="audit-episode"><summary>Episode ${e.episode} · ${esc(e.title)} <span>${e.notes.length} notes</span></summary>
       <div class="audit-list">${e.notes.map(n=>`<div class="audit-row"><span class="audit-original">${esc(n.original)}</span><div><strong lang="es">${esc(n.spanish)}</strong><div class="muted small">${esc(n.english)}</div>${n.note?`<p class="word-note">${esc(n.note)}</p>`:''}</div><span class="audit-check" aria-label="Included">✓</span></div>`).join('')}</div>
     </details>`).join('')}
@@ -931,7 +929,7 @@ function renderPractice() {
     <details class="course-block coffee-course" data-disclosure="coffee" ${openAttr('coffee',true)}>
       <summary><span><small>COURSE 01</small><strong>Coffee Break Spanish</strong><em>Episodes 1–9 + Christmas edition</em></span><span class="course-count">10 episodes</span></summary>
       <div class="lesson-grid">${lessonsCBE}</div>
-      <p class="muted tiny">E9 includes your new phrases and a review of E1–8.</p>
+      <p class="muted tiny">E9 focuses on its own words and phrases. Select E1–8 separately whenever you want a review.</p>
       ${audit}
     </details>
     <details class="course-block" data-disclosure="three-minute" ${openAttr('three-minute',false)}>
@@ -2536,4 +2534,5 @@ progressFile.addEventListener('change', async () => {
 </script>
 </body>
 </html>
+
 
