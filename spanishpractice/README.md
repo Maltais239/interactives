@@ -8,9 +8,9 @@ drills, phrase recall, sentence building and translation challenges remain.
 
 Coffee Break Spanish now covers Darren’s supplied notes for episodes 1–9 and
 the episode 10 Christmas edition. The in-app **Vocabulary check** maps all
-102 note entries to their practice forms, with spelling and meaning notes.
-Whole phrases and useful component words are available. Episode 9 also
-reuses the existing episode 1–8 word records for review.
+112 note entries to their practice forms, with spelling and meaning notes.
+Whole phrases and useful component words are available. Episode 9 practices its own 27 words and phrases instead of automatically
+adding all episode 1–8 cards. Select earlier episodes for optional review.
 
 Corrections include *fenomenal*, *no*, *diez*, *oficina*, *fotografía*,
 *ingeniero*, *Hasta otra*, and *una tienda*. Both *tu* and *tú* are separate.
@@ -32,3 +32,4 @@ Content references for the two unclear note entries:
 
 - [Coffee Break Spanish episode 7: professions](https://coffeebreaklanguages.com/2008/11/lesson-07-coffee-break-spanish/)
 - [Coffee Break Spanish episode 9: review dialogue](https://coffeebreaklanguages.com/2008/12/lesson-09-coffee-break-spanish/)
+
