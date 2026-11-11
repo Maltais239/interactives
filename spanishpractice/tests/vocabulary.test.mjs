@@ -8,7 +8,7 @@ const root = new URL('../', import.meta.url);
 const html = readFileSync(new URL('index.html', root), 'utf8');
 const data = readFileSync(new URL('coffee-break-data.js', root), 'utf8');
 const script = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
-  .map(m=>m[1]).join('\n').replace('loadState(); saveState(); render();','');
+  .map(m=>m[1]).join('\n').split('loadState(); saveState(); render();')[0];
 const legacy = JSON.parse(readFileSync(new URL('legacy-indexes.json',import.meta.url),'utf8'));
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 function app(saved) {
@@ -19,9 +19,9 @@ function app(saved) {
   return {a:ctx.api, storage};
 }
 
-test('all 102 supplied note entries resolve to their episode bank, including corrected spellings',()=>{
+test('all 112 supplied note entries resolve to their episode bank, including corrected spellings',()=>{
   const {a}=app();
-  assert.equal(a.COFFEE_BREAK_EPISODES.reduce((sum,e)=>sum+e.notes.length,0),102);
+  assert.equal(a.COFFEE_BREAK_EPISODES.reduce((sum,e)=>sum+e.notes.length,0),112);
   assert.equal(a.COFFEE_BREAK_EPISODES.length,10);
   for(const ep of a.COFFEE_BREAK_EPISODES) {
     const words=a.state.lessons.find(l=>l.id===1000+ep.episode).vocab;
@@ -58,17 +58,24 @@ test('existing word IDs, practice records, selections and custom vocabulary surv
   assert.equal(restored.state.lessons.find(l=>l.id===1003).vocab.find(w=>w.id==='saved-canada').level,4);
 });
 
-test('E9 reuses every earlier core word and its current progress',()=>{
-  const {a}=app();
-  const early=a.state.lessons.filter(l=>l.course==='CBE'&&l.id<=1008).flatMap(l=>l.vocab.filter(w=>!w.pack));
-  const known=early[0];known.attempts=7;known.level=3;
+test('E9 has a focused 27-card bank and saved progress survives reload',()=>{
+  const {a,storage}=app();
   const review=a.coreWords(1009);
-  for(const word of early) assert.ok(review.includes(word));
-  assert.equal(review.find(w=>w.id===known.id).level,3);
+  assert.equal(review.length,27);
+  assert.ok(review.every(w=>w.lessonId===1009));
+  assert.equal(new Set(review.map(w=>a.spanishKey(w.spanish))).size,27);
   assert.ok(review.some(w=>a.spanishKey(w.spanish)==='hablo un poco de español'));
-  a.state.selLessons=[1001,1009];a.state.selPacks=[];
-  const selected=a.selectedWords();
-  assert.equal(new Set(selected.map(w=>w.id)).size,selected.length);
+  const early=a.coreWords(1001)[0];early.attempts=7;early.level=3;
+  review[0].attempts=5;review[0].level=2;
+  a.saveState();
+  const restored=app(JSON.parse(storage.get(a.STORAGE_KEY))).a;
+  assert.equal(restored.coreWords(1009).length,27);
+  assert.equal(restored.coreWords(1009)[0].level,2);
+  assert.equal(restored.coreWords(1001)[0].level,3);
+  a.state.selLessons=[1009];a.state.selPacks=[];
+  assert.equal(a.selectedWords().length,27);
+  a.state.selLessons=[1001,1009];
+  assert.equal(a.selectedWords().length,27+a.coreWords(1001).length);
 });
 
 test('tu and tú and the comma in No, me llamo Mark keep their distinct meanings',()=>{
@@ -112,3 +119,4 @@ test('new vocabulary generates valid practice cards without losing its source ID
     if(c.choices) assert.ok(c.choices.includes(c.answer));
   }
 });
+
