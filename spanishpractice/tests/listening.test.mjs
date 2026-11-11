@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const root=new URL('../',import.meta.url);
 const html=readFileSync(new URL('index.html',root),'utf8');
-const code=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n').replace('loadState(); saveState(); render();','');
+const code=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n').split('loadState(); saveState(); render();')[0];
 function setup(initialVoices=[]){
   const spoken=[],timers=new Map(),hosts=new Map(),controls=new Map();
   let nextTimer=0,cancels=0,voices=initialVoices;
@@ -84,4 +84,5 @@ test('an empty or Spain-only voice list keeps the Mexican locale and picks up la
   const mexico={lang:'es-MX',name:'Mexico'};
   x.setVoices([mexico]);x.a.playPracticeSpanish('hola');assert.equal(x.spoken.at(-1).lang,'es-MX');assert.equal(x.spoken.at(-1).voice,mexico);
 });
+
 
