@@ -268,6 +268,13 @@ body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;background:var(--bg
 .progress-backup-actions{display:flex;flex-wrap:wrap;gap:8px}
 .progress-backup .btn{min-height:44px}
 .progress-backup p{margin:8px 0 0;color:var(--muted);font-size:.9rem;line-height:1.45}
+.practice-voice{margin-top:14px}
+.practice-voice summary{display:list-item;width:fit-content;min-height:44px;padding:12px 0;cursor:pointer;font-weight:800}
+.practice-voice .toolbar{align-items:end}
+.practice-voice label{display:grid;gap:4px;flex:1 1 220px;min-width:0;max-width:100%;font-size:.9rem;font-weight:700}
+.practice-voice select{width:100%;min-width:0;min-height:44px;padding:6px 8px;border:1px solid var(--border-b);border-radius:8px;background:#fffaf0;color:var(--text);font:inherit;text-overflow:ellipsis}
+.practice-voice .btn{min-height:44px}
+.practice-voice p{margin:8px 0 0}
 .video-heading{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:12px}.video-heading h2{margin:3px 0;font-size:1.6rem}.video-heading p{margin:6px 0}.video-strip{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 12px;scroll-snap-type:x proximity}.video-choice{flex:0 0 174px;min-width:0;overflow:hidden;border:2px solid var(--border);border-radius:14px;padding:0;background:#fffaf0;color:var(--text);text-align:left;cursor:pointer;font-family:inherit;scroll-snap-align:start}.video-choice.selected{border-color:var(--green);box-shadow:0 0 0 1px var(--green)}.video-choice>div:last-child{padding:9px}.video-choice small{display:block;font-size:.62rem;color:var(--muted);letter-spacing:.04em;font-weight:800}.video-choice strong{display:block;font-size:.84rem;margin-top:4px;line-height:1.25}.video-thumb{position:relative;aspect-ratio:16/9;overflow:hidden;background:var(--blues)}.video-thumb img{width:100%;height:100%;object-fit:cover}.video-thumb span{position:absolute;right:5px;bottom:5px;background:#233b59e8;color:white;font-size:.68rem;border-radius:5px;padding:2px 5px}.video-workspace{display:grid;grid-template-columns:minmax(0,2.3fr) minmax(240px,1fr);gap:18px;align-items:start}.video-player{aspect-ratio:16/9;background:#173b42;border-radius:16px;overflow:hidden;position:relative}.video-player iframe{width:100%;height:100%;border:0}.video-poster{display:block;padding:0;border:0;width:100%;height:100%;cursor:pointer;background:#173b42;color:white;position:relative}.video-poster>img{width:100%;height:100%;object-fit:cover;opacity:.8}.video-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:grid;place-items:center;width:68px;height:68px;border-radius:50%;background:#913321;font-size:28px;box-shadow:0 4px 20px #0005}.video-play-label{position:absolute;bottom:12px;left:0;right:0;font-size:.9rem;font-weight:800;text-shadow:0 1px 5px #000}.video-caption{display:flex;align-items:start;justify-content:space-between;gap:12px;margin:12px 0}.video-caption h3{margin:0 0 4px}.video-caption p{margin:0;color:var(--muted);font-size:.85rem}.video-caption a{white-space:nowrap;color:var(--blue);font-size:.82rem;font-weight:800}.video-practice{padding:16px;background:#faf4e8}.video-practice h3{margin:6px 0}.video-practice>.btn{width:100%;justify-content:center;margin-bottom:12px}.video-practice details summary,.video-related>summary{cursor:pointer;font-weight:800;font-size:.85rem;padding:8px 0}.video-word-list{max-height:200px;overflow-y:auto}.video-word-list>div{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:.84rem}.video-related{margin:12px 0 0;border-top:1px solid var(--border);padding-top:4px}.video-related-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:8px 0 12px}.video-round{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 16px;background:var(--blues);font-size:.85rem}.video-round .btn{padding:6px 10px;font-size:.8rem}.nav button{min-width:0}.nav button:focus-visible,.video-choice:focus-visible,.video-poster:focus-visible{outline:3px solid var(--blue);outline-offset:2px}@media(max-width:680px){.video-workspace{grid-template-columns:1fr}.video-heading{align-items:start}.video-heading h2{font-size:1.35rem}.video-heading>.btn{padding:7px 9px;font-size:.75rem;flex-shrink:0}.video-choice{flex-basis:145px}.video-strip{margin-bottom:4px}.video-practice{padding:12px}.video-related-grid{grid-template-columns:1fr}.video-related-grid .video-choice{display:grid;grid-template-columns:105px 1fr}.video-related-grid .video-thumb{height:100%}.video-caption h3{font-size:1rem}.video-round{flex-wrap:wrap}.nav button{font-size:.61rem}.nav button .ni{font-size:1rem}}
 
 </style>
@@ -591,6 +598,7 @@ for (const ep of COFFEE_BREAK_EPISODES) {
 }
 
 const STORAGE_KEY = 'tmSpanish_v2';
+const PRACTICE_SETTINGS_KEY = 'tmSpanish_practiceSettings_v1';
 const MAX_LESSON  = 50; // raise this as new lessons come out
 const INTERVALS   = [0,1,3,7,14,30,60];
 
@@ -684,6 +692,23 @@ const state = {
   challengeProgress:[], // {correct, attempts} per CHALLENGES index; 3 correct = star
   challengeResetAt:0,
 };
+
+function loadPracticeSettings() {
+  try {
+    const saved=JSON.parse(localStorage.getItem(PRACTICE_SETTINGS_KEY)) || {};
+    return {disclosures:{...saved.disclosures},voice:typeof saved.voice==='string'?saved.voice:''};
+  } catch { return {disclosures:{},voice:''}; }
+}
+const practiceSettings=loadPracticeSettings();
+function savePracticeSettings() {
+  try { localStorage.setItem(PRACTICE_SETTINGS_KEY,JSON.stringify(practiceSettings)); } catch {}
+}
+function rememberDisclosure(details) {
+  const name=details.dataset.disclosure;
+  if(practiceSettings.disclosures[name]===details.open) return;
+  practiceSettings.disclosures[name]=details.open;
+  savePracticeSettings();
+}
 
 function initPhraseProgress(saved=[]) {
   return PHRASES.map((_,i)=>saved[i]||{level:0,attempts:0,correct:0,dueAt:todayISO(),mastered:false});
@@ -835,18 +860,30 @@ function stopListeningAutoplay() {
   if(listeningQueue && 'speechSynthesis' in window) window.speechSynthesis.cancel();
   listeningQueue=null; listeningIndex=-1;
 }
-function latinAmericanVoice(voices) {
-  const locale=v=>String(v.lang||'').replace(/_/g,'-').toLowerCase();
-  for(const tag of ['es-mx','es-419','es-us']) {
-    const voice=voices.find(v=>locale(v)===tag);
-    if(voice) return voice;
-  }
-  return voices.find(v=>/^es-(ar|bo|bz|cl|co|cr|cu|do|ec|gt|hn|ni|pa|pe|pr|py|sv|uy|ve)(?:-|$)/.test(locale(v)))||null;
+const voiceLocale = voice => String(voice.lang||'').replace(/_/g,'-').toLowerCase();
+const voiceKey = voice => JSON.stringify([voice.voiceURI,voice.name,voiceLocale(voice)]);
+const voiceLabel = voice => `${voice.name} (${voice.lang})`;
+function spanishVoiceRank(voice) {
+  const locale=voiceLocale(voice);
+  const region=locale.startsWith('es-mx')?0:locale.startsWith('es-419')?1:locale.startsWith('es-us')?2:
+    /^es-(ar|bo|bz|cl|co|cr|cu|do|ec|gt|hn|ni|pa|pe|pr|py|sv|uy|ve)(?:-|$)/.test(locale)?3:4;
+  const name=`${voice.name} ${voice.voiceURI}`;
+  if(/\bespeak\b/i.test(name)) return 30+region;
+  const quality=/\b(natural|neural|enhanced|premium|online)\b/i.test(name)?0:5;
+  return (region===4?15:0)+region+quality;
+}
+function availableSpanishVoices() {
+  const voices=window.speechSynthesis?.getVoices?.()||[];
+  const unique=new Map(voices.filter(v=>/^es(?:-|$)/.test(voiceLocale(v))).map(v=>[voiceKey(v),v]));
+  return [...unique.values()].sort((a,b)=>spanishVoiceRank(a)-spanishVoiceRank(b));
+}
+function selectedSpanishVoice(voices) {
+  return voices.find(voice=>voiceKey(voice)===practiceSettings.voice)||voices[0];
 }
 function spanishUtterance(text) {
   const utterance=new SpeechSynthesisUtterance(text);
   // Re-read the list on every play: some browsers populate voices after load.
-  const voice=latinAmericanVoice(window.speechSynthesis.getVoices?.()||[]);
+  const voice=selectedSpanishVoice(availableSpanishVoices());
   utterance.lang=voice?.lang||'es-MX';
   if(voice) utterance.voice=voice;
   return utterance;
@@ -857,6 +894,22 @@ function playPracticeSpanish(text) {
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(spanishUtterance(text));
 }
+function refreshVoiceControls() {
+  const picker=document.getElementById('spanishVoice');
+  if(!picker) return;
+  const voices=availableSpanishVoices();
+  const preferred=voices.find(voice=>voiceKey(voice)===practiceSettings.voice);
+  picker.replaceChildren(new Option('Automatic',''),...voices.map(voice=>new Option(voiceLabel(voice),voiceKey(voice))));
+  picker.value=preferred?voiceKey(preferred):'';
+  picker.disabled=!voices.length;
+  const preview=document.getElementById('previewSpanishVoice');
+  preview.disabled=!window.speechSynthesis || typeof SpeechSynthesisUtterance==='undefined';
+  document.getElementById('spanishVoiceStatus').textContent=preview.disabled?'Speech playback is unavailable in this browser.':
+    !voices.length?'No Spanish voices are listed yet. Preview uses the browser’s Spanish fallback.':
+    preferred ? 'Your choice is saved on this browser.' :
+    `${practiceSettings.voice?'Saved voice unavailable. ':''}Automatic uses ${voiceLabel(voices[0])}.`;
+}
+window.speechSynthesis?.addEventListener('voiceschanged',refreshVoiceControls);
 function currentListeningTurn() {
   if(state.tab!=='practice') return null;
   const review=state.numDrill.active?state.numDrill:(state.started?state.rev:null);
@@ -898,6 +951,9 @@ function switchSections() {
 }
 
 function renderPractice() {
+  const host=document.getElementById('practiceSection');
+  // Active practice replaces the setup markup, so save disclosure state first.
+  host.querySelectorAll('details[data-disclosure]').forEach(rememberDisclosure);
   const packs=allPacks(), words=selectedWords(), due=words.filter(isDue).length, mastered=words.filter(w=>getStatus(w)==='mastered').length;
 
   // ── Lesson tiles, grouped by course (3MS + CBE) ───────────────────────────
@@ -918,8 +974,7 @@ function renderPractice() {
   const cbeIds = state.lessons.filter(l=>l.course==='CBE'&&coreWords(l.id).length).map(l=>l.id);
   const tmsIds = state.lessons.filter(l=>(l.course||'3MS')==='3MS'&&coreWords(l.id).length).map(l=>l.id);
 
-  const disclosure = Object.fromEntries([...document.querySelectorAll('[data-disclosure]')].map(el=>[el.dataset.disclosure,el.open]));
-  const openAttr = (name, fallback) => (disclosure[name] ?? fallback) ? 'open' : '';
+  const openAttr = (name, fallback) => (practiceSettings.disclosures[name] ?? fallback) ? 'open' : '';
   const noteCount = COFFEE_BREAK_EPISODES.reduce((sum,e)=>sum+e.notes.length,0);
   const audit = `<details class="vocab-audit" data-disclosure="audit" ${openAttr('audit',false)}>
     <summary>Vocabulary check <span>${noteCount} note entries covered</span></summary>
@@ -959,6 +1014,14 @@ function renderPractice() {
         <button class="btn primary" id="goBtn">Begin practice →</button>
       </div>
       <div class="muted small">Choose a few lessons, or mix both courses. Your next round is yours to shape.</div>
+      <details class="practice-voice" data-disclosure="voice" ${openAttr('voice',false)}>
+        <summary>Spanish voice</summary>
+        <div class="toolbar">
+          <label>Voice <select id="spanishVoice" aria-describedby="spanishVoiceStatus"></select></label>
+          <button class="btn" type="button" id="previewSpanishVoice">Preview voice</button>
+        </div>
+        <p id="spanishVoiceStatus" class="muted small" role="status"></p>
+      </details>
       ${videoSuggestions()}
       <div class="summary-grid" style="margin-top:16px;">
         <div class="summary-box"><div class="value">${words.length}</div><div class="label">Selected</div></div>
@@ -1009,7 +1072,20 @@ function renderPractice() {
 
 
 
-  document.getElementById('practiceSection').innerHTML = `${state.started?((videoState.practiceId?`<div class="video-round"><strong>${esc(VISUAL_LESSONS.find(v=>v.id===videoState.practiceId).title)} · scene practice</strong><button class="btn" id="backToVideo">Back to video</button></div>`:'')+session):(state.numDrill.active?'':setup)}<div id="numDrillArea" style="margin-top:16px;"></div><div id="reviewArea" style="margin-top:16px;"></div>`;
+  host.innerHTML = `${state.started?((videoState.practiceId?`<div class="video-round"><strong>${esc(VISUAL_LESSONS.find(v=>v.id===videoState.practiceId).title)} · scene practice</strong><button class="btn" id="backToVideo">Back to video</button></div>`:'')+session):(state.numDrill.active?'':setup)}<div id="numDrillArea" style="margin-top:16px;"></div><div id="reviewArea" style="margin-top:16px;"></div>`;
+
+  host.querySelectorAll('details[data-disclosure]').forEach(details=>{
+    details.addEventListener('toggle',()=>{ if(details.isConnected) rememberDisclosure(details); });
+  });
+  refreshVoiceControls();
+  host.querySelector('#spanishVoice')?.addEventListener('change',event=>{
+    practiceSettings.voice=event.target.value;
+    savePracticeSettings();
+    refreshVoiceControls();
+  });
+  host.querySelector('#previewSpanishVoice')?.addEventListener('click',()=>{
+    playPracticeSpanish('Hola. ¿Cómo estás? Hoy vamos a practicar español.');
+  });
 
   document.querySelectorAll('#practiceSection [data-video]').forEach(b=>b.onclick=()=>openVideo(+b.dataset.video));
   document.querySelector('[data-all-videos]')?.addEventListener('click',()=>{videoState.filter=false;openVideo(videoState.id);});
