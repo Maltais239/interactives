@@ -1157,5 +1157,39 @@ const COFFEE_BREAK_EPISODES = [
         "for you"
       ]
     ]
+  },
+  {
+    episode: 11,
+    title: 'Speaking and learning Spanish',
+    notes: [
+      ['Me encanta la música sobre todo.', 'Me encanta la música, sobre todo.', 'I especially love music.'],
+      ['me gusta Los idiomas', 'Me gustan los idiomas.', 'I like languages.', 'Use gustan with the plural los idiomas.'],
+      ['hablo espanol', 'Hablo español.', 'I speak Spanish.'],
+      ['hablo un poco', 'Hablo un poco.', 'I speak a little.'],
+      ['inglese', 'inglés', 'English'],
+      ['francese', 'francés', 'French'],
+      ['Espanol', 'español', 'Spanish'],
+      ['Italiano', 'italiano', 'Italian'],
+      ['entiendo mucho español', 'Entiendo mucho español.', 'I understand a lot of Spanish.'],
+      ['Entiendes?', '¿Entiendes?', 'Do you understand?'],
+      ['no entiendo lo siento', 'No entiendo. Lo siento.', 'I don’t understand. I’m sorry.'],
+      ['Estoy aprendiendo español.', 'Estoy aprendiendo español.', 'I’m learning Spanish.'],
+      ['Puedes hablar más despacio?', '¿Puedes hablar más despacio?', 'Can you speak more slowly?'],
+      ['Como se scrive', '¿Cómo se escribe?', 'How do you spell it?'],
+      ['Más despacio, por favor.', 'Más despacio, por favor.', 'More slowly, please.'],
+      ['Puedes repetir, por favor?', '¿Puedes repetir, por favor?', 'Can you repeat that, please?'],
+      ['Come se disce', '¿Cómo se dice?', 'How do you say it?'],
+    ].map(([original,spanish,english,note=''])=>({original,spanish,english,note})),
+    components: [['sobre todo','especially'],['los idiomas','languages'],['Me encanta la música, sobre todo la guitarra.','I love music, especially the guitar.'],['Hablo un poco de español.','I speak a little Spanish.'],['No entiendo.','I don’t understand.'],['Lo siento.','I’m sorry.'],['¿Cómo se dice esto en español?','How do you say this in Spanish?']],
+  },
+  {
+    episode: 12,
+    title: 'Days, months and seasons',
+    notes: [
+      ['lunes','Monday'],['martes','Tuesday'],['miércoles','Wednesday'],['jueves','Thursday'],['viernes','Friday'],['sábado','Saturday'],['domingo','Sunday'],
+      ['enero','January'],['febrero','February'],['marzo','March'],['abril','April'],['mayo','May'],['junio','June'],['julio','July'],['agosto','August'],['septiembre','September'],['octubre','October'],['noviembre','November'],['diciembre','December'],
+      ['invierno','winter'],['primavera','spring'],['verano','summer'],['otoño','fall / autumn'],
+    ].map(([spanish,english])=>({original:spanish,spanish,english,note:''})),
+    components: [['los días de la semana','the days of the week'],['los meses del año','the months of the year'],['las estaciones','the seasons']],
   }
 ];
