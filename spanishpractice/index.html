@@ -83,6 +83,12 @@ body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;background:var(--bg
 .score-badge{background:var(--golds);color:#80531d;border:2px solid #a87323;border-radius:999px;padding:5px 12px;font-size:.85rem;font-weight:900;white-space:nowrap}
 .review-card{max-width:720px;margin:14px auto;padding:26px 22px 22px;text-align:center}
 .ex-label{margin-bottom:14px;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+.word-mastery{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px 8px;width:fit-content;max-width:100%;margin:0 auto 12px;padding:4px 10px;border:1px solid var(--border);border-radius:12px;background:#faf4e8;color:var(--text);font-size:.8rem;line-height:1.45}
+.word-mastery-label,.word-mastery-count{color:var(--muted)}
+.word-mastery-count{white-space:nowrap;font-variant-numeric:tabular-nums}
+.word-mastery-track{width:44px;height:7px;border-radius:999px;background:#e5d9c5}
+.word-mastery-track span{display:block;height:100%;background:#39704c;border-radius:inherit}
+.praise-screen .word-mastery{margin:0 auto}
 .task-hint{font-size:.8rem;color:var(--muted);font-weight:700;margin-bottom:14px}
 .prompt{font-size:clamp(1.5rem,4.5vw,2.6rem);font-weight:900;line-height:1.2;margin:0 0 6px;color:var(--text);letter-spacing:-.02em}
 .prompt.long{font-size:clamp(1.1rem,2.8vw,1.7rem);font-weight:800}
@@ -804,6 +810,19 @@ const packWords       = s   => getLesson(s.lessonId)?.vocab.filter(w=>w.pack===s
 const getStatus       = w   => w.mastered||w.level>=6?'mastered':w.level>=3?'strong':w.level>=1?'learning':'new';
 const isDue           = w   => !w.dueAt||new Date(w.dueAt)<=new Date();
 
+function wordMasteryContent(card) {
+  const vocab = getLesson(card.lessonId)?.vocab ?? state.lessons.flatMap(lesson=>lesson.vocab);
+  const word = vocab.find(word=>word.id===card.id) ?? card;
+  const status = getStatus(word);
+  const level = status==='mastered' ? 6 : progressCount(word.level);
+  const label = status[0].toUpperCase()+status.slice(1);
+  return `<span class="word-mastery-label">Word mastery</span><strong>${label}</strong>
+    <span class="word-mastery-track" aria-hidden="true"><span style="width:${level/6*100}%"></span></span>
+    <span class="word-mastery-count">${level} / 6</span>`;
+}
+
+const wordMastery = card => `<div class="word-mastery" role="status">${wordMasteryContent(card)}</div>`;
+
 // Derive available expansion packs from lesson data (no separate config array needed)
 function allPacks() {
   const seen=new Set(), packs=[];
@@ -1270,6 +1289,7 @@ function renderNumDrill() {
       <span class="pill ${exColors[card.ex]||'blue'}">${esc(card.promptLabel)}</span>
       <span class="pill yellow">${nd.idx+1} / ${nd.queue.length}</span>
     </div>
+    ${wordMastery(card)}
     <div class="task-hint">${esc(card.taskText)}</div>
     <div class="prompt" style="font-size:clamp(1.5rem,5vw,2.4rem);">${esc(card.prompt)}</div>
     ${card.speak?`<div class="speak-row"><button class="speak-btn" id="nSpeakBtn">${['listen','dictation'].includes(card.ex)?'🔊 Replay Spanish':'🔊 Play Spanish'}</button></div>`:''}
@@ -1287,12 +1307,19 @@ function renderNumDrill() {
   });
   const nInp=document.getElementById('nAns');
   if(nInp){ nInp.focus(); nInp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();document.getElementById('nCheckBtn')?.click();}}); }
-  document.getElementById('nCheckBtn')?.addEventListener('click',()=>{
+  const showNumberMastery = () => {
+    host.querySelector('.word-mastery').innerHTML=wordMasteryContent(card);
+    setTimeout(()=>{ if(state.numDrill===nd && nd.active && nd.queue[nd.idx]===card) nNextCard(); },700);
+  };
+  document.getElementById('nCheckBtn')?.addEventListener('click',event=>{
     const t=(document.getElementById('nAns')?.value||'').trim(); nd.total++;
     if(norm(t)===norm(card.answer)){
       nd.correct++;
       reviewWord(card.id,'good');
-      nNextCard();
+      event.currentTarget.disabled=true;
+      nInp.disabled=true;
+      document.getElementById('nRevealBtn').disabled=true;
+      showNumberMastery();
     } else { reviewWord(card.id,'again'); nd.reveal=true; renderNumDrill(); }
   });
   document.getElementById('nRevealBtn')?.addEventListener('click',()=>{ nd.total++; reviewWord(card.id,'again'); nd.reveal=true; renderNumDrill(); });
@@ -1304,7 +1331,7 @@ function renderNumDrill() {
     if(norm(b.dataset.nc)===norm(card.answer)){
       b.classList.add('correct'); nd.correct++;
       reviewWord(card.id,'good');
-      setTimeout(()=>nNextCard(), 700);
+      showNumberMastery();
     } else {
       reviewWord(card.id,'again');
       b.classList.add('wrong');
@@ -1326,18 +1353,19 @@ function renderReview() {
     return;
   }
 
+  const card=curCard();
+
   // ── Praise flash screen (brief, shown after correct typed answer) ──────────
-  if(rev.showPraise){
+  if(rev.showPraise && card){
     host.innerHTML=`<div class="card review-card anim-pop">
       <div class="praise-screen">
         <span class="praise-icon">⭐</span>
         <div class="praise-text">${esc(rev.showPraise)}</div>
+        ${wordMastery(card)}
       </div>
     </div>`;
     return;
   }
-
-  const card=curCard();
 
   // ── Session complete ───────────────────────────────────────────────────────
   if(!card){
@@ -1389,6 +1417,7 @@ function renderReview() {
       <span class="pill ${exColors[card.ex]||'blue'}">${esc(card.promptLabel)}</span>
       <span class="pill gray">${esc(card.lessonTitle)}</span>
     </div>
+    ${wordMastery(card)}
     <div class="task-hint">${esc(card.taskText)}</div>
     ${promptHTML}
     ${hintHTML||''}
@@ -1420,21 +1449,27 @@ function renderReview() {
       rev.correct++; reviewWord(card.id,'good');
       rev.showPraise=randPraise(); rev.typed=''; rev.reveal=false;
       renderReview();
-      setTimeout(()=>{ rev.showPraise=null; nextCard(); },900);
+      setTimeout(()=>{
+        rev.showPraise=null;
+        if(state.rev===rev && curCard()===card) nextCard();
+      },900);
     } else {
       rev.reveal=true; rev.lastResult=t?'Not an exact match — check the answer below.':'No answer entered.'; renderReview();
     }
   });
 
-  document.querySelectorAll('.choice').forEach(b=>b.addEventListener('click',()=>{
-    if(b.dataset.clicked) return; b.dataset.clicked='1';
+  const choices=host.querySelectorAll('[data-c]');
+  choices.forEach(b=>b.addEventListener('click',()=>{
+    choices.forEach(choice=>{ choice.disabled=true; });
+    document.getElementById('skipBtn').disabled=true;
     const ok=norm(b.dataset.c)===norm(card.answer); rev.total++;
     if(ok){
       b.classList.add('correct'); rev.correct++; reviewWord(card.id,'good');
-      setTimeout(()=>nextCard(), 700);
+      host.querySelector('.word-mastery').innerHTML=wordMasteryContent(card);
+      setTimeout(()=>{ if(state.rev===rev && curCard()===card) nextCard(); },700);
     } else {
       b.classList.add('wrong');
-      document.querySelectorAll('.choice').forEach(cb=>{ if(norm(cb.dataset.c)===norm(card.answer)) cb.classList.add('correct'); });
+      choices.forEach(cb=>{ if(norm(cb.dataset.c)===norm(card.answer)) cb.classList.add('correct'); });
       rev.reveal=true; rev.lastResult='Not quite — see the correct answer above.';
       setTimeout(()=>renderReview(), 800);
     }
