@@ -44,11 +44,12 @@ const goldfishPaths=new Float32Array([
   12,-8.3,-6.2,4.61,.65,.132,1.14,2.17,
   12,-8.53,-5.85,4.39,.68,.132,1.30,2.21,
 ]);
+const greatWhitePath=new Float32Array([3,-15,-23,16,1.45,.081,1,.36]);
 let marineRoutes,marineCounts;
 function updateWildlifeStatus(){
   const turtleLabel=wildlifeRender?"4 loggerheads":"4 sea turtles";
   const sharkLabel=marineLife?"3 blacktip reef sharks":"3 reef sharks";
-  bn.textContent=turtleLabel+" · "+sharkLabel+" · 6 jellyfish"+(marineLife?" · 9 goldfish":"");
+  bn.textContent=turtleLabel+" · "+sharkLabel+" · 6 jellyfish"+(marineLife?" · 1 great white · 9 goldfish":"");
 }
 const startWildlife=async()=>{
   try {
@@ -69,13 +70,13 @@ const startWildlife=async()=>{
 };
 const startMarineLife=async()=>{
   try {
-    const {loadMarineLife}=await import("./marine-life.js?v=1");
+    const {loadMarineLife}=await import("./marine-life.js?v=2");
     const render=await loadMarineLife({
       device:K,sharedShader:It,sceneLayout:Vs,instanceLayout:mn,
       makeBuffer:Re,colorFormat:Ie,depthFormat:Yt,samples:it,detailed:ge<2,
     });
-    marineRoutes=[gr[1],Re(goldfishPaths,te.VERTEX)];
-    marineCounts=[Ln[1].length/8,goldfishPaths.length/8];
+    marineRoutes=[gr[1],Re(goldfishPaths,te.VERTEX),Re(greatWhitePath,te.VERTEX)];
+    marineCounts=[Ln[1].length/8,goldfishPaths.length/8,greatWhitePath.length/8];
     wildlifeCounts[1]=0;
     marineLife=render;
     for(const animal of Jn){
@@ -85,6 +86,8 @@ const startMarineLife=async()=>{
       Jn.push({data:goldfishPaths,offset,type:"goldfish",name:"Goldfish "+(offset/8+1)});
     }
     ts.querySelector('option[value="shark"]').textContent="Blacktip reef shark";
+    Jn.push({data:greatWhitePath,offset:0,type:"great-white",name:"Great white shark"});
+    ts.add(new Option("Great white shark","great-white"));
     ts.add(new Option("Goldfish","goldfish"));
     updateWildlifeStatus();
   } catch(error) {
