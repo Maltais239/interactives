@@ -3,6 +3,7 @@ const shader = `
 @group(1) @binding(0) var loggerheadColor: texture_2d<f32>;
 @group(1) @binding(1) var loggerheadSampler: sampler;
 @group(1) @binding(2) var<uniform> loggerheadTint: vec4f;
+@group(1) @binding(3) var loggerheadNormal: texture_2d<f32>;
 
 struct LoggerheadVertex {
   @builtin(position) clip: vec4f,
@@ -17,6 +18,12 @@ fn loggerheadRoll(v: vec3f, angle: f32) -> vec3f {
   return vec3f(c*v.x - s*v.y, s*v.x + c*v.y, v.z);
 }
 
+fn loggerheadSweep(v: vec3f, angle: f32) -> vec3f {
+  let c = cos(angle);
+  let s = sin(angle);
+  return vec3f(c*v.x + s*v.z, v.y, c*v.z - s*v.x);
+}
+
 @vertex fn vsLoggerhead(
   @location(0) position: vec3f,
   @location(1) normal: vec3f,
@@ -27,20 +34,22 @@ fn loggerheadRoll(v: vec3f, angle: f32) -> vec3f {
   let time = g.cam.w;
   let phase = fract(motion.w) * 6.28318;
   let a = time * motion.y + motion.x;
-  let center = route.xyz + vec3f(cos(a) * route.w,
-    sin(a * 1.3 + phase) * 0.65, sin(a) * route.w * 0.65);
-  let forward = normalize(vec3f(-sin(a), 0., cos(a) * 0.65)) * sign(motion.y);
-  let right = cross(vec3f(0., 1., 0.), forward);
+  let bob = a * 1.3 + phase;
+  let center = route.xyz + vec3f(cos(a) * route.w, sin(bob) * 0.65, sin(a) * route.w * 0.65);
+  let forward = normalize(vec3f(-sin(a) * route.w, cos(bob) * 0.845,
+    cos(a) * route.w * 0.65)) * sign(motion.y);
+  let right = normalize(cross(vec3f(0., 1., 0.), forward));
   let up = cross(forward, right);
 
   let sideSign = sign(position.x);
-  let pivot = vec3f(sideSign * 0.22, 0., 0.);
-  let finWeight = smoothstep(0.25, 0.52, abs(position.x));
-  let stroke = (0.75 * sin(time * 1.65 + phase) + 0.25 * sin(time * 3.3 + phase))
-    * 0.46 * sideSign * finWeight;
-  let bodyRoll = 0.07 * sin(time * 1.65 + phase);
-  let p = loggerheadRoll(pivot + loggerheadRoll(position - pivot, stroke), bodyRoll);
-  let n = loggerheadRoll(normal, stroke + bodyRoll);
+  let pivot = vec3f(sideSign * 0.24, -0.03, 0.15);
+  let finWeight = smoothstep(0.25, 0.52, abs(position.x)) * smoothstep(-0.2, 0.09, position.z);
+  let beat = time * 1.6 + phase - abs(position.x) * 0.8;
+  let stroke = (sin(beat) + 0.23 * sin(beat * 2.)) * 0.54 * sideSign * finWeight;
+  let sweep = (0.11 + 0.24 * cos(beat)) * sideSign * finWeight;
+  let bank = -0.16 * sign(motion.y) + 0.06 * sin(time * 1.6 + phase);
+  let p = loggerheadRoll(pivot + loggerheadSweep(loggerheadRoll(position - pivot, stroke), sweep), bank);
+  let n = loggerheadRoll(loggerheadSweep(loggerheadRoll(normal, stroke), sweep), bank);
 
   var result: LoggerheadVertex;
   result.world = center + (right * p.x + up * p.y + forward * p.z) * motion.z;
@@ -51,17 +60,34 @@ fn loggerheadRoll(v: vec3f, angle: f32) -> vec3f {
 }
 
 @fragment fn fsLoggerhead(i: LoggerheadVertex) -> @location(0) vec4f {
-  let N = normalize(i.normal);
+  let baseNormal = normalize(i.normal);
+  let normalTexel = textureSample(loggerheadNormal, loggerheadSampler, i.uv).xyz * 2. - 1.;
+  let worldX = dpdx(i.world);
+  let worldY = dpdy(i.world);
+  let uvX = dpdx(i.uv);
+  let uvY = dpdy(i.uv);
+  let det = uvX.x * uvY.y - uvX.y * uvY.x;
+  let tangent = (worldX * uvY.y - worldY * uvX.y) * sign(det);
+  let bitangent = (worldY * uvX.x - worldX * uvY.x) * sign(det);
+  let relief = tangent * (normalTexel.x * inverseSqrt(max(dot(tangent, tangent), 1e-16)))
+    + bitangent * (normalTexel.y * inverseSqrt(max(dot(bitangent, bitangent), 1e-16)));
+  let N = normalize(baseNormal * max(normalTexel.z, .35) + relief * .48);
   let L = g.sun.xyz;
   let V = normalize(g.cam.xyz - i.world);
   let z = zone(i.world);
   let vv = vol(i.world);
   let ca = caus(i.world, length(i.world - g.cam.xyz));
   let alb = textureSample(loggerheadColor, loggerheadSampler, i.uv).rgb * loggerheadTint.rgb;
-  let E = sunE(i.world.y, z) * shadow4(i.world + N * .1);
-  var c = alb * (E * (.18 + .82 * max(0., dot(N, L))) * (.35 + ca)
-    + amb(i.world, N, vv.g, z) * 1.25 + side(i.world, N, 1., z) * .5);
-  c += E * pow(max(0., dot(N, normalize(V + L))), 32.) * .16;
+  let E = sunE(i.world.y, z) * shadow4(i.world + baseNormal * .14);
+  let direct = sat(dot(N, L));
+  let sky = amb(i.world, vec3f(0., 1., 0.), vv.g, z);
+  let rim = pow(1. - sat(dot(baseNormal, V)), 3.);
+  var c = alb * (E * direct * (.36 + ca * .55)
+    + amb(i.world, baseNormal, vv.g, z) * 1.02 + side(i.world, baseNormal, 1., z) * .3);
+  let gloss = 1. - loggerheadTint.a;
+  let specular = pow(sat(dot(N, normalize(V + L))), mix(14., 56., gloss));
+  c += E * specular * direct * mix(.07, .28, gloss) * (.4 + ca * .45);
+  c += sky * rim * .24;
   return fin(fog(c, i.world, z));
 }`;
 
@@ -180,36 +206,115 @@ function flattenModel(three, scene) {
   return meshes;
 }
 
-function upload({ device, meshes, pipeline, materialLayout, makeBuffer }) {
-  const textures = new Map();
+async function resizeTextures(meshes, resized) {
+  if (typeof createImageBitmap !== "function") return;
+  const limits = new Map();
+  for (const { material } of meshes) {
+    const color = material.map?.image;
+    const normal = material.normalMap?.image;
+    if (color) limits.set(color, Math.max(limits.get(color) ?? 0, normal ? 1024 : 256));
+    if (normal) limits.set(normal, 1024);
+  }
+  for (const [image, limit] of limits) {
+    const scale = limit / Math.max(image.width, image.height);
+    if (scale >= 1) continue;
+    try {
+      resized.set(image, await createImageBitmap(image, {
+        resizeWidth: Math.max(1, Math.round(image.width * scale)),
+        resizeHeight: Math.max(1, Math.round(image.height * scale)),
+        resizeQuality: "high",
+        colorSpaceConversion: "none",
+        premultiplyAlpha: "none",
+      }));
+    } catch {
+      // Some browsers can upload the source image without resizing it.
+    }
+  }
+}
+
+const mipShader = `
+@group(0) @binding(0) var mipImage: texture_2d<f32>;
+@group(0) @binding(1) var mipSampler: sampler;
+struct MipVertex {
+  @builtin(position) clip: vec4f,
+  @location(0) uv: vec2f,
+}
+@vertex fn mipVertex(@builtin(vertex_index) index: u32) -> MipVertex {
+  let uv = vec2f(f32((index << 1u) & 2u), f32(index & 2u));
+  return MipVertex(vec4f(uv * vec2f(2., -2.) + vec2f(-1., 1.), 0., 1.), uv);
+}
+@fragment fn mipFragment(i: MipVertex) -> @location(0) vec4f {
+  return textureSample(mipImage, mipSampler, i.uv);
+}
+`;
+
+function upload({ device, meshes, resized, pipeline, materialLayout, makeBuffer }) {
+  const colorViews = new Map();
+  const normalViews = new Map();
   const materials = new Map();
   const resources = [];
+  const mipPipelines = new Map();
+  const mipEncoder = device.createCommandEncoder();
+  const mipModule = device.createShaderModule({ code: mipShader });
   const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
   const sampler = device.createSampler({
-    magFilter: "linear", minFilter: "linear", addressModeU: "repeat", addressModeV: "repeat",
+    magFilter: "linear", minFilter: "linear", mipmapFilter: "linear", maxAnisotropy: 4,
+    addressModeU: "repeat", addressModeV: "repeat",
   });
+  const mipSampler = device.createSampler({ minFilter: "linear", magFilter: "linear" });
 
-  function viewFor(image) {
-    if (textures.has(image)) return textures.get(image);
+  function viewFor(original, isNormal = false) {
+    const views = isNormal ? normalViews : colorViews;
+    if (views.has(original)) return views.get(original);
+    const image = resized.get(original) ?? original;
     const size = image ? [image.width, image.height] : [1, 1];
+    const format = isNormal ? "rgba8unorm" : "rgba8unorm-srgb";
+    const mipLevelCount = 1 + Math.floor(Math.log2(Math.max(...size)));
     const texture = device.createTexture({
-      size, format: "rgba8unorm-srgb", usage: usage | GPUTextureUsage.RENDER_ATTACHMENT,
+      size, format, mipLevelCount, usage: usage | GPUTextureUsage.RENDER_ATTACHMENT,
     });
     resources.push(texture);
     if (image) {
       device.queue.copyExternalImageToTexture({ source: image }, { texture }, size);
     } else {
-      device.queue.writeTexture({ texture }, new Uint8Array([255, 255, 255, 255]), {}, size);
+      const pixel = isNormal ? [128, 128, 255, 255] : [255, 255, 255, 255];
+      device.queue.writeTexture({ texture }, new Uint8Array(pixel), {}, size);
+    }
+    if (mipLevelCount > 1) {
+      let mips = mipPipelines.get(format);
+      if (!mips) {
+        mips = device.createRenderPipeline({
+          layout: "auto",
+          vertex: { module: mipModule, entryPoint: "mipVertex" },
+          fragment: { module: mipModule, entryPoint: "mipFragment", targets: [{ format }] },
+        });
+        mipPipelines.set(format, mips);
+      }
+      for (let level = 1; level < mipLevelCount; level++) {
+        const source = texture.createView({ baseMipLevel: level - 1, mipLevelCount: 1 });
+        const target = texture.createView({ baseMipLevel: level, mipLevelCount: 1 });
+        const input = device.createBindGroup({
+          layout: mips.getBindGroupLayout(0),
+          entries: [{ binding: 0, resource: source }, { binding: 1, resource: mipSampler }],
+        });
+        const pass = mipEncoder.beginRenderPass({
+          colorAttachments: [{ view: target, loadOp: "clear", storeOp: "store" }],
+        });
+        pass.setPipeline(mips);
+        pass.setBindGroup(0, input);
+        pass.draw(3);
+        pass.end();
+      }
     }
     const view = texture.createView();
-    textures.set(image, view);
+    views.set(original, view);
     return view;
   }
 
   function bindMaterial(material) {
     if (materials.has(material)) return materials.get(material);
     const { r, g, b } = material.color;
-    const tint = makeBuffer(new Float32Array([r, g, b, 1]), GPUBufferUsage.UNIFORM);
+    const tint = makeBuffer(new Float32Array([r, g, b, material.roughness ?? .55]), GPUBufferUsage.UNIFORM);
     resources.push(tint);
     const group = device.createBindGroup({
       layout: materialLayout,
@@ -217,6 +322,7 @@ function upload({ device, meshes, pipeline, materialLayout, makeBuffer }) {
         { binding: 0, resource: viewFor(material.map?.image) },
         { binding: 1, resource: sampler },
         { binding: 2, resource: { buffer: tint } },
+        { binding: 3, resource: viewFor(material.normalMap?.image, true) },
       ],
     });
     materials.set(material, group);
@@ -231,6 +337,7 @@ function upload({ device, meshes, pipeline, materialLayout, makeBuffer }) {
       resources.push(indexBuffer);
       return { vertexBuffer, indexBuffer, count: indices.length, material: bindMaterial(material) };
     });
+    device.queue.submit([mipEncoder.finish()]);
 
     return {
       destroy() {
@@ -263,6 +370,7 @@ export async function loadLoggerheadTurtles({
       { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: {} },
       { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
       { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: {} },
+      { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: {} },
     ],
   });
   const module = device.createShaderModule({ code: sharedShader + shader });
@@ -284,14 +392,18 @@ export async function loadLoggerheadTurtles({
     depthStencil: { format: depthFormat, depthWriteEnabled: true, depthCompare: "greater" },
     multisample: { count: samples },
   });
+  const resized = new Map();
+  await resizeTextures(meshes, resized);
   device.pushErrorScope("out-of-memory");
   device.pushErrorScope("validation");
   let turtles;
   let uploadError;
   try {
-    turtles = upload({ device, meshes, pipeline, materialLayout, makeBuffer });
+    turtles = upload({ device, meshes, resized, pipeline, materialLayout, makeBuffer });
   } catch (error) {
     uploadError = error;
+  } finally {
+    for (const image of resized.values()) image.close();
   }
   const [validationError, allocationError] = await Promise.all([
     device.popErrorScope(), device.popErrorScope(),
