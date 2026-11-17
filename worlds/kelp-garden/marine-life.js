@@ -108,7 +108,7 @@ fn motionAt(z: f32, time: f32, phase: f32, wave: vec3f) -> vec2f {
 
 function buildInWorker(detailed) {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL("./marine-worker.js?v=1", import.meta.url), { type: "module" });
+    const worker = new Worker(new URL("./marine-worker.js?v=2", import.meta.url), { type: "module" });
     const deadline = setTimeout(() => finish(reject, new Error("Marine life build timed out")), 45000);
     function finish(callback, result) {
       clearTimeout(deadline);

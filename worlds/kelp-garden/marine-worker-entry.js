@@ -91,6 +91,7 @@ export function buildMarineLife({ detailed = false } = {}) {
   return [
     packAnimal(shark, "blacktip", detailed ? "medium" : "low"),
     packAnimal(fish, "goldfish", "crowd"),
+    packAnimal(shark, "white", "medium"),
   ];
 }
 
