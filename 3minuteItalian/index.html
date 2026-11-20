@@ -362,6 +362,25 @@ mark{background:#fff3b0;color:inherit;border-radius:3px;padding:0 2px}
   .wl-head{padding:10px 12px;gap:8px}
 }
 
+
+.video-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(220px,1fr);gap:16px}
+.video-player{aspect-ratio:16/9;background:#263b51;border-radius:12px;overflow:hidden;position:relative;display:grid;place-items:center}
+.video-player iframe{width:100%;height:100%;border:0}
+.video-poster{position:absolute;inset:0;padding:0;width:100%;height:100%;border:0;background:#263b51;cursor:pointer}
+.video-poster img{width:100%;height:100%;object-fit:cover;opacity:.85}
+.video-poster b{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;place-items:center;border:2px solid #fff;border-radius:50%;background:#a64c36;width:68px;height:68px;color:white;font-size:1.7rem}
+.video-list{display:flex;gap:8px;overflow-x:auto;margin:12px 0 16px;padding:4px}
+.video-choice{flex:0 0 150px;background:#fff;border:1px solid var(--border);border-radius:11px;text-align:left;cursor:pointer;overflow:hidden;padding:0}
+.video-choice[aria-pressed=true]{outline:3px solid var(--green)}
+.video-choice img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}
+.video-choice span{display:block;padding:8px;font-size:.82rem;font-weight:800}
+.video-add{display:grid;gap:10px}
+.video-add label{display:grid;gap:5px;font-size:.8rem;font-weight:800}
+.video-add input,.video-add select{border:1px solid var(--border);border-radius:9px;padding:9px;font:inherit;width:100%;background:white}
+.video-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.video-empty{padding:24px;border:1px dashed var(--border-b);border-radius:12px;color:var(--muted)}
+.video-small{font-size:.78rem;color:var(--muted);line-height:1.5}
+@media(max-width:700px){.video-grid{grid-template-columns:1fr}.video-choice{flex-basis:135px}}
 /* Italian practice journal — aligned with Spanish journal improvements. */
 :root{--green:#a64c36;--gd:#873a29;--gs:#efd2c3;--gxs:#fbede5;--gold:#ae7c36;--golds:#fcf2df;--blue:#315d80;--blues:#e8eff3;--purple:#75627b;--purples:#f1ebf2;--bg:#f3e9da;--panel:#fffaf3;--text:#263b51;--muted:#6c6762;--border:#dfceba;--border-b:#c9b7a1;--shadow-sm:0 2px 8px #65452b0b;--shadow-md:0 12px 32px #65452b17}
 html{scroll-behavior:smooth}body{background:radial-gradient(ellipse at 85% 0,#e4d3bc88,transparent 48%),var(--bg);line-height:1.5}
@@ -389,7 +408,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #315d
     <nav class="nav" id="nav"></nav>
     <div class="content">
       <section class="section active" id="practiceSection"></section>
-      <section class="section" id="wordsSection"></section>
+      <section class="section" id="wordsSection"></section><section class="section" id="videosSection"></section>
       <section class="section" id="verbsSection"></section>
       <section class="section" id="phrasesSection"></section>
       <section class="section" id="buildSection"></section>
@@ -5531,20 +5550,59 @@ const PRAISE = ['Perfetto! 🎉','Eccellente! ⭐','Molto bene! ✓','Corretto! 
 const randPraise = () => PRAISE[0|Math.random()*PRAISE.length];
 
 // ── Render ────────────────────────────────────────────────────────────────────
-function render() { renderNav(); switchSections(); renderPractice(); renderWords(); renderVerbs(); renderPhrases(); renderBuild(); renderStats(); }
+
+const IT_VIDEO_KEY='tmItalian_videos_v1';
+let activeItalianVideo='';
+function italianVideoId(input){
+ const val=String(input||'').trim();
+ const m=val.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|shorts\/|watch\?(?:[^#]*&)?v=))([A-Za-z0-9_-]{11})/);
+ return m?m[1]:/^[A-Za-z0-9_-]{11}$/.test(val)?val:null;
+}
+function italianVideos(){
+ try{const v=JSON.parse(localStorage.getItem(IT_VIDEO_KEY)||'[]');
+ return Array.isArray(v)?v.filter(x=>x&&italianVideoId(x.yt)===x.yt&&typeof x.title==='string'&&x.title.length<=120&&Number.isSafeInteger(x.lessonId)&&getLesson(x.lessonId)).slice(0,100):[];
+ }catch{return []}
+}
+function saveItalianVideos(v){localStorage.setItem(IT_VIDEO_KEY,JSON.stringify(v))}
+function renderVideos(){
+ const host=document.getElementById('videosSection');
+ if(state.tab!=='videos'){host.innerHTML='';return}
+ const videos=italianVideos();
+ if(videos.length&&!videos.some(v=>v.yt===activeItalianVideo))activeItalianVideo=videos[0].yt;
+ const v=videos.find(v=>v.yt===activeItalianVideo);
+ const choices=state.lessons.filter(l=>coreWords(l.id).length);
+ host.innerHTML=`<div style="margin-bottom:15px"><div class="journal-eyebrow">WATCH &amp; PRACTISE</div><h2>Italian in context</h2><p class="video-small">Add your own verified YouTube lessons and link each one to the vocabulary you want to practise. The video links are saved privately on this device and included in your progress backup.</p></div>
+ ${videos.length?`<div class="video-list">${videos.map(x=>`<button class="video-choice" data-vid="${x.yt}" aria-pressed="${x.yt===activeItalianVideo}"><img src="https://i.ytimg.com/vi/${x.yt}/hqdefault.jpg" alt="" loading="lazy"><span>${esc(x.title)}</span></button>`).join('')}</div>`:''}
+ <div class="video-grid"><div>
+ ${v?`<div class="video-player" id="italianVideoPlayer"><button class="video-poster" id="playItalianVideo" aria-label="Play ${esc(v.title)}"><img src="https://i.ytimg.com/vi/${v.yt}/hqdefault.jpg" alt=""><b>▶</b></button></div><h3>${esc(v.title)}</h3><p class="video-small">${esc(getLesson(v.lessonId)?.title||'Italian lesson')}</p><div class="video-actions"><button class="btn primary" id="practiceItalianVideo">Practise this lesson</button><button class="btn soft" id="watchedItalianVideo">${v.watched?'✓ Watched':'Mark watched'}</button><button class="btn" id="deleteItalianVideo">Remove link</button></div>`:
+ `<div class="video-empty"><strong>Your video collection is ready.</strong><p>There are no verified Italian video links yet. Add your own videos to start linking listening with vocabulary practice.</p></div>`}
+ </div><aside class="card"><h3>Add a video</h3><form id="addItalianVideo" class="video-add">
+ <label>YouTube URL<input id="italianVideoUrl" type="url" placeholder="https://youtu.be/…" required></label>
+ <label>Video title<input id="italianVideoTitle" maxlength="120" required></label>
+ <label>Practise lesson<select id="italianVideoLesson">${choices.map(l=>`<option value="${l.id}">${l.course==='OTHER'?'Other · ':''}${esc(l.title)}${l.course==='OTHER'?' ('+esc(l.shortLabel)+')':''}</option>`).join('')}</select></label>
+ <button class="btn primary" type="submit">Add video</button><p class="video-small" id="italianVideoStatus" role="status">Only your own links will appear here.</p>
+ </form></aside></div>`;
+ host.querySelectorAll('[data-vid]').forEach(b=>b.onclick=()=>{activeItalianVideo=b.dataset.vid;renderVideos()});
+ host.querySelector('#playItalianVideo')?.addEventListener('click',()=>{host.querySelector('#italianVideoPlayer').innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${v.yt}?autoplay=1&playsinline=1&rel=0" title="${esc(v.title)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`});
+ host.querySelector('#practiceItalianVideo')?.addEventListener('click',()=>{state.selLessons=[v.lessonId];state.selPacks=[];state.numDrill.active=false;saveState();if(buildQueue()){state.started=true;state.tab='practice';render();document.getElementById('practiceSection').scrollIntoView({block:'start',behavior:'smooth'})}});
+ host.querySelector('#watchedItalianVideo')?.addEventListener('click',()=>{const all=italianVideos();const item=all.find(x=>x.yt===v.yt);item.watched=!item.watched;saveItalianVideos(all);renderVideos()});
+ host.querySelector('#deleteItalianVideo')?.addEventListener('click',()=>{if(!confirm('Remove video link? Your vocabulary progress will remain.'))return;saveItalianVideos(italianVideos().filter(x=>x.yt!==v.yt));activeItalianVideo='';renderVideos()});
+ host.querySelector('#addItalianVideo').addEventListener('submit',event=>{event.preventDefault();const id=italianVideoId(host.querySelector('#italianVideoUrl').value),title=host.querySelector('#italianVideoTitle').value.trim(),lessonId=Number(host.querySelector('#italianVideoLesson').value);const status=host.querySelector('#italianVideoStatus');if(!id||!title||title.length>120||!getLesson(lessonId)){status.textContent='Enter a valid YouTube URL, title and lesson.';return}const all=italianVideos();if(all.some(x=>x.yt===id)){status.textContent='This video is already saved.';return}all.push({yt:id,title,lessonId,watched:false});try{saveItalianVideos(all)}catch{status.textContent='Unable to save. Browser storage may be full.';return}activeItalianVideo=id;renderVideos()});
+}
+function render() { renderNav(); switchSections(); renderPractice(); renderVideos(); renderWords(); renderVerbs(); renderPhrases(); renderBuild(); renderStats(); }
 
 function renderNav() {
   // Verbs/Phrases/Build tabs hidden for focus — their code + data remain below,
   // add entries back here to restore them.
-  const icons={practice:'🎯',words:'🗂',stats:'📊'};
-  const labels={practice:'Practice',words:'Words',stats:'Stats'};
+  const icons={practice:'01',videos:'▶',words:'02',stats:'03'};
+  const labels={practice:'Practice',videos:'Videos',words:'Words',stats:'Stats'};
   const nav=document.getElementById('nav');
   nav.innerHTML=Object.keys(labels).map(id=>`<button class="${state.tab===id?'active':''}" data-tab="${id}"><span class="ni">${icons[id]}</span>${labels[id]}</button>`).join('');
   nav.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ state.tab=b.dataset.tab; render(); }));
 }
 
 function switchSections() {
-  ['practice','words','verbs','phrases','build','stats'].forEach(id=>document.getElementById(id+'Section').classList.toggle('active',state.tab===id));
+  ['practice','videos','words','verbs','phrases','build','stats'].forEach(id=>document.getElementById(id+'Section').classList.toggle('active',state.tab===id));
 }
 
 function renderPractice() {
@@ -7810,7 +7868,7 @@ function italianProgressBackup(){
     words:touched(state.lessons.flatMap(l=>l.vocab.map(w=>[itWordKey(l,w),w]))),
     phrases:touched(PHRASES.map((p,i)=>[itPhraseKey(p),state.phraseProgress[i]])),
     challenges:Object.fromEntries(CHALLENGES.map((c,i)=>[itChallengeKey(c),itCleanProgress(state.challengeProgress[i],true)]).filter(([,v])=>v.attempts>0)),
-    scenarioBest:state.scenarioBest||{}};
+    scenarioBest:state.scenarioBest||{},videos:italianVideos()};
 }
 function downloadItalianProgress(){
   const blob=new Blob([JSON.stringify(italianProgressBackup(),null,2)],{type:'application/json'});
@@ -7832,7 +7890,14 @@ function mergeItalianBackup(backup){
   for(const [key,value] of Object.entries(backup.scenarioBest))if(typeof value==='number'&&Number.isFinite(value))scores[key]=Math.max(Number(scores[key])||0,value);
   const old={lessons:state.lessons,phraseProgress:state.phraseProgress,challengeProgress:state.challengeProgress,scenarioBest:state.scenarioBest};
   Object.assign(state,{lessons:freshWords,phraseProgress:mergedPhrases,challengeProgress:mergedChallenges,scenarioBest:scores});
-  try{saveState();}catch(error){Object.assign(state,old);throw error;}
+  const savedVideos=italianVideos();
+  for(const v of (Array.isArray(backup.videos)?backup.videos:[])){
+    if(!itRecord(v)||italianVideoId(v.yt)!==v.yt||typeof v.title!=='string'||v.title.length>120||!Number.isSafeInteger(v.lessonId)||!getLesson(v.lessonId))continue;
+    const prior=savedVideos.find(x=>x.yt===v.yt);
+    if(prior)prior.watched=prior.watched||v.watched===true;
+    else if(savedVideos.length<100)savedVideos.push({yt:v.yt,title:v.title,lessonId:v.lessonId,watched:v.watched===true});
+  }
+  try{saveState();saveItalianVideos(savedVideos);}catch(error){Object.assign(state,old);throw error;}
   render();
 }
 async function loadItalianProgress(e){
