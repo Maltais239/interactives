@@ -392,6 +392,23 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #315d
 .app{max-width:1132px;padding:0 16px 44px}.shell{background:#fffaf3d0;border:1px solid var(--border);border-radius:20px;box-shadow:var(--shadow-md);overflow:visible}.nav{background:#fffaf3;border-bottom:1px solid var(--border);border-radius:20px 20px 0 0}.nav button{font-weight:800}.nav button.active{background:var(--text);color:#fff}.content{padding:20px}.card,.selection-card{box-shadow:var(--shadow-sm)}.card h2,.complete-title{font-family:Georgia,serif;font-weight:400;letter-spacing:-.025em}.btn{border-radius:10px}.btn.primary{background:var(--green);border-color:var(--gd);color:#fff}.btn.soft{background:#f8e5d8;border-color:#e8c1ac;color:var(--gd)}.lesson-tile.sel{background:var(--green);border-color:var(--gd)}
 .progress-backup{margin:0 0 20px;padding:18px;border:1px solid var(--border);border-radius:15px;background:#fffdf8}.progress-backup h3{margin:0 0 6px;font-family:Georgia,serif;font-size:1.35rem;font-weight:400}.progress-backup-actions{display:flex;gap:9px;flex-wrap:wrap;margin:13px 0}.progress-backup p{font-size:.83rem;line-height:1.5;color:var(--muted);margin:5px 0}.origin-note{padding:10px 14px;margin:8px 0 15px;background:#f7eee3;border-left:3px solid var(--gold);font-size:.79rem;color:var(--muted);border-radius:0 9px 9px 0}
 @media(max-width:680px){.topbar{padding:22px 15px!important}.content{padding:12px}.journal-sub{font-size:.83rem}.nav button{min-height:44px}.progress-backup{padding:14px}}@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* Course accordions and immediate start action */
+.course-group{border:1px solid var(--border);border-radius:13px;background:#fffdf8;margin-bottom:10px;overflow:hidden}
+.course-group>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;padding:14px 16px;list-style:none;min-height:60px}
+.course-group>summary::-webkit-details-marker{display:none}
+.course-group>summary:after{content:'+';font-size:1.4rem;color:var(--gd);margin-left:4px}
+.course-group[open]>summary:after{content:'−'}
+.course-group summary strong{display:block;font:400 1.2rem Georgia,serif;color:var(--text)}
+.course-group summary small{display:block;text-transform:uppercase;letter-spacing:.11em;font-weight:800;font-size:.62rem;color:var(--gd);margin-bottom:3px}
+.course-group .course-count{font-size:.7rem;color:var(--muted);white-space:nowrap;margin-left:auto}
+.course-body{padding:4px 14px 14px;border-top:1px solid var(--border)}
+.course-body .lesson-grid{margin-top:11px}
+.course-body .origin-note{margin-top:12px}
+.practice-start-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.practice-start-row h2{margin:4px 0 8px}
+.practice-start-row #goBtn{padding:14px 24px;font-size:1rem;flex-shrink:0;min-height:48px}
+@media(max-width:680px){.practice-start-row{align-items:stretch}.practice-start-row #goBtn{width:100%;order:-1}.course-group>summary{padding:13px 11px}.course-body{padding:3px 10px 12px}}
 </style>
 </head>
 <body>
@@ -416,6 +433,7 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid #315d
     </div>
   </div>
 </main>
+<script src="coffee-break-italian-data.js?v=20261119-1"></script>
 <script>
 // ── Vocab Data ────────────────────────────────────────────────────────────────
 // Format: [lessonId, [[Italian, English], ...coreWords], {packLabel: [[sp, en], ...]}? ]
@@ -5026,6 +5044,7 @@ const makeWord = (lessonId,sp,en,pack=null) =>
 // Each lesson carries a `course` field: '3MS' (Three Minute Italian)
 // or 'OTHER' (video/article notes). OTHER uses 2001+ so ids never collide.
 const OTHER_ID_OFFSET = 2000;
+const CBI_ID_OFFSET = 3000;
 function buildSeeded() {
   const out = [];
   // 3 Minute Italian lessons
@@ -5055,10 +5074,16 @@ function buildSeeded() {
       ]
     });
   }
-  // Sort: 3MS first by id, then Other Sources.
+  // Coffee Break Italian: separate user-supplied curriculum track with stable 3001+ IDs.
+  for(const ep of COFFEE_BREAK_ITALIAN){
+    const id=CBI_ID_OFFSET+ep.episode;
+    out.push({id,course:'CBI',title:'Episode '+ep.episode+' · '+ep.title,shortLabel:'E'+ep.episode,
+      vocab:ep.notes.map(([original,italian,english])=>({...makeWord(id,italian,english,null),original}))});
+  }
+  // Sort: Three-Minute Italian, Coffee Break Italian, supplemental notes.
   // NB: `||` is wrong here — courseOrder['3MS'] is 0, and 0 || 9 === 9, which silently
   // sorted the whole main course *after* Other Sources. Use ?? so 0 survives.
-  const courseOrder = {'3MS':0, 'OTHER':1};
+  const courseOrder = {'3MS':0, 'CBI':1, 'OTHER':2};
   return out.sort((a,b)=> (a.course===b.course ? a.id-b.id : (courseOrder[a.course] ?? 9) - (courseOrder[b.course] ?? 9)));
 }
 
@@ -5579,7 +5604,7 @@ function renderVideos(){
  </div><aside class="card"><h3>Add a video</h3><form id="addItalianVideo" class="video-add">
  <label>YouTube URL<input id="italianVideoUrl" type="url" placeholder="https://youtu.be/…" required></label>
  <label>Video title<input id="italianVideoTitle" maxlength="120" required></label>
- <label>Practise lesson<select id="italianVideoLesson">${choices.map(l=>`<option value="${l.id}">${l.course==='OTHER'?'Other · ':''}${esc(l.title)}${l.course==='OTHER'?' ('+esc(l.shortLabel)+')':''}</option>`).join('')}</select></label>
+ <label>Practise lesson<select id="italianVideoLesson">${choices.map(l=>`<option value="${l.id}">${l.course==='OTHER'?'Other · ':l.course==='CBI'?'Coffee Break · ':''}${esc(l.title)}${l.course==='OTHER'?' ('+esc(l.shortLabel)+')':''}</option>`).join('')}</select></label>
  <button class="btn primary" type="submit">Add video</button><p class="video-small" id="italianVideoStatus" role="status">Only your own links will appear here.</p>
  </form></aside></div>`;
  host.querySelectorAll('[data-vid]').forEach(b=>b.onclick=()=>{activeItalianVideo=b.dataset.vid;renderVideos()});
@@ -5605,6 +5630,7 @@ function switchSections() {
   ['practice','videos','words','verbs','phrases','build','stats'].forEach(id=>document.getElementById(id+'Section').classList.toggle('active',state.tab===id));
 }
 
+const courseOpen={ '3MS':false, 'CBI':true, 'OTHER':false };
 function renderPractice() {
   const packs=allPacks(), words=selectedWords(), due=words.filter(isDue).length, mastered=words.filter(w=>getStatus(w)==='mastered').length;
 
@@ -5626,21 +5652,21 @@ function renderPractice() {
 
   const lessons3MS = tilesByCourse('3MS');
   const lessonsOTHER = tilesByCourse('OTHER');
+  const lessonsCBI = tilesByCourse('CBI');
+  const cbiIds = state.lessons.filter(l=>l.course==='CBI'&&coreWords(l.id).length).map(l=>l.id);
   const tmsIds = state.lessons.filter(l=>(l.course||'3MS')==='3MS'&&coreWords(l.id).length).map(l=>l.id);
 
+  const courseSummary=(course,title,sub,content)=>`<details class="course-group" data-course="${course}" ${courseOpen[course]?'open':''}><summary><span><small>${sub}</small><strong>${title}</strong></span><span class="course-count">${state.lessons.filter(l=>l.course===course&&coreWords(l.id).length).length} lessons</span></summary><div class="course-body">${content}</div></details>`;
   const lessonSections = `
-    <div style="display:flex;align-items:center;gap:8px;margin:6px 0 8px;">
-      <span style="font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:var(--gd);background:var(--gxs);padding:3px 9px;border-radius:999px;">📘 3 Minute Italian</span>
-      <div style="flex:1;height:2px;background:var(--gs);border-radius:2px;"></div>
-    </div>
-    <div class="lesson-grid">${lessons3MS}</div>
-    ${lessonsOTHER ? `
-      <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px;">
-        <span style="font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:#0369a1;background:#e0f2fe;padding:3px 9px;border-radius:999px;">🌐 Other Sources · curated notes</span>
-        <div style="flex:1;height:2px;background:#bae6fd;border-radius:2px;"></div>
-      </div>
-      <div class="origin-note">Supplemental phrases and role-play practice. Conversation Builders and Restaurants &amp; Social were developed from our practice scenarios; no Coffee Break Italian episode mapping is verified.</div><div class="lesson-grid">${lessonsOTHER}</div>
-    ` : ''}`;
+    ${courseSummary('3MS','Three-Minute Italian','THE MAIN COURSE',`<div class="lesson-grid">${lessons3MS}</div>`)}
+    ${courseSummary('CBI','Coffee Break Italian','EPISODES 1–4 · YOUR NOTES',`
+      <div class="lesson-grid">${lessonsCBI}</div>
+      <p class="origin-note">These episodes come from your supplied notes. Original wording and edited Italian are preserved in the vocabulary data. “e verro” and “si chiama Petra” need confirmation.</p>
+      <button class="btn soft" id="onlyCBI" type="button">Practise Coffee Break only</button>`)}
+    ${courseSummary('OTHER','Other Sources','SUPPLEMENTARY PRACTICE',`
+      <div class="lesson-grid">${lessonsOTHER}</div>
+      <p class="origin-note">Practical phrases and role-play activities, not verified as Coffee Break Italian episode vocabulary.</p>`)}
+  `;
 
   const packChips = packs.length ? packs.map(s=>{
     const isSel=selPacks().includes(packKey(s));
@@ -5652,14 +5678,16 @@ function renderPractice() {
 
   const setup = `
     <div class="card">
-      <h2>Choose your mission</h2>
-      <div class="muted small">Tap lessons and packs to select.</div>
+      <div class="practice-start-row">
+        <div><div class="journal-eyebrow">TODAY’S PRACTICE</div><h2>Choose your mission</h2><div class="muted small">Select a course, lesson or pack to get started.</div></div>
+        <button class="btn primary" id="goBtn" type="button">Let’s Begin →</button>
+      </div>
       <div class="grid cols-2" style="margin-top:16px;">
         <div>
           <div class="toolbar" style="justify-content:space-between;margin-bottom:6px;">
             <h3>Lessons</h3>
             <div class="toolbar">
-              <button class="btn" id="allTMS">All 3MS</button>
+              <button class="btn" id="allTMS">All 3MS</button><button class="btn" id="allCBI">All CBI</button>
               <button class="btn" id="clrL">Clear</button>
             </div>
           </div>
@@ -5682,7 +5710,7 @@ function renderPractice() {
         <button class="btn toggle-chip${state.listenFirst?' on':''}" id="listenFirstBtn" title="All cards become audio-driven — hear Italian first, then answer.">👂 Listening-first: ${state.listenFirst?'ON':'OFF'}</button>
         <div class="toolbar" style="gap:10px;">
           <button class="btn big2" id="weakBtn" title="Drill your 10 lowest-accuracy words.">💪 Weak words</button>
-          <button class="btn primary" id="goBtn" style="font-size:1.05rem;padding:13px 28px;">Let's Go! 🚀</button>
+          <span class="muted small">Ready? Use Let’s Begin above.</span>
         </div>
       </div>
     </div>
@@ -5754,10 +5782,19 @@ function renderPractice() {
     });
     document.getElementById('allTMS')?.addEventListener('click',()=>{
       // Add all 3MS lessons while keeping any selected Other Sources.
-      const keep = selLessons().filter(id => { const l=getLesson(id); return l && l.course==='OTHER'; });
+      const keep = selLessons().filter(id => { const l=getLesson(id); return l && l.course!=='3MS'; });
       state.selLessons = [...new Set([...keep, ...tmsIds])].sort((a,b)=>a-b);
       saveState(); renderPractice();
     });
+    document.getElementById('allCBI')?.addEventListener('click',()=>{
+      state.selLessons=[...new Set([...selLessons(),...cbiIds])].sort((a,b)=>a-b);saveState();renderPractice();
+    });
+    document.getElementById('onlyCBI')?.addEventListener('click',()=>{
+      state.selLessons=[...cbiIds];state.selPacks=[];saveState();renderPractice();
+    });
+    document.querySelectorAll('.course-group').forEach(el=>el.addEventListener('toggle',()=>{
+      courseOpen[el.dataset.course]=el.open;
+    }));
     document.getElementById('clrL')?.addEventListener('click',()=>{ state.selLessons=[]; saveState(); renderPractice(); });
     document.getElementById('allP')?.addEventListener('click',()=>{ state.selPacks=packs.map(packKey); saveState(); renderPractice(); });
     document.getElementById('clrP')?.addEventListener('click',()=>{ state.selPacks=[]; saveState(); renderPractice(); });
