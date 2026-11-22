@@ -639,15 +639,45 @@ const todayISO = () => new Date().toISOString();
 const addDays  = (d,n) => { const r=new Date(d); r.setDate(r.getDate()+n); return r.toISOString(); };
 const norm     = t => String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[¿?¡!.,;:()"'’‘]/g,'').replace(/\s+/g,' ').trim();
 const NUMBER_WORDS = new Set(NUM_GROUPS.flatMap(group=>group.pairs.map(([spanish])=>norm(spanish))));
-const matchesAnswer = (typed, answer) => splitAns(answer).some(a => {
-  // Normally tolerate omitted accents; tu and tú are the explicit exception.
-  const exact = t => String(t).normalize('NFC').toLowerCase().replace(/[¿?¡!.,;:]/g,'').trim();
-  if (['tu','tú'].includes(exact(a))) return exact(typed) === exact(a);
-  // The comma changes “my name is not Mark” into “No, my name is Mark”.
-  if (/^no,? me llamo /i.test(a)) return /^no,/i.test(String(typed).trim()) === /^no,/i.test(a) && norm(typed) === norm(a);
-  return norm(typed) === norm(a);
-});
-const splitAns = t => String(t??'').replace(/\s*\([^)]*\)/g,'').split(/\s*[;/]\s*/).map(s=>s.trim()).filter(Boolean);
+// A gloss can contain alternative translations, shared-word slashes, and
+// optional parenthetical grammar labels. Never grade an isolated pronoun
+// as correct for a full verb phrase (e.g., "he / she should").
+const splitAns = answer => {
+  const original=String(answer??'').trim();
+  const results=new Set();
+  const add=value=>{if(String(value).trim())results.add(String(value).trim());};
+  for(const part of [original,original.replace(/\s*\([^)]*\)/g,'').trim()]){
+    add(part);
+    for(const clause of part.split(/\s*;\s*/)){
+      add(clause);
+      const pieces=clause.split(/\s*\/\s*/);
+      if(pieces.length<2)continue;
+      const left=pieces[0].trim(),right=pieces[1].trim();
+      const lt=left.split(/\s+/),rt=right.split(/\s+/);
+      if(pieces.length===2 && lt.length===1 && rt.length>1){
+        // "he / she should" => "he should" and "she should".
+        add(left+' '+rt.slice(1).join(' '));
+        add(right);
+      }else if(pieces.length===2 && lt.length>1 && rt.length===1){
+        // "a trolley / cart" => "a trolley", "a cart", "cart".
+        add(left);add(lt.slice(0,-1).join(' ')+' '+right);add(right);
+      }else pieces.forEach(add);
+    }
+  }
+  return [...results];
+};
+const matchesAnswer = (typed,answer) => {
+  if(!String(typed??'').trim())return false;
+  const plain=t=>norm(String(t).replace(/\s*\/\s*/g,'/'));
+  const exact=t=>String(t).normalize('NFC').toLowerCase().replace(/[¿?¡!.,;:]/g,'').replace(/\s*\/\s*/g,'/').trim();
+  const input=String(typed).trim();
+  const variants=[input,input.replace(/\s*\([^)]*\)/g,'').trim()];
+  return splitAns(answer).some(a=>{
+    if(['tu','tú'].includes(exact(a)))return variants.some(v=>exact(v)===exact(a));
+    if(/^no,? me llamo /i.test(a))return variants.some(v=>/^no,/i.test(v)===/^no,/i.test(a)&&plain(v)===plain(a));
+    return variants.some(v=>plain(v)===plain(a));
+  });
+};
 const shuffle  = a => { for(let i=a.length-1;i>0;i--){const j=0|Math.random()*(i+1);[a[i],a[j]]=[a[j],a[i]]}return a; };
 const esc      = t => String(t??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 
