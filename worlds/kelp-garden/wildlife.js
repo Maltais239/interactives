@@ -502,7 +502,8 @@ fn reefSharkSurface(p: vec3f, normal: vec3f, material: f32) -> vec4f {
     + side(i.world,n,1.,z)*.45);
   c += E*highlight*lit*mix(.12,.5,gloss)*(.31+ca*.62);
   c += sky*rim*select(.23,.11,turtle) * select(1.,.3,i.material>3.5);
-  return fin(fog(c,i.world,z));
+  let scatter = smoothstep(0.,.45,sg(z).g*max(0.,distance(i.world,g.cam.xyz)-2.5));
+  return vec4f(fin(fog(c,i.world,z)).rgb,select(1.,1.-scatter,turtle));
 }
 `;
 

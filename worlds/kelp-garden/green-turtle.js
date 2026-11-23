@@ -39,11 +39,15 @@ struct TurtleVertex {
   let c1 = cross(dy,geo); let c2 = cross(geo,dx);
   let tangent = c1*ux.x+c2*uy.x; let bitangent = c1*ux.y+c2*uy.y;
   let scale = inverseSqrt(max(1e-14,max(dot(tangent,tangent),dot(bitangent,bitangent))));
-  let bump = textureSample(relief,surfaceSampler,i.uv).xyz*2.-1.;
-  let N = normalize(geo*max(.2,bump.z)+(tangent*bump.x+bitangent*bump.y)*scale*.68);
-  let alb = textureSample(coat,surfaceSampler,i.uv).rgb;
-  let z = zone(i.world); let sky = vol(i.world).g;
-  let ca = caus(i.world,length(i.world-g.cam.xyz));
+  let dist = length(i.world-g.cam.xyz);
+  let z = zone(i.world);
+  let scatter = smoothstep(0.,.45,sg(z).g*max(0.,dist-2.5));
+  let mipBias = 1.55*scatter;
+  let bump = textureSampleBias(relief,surfaceSampler,i.uv,mipBias).xyz*2.-1.;
+  let N = normalize(geo*max(.2,bump.z)+(tangent*bump.x+bitangent*bump.y)*scale*mix(.68,.16,scatter));
+  let alb = textureSampleBias(coat,surfaceSampler,i.uv,mipBias).rgb;
+  let sky = vol(i.world).g;
+  let ca = caus(i.world,dist);
   let sun = sunE(i.world.y,z)*shadow4(i.world+geo*.075);
   // Water scatters some skylight into shadow even on the ventral plates.
   let diffuseSky = mix(amb(i.world,N,sky,z),amb(i.world,vec3f(0.,1.,0.),sky,z),.28);
@@ -52,7 +56,8 @@ struct TurtleVertex {
   let view = normalize(g.cam.xyz-i.world);
   let shine = pow(sat(dot(N,normalize(g.sun.xyz+view))),37.);
   let c = alb*(bounce*1.22+sun*direct*(.62+ca*.81))+sun*direct*shine*(.018+.033*ca);
-  return fin(fog(c,i.world,z));
+  // The opaque scene alpha carries forward-scatter strength into the composite.
+  return vec4f(fin(fog(c,i.world,z)).rgb,1.-scatter);
 }
 `;
 

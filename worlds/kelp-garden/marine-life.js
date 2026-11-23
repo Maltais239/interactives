@@ -1,6 +1,9 @@
+import { buildKelpFish, kelpFishSchools } from "./kelp-fish.js?v=1";
+export {kelpFishSchools};
+
 const swimShader = `
 struct SwimProfile {
-  // Body length, envelope exponent (negative for exponential), head gain, is shark.
+  // Body length, envelope exponent (negative for exponential), head gain, type (1 shark, 0 goldfish, negative for kelp fish).
   shape: vec4f,
   // Body lengths per second, beats per second, peak-to-peak amplitude, wavelength.
   wave: array<vec4f,6>,
@@ -13,7 +16,7 @@ struct MarineVertex {
   @location(1) normal: vec3f,
   @location(2) color: vec4f,
   @location(3) local: vec3f,
-  @location(4) @interpolate(flat) isShark: f32,
+  @location(4) @interpolate(flat) species: f32,
 }
 
 fn waveAt(speed: f32) -> vec3f {
@@ -76,9 +79,24 @@ fn motionAt(z: f32, time: f32, phase: f32, wave: vec3f) -> vec2f {
   let tangent = normalize(vec2f(stroke.y,1.));
   // Rotate each cross-section into the local spine frame. This makes the
   // caudal fin change its angle of attack instead of sliding broadside.
-  let bendX = stroke.x+p.x*tangent.y;
-  let bendZ = p.z-p.x*tangent.x;
-  let bentNormal = vec3f(n.x*tangent.y+n.z*tangent.x,n.y,n.z*tangent.y-n.x*tangent.x);
+  var finPos=p;
+  var finNormal=n;
+  if(profile.shape.w<0. && abs(color.a-.44)<.002){
+    // The paired pectoral fins scull most visibly on damselfish. The sardines
+    // propel themselves chiefly with their tails.
+    let width=select(select(.051,.085,profile.shape.w> -2.5),.119,profile.shape.w> -1.5);
+    let pivot=vec3f(sign(p.x)*width,-.030,.18)*profile.shape.x;
+    let reach=smoothstep(.012,.15,length(p-pivot)/profile.shape.x);
+    let gain=select(select(.09,.22,profile.shape.w> -2.5),.45,profile.shape.w> -1.5);
+    let angle=sign(p.x)*gain*reach*sin(time*TAU*wave.x+phase-p.z/profile.shape.x*2.);
+    let cs=cos(angle);let sn=sin(angle);
+    let q=p-pivot;
+    finPos=pivot+vec3f(cs*q.x+sn*q.z,q.y,-sn*q.x+cs*q.z);
+    finNormal=vec3f(cs*n.x+sn*n.z,n.y,-sn*n.x+cs*n.z);
+  }
+  let bendX = stroke.x+finPos.x*tangent.y;
+  let bendZ = finPos.z-finPos.x*tangent.x;
+  let bentNormal = vec3f(finNormal.x*tangent.y+finNormal.z*tangent.x,finNormal.y,finNormal.z*tangent.y-finNormal.x*tangent.x);
   let ellipseSpeed = length(vec2f(sin(a),.65*cos(a)));
   let acceleration = motion.y*motion.y*route.w*.65/ellipseSpeed;
   let bank = sign(motion.y)*min(.20,acceleration*select(.64,1.6,fish));
@@ -94,7 +112,7 @@ fn motionAt(z: f32, time: f32, phase: f32, wave: vec3f) -> vec2f {
   result.normal = normal;
   result.color = color;
   result.local = p;
-  result.isShark = profile.shape.w;
+  result.species = profile.shape.w;
   return result;
 }
 
@@ -112,7 +130,7 @@ fn motionAt(z: f32, time: f32, phase: f32, wave: vec3f) -> vec2f {
   let alb = i.color.rgb*mix(.92,1.08,texture.g);
   let lit = sat(dot(N,L));
   let rim = pow(1.-sat(dot(N,V)),3.);
-  let sharkSkin = i.isShark > .5 && i.color.a < .8;
+  let sharkSkin = i.species > .5 && i.color.a < .8;
   let fillY = select(.20+.65*abs(N.y), .20+.65*N.y, sharkSkin);
   let fillNormal = normalize(vec3f(N.x,fillY,N.z));
   var c = alb*(E*lit*(.44+ca*.63)+amb(i.world,fillNormal,sky,z)*1.28
@@ -121,7 +139,8 @@ fn motionAt(z: f32, time: f32, phase: f32, wave: vec3f) -> vec2f {
   c += E*spec*lit*mix(.11,.47,i.color.a)*(.32+ca*.54);
   let edge = select(.19,.12,sharkSkin);
   c += up*rim*select(edge,.09,i.color.a>.8);
-  return fin(fog(c,i.world,z));
+  let scatter = smoothstep(0.,.45,sg(z).g*max(0.,dist-2.5));
+  return vec4f(fin(fog(c,i.world,z)).rgb,select(1.,1.-scatter,i.species<0.));
 }
 `;
 
@@ -147,7 +166,7 @@ export async function loadMarineLife({
   device, sharedShader, sceneLayout, instanceLayout, makeBuffer, colorFormat, depthFormat,
   samples, detailed, build = buildInWorker,
 }) {
-  const meshes = await build(detailed);
+  const meshes = [...await build(detailed), ...buildKelpFish(detailed)];
   const layout = device.createBindGroupLayout({
     entries: [{ binding: 0, visibility: GPUShaderStage.VERTEX, buffer: {} }],
   });
