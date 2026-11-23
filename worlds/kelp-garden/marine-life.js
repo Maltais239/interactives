@@ -63,18 +63,32 @@ fn motionAt(z: f32, time: f32, phase: f32, wave: vec3f) -> vec2f {
   let forward = normalize(vec3f(-sin(a)*route.w,.845*cos(bob),cos(a)*route.w*.65))*sign(motion.y);
   let right = normalize(cross(vec3f(0.,1.,0.),forward));
   let up = cross(forward,right);
-  let speed = abs(motion.y)*route.w*.83/(profile.shape.x*motion.z);
-  let wave = waveAt(speed);
-  let waveOffset = motionAt(p.z,time,phase,wave);
-  let bank = -sign(motion.y)*select(.11,.18,profile.shape.w>.5);
+  let bodyLength = profile.shape.x*motion.z;
+  let meanSpeed = abs(motion.y)*route.w*.835/bodyLength;
+  let fish = profile.shape.w<.5;
+  let individual = select(1., .94+.12*fract(motion.x*11.79),fish);
+  let wave = waveAt(meanSpeed*individual);
+  // The ellipse is slowest at its ends. A periodic phase correction varies
+  // cadence continuously, including after a long dive.
+  let swimTime = time*individual-.055*sin(2.*a)/motion.y;
+  let stroke = motionAt(p.z,swimTime,phase,wave);
+  let tangent = normalize(vec2f(stroke.y,1.));
+  // Rotate each cross-section into the local spine frame. This makes the
+  // caudal fin change its angle of attack instead of sliding broadside.
+  let bendX = stroke.x+p.x*tangent.y;
+  let bendZ = p.z-p.x*tangent.x;
+  let bentNormal = vec3f(n.x*tangent.y+n.z*tangent.x,n.y,n.z*tangent.y-n.x*tangent.x);
+  let ellipseSpeed = length(vec2f(sin(a),.65*cos(a)));
+  let acceleration = motion.y*motion.y*route.w*.65/ellipseSpeed;
+  let bank = sign(motion.y)*min(.20,acceleration*select(.64,1.6,fish));
   let cs = cos(bank);
   let sn = sin(bank);
-  let side = p.x+waveOffset.x;
-  let px = cs*side-sn*p.y;
-  let py = sn*side+cs*p.y;
-  let normal = normalize(right*(cs*n.x-sn*n.y)+up*(sn*n.x+cs*n.y)+forward*(n.z-waveOffset.y*n.x));
+  let px = cs*bendX-sn*p.y;
+  let py = sn*bendX+cs*p.y;
+  let normal = normalize(right*(cs*bentNormal.x-sn*bentNormal.y)
+    +up*(sn*bentNormal.x+cs*bentNormal.y)+forward*bentNormal.z);
   var result: MarineVertex;
-  result.world = center+(right*px+up*py+forward*p.z)*motion.z;
+  result.world = center+(right*px+up*py+forward*bendZ)*motion.z;
   result.clip = g.vp*vec4f(result.world,1.);
   result.normal = normal;
   result.color = color;

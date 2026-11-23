@@ -1,7 +1,7 @@
 const TAU = 2 * Math.PI;
 
 const part = {
-  shell: 0, skin: 1, foreflipper: 2, hindflipper: 3, eye: 4, iris: 5, groove: 6,
+  shell: 0, skin: 1, foreflipper: 2, hindflipper: 3, eye: 4, iris: 5, groove: 6, plastron: 7,
   sharkBody: 0, sharkFin: 1, sharkTail: 2,
 };
 
@@ -66,7 +66,7 @@ function shape() {
     }, 25, 22, material);
   }
 
-  function seam(points, radius) {
+  function seam(points, radius, material = part.groove) {
     // Tiny shaded ridges define the mouth and gills at close range.
     surface((t, a) => {
       const at = progress => interpolate(points, progress * (points.length - 1));
@@ -81,7 +81,7 @@ function shape() {
       const up = [y*side[2] - z*side[1], z*side[0] - x*side[2], x*side[1] - y*side[0]];
       const r = radius * (.22 + .78 * Math.sin(Math.PI*t) ** .35);
       return p.map((v, i) => v + r * (side[i]*Math.cos(a) + up[i]*Math.sin(a)) / width);
-    }, 14, 8, part.groove);
+    }, 18, 8, material);
   }
 
   return {
@@ -92,50 +92,101 @@ function shape() {
 
 function turtleMesh() {
   const m = shape();
-  // The oval shell has a high back, flat marginal plates, and a shallow plastron.
+  // These sections run from the tapered rear to the wide shoulders. The
+  // marginal plates turn out into a lip before meeting the recessed belly.
   const shell = [
-    [-.93, .004, .003], [-.86, .251, .132], [-.68, .433, .215],
-    [-.40, .533, .265], [-.11, .558, .286], [.18, .53, .261],
-    [.44, .444, .195], [.61, .286, .112], [.68, .003, .004],
+    [-.99,.007,.018],[-.90,.20,.094],[-.72,.36,.18],[-.47,.49,.245],
+    [-.16,.574,.29],[.13,.586,.30],[.38,.535,.26],[.55,.433,.192],
+    [.66,.265,.112],[.69,.008,.035],
   ];
   m.surface((t, a) => {
-    const [z, width, high] = interpolate(shell, t * (shell.length - 1));
+    const [z, width, height] = interpolate(shell, t*(shell.length-1));
     const rise = Math.sin(a);
-    const belly = rise < 0 ? .42 : 1;
-    return [Math.cos(a)*Math.max(.002, width), .025 + rise*belly*Math.max(.002, high), z];
-  }, 48, 48, part.shell);
+    const rim = Math.exp(-((rise/.14)**2));
+    const keel = Math.exp(-((Math.cos(a)/.19)**2));
+    const x = width*Math.cos(a)*(1+.037*rim);
+    const y = .025 + (rise>=0 ? height*rise*(1+.05*keel) : .145*rise*width/.59) - .009*rim;
+    const neckNotch = .057*Math.exp(-((x/.13)**2))*Math.max(0,t*6-5);
+    return [x, y, z-neckNotch];
+  }, 56, 64, part.shell);
 
-  // A broad loggerhead skull with a shorter beak and a neck recessed into the shell.
-  const head = [
-    [.36, .017, .17, .13], [.58, .02, .148, .125], [.70, .017, .128, .104],
-    [.80, .043, .169, .128], [.94, .033, .174, .118], [1.06, .005, .135, .088],
-    [1.14, -.029, .092, .050], [1.175, -.044, .003, .003],
+  // The ventral shield is narrower than the carapace. Its two bridges
+  // leave space for the soft shoulder and hip pockets on either side.
+  const plastron = [
+    [-.87,.012,.017],[-.78,.155,.042],[-.60,.254,.062],[-.43,.350,.074],
+    [-.20,.439,.075],[.11,.448,.076],[.32,.394,.068],[.47,.279,.060],
+    [.57,.175,.046],[.61,.018,.018],
   ];
-  m.surface((t, a) => {
-    const [z, y, width, height] = interpolate(head, t * (head.length - 1));
-    return [Math.max(.002, width)*Math.cos(a), y + Math.max(.002,height)*Math.sin(a), z];
-  }, 36, 38, part.skin);
-  m.ellipsoid(0, -.062, -.87, .095, .062, .23, part.skin);
+  m.surface((t,a)=>{
+    const [z,w,h]=interpolate(plastron,t*(plastron.length-1));
+    return [w*Math.cos(a),-.065+h*Math.sin(a),z];
+  },38,40,part.plastron);
 
-  for (const side of [-1, 1]) {
-    const mirrored = sections => sections.map(([x, ...rest]) => [side*x, ...rest]);
-    m.fin(mirrored([
-      [.28, -.055, .33, .137, .054], [.49, -.087, .39, .198, .050],
-      [.70, -.122, .33, .194, .042], [.94, -.154, .19, .145, .029],
-      [1.15, -.180, -.02, .085, .017], [1.30, -.211, -.25, .002, .001],
-    ]), false, part.foreflipper);
-    m.fin(mirrored([
-      [.24, -.056, -.63, .106, .041], [.42, -.075, -.72, .127, .035],
-      [.57, -.095, -.85, .090, .022], [.61, -.111, -.988, .002, .001],
-    ]), false, part.hindflipper);
-    m.ellipsoid(side*.157, .089, .913, .029, .044, .051, part.skin);
-    m.ellipsoid(side*.174, .092, .92, .019, .030, .034, part.iris);
-    m.ellipsoid(side*.186, .093, .926, .011, .021, .023, part.eye);
-    m.ellipsoid(side*.054, .024, 1.118, .017, .010, .014, part.groove);
-    m.seam(mirrored([
-      [.157, -.023, .905], [.159, -.043, .947], [.137, -.056, 1.014],
-      [.102, -.061, 1.089], [.005, -.068, 1.156],
-    ]), .006);
+  // Neck widens into the bony cheeks. The upper bill turns down over the
+  // small lower jaw. Angled cross-sections flatten the crown and jaw sides.
+  const head = [
+    [.37,-.034,.17,.13],[.56,-.025,.153,.122],[.68,-.006,.136,.12],
+    [.77,.030,.177,.15],[.88,.049,.200,.158],[.99,.048,.188,.139],
+    [1.085,.026,.144,.105],[1.155,.006,.092,.073],[1.198,-.013,.044,.048],
+    [1.212,-.040,.004,.009],
+  ];
+  const skull = (t,a) => {
+    const [z,y,w,h] = interpolate(head,t*(head.length-1));
+    const s = Math.sin(a), c=Math.cos(a);
+    return [w*Math.sign(c)*Math.pow(Math.abs(c),.79),
+      y+h*Math.sign(s)*Math.pow(Math.abs(s),.84),z];
+  };
+  m.surface(skull,42,40,part.skin);
+  // A separate mandible and throat make the beak overhang readable in profile.
+  const jaw = [[.60,-.056,.133,.085],[.75,-.055,.151,.100],
+    [.87,-.058,.171,.101],[.98,-.064,.161,.082],[1.08,-.054,.125,.058],
+    [1.155,-.049,.075,.036],[1.189,-.048,.018,.018],[1.195,-.045,.003,.005]];
+  m.surface((t,a)=>{
+    const [z,y,w,h]=interpolate(jaw,t*(jaw.length-1));
+    return [w*Math.cos(a),y+h*Math.sin(a),z];
+  },32,30,part.skin);
+  m.ellipsoid(0,-.074,-.91,.063,.046,.145,part.skin);
+
+  const at = (z, angle, side, lift=0) => {
+    let lo=0, hi=1;
+    for (let i=0;i<18;i++) {
+      const mid=(lo+hi)/2;
+      if (skull(mid,0)[2]<z) lo=mid; else hi=mid;
+    }
+    const [x,y] = skull((lo+hi)/2,angle);
+    return [side*(x+lift*Math.cos(angle)), y+lift*Math.sin(angle),z];
+  };
+  for (const side of [-1,1]) {
+    const mirror = sections => sections.map(([x,...section]) => [side*x,...section]);
+    // Leading edge is thick at the shoulder. The narrow trailing edge
+    // widens into a swept paddle before the rounded, downturned tip.
+    const paddle = [
+      [.29,-.058,.375,.096,.062],[.44,-.059,.430,.130,.068],
+      [.59,-.071,.463,.144,.054],[.76,-.092,.443,.167,.042],
+      [.95,-.11,.352,.159,.032],[1.13,-.141,.203,.131,.026],
+      [1.25,-.165,.047,.096,.019],[1.31,-.18,-.077,.050,.012],
+      [1.324,-.189,-.135,.003,.002],
+    ];
+    m.surface((t,a)=>{
+      const [span,y,z,chord,h]=interpolate(paddle,t*(paddle.length-1));
+      const chordPos=Math.cos(a);
+      return [side*span, y+h*Math.sin(a)*(.83+.30*chordPos)+.017*t*chordPos,
+        z+chord*chordPos];
+    },34,20,part.foreflipper);
+    m.fin(mirror([[.25,-.075,-.56,.094,.043],[.37,-.083,-.68,.132,.047],
+      [.48,-.109,-.81,.151,.037],[.54,-.133,-.933,.129,.028],
+      [.565,-.139,-1.018,.064,.013],[.566,-.141,-1.056,.004,.002]]),false,part.hindflipper);
+
+    const [ex,ey,ez]=at(.960,.38,side);
+    m.ellipsoid(ex,ey,ez,.019,.030,.039,part.iris);
+    m.ellipsoid(ex+side*.013,ey+.002,ez+.002,.008,.021,.024,part.eye);
+    const brow=[[.915,.40],[.935,.56],[.960,.59],[.982,.51],[.996,.37]];
+    m.seam(brow.map(([z,a])=>at(z,a,side,.004)),.010,part.skin);
+    const [nx,ny,nz]=at(1.151,.72,side,.002);
+    m.ellipsoid(nx,ny,nz,.010,.006,.013,part.groove);
+    const mouth=[[.892,-.38],[.955,-.48],[1.018,-.41],[1.091,-.34],
+      [1.15,-.42],[1.184,-.74],[1.198,-1.12],[1.201,-Math.PI/2]];
+    m.seam(mouth.map(([z,a])=>at(z,a,side,.002)),.0055);
   }
   return m.build();
 }
@@ -211,6 +262,7 @@ struct WildlifeVertex {
   @location(2) local: vec3f,
   @location(3) @interpolate(flat) material: f32,
   @location(4) @interpolate(flat) species: f32,
+  @location(5) restUp: f32,
 }
 
 fn rollAnimal(v: vec3f, angle: f32) -> vec3f {
@@ -254,25 +306,38 @@ fn sharkWave(z: f32, time: f32, phase: f32) -> vec2f {
   var n = normal;
   var bank: f32;
   if (species < .5) {
-    let a = time*1.6 + phase;
-    bank = -.12*sign(motion.y) + .055*sin(a);
+    let cycle = time*(1.92+.17*sin(phase))+phase;
+    let effort = smoothstep(-.54,.40,sin(time*.49+phase));
+    let turn = sign(motion.y);
+    bank = .075*turn + .025*effort*sin(cycle);
     let front = material > 1.5 && material < 2.5;
     let rear = material > 2.5 && material < 3.5;
     if (front || rear) {
       let side = sign(p.x);
-      let pivot = vec3f(side*select(.28,.33,front), -.058, select(-.65,.34,front));
-      let weight = smoothstep(.26,select(.50,.68,front),abs(p.x));
-      let beat = a - abs(p.x)*.9 + select(1.3,0.,front);
-      let stroke = (sin(beat) + .22*sin(beat*2.))*select(.17,.49,front)*weight*side;
-      let sweep = (.13 + .30*cos(beat))*select(.32,1.,front)*weight*side;
-      p = pivot + yawAnimal(rollAnimal(p-pivot,stroke),sweep);
-      n = yawAnimal(rollAnimal(n,stroke),sweep);
+      let pivot = vec3f(side*select(.255,.315,front), -.06, select(-.58,.39,front));
+      let span = abs(position.x)-abs(pivot.x);
+      let flex = smoothstep(0.,select(.22,.45,front),span);
+      let beat = cycle-.58*span + side*.048*turn;
+      let lift = select(.07*sin(cycle*.52+side),.12+effort*(.75*sin(beat)+.12*sin(2.*beat)),front);
+      let rake = select(.07*sin(cycle*.46+phase),.12+effort*.27*cos(beat),front);
+      let pitch = select(.15*turn,.08+effort*.47*cos(beat-.28),front)*flex;
+      // Feather the blade around its own span. The shoulder stays buried
+      // while the distal paddle changes its angle of attack on recovery.
+      let cs=cos(pitch);
+      let sn=sin(pitch);
+      let axisZ=select(-.58-.68*span,.39+.16*span-.63*span*span,front);
+      let axis=vec3f(p.x, -.06-.13*span,axisZ);
+      let q=p-axis;
+      p=axis+vec3f(q.x,cs*q.y-sn*q.z,sn*q.y+cs*q.z);
+      n=vec3f(n.x,cs*n.y-sn*n.z,sn*n.y+cs*n.z);
+      p=pivot+yawAnimal(rollAnimal(p-pivot,lift*side*flex),rake*side*flex);
+      n=yawAnimal(rollAnimal(n,lift*side*flex),rake*side*flex);
     }
   } else {
     let wave = sharkWave(p.z,time,phase);
     p.x += wave.x;
     n = normalize(vec3f(n.x,n.y,n.z - wave.y*n.x));
-    bank = -.19*sign(motion.y) + .05*sin(time*2.85 + phase);
+    bank = .14*sign(motion.y) + .05*sin(time*2.85 + phase);
   }
   p = rollAnimal(p,bank);
   n = rollAnimal(n,bank);
@@ -282,63 +347,107 @@ fn sharkWave(z: f32, time: f32, phase: f32) -> vec2f {
   result.clip = g.vp * vec4f(result.world,1.);
   result.normal = normalize(right*n.x + up*n.y + forward*n.z);
   result.local = position;
+  result.restUp = normal.y;
   result.material = material;
   result.species = species;
   return result;
 }
 
-// Scute borders follow the elongated shell and branch along paired side plates.
-fn shellPattern(p: vec3f) -> vec2f {
-  let x = abs(p.x);
-  let z = p.z;
-  let row = z*3.25 + .15 + sin(z*6.)*.085 + sin(p.x*24.+z*8.)*.027;
-  let plate = abs(fract(row + .5) - .5);
-  let bend = .168 + .061*plate - .032*abs(z+.12);
-  let centerSeam = abs(x-bend + sin(z*31.)*.006);
-  let sideRow = row + .82*(x-bend)*sin(z*2.1+1.4);
-  let sideSeam = abs(fract(sideRow+.5)-.5)/3.25;
-  let ridge = select(plate/3.25,sideSeam,x>bend);
-  let edge = length(vec2f(x/.552,(z+.11)/.82));
-  let marginals = abs(fract(atan2(x,z+.111)*3.9+.5)-.5)*.14;
-  let distance = select(min(centerSeam,ridge),marginals,edge>.92);
-  let border = min(distance,abs(edge-.91)*.52);
-  let aa = clamp(fwidth(border),.0015,.018);
-  let seam = 1.-smoothstep(.0025,.0045+aa,border);
-  let plateTone = hs(floor(row+.5)*3.7 + select(0.,3.,x>bend) + select(4.,0.,p.x>0.));
-  return vec2f(seam,plateTone);
+// The vertebral scutes interlock with two staggered costal rows. Marginal
+// plates wrap around the lip. Work in shell space so growth lines follow
+// each plate as the animal rolls.
+fn carapace(p: vec3f, grain: vec4f) -> vec4f {
+  let v = (p.z+.15)/.84;
+  let u = p.x/(.592+.095*clamp(v,-1.,1.));
+  let radial = length(vec2f(u,v));
+  let width = sqrt(max(.022,1.-v*v));
+  let across = abs(u)/width;
+  let row = 2.51*v+.45+.065*sin(4.5*v);
+  let zig = 1.-2.*abs(fract(row)-.5);
+  let boundary = .245+.205*zig;
+  let centre = across<boundary;
+  let angle = atan2(abs(u)+.0001,v);
+  let sideRow = row+.48 + (.23-v*.24)*(across-.45);
+  let transverse = select(abs(fract(sideRow+.5)-.5),abs(fract(row+.5)-.5),centre)*.31;
+  let seam = min(transverse,abs(across-boundary)*width*.45);
+  let edge = .892+.014*sin(angle*9.);
+  let marginal = radial>edge;
+  let marginRow = angle*3.79+.13;
+  let gap = select(seam,abs(fract(marginRow+.5)-.5)*.165,marginal);
+  let d = min(gap,abs(radial-edge)*.64);
+  let aa = clamp(fwidth(d),.0008,.014);
+  let line = 1.-smoothstep(.001,.0033+aa,d);
+  let panelId = select(select(floor(sideRow+.5)+10.+select(5.,0.,u<0.),floor(row+.5),centre),floor(marginRow+.5)+28.,marginal);
+  let variation = hs(panelId+11.);
+  let age = d*105.+grain.r*.55;
+  let rings = (.5+.5*cos(age))*exp(-11.*d)*(1.-smoothstep(.4,2.5,fwidth(age)));
+  let ray = atan2(v+.22,abs(u)+.15);
+  let amber = .5+.5*sin(ray*38.+v*7.+grain.b*2.8+sin(ray*15.));
+  let amberWash = smoothstep(.07,.94,.28*grain.a+.38*variation+.16*amber+.18*rings);
+  var color = mix(vec3f(.105,.044,.023),vec3f(.385,.177,.069),amberWash);
+  color *= .90+.13*rings+.10*grain.g;
+  color = mix(color,vec3f(.11,.055,.027),line*.80);
+  let wear = exp(-120.*abs(d-.008))*(1.-line);
+  color += vec3f(.052,.029,.010)*wear;
+  return vec4f(color,.00055*grain.b+.0014*rings-.0034*line);
 }
 
-fn turtleSurface(p: vec3f, material: f32) -> vec4f {
-  let skinNoise = textureSample(tD,sR,p.xz*2.1 + vec2f(p.y*.91,p.y*1.7));
-  let skinFine = textureSample(tD,sR,p.zy*7.2 + vec2f(p.x*2.1,p.x*5.4));
-  let mottling = smoothstep(.27,.73,skinNoise.a*.63 + skinNoise.b*.37);
-  var alb = mix(vec3f(.078,.103,.058),vec3f(.37,.32,.18),mottling);
-  var q = vec2f(p.z*27. + p.y*4., p.x*23. + p.y*24.);
-  q += vec2f(sin(q.y*.59+sin(q.x*.13)),sin(q.x*.52+sin(q.y*.18)))*.35;
-  let footprint = max(length(dpdx(q)),length(dpdy(q)));
-  let row = floor(q.y);
-  q.x += fract(row*.5);
-  let cell = floor(q);
-  let cellColor = hs(dot(cell,vec2f(3.3,9.1)));
-  let outline = abs(fract(q)-.5);
-  let gap = max(outline.x, outline.y*.9 + outline.x*.23);
-  let scales = smoothstep(.35,.48,gap) * (1.-smoothstep(.17,.71,footprint));
-  alb *= (.82 + .24*skinFine.g) * (1. - scales*(.15+.23*cellColor));
-  var relief = skinFine.b*.0012 - scales*.0016;
-  let underside = smoothstep(-.075,.048,p.y);
-  alb = mix(vec3f(.44,.35,.215)*(.82 + .24*skinNoise.g),alb,underside);
-  let plates = shellPattern(p);
-  if (material < .5) {
-    let streak = .5+.5*sin(p.z*65. + sin(p.x*17.)*1.4 + skinFine.r*3.1);
-    let warm = mix(vec3f(.10,.048,.019),vec3f(.40,.186,.062),
-      clamp(.20+plates.y*.27+skinNoise.g*.36+streak*.09,0.,1.));
-    let edge = smoothstep(.017,.045,p.y);
-    let back = mix(warm,vec3f(.048,.026,.013),plates.x*.57);
-    let belly = vec3f(.53,.424,.236) * (.77+.23*skinNoise.g) * (1.-plates.x*.21);
-    alb = mix(belly,back,edge);
-    relief = .0019*skinFine.g - .0045*plates.x*edge;
+// Scale islands with uneven, cream-coloured borders. Using the two nearest
+// centres keeps adjacent plates joined, even around the cheek and the wrists.
+fn scaleIslands(uv: vec2f) -> vec2f {
+  let grid = floor(uv);
+  let f = fract(uv);
+  var near = 10.;
+  var next = 10.;
+  var id = 0.;
+  for (var y=-1;y<=1;y++) {
+    for (var x=-1;x<=1;x++) {
+      let k=vec2f(f32(x),f32(y));
+      let h=dot(grid+k,vec2f(17.31,49.73));
+      let offset=vec2f(hs(h+.37),hs(h+5.19));
+      let delta=k+.20+.60*offset-f;
+      let dd=dot(delta,delta);
+      if (dd<near) { next=near; near=dd; id=offset.x; }
+      else { next=min(next,dd); }
+    }
   }
-  return vec4f(alb,relief);
+  let border=sqrt(next)-sqrt(near);
+  let aa=clamp(fwidth(border),.012,.14);
+  return vec2f(smoothstep(.012,.055+aa,border),id);
+}
+
+fn turtleSurface(p: vec3f, material: f32, restUp: f32) -> vec4f {
+  let grain=textureSample(tD,sR,p.xz*1.65+vec2f(p.y*1.3,p.y*2.3));
+  // Angular projection wraps a continuous scale field around the head.
+  let faceAngle=atan2(p.y-.04,max(.0001,abs(p.x)));
+  let faceUV=vec2f(p.z*14.,faceAngle*2.7);
+  let paddleUV=vec2f(abs(p.x)*16.+p.z*3.,p.z*18.+p.y*1.5);
+  let isPaddle=material>1.5 && material<3.5;
+  let scales=scaleIslands(select(faceUV,paddleUV,isPaddle));
+  let back=carapace(p,grain);
+  let middle=abs(p.x+.012*sin(4.*p.z));
+  let pair=abs(fract((p.z+.73)*3.45+.20*sin(middle*5.)+.5)-.5)*.29;
+  let seam=min(middle,pair);
+  let line=1.-smoothstep(.002,.006+clamp(fwidth(seam),.001,.015),seam);
+  if (material<.5 || material>6.5) {
+    let belly=mix(vec3f(.51,.345,.147),vec3f(.66,.525,.295),grain.g)*(1.-line*.21);
+    if (material>6.5) { return vec4f(belly,.0007*grain.g-line*.0014); }
+    let lip=smoothstep(-.003,.027,p.y);
+    let bridge = mix(vec3f(.265,.183,.104),vec3f(.42,.31,.19),grain.g);
+    return mix(vec4f(bridge,.00055*grain.g),back,lip);
+  }
+  let rust=mix(vec3f(.17,.064,.024),vec3f(.36,.164,.062),scales.y*.56+grain.a*.44);
+  let honey=vec3f(.46,.310,.157)*(.88+.20*grain.g);
+  let pattern=mix(honey,rust,scales.x)*(.84+.26*grain.b);
+  let chin=select(p.y,p.y+.11+.065*abs(p.x),isPaddle);
+  var mask=smoothstep(-.06,.03,chin);
+  if (isPaddle) { mask=smoothstep(-.55,.45,restUp); }
+  if (!isPaddle) {
+    // Soft neck skin and the horn at the tip of the beak carry fewer scales.
+    mask*=smoothstep(.65,.81,p.z)*(1.-smoothstep(1.075,1.165,p.z));
+  }
+  let neutral=mix(vec3f(.37,.263,.135),vec3f(.56,.432,.265),grain.g);
+  return vec4f(mix(neutral,pattern,mask),mix(.00045*grain.g,.0011*scales.x,mask));
 }
 
 fn reefSharkSurface(p: vec3f, normal: vec3f, material: f32) -> vec4f {
@@ -358,16 +467,16 @@ fn reefSharkSurface(p: vec3f, normal: vec3f, material: f32) -> vec4f {
   let turtle = i.species < .5;
   let geometricNormal = normalize(i.normal);
   let material = select(reefSharkSurface(i.local,geometricNormal,i.material),
-    turtleSurface(i.local,i.material),turtle);
+    turtleSurface(i.local,i.material,i.restUp),turtle);
   var albedo = material.rgb;
-  var gloss = select(.46,.32,turtle);
+  var gloss = select(.46,.21,turtle);
   if (i.material > 3.5 && i.material < 4.5) {
     albedo = vec3f(.0045,.007,.008);
     gloss = .86;
   } else if (i.material > 4.5 && i.material < 5.5) {
-    albedo = select(vec3f(.12,.083,.039),vec3f(.28,.128,.036),turtle);
+    albedo = select(vec3f(.12,.083,.039),vec3f(.19,.111,.042),turtle);
     gloss = .68;
-  } else if (i.material > 5.5) {
+  } else if (i.material > 5.5 && i.material < 6.5) {
     albedo = select(vec3f(.046,.056,.058),vec3f(.049,.031,.016),turtle);
     gloss = .16;
   }
@@ -392,7 +501,7 @@ fn reefSharkSurface(p: vec3f, normal: vec3f, material: f32) -> vec4f {
   var c = albedo * (E*lit*(.43 + ca*.58) + amb(i.world,fillNormal,vv.g,z)*1.04
     + side(i.world,n,1.,z)*.45);
   c += E*highlight*lit*mix(.12,.5,gloss)*(.31+ca*.62);
-  c += sky*rim*select(.29,.22,turtle) * select(1.,.3,i.material>3.5);
+  c += sky*rim*select(.23,.11,turtle) * select(1.,.3,i.material>3.5);
   return fin(fog(c,i.world,z));
 }
 `;
