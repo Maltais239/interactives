@@ -1,3 +1,5 @@
+import {createTurtleRoutes} from "./turtle-motion.js?v=1";
+
 // Adapted from tevy's CC0 Sea Turtle v1. The mesh includes the original skin
 // weights, both clips sampled as joint matrices, and mipmapped colour and normal maps.
 const shader = `
@@ -15,25 +17,18 @@ struct TurtleVertex {
 @vertex fn vsGreen(
   @builtin(instance_index) inst: u32,
   @location(0) pos: vec4f, @location(1) norm: vec4f,
-  @location(2) route: vec4f, @location(3) motion: vec4f,
   @location(4) uv: vec2f, @location(5) indices: vec4u, @location(6) weights: vec4f,
 ) -> TurtleVertex {
-  let base = inst * boneCount;
+  let base = inst * (boneCount+1u);
   let skin = joints[base+indices.x]*weights.x + joints[base+indices.y]*weights.y
            + joints[base+indices.z]*weights.z + joints[base+indices.w]*weights.w;
   let p = (skin * vec4f(pos.xyz,1.)).xyz;
   let normal = (skin * vec4f(norm.xyz,0.)).xyz;
-  let a = g.cam.w*motion.y+motion.x;
-  let bob = a*1.3+fract(motion.w)*TAU;
-  let center = route.xyz+vec3f(cos(a)*route.w,.65*sin(bob),sin(a)*route.w*.65);
-  let forward = normalize(vec3f(-sin(a)*route.w,.845*cos(bob),cos(a)*route.w*.65))*sign(motion.y);
-  let right = normalize(cross(vec3f(0.,1.,0.),forward));
-  let up = cross(forward,right);
-  let basis = mat3x3f(right,up,forward);
+  let transform = joints[base+boneCount];
   var out: TurtleVertex;
-  out.world = center + basis*p*(motion.z*.94);
+  out.world = (transform*vec4f(p,1.)).xyz;
   out.clip = g.vp*vec4f(out.world,1.);
-  out.normal = normalize(basis*normal);
+  out.normal = normalize((transform*vec4f(normal,0.)).xyz);
   out.uv = uv;
   return out;
 }
@@ -79,7 +74,7 @@ async function readTurtle(device, data, makeBuffer, count, allocated) {
   const stride = bones*16;
   const clipBytes = take((swimFrames+glideFrames)*stride*4);
   const clips = new Float32Array(data,clipBytes.byteOffset,clipBytes.byteLength/4);
-  const pose = new Float32Array(count*stride);
+  const pose = new Float32Array(count*(stride+16));
   const skin = buffer(pose,GPUBufferUsage.STORAGE);
   async function texture(format) {
     const levels = word();
@@ -96,16 +91,60 @@ async function readTurtle(device, data, makeBuffer, count, allocated) {
   }
   const coat = await texture('rgba8unorm-srgb');
   const normal = await texture('rgba8unorm');
-  return {vertex,index,indexCount,skin,pose,clips,stride,swimFrames,glideFrames,coat,normal};
+  return {vertex,index,indexCount,skin,pose,clips,stride,swimFrames,coat,normal};
 }
 
-function sampleFrames(time, seconds, frames, start, stride) {
-  const pos = (time/seconds % 1)*frames;
-  const a = Math.floor(pos);
-  return [(start+a)*stride,(start+(a+1)%frames)*stride,pos-a];
+// Rest-space hinges from the mesh's inverse bind matrices. The joint order is
+// body, two left foreflipper bones, two right, left and right rear, neck, head, tail.
+const shoulder=[.26374,-.06642,.29096];
+const hip=[.24277,-.08868,-.61783];
+
+function rotateJoints(pose, base, first, last, x,y,z, yaw,pitch,roll) {
+  const start=base+first*16;
+  const px=pose[start]*x+pose[start+4]*y+pose[start+8]*z+pose[start+12];
+  const py=pose[start+1]*x+pose[start+5]*y+pose[start+9]*z+pose[start+13];
+  const pz=pose[start+2]*x+pose[start+6]*y+pose[start+10]*z+pose[start+14];
+  const cy=Math.cos(yaw), sy=Math.sin(yaw), cp=Math.cos(pitch), sp=Math.sin(pitch);
+  const cr=Math.cos(roll), sr=Math.sin(roll);
+  for(let bone=first;bone<=last;bone++){
+    for(let column=0;column<4;column++){
+      const j=base+bone*16+column*4;
+      const w=pose[j+3];
+      const dx=pose[j]-w*px, dy=pose[j+1]-w*py, dz=pose[j+2]-w*pz;
+      const rx=cr*dx-sr*dy, ry=sr*dx+cr*dy;
+      const rz=sp*ry+cp*dz;
+      pose[j]=cy*rx+sy*rz+w*px;
+      pose[j+1]=cp*ry-sp*dz+w*py;
+      pose[j+2]=-sy*rx+cy*rz+w*pz;
+    }
+  }
 }
 
-export async function loadGreenTurtles({device,sharedShader,sceneLayout,instanceLayout,
+function steerFlippers(pose,base,{steer,climb,stroke}) {
+  const beat=stroke*Math.PI*2;
+  const sweep=Math.sin(beat-.48), recover=Math.cos(beat+.25);
+  for(const side of [1,-1]){
+    const fore=side===1?1:3, rear=side===1?5:6;
+    const inside=steer*side;
+    // Change the reach and blade angle through the turn, moving both bones
+    // about the shoulder so the distal joint stays attached.
+    rotateJoints(pose,base,fore,fore+1,side*shoulder[0],shoulder[1],shoulder[2],
+      steer*(.17+.15*sweep), .24*Math.sin(beat+.1)-.10*inside*sweep, -steer*(.15+.13*recover));
+    // The distal blade twists later than the shoulder. It presents its broad
+    // face on the power stroke and slices back through the water on recovery.
+    rotateJoints(pose,base,fore+1,fore+1,side*.64443,-.09680,.15731,
+      0,.24*Math.sin(beat-.2),0);
+    // Rear paddles open into the flow and change pitch independently on a bend.
+    // Both also trim a climb or dive as the foreflippers come through recovery.
+    const effort=.09+.16*Math.abs(steer);
+    rotateJoints(pose,base,rear,rear,side*hip[0],hip[1],hip[2],
+      -.43*steer+side*effort*recover, .50*climb+.37*inside+effort*sweep,
+      -side*.12*sweep-.18*steer);
+  }
+  rotateJoints(pose,base,7,8,.00009,-.04822,.35325,.15*steer,-.12*climb,0);
+}
+
+export async function loadGreenTurtles({device,sharedShader,sceneLayout,
   makeBuffer,colorFormat,depthFormat,samples,routes}) {
   const response = await fetch(new URL('./green-turtle.mesh',import.meta.url));
   if (!response.ok) throw Error('Green turtle download failed ('+response.status+')');
@@ -122,7 +161,7 @@ export async function loadGreenTurtles({device,sharedShader,sceneLayout,instance
       {shaderLocation:0,offset:0,format:'snorm16x4'}, {shaderLocation:1,offset:8,format:'snorm8x4'},
       {shaderLocation:4,offset:12,format:'unorm16x2'},{shaderLocation:5,offset:16,format:'uint8x4'},
       {shaderLocation:6,offset:20,format:'unorm8x4'},
-    ]},instanceLayout]},
+    ]}]},
     fragment:{module,entryPoint:'fsGreen',targets:[{format:colorFormat}]},
     depthStencil:{format:depthFormat,depthWriteEnabled:true,depthCompare:'greater'},multisample:{count:samples},
   });
@@ -130,32 +169,38 @@ export async function loadGreenTurtles({device,sharedShader,sceneLayout,instance
   const allocated = [];
   try {
     const mesh = await readTurtle(device,await response.arrayBuffer(),makeBuffer,count,allocated);
-    const {stride,swimFrames,glideFrames,clips,pose} = mesh;
+    const {stride,swimFrames,clips,pose} = mesh;
     const sampler = device.createSampler({magFilter:'linear',minFilter:'linear',mipmapFilter:'linear'});
     const group = device.createBindGroup({layout:groupLayout,entries:[
       {binding:0,resource:{buffer:mesh.skin}},{binding:1,resource:mesh.coat},
       {binding:2,resource:mesh.normal},{binding:3,resource:sampler},
     ]});
-    return {draw(pass,routeBuffer,time) {
-      // Interpolate the ten bones once per animal, then skin all four in one draw.
-      for(let i=0;i<count;i++){
-        const phase=routes[8*i+7]*Math.PI*2;
-        const clock=time+phase;
-        const [a,b,u]=sampleFrames(clock,76/30,swimFrames,0,stride);
-        const [c,d,v]=sampleFrames(clock,91/30,glideFrames,swimFrames,stride);
-        const t=Math.min(1,Math.max(0,.5+1.7*Math.sin(time*.55+phase)));
-        const effort=t*t*(3-2*t);
-        for(let j=0;j<stride;j++){
-          const swim=clips[a+j]+u*(clips[b+j]-clips[a+j]);
-          const glide=clips[c+j]+v*(clips[d+j]-clips[c+j]);
-          pose[i*stride+j]=glide+effort*(swim-glide);
+    const tracks=createTurtleRoutes(routes);
+    return {
+      positionFor(offset,time,out) {
+        const m=tracks[offset/8](time).matrix;
+        out[0]=m[12];out[1]=m[13];out[2]=m[14];
+      },
+      draw(pass,time) {
+        for(let i=0;i<count;i++){
+          const state=tracks[i](time);
+          const cycle=state.stroke-Math.floor(state.stroke);
+          const frame=cycle*swimFrames;
+          const low=Math.floor(frame), high=(low+1)%swimFrames, mix=frame-low;
+          const base=i*(stride+16);
+          for(let j=0;j<stride;j++){
+            const a=clips[low*stride+j];
+            pose[base+j]=a+mix*(clips[high*stride+j]-a);
+          }
+          steerFlippers(pose,base,state);
+          pose.set(state.matrix,base+stride);
         }
+        device.queue.writeBuffer(mesh.skin,0,pose);
+        pass.setPipeline(pipeline); pass.setBindGroup(1,group);
+        pass.setVertexBuffer(0,mesh.vertex);
+        pass.setIndexBuffer(mesh.index,'uint16'); pass.drawIndexed(mesh.indexCount,count);
       }
-      device.queue.writeBuffer(mesh.skin,0,pose);
-      pass.setPipeline(pipeline); pass.setBindGroup(1,group);
-      pass.setVertexBuffer(0,mesh.vertex); pass.setVertexBuffer(1,routeBuffer);
-      pass.setIndexBuffer(mesh.index,'uint16'); pass.drawIndexed(mesh.indexCount,count);
-    }};
+    };
   } catch (error) {
     for(const resource of allocated) resource.destroy();
     throw error;
