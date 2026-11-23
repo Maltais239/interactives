@@ -83,7 +83,7 @@ export function chartReef(terrain, scene, meshes) {
       triangles(placed, mesh.ib, 3, heave);
     }
   }
-  scene.solids.ranges.forEach(([start, count], i) => objects(i, scene.solids.data, start, count));
+  scene.solids.ranges.forEach(([start, count], i) => objects(scene.solids.meshIndices[i], scene.solids.data, start, count));
   scene.props.forEach((set, i) => {
     objects(4 + i, set.data);
     if (i === 3 || i === 4) objects(18 + i, set.data);
