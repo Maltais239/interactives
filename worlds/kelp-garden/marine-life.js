@@ -13,6 +13,7 @@ struct MarineVertex {
   @location(1) normal: vec3f,
   @location(2) color: vec4f,
   @location(3) local: vec3f,
+  @location(4) @interpolate(flat) isShark: f32,
 }
 
 fn waveAt(speed: f32) -> vec3f {
@@ -93,6 +94,7 @@ fn motionAt(z: f32, time: f32, phase: f32, wave: vec3f) -> vec2f {
   result.normal = normal;
   result.color = color;
   result.local = p;
+  result.isShark = profile.shape.w;
   return result;
 }
 
@@ -110,12 +112,15 @@ fn motionAt(z: f32, time: f32, phase: f32, wave: vec3f) -> vec2f {
   let alb = i.color.rgb*mix(.92,1.08,texture.g);
   let lit = sat(dot(N,L));
   let rim = pow(1.-sat(dot(N,V)),3.);
-  let fillNormal = normalize(vec3f(N.x,.20+.65*abs(N.y),N.z));
+  let sharkSkin = i.isShark > .5 && i.color.a < .8;
+  let fillY = select(.20+.65*abs(N.y), .20+.65*N.y, sharkSkin);
+  let fillNormal = normalize(vec3f(N.x,fillY,N.z));
   var c = alb*(E*lit*(.44+ca*.63)+amb(i.world,fillNormal,sky,z)*1.28
     +side(i.world,N,1.,z)*.55);
   let spec = pow(sat(dot(N,normalize(V+L))),mix(21.,90.,i.color.a));
   c += E*spec*lit*mix(.11,.47,i.color.a)*(.32+ca*.54);
-  c += up*rim*select(.19,.09,i.color.a>.8);
+  let edge = select(.19,.12,sharkSkin);
+  c += up*rim*select(edge,.09,i.color.a>.8);
   return fin(fog(c,i.world,z));
 }
 `;
