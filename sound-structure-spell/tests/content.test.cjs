@@ -23,3 +23,34 @@ assert(spellingMatch('  HAPPILY ','happily'));assert(!spellingMatch('happilly','
 assert(sentenceMatch('The cat sat.','the cat sat!'));assert(!sentenceMatch('The cats sat.','The cat sat.'));
 assert(sumMatch(' GENTLE + ly ','gentle ly'.split(' ')));assert(!sumMatch('gent + ly',['gentle','ly']));
 console.log('PASS: 11 topics, 29 days, '+COURSE.reduce((n,m)=>n+m.words.length,0)+' bank entries, 105 explicit sound maps; exception keys and answer normalization verified.');
+
+
+const workbook=require('../workbook.js');
+const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
+const assets=path.resolve(__dirname,'..');
+const audio=vm.runInNewContext(fs.readFileSync(path.join(assets,'audio-index.js'),'utf8')+'; AUDIO_RANGES');
+for(const topic of COURSE){
+  const lesson=workbook.LESSONS[topic.id], clips=audio[topic.id];
+  assert(lesson.groups.length>=2&&lesson.groups.length<=4);
+  const hasClip=text=>assert(clips[text]&&clips[text][0]>=0&&clips[text][1]>clips[text][0],topic.id+' missing pronunciation for '+text);
+  for(const group of lesson.groups){const list=group.split(' ');list.forEach(hasClip);hasClip(list.join('. ')+'.');}
+  assert(fs.statSync(path.join(assets,'assets/audio',topic.id+'.mp3')).size>0);
+  for(let day=1;day<=topic.days;day++){
+    const sequence=workbook.activities(topic,day);
+    assert.equal(sequence.length,new Set(sequence).size);
+    if(sequence.includes('sort')){
+      const list=workbook.sortItems(topic.id,day),labels=workbook.sortLabels(topic.id,day);
+      assert.equal(new Set(list.map(i=>i.group)).size,labels.length);
+      assert.equal(new Set(list.map(i=>i.word)).size,list.length);
+      for(const item of list)assert(labels[item.group]&&item.word);
+    }
+    if(sequence.includes('spell')){
+      const items=workbook.spellingItems(topic,day);assert.equal(items.length,5);
+      for(const item of items){assert.equal(item.boxes.join(''),item.word);hasClip(item.word);}
+    }
+    if(sequence.includes('analogy'))for(const pair of workbook.pairs(topic))assert.equal(pair.length,4);
+  }
+}
+assert.deepEqual(workbook.spellingItems(COURSE[0],1).map(x=>x.word),['spike','flame','stoke','bride','grim']);
+assert.deepEqual(workbook.activities(COURSE[0],1),['pattern','sort','spell']);
+console.log('PASS: workbook sequence, sorting keys, sound-box spellings and bundled audio coverage for all 29 days.');
