@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#292923"><meta name="description" content="Walk through an imagined district of imperial Rome. A small procedural WebGPU world.">
+<link rel="icon" href="data:,"><title>Vicus Aureus · Ancient Rome</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;--ivory:#fff6e2;--line:#d5bc8759;--gold:#e2c28d;--dark:#272720f2}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#98a9a7;color:var(--ivory)}body{height:100dvh;touch-action:none}button{font:inherit;color:inherit;cursor:pointer}button:focus-visible,canvas:focus-visible{outline:2px solid #f5c374;outline-offset:3px}#world{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}#world:active{cursor:grabbing}
+header,.location,#hint,#stick{position:fixed;z-index:1}header{top:max(18px,env(safe-area-inset-top));left:max(22px,env(safe-area-inset-left));right:max(22px,env(safe-area-inset-right));display:flex;align-items:flex-start;justify-content:space-between;pointer-events:none}
+.brand,.mapButton,.location,#hint{background:var(--dark);box-shadow:0 3px 16px #19150926;border:1px solid var(--line)}
+.brand{padding:10px 17px 11px;border-left:3px solid #c7a365}.brand small,.eyebrow{display:block;font-size:10px;font-weight:650;letter-spacing:.20em;text-transform:uppercase;color:var(--gold)}h1{margin:2px 0 0;font:normal 25px/1.05 Georgia,serif;letter-spacing:-.03em}
+.mapButton{pointer-events:auto;display:flex;align-items:center;gap:10px;border-radius:4px;padding:10px 15px;min-height:44px;font-size:14px;font-weight:560}.mapIcon{width:20px;height:15px;display:inline-block;border:1px solid var(--gold);transform:skewY(-8deg);background:linear-gradient(90deg,transparent 28%,var(--gold) 29% 34%,transparent 35% 63%,var(--gold) 64% 69%,transparent 70%)}
+.location{bottom:max(19px,env(safe-area-inset-bottom));left:max(22px,env(safe-area-inset-left));padding:9px 13px;display:flex;align-items:center;gap:12px;border-radius:3px;pointer-events:none}.location strong{font:normal 19px Georgia,serif}.location span{border-left:1px solid var(--line);padding-left:11px;color:var(--gold);font-size:11px;letter-spacing:.08em}
+#hint{bottom:20px;right:22px;margin:0;padding:9px 13px;border-radius:3px;font-size:13px;pointer-events:none;transition:opacity .45s}.hideHint #hint{opacity:0}
+#stick{display:none;left:max(21px,env(safe-area-inset-left));bottom:max(20px,env(safe-area-inset-bottom));width:84px;height:84px;border:1px solid #fff6daaa;border-radius:50%;background:#282a2577;touch-action:none;align-items:center;justify-content:center;user-select:none}#knob{height:34px;width:34px;border-radius:50%;background:#f4dfb9aa;border:1px solid #fff3d9;pointer-events:none}
+dialog{color:var(--ivory);background:#2a2a23;border:1px solid #9b8867;border-radius:5px;padding:0;width:min(390px,calc(100vw - 28px));max-height:calc(100dvh - 28px);box-shadow:0 20px 80px #17170eb3;overflow:auto;overscroll-behavior:contain}dialog::backdrop{background:#1c1e166e}
+.panel{padding:21px 22px 17px}.head{display:flex;align-items:center;justify-content:space-between}.head h2{margin:2px 0 0;font:normal 27px Georgia,serif}.close{border:1px solid var(--line);background:transparent;border-radius:3px;width:40px;height:40px;color:var(--gold);font-size:24px}.plan{width:100%;height:auto;display:block;margin:14px 0 8px;background:#d4c49d;border:1px solid #a59775}.dest{display:grid;grid-template-columns:1fr 1fr;gap:6px}.dest button,.retry{min-height:42px;border:1px solid var(--line);background:#38382d;text-align:left;font-size:14px;border-radius:3px;padding:8px 10px}.dest button:hover,.mapButton:hover,.close:hover,.retry:hover{background:#454232}.panel p{font-size:13px;line-height:1.45;color:#e7dfce;margin:10px 0 0}.panel .note{font-size:12px;color:#c6bca5}.mobileOnly{display:none}
+#status{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#2a2a23f5;color:var(--ivory);padding:21px 24px;border:1px solid var(--line);border-radius:4px;text-align:center;max-width:420px;width:max-content;max-width:min(420px,90vw);z-index:4}#status p{margin:0;font-size:15px;line-height:1.45}.retry{display:block;margin:12px auto 0;text-align:center}[hidden]{display:none!important}
+@media(pointer:coarse){#stick{display:flex}.mobileOnly{display:inline}.desktopOnly{display:none}.location{bottom:auto;top:max(84px,calc(env(safe-area-inset-top) + 65px));padding:5px 10px}.location strong{font-size:15px}#hint{right:max(18px,env(safe-area-inset-right));bottom:max(22px,env(safe-area-inset-bottom))}}
+@media(max-width:540px),(max-height:490px){header{top:max(12px,env(safe-area-inset-top));left:max(14px,env(safe-area-inset-left));right:max(14px,env(safe-area-inset-right))}.brand{padding:7px 12px}.brand small{font-size:9px}h1{font-size:21px}.location{left:max(14px,env(safe-area-inset-left))}}
+@media(pointer:coarse) and (max-height:490px){.location{top:70px}#stick{width:74px;height:74px}.plan{width:64%;margin:8px auto}.panel{padding:12px 16px}.panel p{margin-top:5px}}
+@media(prefers-reduced-motion:reduce){#hint{transition:none}}
+</style></head>
+<body>
+<canvas id="world" tabindex="0" aria-label="Walk through the Roman district"></canvas>
+<header><div class="brand"><small>Ancient Rome</small><h1>Vicus Aureus</h1></div><button class="mapButton" id="openMap" aria-controls="map" disabled><i class="mapIcon" aria-hidden="true"></i>Map</button></header>
+<div class="location"><strong id="place">The Forum</strong><span id="bearing">NNW</span></div>
+<p id="hint"><span class="desktopOnly">WASD to walk · Drag to look · M for map</span><span class="mobileOnly">Left thumb to walk · Drag to look</span></p>
+<div id="stick" aria-hidden="true"><div id="knob"></div></div>
+<dialog id="map" aria-labelledby="mapTitle"><div class="panel"><div class="head"><div><span class="eyebrow">Vicus Aureus</span><h2 id="mapTitle">District map</h2></div><button class="close" id="closeMap" aria-label="Close map">×</button></div><canvas class="plan" id="plan" width="690" height="490" aria-label="Map of the district and your position"></canvas>
+<nav class="dest" id="destinations" aria-label="Go to a landmark"></nav><p>Choose a landmark to start walking from there.</p><p class="note">An imagined neighborhood of imperial Rome.</p>
+<p class="note desktopOnly">WASD to walk, arrows to walk and turn, R/F to look up and down, Shift to move faster.</p></div></dialog>
+<div id="status" role="status"><p id="message">Building the Roman district…</p><button class="retry" hidden id="retry">Try again</button></div>
+<script type="module" src="./walk.js"></script>
+</body></html>
