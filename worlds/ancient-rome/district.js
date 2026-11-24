@@ -1,5 +1,7 @@
 import {masonry} from './masonry.js';
-import {seeded,surface as M} from './texture.js';
+import {seeded,surface as M} from './texture.js?v=forum2';
+
+import {forumSlabs,growTree,marketBarrow,herbBed,balcony,capital} from './street.js?v=forum2';
 
 export const stops=[
   {name:'The Forum',x:9.3,z:15.5,yaw:-.34,pitch:.14},
@@ -13,7 +15,7 @@ export function buildDistrict(){
     brick=0xcb8b68,timber=0x755037,bronze=0x72684b;
   const tone=(col,k)=>[16,8,0].reduce((sum,shift)=>sum+(Math.min(255,Math.max(0,Math.round((col>>shift&255)*k)))<<shift),0);
   const colors=[0xd9aa7c,0xe0c39c,0xd7b992,0xe4cfa9,0xc99674,0xe8c695];
-  const leafy=seeded(912);
+
   const pick=a=>a[Math.floor(R()*a.length)];
   function roof(x,y,z,w,d,rise,color=tile){
     const l=x-w/2,r=x+w/2,n=z-d/2,s=z+d/2,peak=y+rise;
@@ -24,14 +26,26 @@ export function buildDistrict(){
     face([[l,y,n],[l,y,s],[x,peak,s],[x,peak,n]],color,M.roof,[[0,w/5],[d/3,w/5],[d/3,0],[0,0]]);
     face([[x,peak,n],[x,peak,s],[r,y,s],[r,y,n]],tone(color,.96),M.roof,uv);
     beam([x,peak+.04,n],[x,peak+.04,s],.115,tone(color,1.12),M.roof,9);
+    if(w<18 && d<20){
+      const count=Math.round(d/.38);
+      for(const side of [-1,1])for(let k=0;k<count;k++){
+        const cx=x+side*w/2,cz=n+(k+.5)*d/count,radius=.085;
+        const end=(a,inset)=>[cx-side*inset,y+.012+inset*rise/(w/2)+Math.sin(a)*radius,cz+Math.cos(a)*radius];
+        for(let j=0;j<5;j++){
+          const a=j*PI/5,b=(j+1)*PI/5;
+          face([end(a,-.09),end(b,-.09),end(b,.57),end(a,.57)],tone(color,.87+.12*((k*43)%11)/10),M.plaster);
+        }
+      }
+    }
     box(l,y-.16,z,.14,.19,d+.08,tone(color,.81));box(r,y-.16,z,.14,.19,d+.08,tone(color,.81));
   }
   function column(x,y,z,h,r,fancy){
-    const cap=fancy?light:stone;
+    const cap=fancy?0xf2e7d2:0xe0d3bd;
     box(x,y,z,r*2.48,.20,r*2.48,cap);
     post(x,y+.19,z,[[0,1.21*r],[.07,1.24*r],[.14,1.08*r],[.22,r],[.29,1.03*r]],cap,0,20);
     post(x,y+.47,z,[[0,r],[h*.23,r*.99],[h*.56,r*.91],[h-.98,r*.78]],cap,0,fancy?64:16,fancy?16:0);
     post(x,y+h-.52,z,[[0,r*.81],[.06,r*.94],[.11,r*.91],[.15,r*.98],[.29,r*1.19],[.36,r*1.26]],cap,0,24);
+    if(fancy)capital(g,x,y+h-.31,z,r,cap);
     box(x,y+h-.16,z,r*2.72,.16,r*2.72,cap);block(x,z,r*1.78,r*1.78,y,y+h);
   }
   // A podium with a climbable frontal stair and a shaded, six-column porch.
@@ -52,6 +66,7 @@ export function buildDistrict(){
     for(const x of [-7.15,-4.29,-1.43,1.43,4.29,7.15])column(x,floor,2.14,h,.48,true);
     for(const x of [-7.15,7.15])for(const z of [-1.35,-5.12,-8.89,-12.1])column(x,floor,z,h,.48,true);
     wall(0,floor,-8.8,12.1,h,7.7,0xe6d1ab,M.plaster);
+    for(const x of [-3.86,3.86])label(x,floor+.59,-4.928,2.60,4.96,M.fresco);
     for(const x of [-5.68,5.68])box(x,floor,-4.87,.62,h,.35,light);
     box(0,floor,-4.84,3.7,4.9,.25,shadowStone);box(0,floor,-4.64,3.19,4.54,.19,0x65492f,M.wood);
     for(const x of [-1.64,1.64])box(x,floor,-4.51,.19,4.76,.19,light);
@@ -70,7 +85,7 @@ export function buildDistrict(){
     box(0,9.92,-5.02,17.08,.22,16.97,light);
     roof(0,10.15,-5.02,17.45,17.29,2.44);
     const centerZ=3.66;
-    face([[-7.45,10.33,centerZ],[7.45,10.33,centerZ],[0,12.38,centerZ]],0xc5a78a,M.plaster);
+    face([[-7.45,10.33,centerZ],[7.45,10.33,centerZ],[0,12.38,centerZ]],0x74817c,M.plaster);
     for(const side of [-1,1]){
       beam([side*8.73,10.18,3.71],[0,12.62,3.71],.145,light,0,8);
       beam([side*8.48,10.25,3.73],[0,12.59,3.73],.06,stone,0,7);
@@ -78,6 +93,17 @@ export function buildDistrict(){
         const a=i/9*1.54,x=side*(.28+1.07*Math.sin(a)),y=10.58+.90*(1-Math.cos(a));
         beam([x,y,3.75],[x+side*.27,y+.10+.12*i/9,3.75],.084,bronze,M.metal);
         if(i>0)beam([x,y,3.75],[side*(.28+1.07*Math.sin((i-1)/9*1.54)),10.58+.90*(1-Math.cos((i-1)/9*1.54)),3.75],.055,bronze);
+      }
+    }
+    // Two low-relief olive branches fill the long, shallow corners of the pediment.
+    for(const side of [-1,1]){
+      const point=t=>[side*(1.58+4.33*t),10.65+.28*Math.sin(t*PI)-.17*t,3.72];
+      for(let i=0;i<18;i++){
+        const t=i/18,a=point(t),b=point((i+1)/18);beam(a,b,.026,0xc1a16b,M.metal,6);
+        for(const v of [-1,1]){
+          const len=.25*(1-.48*t),cx=a[0],cy=a[1],dx=side*len,dy=v*len*.75;
+          face([[cx,cy,3.75],[cx+dx*.46,cy+dy*.73+.038,3.78],[cx+dx,cy+dy,3.75],[cx+dx*.65,cy+dy*.27-.026,3.78]],0xd2b883,M.metal);
+        }
       }
     }
     for(const x of [-6.5,6.5]){
@@ -163,6 +189,7 @@ export function buildDistrict(){
   }
   function shop(w,d,h,id){
     const color=pick(colors),back=-d;
+    if(id%2===0)balcony(g,0,4.05,.17,w*.51,[0xab5843,0x778f89,0xae794a][id/2%3]);
     wall(0,0,back,w,h,.38,color,M.plaster);
     for(const sign of [-1,1])wall(sign*(w/2-.17),0,back/2,.34,h,d,color,M.plaster);
     for(const sign of [-1,1]){
@@ -175,6 +202,7 @@ export function buildDistrict(){
     for(let i=-1;i<=1;i++)windowBay(i*w*.30,4.01,.05,Math.min(.95,w*.14),1.39);
     box(0,h-.27,-d/2,w+.29,.24,d+.32,stone);roof(0,h,-d/2,w+.65,d+.64,1.17+R()*.46);
     box(0,.01,-d/2,w,.07,d,0xb49477,M.paving);
+    for(const col of [-1,0,1])label(w*.296*col,.37,back+.199,w*.277,2.28,M.fresco);
     box(0,1.17,back+.25,w*.89,.13,.32,timber,M.wood);
     box(0,1.95,back+.25,w*.89,.13,.32,timber,M.wood);
     for(let i=0;i<8;i++)pot((i-3.5)*w*.102,i%2?1.29:2.08,back+.33,.13+R()*.09,0xc48b60);
@@ -186,6 +214,8 @@ export function buildDistrict(){
     if(id%4===0 || id%4===3){
       for(let i=0;i<4;i++)for(let j=0;j<2;j++)post(tableX-.76+i*.47,1,-.92+.42*j,[[0,.17],[.12,.215],[.21,.14],[.23,.02]],id%4===0?0xca8a46:pick([0xb46943,0xd6a03d,0x809143]),M.plaster,10);
     }else for(let i=-1;i<=1;i++)pot(tableX+i*.54,1,-.67,.21,i%2?0xcb855d:0xa66d4e);
+    // Stacked storage amphorae and woven produce baskets give each stall a working floor.
+    if(id%2===1)for(let i=0;i<3;i++)pot(w*.28+(i%2)*.36,.08,-1.24-Math.floor(i/2)*.45,.27+.038*i,0xb97651);
     if(id%3===1){pot(w*.38,.03,1.07,.43,0xa86848);pot(w*.36,.03,1.89,.29,0xc48b65);}
   }
   function house(w,d,h,decor=true){
@@ -209,52 +239,30 @@ export function buildDistrict(){
       post(0,.34,0,[[0,2.16*s],[.29,2.22*s],[.46,2.36*s],[.56,2.38*s],[.60,2.28*s],[.50,2.11*s],[.15,2.04*s]],light,0,40);
       post(0,.70,0,[[0,2.13*s],[.02,2.13*s],[.021,0]],0x72a59a,M.water,48);
       post(0,.72,0,[[0,.57],[.12,.65],[.25,.41],[.86,.25],[1.0,.34],[1.13,.83],[1.26,1.12],[1.41,1.17],[1.45,1.04],[1.27,.67]],bronze,M.metal,32);
-      post(0,2.0,0,[[0,.20],[.28,.19],[.39,.11],[.66,.075]],bronze,M.metal,16);
+      post(0,2.045,0,[[0,.40],[.06,.42],[.09,.36],[.14,.35]],bronze,M.metal,36);
+      post(0,2.067,0,[[0,1.00],[.009,1.00],[.010,0]],0x83a69e,M.water,48);
       for(let i=0;i<8;i++){
-        const a=i/8*PI*2, point=t=>[(.18+1.26*t)*Math.cos(a),2.45+.59*Math.sin(t*PI)-1.71*t*t,(.18+1.26*t)*Math.sin(a)];
-        for(let j=0;j<11;j++)beam(point(j/11),point((j+1)/11),.016,0xd3daca,M.water,4);
+        const a=i/8*PI*2, point=t=>[(1.09+.58*t)*Math.cos(a),2.124+.14*t-1.53*t*t,(1.09+.58*t)*Math.sin(a)];
+        for(let j=0;j<11;j++)beam(point(j/11),point((j+1)/11),.019-.005*j/11,0xd3daca,M.water,4);
       }
       // Round rims use several short tangent colliders so the basin feels round.
       for(let i=0;i<16;i++){const a=i/16*2*PI;frame(Math.sin(a)*2.17*s,Math.cos(a)*2.17*s,a,()=>block(0,0,.88*s,.38*s));}
     });
   }
   function tree(x,z,h,pine=false,solid=true){
-    frame(x,z,R()*6.28,()=>{
-      post(0,0,0,[[0,h*.046],[.25,h*.05],[h*.57,h*.031],[h*.78,h*.015]],0x76664d,M.wood,9);
-      if(!pine){
-        const ys=[.12,.19,.31,.49,.68,.82,.93,1],rs=[.08,.56,.9,1,.79,.52,.25,.02],N=13;
-        const rings=ys.map((v,k)=>Array.from({length:N},(_,i)=>{const a=i/N*PI*2,rad=h*.126*rs[k]*(.78+R()*.35);return [rad*Math.cos(a),v*h+(R()-.5)*.27,rad*Math.sin(a)];}));
-        for(let k=0;k<rings.length-1;k++)for(let i=0;i<N;i++){
-          const next=(i+1)%N;face([rings[k][i],rings[k+1][i],rings[k+1][next],rings[k][next]],tone(0x536b43,.83+.22*R()),M.leaf);
-        }
-        for(let i=0;i<155;i++){
-          const t=.17+.79*leafy(),ang=i*2.39996+leafy()*.55;
-          const ra=h*.122*(Math.sin((t-.12)/.89*Math.PI)**.74),cx=ra*Math.cos(ang),cz=ra*Math.sin(ang);
-          const half=h*(.025+.026*leafy())*(1.32-t*.5),len=h*(.083+.052*leafy()),y=h*t;
-          const tangent=[-Math.sin(ang),0,Math.cos(ang)],n=[Math.cos(ang)*.85,.52,Math.sin(ang)*.85];
-          const corners=[[-1,0],[1,0],[1,1],[-1,1]].map(([side,v])=>[cx+tangent[0]*half*side+v*.06*n[0],y+len*v,cz+tangent[2]*half*side+v*.06*n[2]]);
-          face(corners,tone(0x62784b,.95+.22*leafy()),M.sprig,[[0,1],[1,1],[1,0],[0,0]],[n,n,n,n]);
-        }
-      }else{
-        for(let i=0;i<7;i++){
-          const a=i/7*PI*2,l=h*(.16+.09*R()),dx=Math.cos(a)*l,dz=Math.sin(a)*l,y=h*(.76+.12*R());
-          beam([0,h*.51,0],[dx*.55,h*.66,dz*.55],.13,timber);beam([dx*.55,h*.66,dz*.55],[dx,y,dz],.10,timber);
-          const r=h*(.15+R()*.10);post(dx,y-.43,dz,[[0,.22*r],[.22,.78*r],[.64,r],[1.3,r*.84],[1.8,.50*r],[1.98,.02]],tone(0x627746,.91+R()*.18),M.leaf,11);
-        }
-      }
-      if(solid)block(0,0,h*.08,h*.08);
-    });
+    growTree(g,x,z,h,pine?'pine':'cypress',solid);
   }
   // Forum pavement, edging, and a continuous route around the sanctuary.
-  box(0,-.24,0,190,.21,165,0xb8ab87,M.garden);
-  box(0,-.075,4.5,46,.075,43,0xcbbda7,M.paving);
+  box(0,-.24,0,190,.21,165,0xddd3b6,M.garden);
+  box(0,-.075,4.5,46,.075,43,0xb8ad9c,M.paving);
+  forumSlabs(g);
   for(const x of [-13.48,12.82]){box(x,.005,5.3,.22,.025,39,light);box(x+.34,.005,5.3,.08,.027,39,0xb7916c);}
   box(-.05,.003,10.2,26.8,.016,.19,light);
-  for(const x of [-13.12,12.48])face([[x-.20,.035,24],[x+.20,.035,24],[x+.20,.035,-12],[x-.20,.035,-12]],0xfff3dc,M.meander,[[0,1],[0,0],[36,0],[36,1]]);
-  face([[-13.14,.04,10.69],[12.51,.04,10.69],[12.51,.04,10.28],[-13.14,.04,10.28]],0xfff3dc,M.meander,[[0,1],[25,1],[25,0],[0,0]]);
+  for(const x of [-13.12,12.48])face([[x-.20,.058,24],[x+.20,.058,24],[x+.20,.058,-12],[x-.20,.058,-12]],0xfff3dc,M.meander,[[0,1],[0,0],[36,0],[36,1]]);
+  face([[-13.14,.059,10.69],[12.51,.059,10.69],[12.51,.059,10.28],[-13.14,.059,10.28]],0xfff3dc,M.meander,[[0,1],[25,1],[25,0],[0,0]]);
   box(-16.8,-.02,0,7.2,.12,47.2,0xd3c4a9,M.lime);
-  box(22,-.07,-5,12,.075,68,0xc6b59a,M.paving);
-  box(-3,-.075,-25,28,.075,30,0xc6b59a,M.paving);
+  box(22,-.07,-5,12,.075,68,0xafa698,M.paving);
+  box(-3,-.075,-25,28,.075,30,0xafa698,M.paving);
   frame(-2,-20,0,temple);
   for(let i=0;i<6;i++)frame(-19.8,-15.05+i*6.62,PI/2,()=>shop(6.6,5.2+R()*.24,6.13+R()*1.02,i));
   // Market portico, open toward the piazza and lit through the full length.
@@ -267,13 +275,21 @@ export function buildDistrict(){
   frame(30,-9,-PI/2,()=>house(6.9,5.4,7.5));
   frame(11.5,-18.8,0,aqueduct);
   fountain(7.4,1.2);
+  growTree(g,14.1,8.0,6.7,'olive');
+  growTree(g,-11.85,-1.1,5.3,'olive');
+  marketBarrow(g,-11.55,4.4,.63);
+  marketBarrow(g,-11.47,-8.1,1.12);
   // The garden is accessible under several different spans.
-  box(24,-.04,-32.3,31,.07,17.7,0xb7b68b,M.garden);
+  box(24,-.04,-32.3,31,.07,17.7,0xf7e9ca,M.garden);
   box(23.40,.032,-31,3,.04,19,0xbfb59b,M.paving);
   box(25,.036,-32.1,29,.04,2.72,0xbfb59b,M.paving);
   for(const x of [15.2,31.7])for(const z of [-26.4,-36.8]){
-    box(x,.05,z,5.1,.22,4.4,0xc9b696);box(x,.27,z,4.76,.04,4.05,0x92906b,M.garden);
-    tree(x,z,6.8+R()*1.3);
+    box(x,.05,z,5.1,.22,4.4,0xc9b696);box(x,.27,z,4.76,.04,4.05,0xab9577,M.garden);
+    tree(x,z,6.8+R()*1.3);herbBed(g,x,z,4.52,3.82,Math.round(x*140-z*42));
+  }
+  for(const [x,z] of [[20,-38.2],[26.6,-38.2],[13.6,-31],[34.6,-31]]){
+    box(x,.018,z,3.25,.24,2.20,0xc4b198);box(x,.258,z,3.06,.04,2.01,0x867b61,M.garden);
+    herbBed(g,x,z,2.93,1.83,Math.round(x*230));block(x,z,3.25,2.20,0,.30);
   }
   for(const x of [17.5,29.5]){
     box(x,.18,-32.2,.94,.39,2.7,shadowStone);box(x,.56,-32.2,1.22,.18,3,light);

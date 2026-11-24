@@ -1,5 +1,7 @@
-import {buildDistrict,stops} from './district.js';
-import {createRenderer} from './renderer.js';
+import {buildDistrict,stops} from './district.js?v=forum2';
+import {createRenderer} from './renderer.js?v=forum2';
+
+import {installFountainLion} from './street.js?v=forum2';
 
 const get=id=>document.getElementById(id),canvas=get('world'),dialog=get('map'),status=get('status');
 const mesh=buildDistrict(),cam={...stops[0],eye:1.69};
@@ -79,12 +81,17 @@ function drawPlan(){
   const [px,py]=pos(cam.x,cam.z);p.save();p.translate(px,py);p.rotate(cam.yaw);p.beginPath();p.moveTo(0,-15);p.lineTo(9,9);p.lineTo(0,5);p.lineTo(-9,9);p.closePath();p.fillStyle='#9c462a';p.strokeStyle='#fff5dc';p.lineWidth=3;p.fill();p.stroke();p.restore();
   p.font='17px system-ui';p.fillStyle='#60513a';p.fillText('N',c.width-37,40);p.fillRect(c.width-38,53,2,19);
 }
+function updateLocation(){
+  const d=(Math.round(cam.yaw*180/Math.PI)%360+360)%360;
+  bearing.textContent=['N','NE','E','SE','S','SW','W','NW'][Math.round(d/45)%8]+' · '+d+'°';
+  place.textContent=locationName();
+}
 function showMap(){if(!ready||dialog.open)return;resetInput();drawPlan();dialog.showModal();}
 function hideMap(){dialog.close();canvas.focus({preventScroll:true});}
 get('openMap').onclick=showMap;get('closeMap').onclick=hideMap;dialog.onclick=e=>{if(e.target===dialog)hideMap();};
 dialog.addEventListener('close',()=>{resetInput();canvas.focus({preventScroll:true});});
 for(const dest of stops){
-  const button=document.createElement('button');button.type='button';button.textContent=dest.name;button.onclick=()=>{Object.assign(cam,dest);cam.eye=heightAt(cam.x,cam.z)+1.66;hideMap();active();};get('destinations').append(button);
+  const button=document.createElement('button');button.type='button';button.textContent=dest.name;button.onclick=()=>{Object.assign(cam,dest);cam.eye=heightAt(cam.x,cam.z)+1.66;updateLocation();hideMap();active();};get('destinations').append(button);
 }
 const codes=['KeyW','KeyS','KeyA','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyR','KeyF','ShiftLeft','ShiftRight'];
 document.addEventListener('keydown',e=>{
@@ -96,6 +103,7 @@ document.addEventListener('keyup',e=>keys.delete(e.code));
 get('retry').onclick=()=>location.reload();
 function fail(message){ready=false;get('openMap').disabled=true;get('message').textContent=message;get('retry').hidden=false;status.hidden=false;}
 async function start(){
+  await installFountainLion(mesh);
   const render=await createRenderer(canvas,mesh,fail);
   let last=0,time=0,hud=0;
   ready=true;get('openMap').disabled=false;
@@ -110,7 +118,7 @@ async function start(){
       if(forward||side)move((Math.sin(cam.yaw)*forward+Math.cos(cam.yaw)*side)*speed,(-Math.cos(cam.yaw)*forward+Math.sin(cam.yaw)*side)*speed);
       cam.eye+=(heightAt(cam.x,cam.z)+1.66-cam.eye)*(1-Math.exp(-dt*18));
       time+=dt;render(cam,time);hud+=dt;
-      if(hud>.1){hud=0;const d=(Math.round(cam.yaw*180/Math.PI)%360+360)%360;bearing.textContent=['N','NE','E','SE','S','SW','W','NW'][Math.round(d/45)%8]+' · '+d+'°';place.textContent=locationName();}
+      if(hud>.1){hud=0;updateLocation();}
     }
     requestAnimationFrame(tick);
   }

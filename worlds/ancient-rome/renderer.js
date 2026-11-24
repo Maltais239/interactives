@@ -1,4 +1,4 @@
-import {makeTextures} from './texture.js';
+import {makeTextures} from './texture.js?v=forum2';
 
 const shader=`
 struct Scene { vp:mat4x4f, light:mat4x4f, eye:vec4f, front:vec4f, right:vec4f, up:vec4f, sun:vec4f }
@@ -8,58 +8,144 @@ struct Scene { vp:mat4x4f, light:mat4x4f, eye:vec4f, front:vec4f, right:vec4f, u
 @group(0) @binding(3) var shadowMap:texture_depth_2d;
 @group(0) @binding(4) var shade:sampler_comparison;
 @group(0) @binding(5) var contact:texture_2d<f32>;
+@group(0) @binding(6) var relief:texture_2d_array<f32>;
+struct SkyField { vp:array<mat4x4f,5>, direction:array<vec4f,5> }
+@group(0) @binding(7) var<uniform> field:SkyField;
+@group(0) @binding(8) var openSky:texture_depth_2d_array;
+@group(0) @binding(9) var daylight:texture_2d<f32>;
+@group(0) @binding(10) var forumReflection:texture_cube<f32>;
+@group(0) @binding(11) var reflectionFace:texture_2d<f32>;
 struct Attr { @location(0) pos:vec3f, @location(1) norm:vec3f, @location(2) uv:vec2f, @location(3) color:vec3f, @location(4) layer:f32 }
 struct Vary { @builtin(position) clip:vec4f, @location(0) world:vec3f, @location(1) norm:vec3f, @location(2) uv:vec2f, @location(3) color:vec3f, @location(4) @interpolate(flat) layer:u32 }
 @vertex fn geometry(i:Attr)->Vary{
-  var o:Vary; o.world=i.pos;o.norm=i.norm;o.uv=i.uv;o.color=i.color;o.layer=u32(i.layer+.5);o.clip=s.vp*vec4f(i.pos,1);return o;
+  var o:Vary;var pos=i.pos;
+  if(i.layer==24.||i.layer==26.||i.layer==21.){
+    let breeze=sin(s.eye.w*1.6+pos.x*.74+pos.z*.52)+.38*sin(s.eye.w*3.1+pos.y*1.24);
+    pos.x+=.032*breeze*(1.-i.uv.y);pos.z+=.018*breeze*(1.-i.uv.y);
+  }
+  o.world=pos;o.norm=i.norm;o.uv=i.uv;o.color=i.color;o.layer=u32(i.layer+.5);o.clip=s.vp*vec4f(pos,1);return o;
 }
 struct ShadowVary { @builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) @interpolate(flat) layer:u32 }
 @vertex fn shadowVertex(i:Attr)->ShadowVary{var o:ShadowVary;o.clip=s.light*vec4f(i.pos,1);o.uv=i.uv;o.layer=u32(i.layer+.5);return o;}
-@fragment fn shadowFragment(i:ShadowVary){if(i.layer==21u && textureSampleLevel(materials,paint,i.uv,21,0.).a<.38){discard;}}
+@fragment fn shadowFragment(i:ShadowVary){if((i.layer==21u || i.layer==24u||i.layer==26u) && textureSampleLevel(materials,paint,i.uv,i.layer,0.).a<.28){discard;}}
 fn hash(p:vec2f)->f32{var a=fract(vec3f(p.x,p.y,p.x)*.1031);a+=dot(a,a.yzx+33.33);return fract((a.x+a.y)*a.z);}
 fn noise(p:vec2f)->f32{let i=floor(p);let f=fract(p);let u=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2f(1,0)),u.x),mix(hash(i+vec2f(0,1)),hash(i+vec2f(1,1)),u.x),u.y);}
-fn clouds(p:vec2f)->f32{return noise(p)*.52+noise(p*2.11+8.)*.31+noise(p*4.26)*.17;}
 struct Sky { @builtin(position) clip:vec4f,@location(0) p:vec2f }
 @vertex fn skyVert(@builtin(vertex_index) id:u32)->Sky{
   var xy=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:Sky;o.clip=vec4f(xy[id],.999999,1);o.p=xy[id];return o;
 }
+@fragment fn filterFace(i:Sky)->@location(0) vec4f{
+  let uv=i.p*vec2f(.5,-.5)+.5;
+  return textureSampleLevel(reflectionFace,paint,uv,0.);
+}
+fn skyColor(ray:vec3f)->vec3f{
+  let elevation=asin(clamp(ray.y,-1.,1.));let az=atan2(ray.z,ray.x);let sunAz=atan2(s.sun.z,s.sun.x);
+  let uv=vec2f(fract(.602+(az-sunAz)/6.283185),clamp(1.-max(0.,elevation)/1.570796,.003,.973));
+  let photo=textureSampleLevel(daylight,paint,uv,0).rgb;
+  let air=vec3f(.84,.85,.84);let blue=mix(vec3f(.86,.865,.84),vec3f(.38,.58,.79),smoothstep(0.,.92,ray.y));
+  let sky=mix(blue,mix(photo,vec3f(.78,.84,.91),.12),s.sun.w);
+  return mix(air,sky,smoothstep(-.028,.105,ray.y)*.94);
+}
 @fragment fn skyFrag(i:Sky)->@location(0) vec4f{
   let ray=normalize(s.front.xyz+i.p.x*s.front.w*s.right.w*s.right.xyz+i.p.y*s.front.w*s.up.xyz);
-  let altitude=max(0.,ray.y);
-  var col=mix(vec3f(.92,.846,.705),vec3f(.36,.62,.76),smoothstep(-.04,.63,altitude));col=mix(col,vec3f(.29,.52,.70),smoothstep(.4,1.,altitude)*.44);
-  let plane=ray.xz/max(.07,ray.y+.09);let vapor=clouds(plane*vec2f(.75,1.35)+vec2f(8.3,11.6));
-  col=mix(col,vec3f(.99,.94,.82),smoothstep(.50,.79,vapor)*.47*smoothstep(.025,.21,altitude));
-  let glow=max(dot(ray,s.sun.xyz),0.);col+=vec3f(.30,.19,.06)*pow(glow,14.)+vec3f(.90,.72,.46)*smoothstep(.99945,.99988,glow);
-  let az=atan2(ray.x,ray.z);let ridgeline=.045+.026*sin(az*6.)+.012*sin(az*13.)+.010*sin(az*31.);
-  col=mix(col,vec3f(.60,.64,.56),(1.-smoothstep(ridgeline-.002,ridgeline+.004,ray.y))*.50);return vec4f(col,1);
+  let az=atan2(ray.x,ray.z);let ridge=.034+.019*sin(az*6.)+.013*sin(az*13.)+.007*sin(az*31.);
+  return vec4f(mix(skyColor(ray),vec3f(.59,.63,.59),(1.-smoothstep(ridge-.001,ridge+.002,ray.y))*.67),1);
+}
+fn visibility(p:vec3f,n:vec3f)->f32{
+  var available=.0;var total=.0;
+  for(var j=0;j<5;j++){
+    let q=field.vp[j]*vec4f(p+n*.085,1);let uv=q.xy*vec2f(.5,-.5)+.5;
+    let weight=.16+max(dot(n,field.direction[j].xyz),0.);
+    let spread=.0052;let depth=q.z-.00145;
+    var v:f32;
+    if(s.up.w>.5){
+      v=.34*textureSampleCompareLevel(openSky,shade,uv+vec2f(.81,.35)*spread,j,depth)
+        +.33*textureSampleCompareLevel(openSky,shade,uv+vec2f(-.73,.61)*spread,j,depth)
+        +.33*textureSampleCompareLevel(openSky,shade,uv+vec2f(-.19,-.83)*spread,j,depth);
+    }else{v=textureSampleCompareLevel(openSky,shade,uv,j,depth);}
+    available+=weight*v;total+=weight;
+  }
+  return available/total;
+}
+fn sunlight(p:vec3f,n:vec3f)->f32{
+  let q=s.light*vec4f(p+n*.024,1);let uv=q.xy*vec2f(.5,-.5)+.5;
+  let bias=.00012+.00038*(1.-abs(dot(n,s.sun.xyz)));let pixel=1./f32(textureDimensions(shadowMap).x);
+  var sum=0.;for(var x=-1;x<=1;x++){for(var y=-1;y<=1;y++){sum+=textureSampleCompareLevel(shadowMap,shade,uv+vec2f(f32(x),f32(y))*pixel*.91,q.z-bias);}}
+  return select(sum/9.,1.,any(uv<vec2f(0))||any(uv>vec2f(1)));
+}
+fn weather(color:vec3f,p:vec3f,layer:u32)->vec3f{
+  if(layer>2u){return color;}
+  let u=p.xz+vec2f(p.y*.41,p.y*.79);let blotch=noise(u*.65)*.62+noise(u*2.7)*.27+noise(u*7.3)*.11;
+  let damp=(1.-smoothstep(.02,1.04+.48*blotch,p.y))*(.18+.58*blotch);
+  let dust=select(.0,smoothstep(.59,.81,blotch)*.35,layer==1u);
+  return mix(color,vec3f(.82,.76,.65),dust)*mix(vec3f(.99),vec3f(.68,.71,.65),damp);
+}
+fn illuminate(base:vec3f,p:vec3f,n:vec3f,access:f32,sun:f32,leaf:bool)->vec3f{
+  let hemi=clamp(n.y*.5+.5,0.,1.);
+  let sky=mix(vec3f(.20,.245,.305),vec3f(.40,.51,.66),hemi)*(.18+.82*access);
+  let ground=vec3f(.20,.148,.10)*(.35+.65*(1.-hemi))*(.67+.33*access);
+  var direct=max(.0,dot(n,s.sun.xyz));if(leaf){direct=.27+.67*abs(dot(n,s.sun.xyz));}
+  let irradiance=sky+ground+sun*direct*vec3f(1.18,.99,.75);
+  // Inputs are display-encoded. Illuminate in linear light and roll off sunlit highlights.
+  let radiance=pow(max(base,vec3f(0)),vec3f(2.2))*irradiance;
+  return pow(radiance/(1.+.23*radiance)*1.10,vec3f(1./2.2));
+}
+fn airColor(color:vec3f,p:vec3f)->vec3f{
+  let d=distance(s.eye.xyz,p);
+  let haze=1.-exp(-d*.00135-max(d-33.,0.)*.00085);
+  return mix(color,vec3f(.80,.83,.845),min(haze,.62));
+}
+// The reflection probe is rendered only once from the fountain, with the basin omitted.
+@fragment fn capture(i:Vary)->@location(0) vec4f{
+  let c=textureSample(materials,paint,i.uv,i.layer);let leaf=i.layer==21u||i.layer==24u||i.layer==26u;
+  if((leaf&&c.a<.20)||(distance(i.world.xz,vec2f(7.4,1.2))<2.52&&i.world.y<4.3)){discard;}
+  let n=normalize(i.norm);
+  return vec4f(airColor(illuminate(i.color*c.rgb,i.world,n,visibility(i.world,n),sunlight(i.world,n),leaf),i.world),1);
 }
 @fragment fn surface(i:Vary)->@location(0) vec4f{
-  let n=normalize(i.norm);let p=i.world;let view=normalize(s.eye.xyz-p);let layer=i.layer;
-  let sampleColor=textureSample(materials,paint,i.uv,layer);
-  if(layer==21u && sampleColor.a<.31){discard;}let tex=sampleColor.rgb;
-  var base=i.color*tex;
-  let patina=noise(p.xz*.58+vec2f(p.y*.35,p.y*.7));
-  if(layer<=2u){base*=.93+.09*patina+.045*noise(p.xz*2.4+p.y);
-    let damp=(1.-smoothstep(.10,1.2,p.y))*(.48+.48*patina);base=mix(base,base*vec3f(.77,.78,.68),damp);}
-  let light=s.light*vec4f(p+n*.026,1);let suv=light.xy*vec2f(.5,-.5)+.5;let bias=.00014+.00045*(1.-abs(dot(n,s.sun.xyz)));
-  var sun=0.;let pixel=1./f32(textureDimensions(shadowMap).x);
-  for(var x=-1;x<=1;x++){for(var y=-1;y<=1;y++){sun+=textureSampleCompareLevel(shadowMap,shade,suv+vec2f(f32(x),f32(y))*pixel*.95,light.z-bias);}}
-  sun/=9.;if(any(suv<vec2f(0))||any(suv>vec2f(1))){sun=1.;}
-  let diffuse=max(0.,dot(n,s.sun.xyz));let hemi=.5+.5*n.y;
-  let contactShade=textureSampleLevel(contact,paint,p.xz/128.+.5,0.).r;
-  let occlusion=mix(contactShade,1.,smoothstep(.10,2.6,p.y));
-  let skylight=mix(vec3f(.46,.436,.414),vec3f(.78,.80,.83),hemi)*occlusion;
-  var out=base*(skylight+vec3f(.58,.50,.37)*sun*diffuse);
-  if(layer==7u){out+=vec3f(.26,.21,.12)*pow(max(dot(reflect(-s.sun.xyz,n),view),0.),26.)*sun;}
-  if(layer==10u){
-    let waves=sin(p.x*9.+s.eye.w*2.3+p.z*3.2)+sin(p.z*11.-s.eye.w*2.9-p.x);
-    let slope=normalize(n+vec3f(.09*waves,0,.11*cos(p.z*8.+s.eye.w*2.)));
-    let fres=pow(1.-max(0.,dot(slope,view)),2.);out=mix(base*vec3f(.63,.94,.87),vec3f(.69,.83,.85),fres*.72);
-    out+=vec3f(.30,.31,.24)*max(waves-1.13,0.)*sun;
-    if(p.y>.74){out=mix(vec3f(.48,.56,.54),vec3f(.91,.93,.85),.38+.40*sin(p.y*24.+s.eye.w*9.+p.x*3.));}
+  let p=i.world;let layer=i.layer;let geometric=normalize(i.norm);var n=geometric;
+  let view=normalize(s.eye.xyz-p);let leaf=layer==21u||layer==24u||layer==26u;
+  let c=textureSample(materials,paint,i.uv,layer);
+  let detail=textureSample(relief,paint,i.uv,min(layer,3u)).rgb;
+  let du=dpdx(i.uv);let dv=dpdy(i.uv);
+  let a=cross(dpdy(p),n);let b=cross(n,dpdx(p));
+  let tangent=a*du.x+b*dv.x;let bitangent=a*du.y+b*dv.y;
+  if(layer<=3u){
+    let xy=detail.rg*2.-1.;let strength=select(select(.76,.27,layer==0u && abs(geometric.y)<.82),1.12,layer==3u);
+    let inv=inverseSqrt(max(max(dot(tangent,tangent),dot(bitangent,bitangent)),.0000000001));
+    n=normalize(n*sqrt(max(.08,1.-dot(xy,xy)))+(tangent*xy.x+bitangent*xy.y)*inv*strength);
   }
-  let dist=distance(p,s.eye.xyz);let mist=1.-exp(-dist*dist*.000015);
-  return vec4f(mix(out,vec3f(.855,.795,.688),mist*.79),1);
+  if(leaf&&c.a<.10){discard;}
+  let sun=sunlight(p,geometric);let ground=textureSampleLevel(contact,paint,p.xz/128.+.5,0.).r;
+  let access=visibility(p,geometric)*mix(ground,1.,smoothstep(.06,2.4,p.y));
+  var pigment=c.rgb;
+  if(layer==0u && abs(geometric.y)<.82){pigment=mix(vec3f(.88),pigment,.39);}
+  let base=weather(pigment*i.color,p,layer);
+  var out=illuminate(base,p,n,access,sun,leaf);
+  let halfVec=normalize(s.sun.xyz+view);
+  if(layer<=3u){out+=vec3f(.034,.029,.020)*pow(max(dot(n,halfVec),0.),mix(55.,10.,detail.b))*sun*(1.-detail.b);}
+  if(layer==7u){
+    let reflected=textureSampleLevel(forumReflection,paint,reflect(-view,n),2.7).rgb;
+    let facing=1.-clamp(dot(n,view),0.,1.);
+    out=mix(out,reflected*vec3f(.77,.65,.44),.19+.29*facing*facing);
+    out+=vec3f(.43,.32,.16)*pow(max(dot(n,halfVec),0.),68.)*sun;
+  }
+  if(layer==10u){
+    let t=s.eye.w;let basin=p.xz-vec2f(7.4,1.2);let r=length(basin);
+    let spacing=.7853982;let angle=round(atan2(basin.y,basin.x)/spacing)*spacing;
+    let fromJet=basin-1.67*vec2f(cos(angle),sin(angle));let dist=max(length(fromJet),.002);
+    let wave=sin(dist*34.-t*6.8)*exp(-dist*2.45);
+    let small=vec2f(sin(p.x*8.9+t*1.9+p.z*3.2),cos(p.z*9.1-t*1.63+p.x*4.));
+    let slope=normalize(n+vec3f(.019*small.x,0.,.019*small.y)+vec3f(fromJet.x,0.,fromJet.y)*(.076*wave/dist));
+    let env=textureSampleLevel(forumReflection,paint,reflect(-view,slope),1.25).rgb;
+    let fres=.035+.965*pow(1.-max(0.,dot(slope,view)),4.);
+    let bottom=mix(vec3f(.20,.37,.32),vec3f(.36,.49,.37),clamp(r*.34+.12*sin(dist*27.-t*5.)*exp(-dist),0.,1.))*(.69+.31*sun);
+    out=mix(bottom,env,.12+.84*fres);
+    if(p.y>.74 && abs(p.y-2.077)>.004){out=mix(env,vec3f(.78,.85,.84),.36+.12*sin(p.y*43.-t*8.+p.x*4.));}
+    out+=vec3f(.68,.64,.50)*pow(max(dot(slope,halfVec),0.),130.)*sun;
+    out+=vec3f(.16,.18,.16)*exp(-dist*18.)*(.55+.45*wave);
+  }
+  return vec4f(airColor(out,p),select(1.,smoothstep(.10,.58,c.a),leaf));
 }`;
 const normalize=a=>{const d=Math.hypot(...a);return a.map(n=>n/d);};
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
@@ -82,7 +168,7 @@ export async function createRenderer(canvas,mesh,onLost){
   const samples=4,shSize=2048;
   const pipelines=await Promise.all([
     device.createRenderPipelineAsync({layout:'auto',vertex:{module:mod,entryPoint:'geometry',buffers},fragment:{module:mod,entryPoint:'surface',targets:[{format}]},
-      multisample:{count:samples},depthStencil:{format:'depth24plus',depthWriteEnabled:true,depthCompare:'less'}}),
+      multisample:{count:samples,alphaToCoverageEnabled:true},depthStencil:{format:'depth24plus',depthWriteEnabled:true,depthCompare:'less'}}),
     device.createRenderPipelineAsync({layout:'auto',vertex:{module:mod,entryPoint:'shadowVertex',buffers},fragment:{module:mod,entryPoint:'shadowFragment',targets:[]},depthStencil:{format:'depth24plus',depthWriteEnabled:true,depthCompare:'less',depthBias:2,depthBiasSlopeScale:1.1}}),
     device.createRenderPipelineAsync({layout:'auto',vertex:{module:mod,entryPoint:'skyVert'},fragment:{module:mod,entryPoint:'skyFrag',targets:[{format}]},
       multisample:{count:samples},depthStencil:{format:'depth24plus',depthWriteEnabled:false,depthCompare:'always'}})
@@ -91,7 +177,7 @@ export async function createRenderer(canvas,mesh,onLost){
   const vertices=buffer(new Float32Array(mesh.data),GPUBufferUsage.VERTEX),indices=buffer(new Uint32Array(mesh.indices),GPUBufferUsage.INDEX);
   const count=mesh.indices.length;mesh.data.length=0;mesh.indices.length=0;
   const uniform=device.createBuffer({size:208,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
-  const material=makeTextures(device);
+  const {material,detail,sky,hasSky}=await makeTextures(device);
   const filtered=device.createSampler({addressModeU:'repeat',addressModeV:'repeat',magFilter:'linear',minFilter:'linear',mipmapFilter:'linear',maxAnisotropy:4});
   const shadow=device.createTexture({size:[shSize,shSize],format:'depth24plus',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
   const shadowView=shadow.createView(),compare=device.createSampler({compare:'less-equal',magFilter:'linear',minFilter:'linear'});
@@ -105,19 +191,86 @@ export async function createRenderer(canvas,mesh,onLost){
   }
   const contact=device.createTexture({size:[512,512],format:'rgba8unorm',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
   device.queue.writeTexture({texture:contact},gc.getImageData(0,0,512,512).data,{bytesPerRow:2048},[512,512]);
-  const bind=()=>({binding:0,resource:{buffer:uniform}});
-  const bindGroups=pipelines.map((p,i)=>device.createBindGroup({layout:p.getBindGroupLayout(0),entries:[bind(),...(i===2?[]:[{binding:1,resource:material.createView({dimension:'2d-array'})},{binding:2,resource:filtered}]),...(i===0?[{binding:3,resource:shadowView},{binding:4,resource:compare},{binding:5,resource:contact.createView()}]:[])]}));
-  const sun=normalize([-.68,.82,.50]),f=sun.map(v=>-v),r=normalize(cross(f,[0,1,0])),u=cross(r,f);
-  const sunEye=sun.map((v,i)=>v*88+[3,2,-6][i]);
-  const ortho=[1/55,0,0,0,0,1/53,0,0,0,0,-1/164,0,0,0,0,1];
-  const params=new Float32Array(52);params.set(multiply(ortho,view(sunEye,f,r,u)),16);params.set(sun,48);device.queue.writeBuffer(uniform,0,params);
-  const enc=device.createCommandEncoder(),depthPass=enc.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:shadowView,depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'store'}});
-  depthPass.setPipeline(pipelines[1]);depthPass.setBindGroup(0,bindGroups[1]);depthPass.setVertexBuffer(0,vertices);depthPass.setIndexBuffer(indices,'uint32');depthPass.drawIndexed(count);depthPass.end();device.queue.submit([enc.finish()]);
+  const sun=normalize([.77,.91,.34]);
+  const skyDirections=[[.04,1,.03],[.86,.66,.1],[-.86,.66,-.1],[.1,.61,.88],[-.1,.61,-.88]].map(normalize);
+  function lightMatrix(direction){
+    const forward=direction.map(x=>-x),right=normalize(cross(forward,[0,1,0])),up=cross(right,forward);
+    const eye=direction.map((v,i)=>v*92+[3,2,-6][i]);
+    const ortho=[1/55,0,0,0,0,1/53,0,0,0,0,-1/178,0,0,0,0,1];
+    return multiply(ortho,view(eye,forward,right,up));
+  }
+  const skyMatrices=skyDirections.map(lightMatrix),skyData=new Float32Array(100);
+  for(let j=0;j<5;j++){skyData.set(skyMatrices[j],j*16);skyData.set(skyDirections[j],80+j*4);}
+  const skyUniform=buffer(skyData,GPUBufferUsage.UNIFORM);
+  const skyDepth=device.createTexture({label:'Static sky visibility',size:[640,640,5],format:'depth24plus',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
+  const probeSize=192,probe=device.createTexture({label:'Forum reflected in fountain',size:[probeSize,probeSize,6],mipLevelCount:8,format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
+  const oneLayer=(texture,j,mip=0)=>texture.createView({dimension:'2d',baseArrayLayer:j,arrayLayerCount:1,baseMipLevel:mip,mipLevelCount:1});
+  const resources=[null,material.createView({dimension:'2d-array'}),filtered,shadowView,compare,contact.createView(),detail.createView({dimension:'2d-array'}),
+    {buffer:skyUniform},skyDepth.createView({dimension:'2d-array'}),sky.createView(),probe.createView({dimension:'cube'})];
+  function group(pipeline,ubo,bindings){
+    return device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:ubo}},
+      ...bindings.map(binding=>({binding,resource:resources[binding]}))]});
+  }
+  const bindGroups=[group(pipelines[0],uniform,[1,2,3,4,5,6,7,8,10]),group(pipelines[1],uniform,[1,2]),group(pipelines[2],uniform,[2,9])];
+  const params=new Float32Array(52);params.set(lightMatrix(sun),16);params.set([...sun,Number(hasSky)],48);
+  device.queue.writeBuffer(uniform,0,params);
+  function draw(pass,pipeline,bindings){
+    pass.setPipeline(pipeline);pass.setBindGroup(0,bindings);pass.setVertexBuffer(0,vertices);pass.setIndexBuffer(indices,'uint32');pass.drawIndexed(count);
+  }
+  const enc=device.createCommandEncoder(),temporary=[];
+  function staticUniform(values){const u=buffer(values,GPUBufferUsage.UNIFORM);temporary.push(u);return u;}
+  function depthPass(target,bindings){
+    const pass=enc.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:target,depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'store'}});
+    draw(pass,pipelines[1],bindings);pass.end();
+  }
+  depthPass(shadowView,bindGroups[1]);
+  for(let j=0;j<skyMatrices.length;j++){
+    const values=new Float32Array(params);values.set(skyMatrices[j],16);
+    depthPass(oneLayer(skyDepth,j),group(pipelines[1],staticUniform(values),[1,2]));
+  }
+  const [probeScene,probeSky,probeFilter]=await Promise.all([
+    device.createRenderPipelineAsync({layout:'auto',vertex:{module:mod,entryPoint:'geometry',buffers},fragment:{module:mod,entryPoint:'capture',targets:[{format}]},
+      depthStencil:{format:'depth24plus',depthWriteEnabled:true,depthCompare:'less'}}),
+    device.createRenderPipelineAsync({layout:'auto',vertex:{module:mod,entryPoint:'skyVert'},fragment:{module:mod,entryPoint:'skyFrag',targets:[{format}]},
+      depthStencil:{format:'depth24plus',depthWriteEnabled:false,depthCompare:'always'}}),
+    device.createRenderPipelineAsync({layout:'auto',vertex:{module:mod,entryPoint:'skyVert'},fragment:{module:mod,entryPoint:'filterFace',targets:[{format}]}})
+  ]);
+  const probeDepth=device.createTexture({size:[probeSize,probeSize],format:'depth24plus',usage:GPUTextureUsage.RENDER_ATTACHMENT});
+  const near=.12,far=180,projection=[1,0,0,0,0,1,0,0,0,0,far/(near-far),-1,0,0,near*far/(near-far),0];
+  const axes=[[[1,0,0],[0,0,-1],[0,1,0]],[[-1,0,0],[0,0,1],[0,1,0]],[[0,1,0],[1,0,0],[0,0,-1]],
+    [[0,-1,0],[1,0,0],[0,0,1]],[[0,0,1],[1,0,0],[0,1,0]],[[0,0,-1],[-1,0,0],[0,1,0]]];
+  const origin=[7.4,.93,1.2];
+  axes.forEach(([front,right,up],j)=>{
+    const values=new Float32Array(params);values.set(multiply(projection,view(origin,front,right,up)));values.set(origin,32);
+    values.set([...front,1],36);values.set([...right,1],40);values.set(up,44);
+    const u=staticUniform(values),pass=enc.beginRenderPass({colorAttachments:[{view:oneLayer(probe,j),loadOp:'clear',clearValue:{r:.6,g:.7,b:.8,a:1},storeOp:'store'}],
+      depthStencilAttachment:{view:probeDepth.createView(),depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'discard'}});
+    pass.setPipeline(probeSky);pass.setBindGroup(0,group(probeSky,u,[2,9]));pass.draw(3);
+    draw(pass,probeScene,group(probeScene,u,[1,2,3,4,7,8]));pass.end();
+  });
+  for(let level=1;level<8;level++)for(let j=0;j<6;j++){
+    const pass=enc.beginRenderPass({colorAttachments:[{view:oneLayer(probe,j,level),loadOp:'clear',clearValue:{r:0,g:0,b:0,a:1},storeOp:'store'}]});
+    const bindings=device.createBindGroup({layout:probeFilter.getBindGroupLayout(0),entries:[{binding:2,resource:filtered},{binding:11,resource:oneLayer(probe,j,level-1)}]});
+    pass.setPipeline(probeFilter);pass.setBindGroup(0,bindings);pass.draw(3);pass.end();
+  }
+  device.queue.submit([enc.finish()]);for(const u of temporary)u.destroy();probeDepth.destroy();
   const validation=await device.popErrorScope();if(validation)throw Error(validation.message);
-  let color,depth,cv,dv;
+  let color,depth,cv,dv,lastFrame=0,elapsed=0,timedFrames=0,resolution=1;
+  // Change resolution only after sustained pressure. Ignore time spent in the map or a hidden tab.
+  function frameBudget(now){
+    const frame=now-lastFrame;lastFrame=now;
+    if(frame>250||frame<3){timedFrames=0;elapsed=0;return;}
+    elapsed+=frame;timedFrames++;
+    if(timedFrames<48)return;
+    const mean=elapsed/timedFrames;elapsed=0;timedFrames=0;
+    if(mean>29)resolution=Math.max(.72,resolution-.09);
+    else if(mean<18)resolution=Math.min(1,resolution+.06);
+  }
   return function render(cam,time){
     const w=canvas.clientWidth,h=canvas.clientHeight;if(!w||!h)return;
-    const scale=Math.min(devicePixelRatio||1,1.6,Math.sqrt(1440000/(w*h))),width=Math.max(1,Math.floor(w*scale)),height=Math.max(1,Math.floor(h*scale));
+    frameBudget(performance.now());
+    const compact=w<700;
+    const scale=resolution*Math.min(devicePixelRatio||1,compact?1.35:1.6,Math.sqrt(1440000/(w*h))),width=Math.max(1,Math.floor(w*scale)),height=Math.max(1,Math.floor(h*scale));
     if(!color||canvas.width!==width||canvas.height!==height){
       color?.destroy();depth?.destroy();canvas.width=width;canvas.height=height;
       color=device.createTexture({size:[width,height],format,sampleCount:samples,usage:GPUTextureUsage.RENDER_ATTACHMENT});cv=color.createView();
@@ -126,7 +279,7 @@ export async function createRenderer(canvas,mesh,onLost){
     const a=width/height,t=Math.tan((a<1?70:61)*Math.PI/360),near=.08,far=220;
     const front=[Math.sin(cam.yaw)*Math.cos(cam.pitch),Math.sin(cam.pitch),-Math.cos(cam.yaw)*Math.cos(cam.pitch)],right=[Math.cos(cam.yaw),0,Math.sin(cam.yaw)],up=cross(right,front),eye=[cam.x,cam.eye,cam.z];
     const proj=[1/(t*a),0,0,0,0,1/t,0,0,0,0,far/(near-far),-1,0,0,near*far/(near-far),0];
-    params.set(multiply(proj,view(eye,front,right,up)),0);params.set([...eye,time],32);params.set([...front,t],36);params.set([...right,a],40);params.set(up,44);
+    params.set(multiply(proj,view(eye,front,right,up)),0);params.set([...eye,time],32);params.set([...front,t],36);params.set([...right,a],40);params.set([...up,Number(!compact && resolution>.83)],44);
     device.queue.writeBuffer(uniform,0,params);
     const cmd=device.createCommandEncoder(),pass=cmd.beginRenderPass({colorAttachments:[{view:cv,resolveTarget:ctx.getCurrentTexture().createView(),loadOp:'clear',clearValue:{r:.7,g:.8,b:.83,a:1},storeOp:'discard'}],
       depthStencilAttachment:{view:dv,depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'discard'}});
