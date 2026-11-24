@@ -1114,9 +1114,12 @@ function renderPractice() {
 
   const packChips = packs.length ? packs.map(s=>{
     const isSel=selPacks().includes(packKey(s));
-    return `<button class="pack-chip${isSel?' sel':''}" data-pk="${esc(packKey(s))}" aria-pressed="${isSel}">
+    const vocab=packWords(s);
+    const mastered=vocab.filter(w=>getStatus(w)==='mastered').length;
+    const pct=vocab.length?Math.round(mastered/vocab.length*100):0;
+    return `<button class="pack-chip${isSel?' sel':''}" data-pk="${esc(packKey(s))}" aria-pressed="${isSel}" title="${esc(s.label)} — ${mastered}/${vocab.length} mastered (${pct}%)">
       <input type="checkbox" ${isSel?'checked':''} tabindex="-1" aria-hidden="true"/>
-      <span>${esc(s.label)} <span class="tiny muted">${s.lessonId>=CBE_ID_OFFSET?'E'+(s.lessonId-CBE_ID_OFFSET):'L'+s.lessonId}</span></span>
+      <span class="pack-content"><span class="pack-name">${esc(s.label)}</span><span class="tiny muted">${s.lessonId>=CBE_ID_OFFSET?'E'+(s.lessonId-CBE_ID_OFFSET):'L'+s.lessonId}</span><span class="pack-prog" role="img" aria-label="${mastered} of ${vocab.length} words mastered"><span style="width:${pct}%"></span></span></span>
     </button>`;
   }).join('') : '<div class="empty">No expansion packs loaded yet.</div>';
 
