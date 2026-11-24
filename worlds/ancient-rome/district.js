@@ -9,7 +9,7 @@ export const stops=[
   {name:'Market street',x:-10.5,z:13.5,yaw:-.49,pitch:.04},
   {name:'Aqueduct garden',x:21,z:-33,yaw:2.78,pitch:.11}
 ];
-export function buildDistrict(){
+export function buildDistrict(site){
   const g=masonry(),{box,wall,frame,block,face,post,beam,label,ramp}=g,R=seeded(7534),PI=Math.PI;
   const stone=0xe4cda6,light=0xf5e3bc,shadowStone=0xbfa887,tile=0xbe6e48,red=0x984b36,
     brick=0xcb8b68,timber=0x755037,bronze=0x72684b;
@@ -252,6 +252,7 @@ export function buildDistrict(){
   function tree(x,z,h,pine=false,solid=true){
     growTree(g,x,z,h,pine?'pine':'cypress',solid);
   }
+  if(site)return site(g,{column,roof,pot,shop,house});
   // Forum pavement, edging, and a continuous route around the sanctuary.
   box(0,-.24,0,190,.21,165,0xddd3b6,M.garden);
   box(0,-.075,4.5,46,.075,43,0xb8ad9c,M.paving);

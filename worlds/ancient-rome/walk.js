@@ -1,13 +1,22 @@
-import {buildDistrict,stops} from './district.js?v=forum2';
-import {createRenderer} from './renderer.js?v=forum2';
+import {buildDistrict,stops as oldStops} from './district.js?v=boarium1';
+import {createRenderer} from './renderer.js?v=boarium1';
 
 import {installFountainLion} from './street.js?v=forum2';
 
 const get=id=>document.getElementById(id),canvas=get('world'),dialog=get('map'),status=get('status');
-const mesh=buildDistrict(),cam={...stops[0],eye:1.69};
+const historical=new URLSearchParams(location.search).get('district')!=='vicus';
+const site=historical?await import('./boarium.js?v=boarium1'):null;
+const stops=site?.stops??oldStops,mesh=buildDistrict(site?.buildBoarium),cam={...stops[0],eye:1.69};
+if(!historical){
+  document.title='Vicus Aureus · Ancient Rome';
+  document.querySelector('h1').textContent='Vicus Aureus';document.querySelector('.brand small').textContent='Ancient Rome';
+  document.querySelector('.eyebrow').textContent='Vicus Aureus';get('siteNotes').hidden=true;
+  get('otherDistrict').textContent='Explore the Forum Boarium';get('otherDistrict').href='?district=boarium';
+}
+cam.eye=(mesh.groundHeight?.(cam.x,cam.z)??.025)+1.66;
 const yawLimit=Math.PI*2;
 function heightAt(x,z){
-  let height=.025;
+  let height=mesh.groundHeight?.(x,z)??.025;
   for(const b of mesh.stairs){
     const dx=x-b.x,dz=z-b.z,lx=dx*b.c-dz*b.s,lz=dx*b.s+dz*b.c;
     if(Math.abs(lx)<=b.hx+.005&&Math.abs(lz)<=b.hz+.005)height=Math.max(height,b.back+(b.front-b.back)*(lz+b.hz)/(2*b.hz));
@@ -15,7 +24,8 @@ function heightAt(x,z){
   return height;
 }
 function free(x,z,feet){
-  if(x< -25.5||x>40.3||z< -40.4||z>27.3||Math.abs(heightAt(x,z)-feet)>.31)return false;
+  const inside=site?site.withinDistrict(x,z):x>=-25.5&&x<=40.3&&z>=-40.4&&z<=27.3;
+  if(!inside||Math.abs(heightAt(x,z)-feet)>.31)return false;
   for(const b of mesh.blocks){
     if(b.top<=feet+.29||b.bottom>=feet+1.73)continue;
     const dx=x-b.x,dz=z-b.z,lx=Math.abs(dx*b.c-dz*b.s),lz=Math.abs(dx*b.s+dz*b.c);
@@ -59,6 +69,7 @@ canvas.addEventListener('pointermove',e=>{
 for(const ev of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(ev,e=>{if(look?.id===e.pointerId)look=null;});
 const place=get('place'),bearing=get('bearing');
 function locationName(){
+  if(site)return site.placeAt(cam.x,cam.z);
   if(cam.z< -20.5&&cam.x>9)return 'Aqueduct garden';
   if(cam.z< -10&&cam.x<8&&cam.x> -12)return 'Temple portico';
   if(cam.x< -10.2)return 'Market street';
@@ -68,6 +79,7 @@ function locationName(){
 }
 function drawPlan(){
   const c=get('plan'),p=c.getContext('2d'),scale=6.25,ox=283,oz=287;
+  if(site){site.drawSitePlan(p,c.width,c.height,cam);return;}
   const pos=(x,z)=>[ox+x*scale,oz+z*scale];
   p.fillStyle='#e7d9ba';p.fillRect(0,0,c.width,c.height);
   p.save();p.translate(ox,oz);p.scale(scale,scale);
@@ -103,7 +115,7 @@ document.addEventListener('keyup',e=>keys.delete(e.code));
 get('retry').onclick=()=>location.reload();
 function fail(message){ready=false;get('openMap').disabled=true;get('message').textContent=message;get('retry').hidden=false;status.hidden=false;}
 async function start(){
-  await installFountainLion(mesh);
+  if(site)await site.installCattle(mesh);else await installFountainLion(mesh);
   const render=await createRenderer(canvas,mesh,fail);
   let last=0,time=0,hud=0;
   ready=true;get('openMap').disabled=false;
@@ -122,6 +134,6 @@ async function start(){
     }
     requestAnimationFrame(tick);
   }
-  render(cam,0);status.hidden=true;requestAnimationFrame(tick);
+  updateLocation();render(cam,0);status.hidden=true;requestAnimationFrame(tick);
 }
 start().catch(e=>{console.error(e);fail(e.message||'The district could not be loaded.');});

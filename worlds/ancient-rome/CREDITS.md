@@ -1,6 +1,23 @@
-# Vicus Aureus
+# Ancient Rome
 
-The district layout, buildings, market stalls, vegetation, paving, fountain and water are generated in JavaScript and rendered with WebGPU. The neighborhood is an imagined setting.
+The default walk explores the Forum Boarium around AD 10. The district map also links to Vicus Aureus, the original imagined neighborhood. Buildings, boats, stalls, vegetation, paving, and water are generated locally in JavaScript and rendered with WebGPU.
+
+## Forum Boarium reconstruction
+
+The ground plane uses metres east and south of 41.88900° N, 12.48084° E. The main rectangle of Portunus, the circular colonnade of Hercules Victor, and the alignment of the surviving Ponte Rotto provide the three registration points. The walk uses the relative positions of those landmarks. Elevations, reconstructed roofs and bridge spans, shoreline, shops, cargo and animals are interpretive.
+
+| Reference | Use in this walk |
+| --- | --- |
+| [Temple of Portunus, Smarthistory](https://smarthistory.org/temple-of-portunus/) and [Portunus, Digital Augustan Rome](https://www.digitalaugustanrome.org/records/portunus-aedes/) | Approximate 10.5 × 19 metre temple, four frontal Ionic columns, engaged columns, and the north-facing approach |
+| [Round Temple by the Tiber, Digital Augustan Rome](https://www.digitalaugustanrome.org/records/round-temple-tiberis/) and [Forum Boarium guide, World Monuments Fund](https://www.wmf.org/sites/default/files/article/pdfs/forumboarium_guide_2017_eng.pdf) | Twenty Corinthian columns, circular sanctuary, raised site and east-facing door |
+| [Pons Aemilius, Digital Augustan Rome](https://www.digitalaugustanrome.org/records/pons-aemilius/) | Connection across the Tiber and the surviving span |
+| [Modern Portunus footprint](https://www.openstreetmap.org/way/251331418), [Hercules footprint](https://www.openstreetmap.org/way/251342364) and [Ponte Rotto](https://www.openstreetmap.org/relation/6384861) | Footprint alignment © OpenStreetMap contributors, [ODbL](https://www.openstreetmap.org/copyright) |
+| [Procedural real-world cities, r/proceduralgeneration](https://www.reddit.com/r/proceduralgeneration/comments/1u95069/procedural_realworld_cities_in_pure_python_real/) | Technical reference for fitting generated architecture to real footprints |
+| [Creating a procedural world with varying terrain, r/proceduralgeneration](https://www.reddit.com/r/proceduralgeneration/comments/12zxtby/) | Broad noise variations used to vary the placement of finer surface detail |
+| [Effective Water Simulation from Physical Models, Mark Finch](https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-1-effective-water-simulation-physical-models) | Long geometric waves and fine, distance-filtered surface ripples |
+| [Black Bull, Grab3D](https://grab3d.com/models/animals/bull/) | CC0 cattle model adapted to 2,198 triangles, baked vertex colours and two coat variations. Modern visual reference for the illustrative pen |
+
+## Shared materials and Vicus Aureus assets
 
 The following assets from [Poly Haven](https://polyhaven.com/license) are available under CC0. Compact derivatives are served alongside the game.
 

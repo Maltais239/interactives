@@ -1,6 +1,7 @@
 import {makeTextures} from './texture.js?v=forum2';
 
-const shader=`
+const shader=riverTown=>`
+const riverTown=${riverTown};
 struct Scene { vp:mat4x4f, light:mat4x4f, eye:vec4f, front:vec4f, right:vec4f, up:vec4f, sun:vec4f }
 @group(0) @binding(0) var<uniform> s:Scene;
 @group(0) @binding(1) var materials:texture_2d_array<f32>;
@@ -19,6 +20,14 @@ struct Attr { @location(0) pos:vec3f, @location(1) norm:vec3f, @location(2) uv:v
 struct Vary { @builtin(position) clip:vec4f, @location(0) world:vec3f, @location(1) norm:vec3f, @location(2) uv:vec2f, @location(3) color:vec3f, @location(4) @interpolate(flat) layer:u32 }
 @vertex fn geometry(i:Attr)->Vary{
   var o:Vary;var pos=i.pos;
+  if(i.layer==27.){
+    let head=smoothstep(.41,1.08,i.uv.x)*smoothstep(.41,.85,i.uv.y);
+    let phase=s.eye.w*.71+floor(i.pos.x*.17);
+    pos.y+=head*.034*sin(phase)+.008*sin(phase*1.73)*smoothstep(.65,1.27,i.uv.y);
+  }
+  if(riverTown && i.layer==10. && pos.y< -7.5){
+    pos.y+=.075*sin(dot(pos.xz,vec2f(.16,.49))-s.eye.w*.90)+.035*sin(dot(pos.xz,vec2f(-.37,.19))-s.eye.w*.57);
+  }
   if(i.layer==24.||i.layer==26.||i.layer==21.){
     let breeze=sin(s.eye.w*1.6+pos.x*.74+pos.z*.52)+.38*sin(s.eye.w*3.1+pos.y*1.24);
     pos.x+=.032*breeze*(1.-i.uv.y);pos.z+=.018*breeze*(1.-i.uv.y);
@@ -63,6 +72,7 @@ fn visibility(p:vec3f,n:vec3f)->f32{
         +.33*textureSampleCompareLevel(openSky,shade,uv+vec2f(-.73,.61)*spread,j,depth)
         +.33*textureSampleCompareLevel(openSky,shade,uv+vec2f(-.19,-.83)*spread,j,depth);
     }else{v=textureSampleCompareLevel(openSky,shade,uv,j,depth);}
+    if(any(uv<vec2f(0))||any(uv>vec2f(1))){v=1.;}
     available+=weight*v;total+=weight;
   }
   return available/total;
@@ -97,15 +107,15 @@ fn airColor(color:vec3f,p:vec3f)->vec3f{
 }
 // The reflection probe is rendered only once from the fountain, with the basin omitted.
 @fragment fn capture(i:Vary)->@location(0) vec4f{
-  let c=textureSample(materials,paint,i.uv,i.layer);let leaf=i.layer==21u||i.layer==24u||i.layer==26u;
-  if((leaf&&c.a<.20)||(distance(i.world.xz,vec2f(7.4,1.2))<2.52&&i.world.y<4.3)){discard;}
+  let c=select(textureSample(materials,paint,i.uv,min(i.layer,26u)),vec4f(1),i.layer==27u);let leaf=i.layer==21u||i.layer==24u||i.layer==26u;
+  if((leaf&&c.a<.20)||i.layer==10u||(!riverTown && distance(i.world.xz,vec2f(7.4,1.2))<2.52&&i.world.y<4.3)){discard;}
   let n=normalize(i.norm);
   return vec4f(airColor(illuminate(i.color*c.rgb,i.world,n,visibility(i.world,n),sunlight(i.world,n),leaf),i.world),1);
 }
 @fragment fn surface(i:Vary)->@location(0) vec4f{
   let p=i.world;let layer=i.layer;let geometric=normalize(i.norm);var n=geometric;
   let view=normalize(s.eye.xyz-p);let leaf=layer==21u||layer==24u||layer==26u;
-  let c=textureSample(materials,paint,i.uv,layer);
+  let c=select(textureSample(materials,paint,i.uv,min(layer,26u)),vec4f(1),layer==27u);
   let detail=textureSample(relief,paint,i.uv,min(layer,3u)).rgb;
   let du=dpdx(i.uv);let dv=dpdy(i.uv);
   let a=cross(dpdy(p),n);let b=cross(n,dpdx(p));
@@ -120,7 +130,19 @@ fn airColor(color:vec3f,p:vec3f)->vec3f{
   let access=visibility(p,geometric)*mix(ground,1.,smoothstep(.06,2.4,p.y));
   var pigment=c.rgb;
   if(layer==0u && abs(geometric.y)<.82){pigment=mix(vec3f(.88),pigment,.39);}
-  let base=weather(pigment*i.color,p,layer);
+  var base=weather(pigment*i.color,p,layer);
+  if(riverTown && (layer==3u || layer==0u || layer==22u)){
+    // Low-frequency variation crosses texture tiles. Damp masonry follows the waterline.
+    let warp=vec2f(noise(p.xz*.075),noise(p.zx*.091+4.))*1.8;
+    let large=noise(p.xz*.17+warp+p.y*.19);
+    let wet=(1.-smoothstep(-8.5,-7.32+large*.51,p.y));
+    base*=mix(vec3f(1.),vec3f(.58,.66,.59),wet);
+    if(layer==3u){
+      let lane=abs(p.x-13.-.09*p.z);
+      let dust=(1.-smoothstep(.72,2.05,abs(lane-1.18)))*(.36+.44*large);
+      base=mix(base*(.90+.16*large),vec3f(.68,.585,.454),dust*.47);
+    }
+  }
   var out=illuminate(base,p,n,access,sun,leaf);
   let halfVec=normalize(s.sun.xyz+view);
   if(layer<=3u){out+=vec3f(.034,.029,.020)*pow(max(dot(n,halfVec),0.),mix(55.,10.,detail.b))*sun*(1.-detail.b);}
@@ -130,7 +152,19 @@ fn airColor(color:vec3f,p:vec3f)->vec3f{
     out=mix(out,reflected*vec3f(.77,.65,.44),.19+.29*facing*facing);
     out+=vec3f(.43,.32,.16)*pow(max(dot(n,halfVec),0.),68.)*sun;
   }
-  if(layer==10u){
+  if(riverTown && layer==10u){
+    let t=s.eye.w;let xz=p.xz;
+    let warp=noise(xz*.096-vec2f(0.,t*.034))*4.8+noise(xz*.28+t*.04)*1.25;
+    let d=distance(p,s.eye.xyz);let micro=1.-smoothstep(16.,76.,d);
+    let dx=.030*cos(dot(xz,vec2f(.16,.49))+warp*.47-t*.9)+.022*cos(dot(xz,vec2f(-.37,.19))-t*.57);
+    let dz=.054*cos(dot(xz,vec2f(.16,.49))+warp*.47-t*.9)+.048*cos(dot(xz,vec2f(.7,1.6))+warp-t*1.23);
+    let slope=normalize(vec3f(dx+micro*.048*cos(xz.x*2.8+xz.y*4.1+warp-t*2.3),1.,
+      dz+micro*.074*sin(xz.y*4.9+xz.x*.84+warp-t*2.5)));
+    let ray=reflect(-view,slope);let reflection=textureSampleLevel(forumReflection,paint,ray,1.1+1.6*smoothstep(26.,125.,d)).rgb;
+    let fres=.055+.945*pow(1.-max(0.,dot(slope,view)),4.);
+    let sediment=mix(vec3f(.216,.276,.213),vec3f(.30,.34,.24),noise(xz*.065+warp));
+    out=mix(sediment*(.65+.35*sun),reflection,.21+.76*fres)+vec3f(.49,.45,.32)*pow(max(dot(slope,halfVec),0.),94.)*sun;
+  }else if(layer==10u){
     let t=s.eye.w;let basin=p.xz-vec2f(7.4,1.2);let r=length(basin);
     let spacing=.7853982;let angle=round(atan2(basin.y,basin.x)/spacing)*spacing;
     let fromJet=basin-1.67*vec2f(cos(angle),sin(angle));let dist=max(length(fromJet),.002);
@@ -161,7 +195,7 @@ export async function createRenderer(canvas,mesh,onLost){
   device.lost.then(info=>onLost(info.message||'The graphics device was disconnected. Reload to resume.'));
   device.pushErrorScope('validation');
   ctx.configure({device,format,alphaMode:'opaque'});
-  const mod=device.createShaderModule({code:shader}),info=await mod.getCompilationInfo();
+  const mod=device.createShaderModule({code:shader(!!mesh.reflectionOrigin)}),info=await mod.getCompilationInfo();
   const err=info.messages.filter(i=>i.type==='error');if(err.length)throw Error(err.map(i=>i.lineNum+' '+i.message).join('\n'));
   const buffers=[{arrayStride:48,attributes:[{shaderLocation:0,offset:0,format:'float32x3'},{shaderLocation:1,offset:12,format:'float32x3'},
     {shaderLocation:2,offset:24,format:'float32x2'},{shaderLocation:3,offset:32,format:'float32x3'},{shaderLocation:4,offset:44,format:'float32'}]}];
@@ -195,8 +229,9 @@ export async function createRenderer(canvas,mesh,onLost){
   const skyDirections=[[.04,1,.03],[.86,.66,.1],[-.86,.66,-.1],[.1,.61,.88],[-.1,.61,-.88]].map(normalize);
   function lightMatrix(direction){
     const forward=direction.map(x=>-x),right=normalize(cross(forward,[0,1,0])),up=cross(right,forward);
-    const eye=direction.map((v,i)=>v*92+[3,2,-6][i]);
-    const ortho=[1/55,0,0,0,0,1/53,0,0,0,0,-1/178,0,0,0,0,1];
+    const extent=mesh.shadowRadius??55,focus=mesh.reflectionOrigin?[-29,1,-7]:[3,2,-6];
+    const eye=direction.map((v,i)=>v*(extent+38)+focus[i]);
+    const ortho=[1/extent,0,0,0,0,1/(extent-2),0,0,0,0,-1/(extent*2+68),0,0,0,0,1];
     return multiply(ortho,view(eye,forward,right,up));
   }
   const skyMatrices=skyDirections.map(lightMatrix),skyData=new Float32Array(100);
@@ -239,7 +274,7 @@ export async function createRenderer(canvas,mesh,onLost){
   const near=.12,far=180,projection=[1,0,0,0,0,1,0,0,0,0,far/(near-far),-1,0,0,near*far/(near-far),0];
   const axes=[[[1,0,0],[0,0,-1],[0,1,0]],[[-1,0,0],[0,0,1],[0,1,0]],[[0,1,0],[1,0,0],[0,0,-1]],
     [[0,-1,0],[1,0,0],[0,0,1]],[[0,0,1],[1,0,0],[0,1,0]],[[0,0,-1],[-1,0,0],[0,1,0]]];
-  const origin=[7.4,.93,1.2];
+  const origin=mesh.reflectionOrigin??[7.4,.93,1.2];
   axes.forEach(([front,right,up],j)=>{
     const values=new Float32Array(params);values.set(multiply(projection,view(origin,front,right,up)));values.set(origin,32);
     values.set([...front,1],36);values.set([...right,1],40);values.set(up,44);
@@ -276,7 +311,7 @@ export async function createRenderer(canvas,mesh,onLost){
       color=device.createTexture({size:[width,height],format,sampleCount:samples,usage:GPUTextureUsage.RENDER_ATTACHMENT});cv=color.createView();
       depth=device.createTexture({size:[width,height],format:'depth24plus',sampleCount:samples,usage:GPUTextureUsage.RENDER_ATTACHMENT});dv=depth.createView();
     }
-    const a=width/height,t=Math.tan((a<1?70:61)*Math.PI/360),near=.08,far=220;
+    const a=width/height,t=Math.tan((a<1?70:61)*Math.PI/360),near=.08,far=mesh.reflectionOrigin?350:220;
     const front=[Math.sin(cam.yaw)*Math.cos(cam.pitch),Math.sin(cam.pitch),-Math.cos(cam.yaw)*Math.cos(cam.pitch)],right=[Math.cos(cam.yaw),0,Math.sin(cam.yaw)],up=cross(right,front),eye=[cam.x,cam.eye,cam.z];
     const proj=[1/(t*a),0,0,0,0,1/t,0,0,0,0,far/(near-far),-1,0,0,near*far/(near-far),0];
     params.set(multiply(proj,view(eye,front,right,up)),0);params.set([...eye,time],32);params.set([...front,t],36);params.set([...right,a],40);params.set([...up,Number(!compact && resolution>.83)],44);
