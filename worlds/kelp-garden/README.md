@@ -6,11 +6,15 @@ Original source and project documentation are at [Noniv/abyssal-garden](https://
 
 This version extends the underwater world with four loggerhead turtles, three blacktip reef sharks, one great white shark, nine goldfish, six jellyfish, four garibaldi, five kelp bass, and a school of 24 Pacific sardines. The turtle meshes use curved cross-sections in `wildlife.js`. A Web Worker generates the shark and goldfish meshes and colors on the device using [Procedural Animals](https://github.com/majidmanzarpour/threejs-procedural-animals) by Majid Manzarpour and contributors. `marine-life.js` adapts their swim tables to the kelp routes and shades the animals in WebGPU. The default dive generates its wildlife on the device. The three kelp-forest fish have species-specific body profiles, fins, colouring, and tail beats in `kelp-fish.js`.
 
-The Alder is a fictional sidewheel steamer grounded on the southwest shelf. The dive tracker can guide you to all three wrecks. The Alder waypoint leads through the broken hull beneath its stern deck. [Dive beside the Alder](https://maltais239.github.io/interactives/worlds/kelp-garden/?site=alder&turtle=green).
+The Alder is a fictional sidewheel steamer grounded on the southwest shelf. The dive tracker can guide you to all four wrecks. The Alder waypoint leads through the broken hull beneath its stern deck. [Dive beside the Alder](https://maltais239.github.io/interactives/worlds/kelp-garden/?site=alder&turtle=green).
 
 [Dive beside the Kestrel](https://maltais239.github.io/interactives/worlds/kelp-garden/?site=tug&turtle=green), or select **WWII harbour tug** in the dive tracker. The fictional 35-metre tug lies east of the Alder in about 43 metres of water. Its raised pilothouse, single funnel and towing gear draw on the [National Park Service survey of the 1943 Army tug LT-5](https://npgallery.nps.gov/GetAsset/e9120f48-938b-4319-a008-ca0db8d77e2a). The starboard breach exposes the engine and the stern still carries its three-bladed screw. The geometry is built on the device in `harbour-tug.js`.
 
 ![The Kestrel in the kelp forest, seen from its stern quarter](kestrel-wreck.jpg)
+
+[Dive beside the Tribal-class destroyer](https://maltais239.github.io/interactives/worlds/kelp-garden/?site=destroyer&turtle=green), or select **Tribal-class destroyer** in the dive tracker. This fictional wreck sits in the northwest basin. It uses [Tribal-class Destroyer (1936) by kriss50](https://sketchfab.com/3d-models/tribal-class-destroyer-1936-97dce925c4044ba4aa03674289d54b4a), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). This adaptation simplifies and packs the supplied GLB, removes the flag, bends the upper mast, and adds weathering and marine growth. The terrain follows the hull with drifted sediment and a shallow scour near the bow.
+
+![Diver’s view of the Tribal-class destroyer listing into the sand in the northwest basin](tribal-destroyer.jpg)
 
 At startup, `reef-routes.js` charts the rendered seabed, rock outcrops, props and wrecks. It checks a whole loop with clearance for the animal or school, then fits that loop into open water before the renderer and tracker use it.
 
