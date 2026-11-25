@@ -14,7 +14,7 @@ const digest = value => createHash('sha256').update(JSON.stringify(value)).diges
 function app(saved) {
   const storage = new Map(saved ? [['tmSpanish_v2',JSON.stringify(saved)]] : []);
   const ctx = vm.createContext({localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)}});
-  vm.runInContext(data+'\n'+script+`;render = () => {}; globalThis.api={COFFEE_BREAK_EPISODES,RAW,RAW_CBE,PHRASES,NUM_GROUPS,STORAGE_KEY,state,buildSeeded,loadState,saveState,coreWords,selectedWords,matchesAnswer,spanishKey,buildCard,matchesCardAnswer,buildPhraseQueue,episodePhrases,reviewWord,reviewPhrase,exportProgress,importProgress};`, ctx);
+  vm.runInContext(data+'\n'+script+`;render = () => {}; globalThis.api={VERBS,matchesVerbAnswer,COFFEE_BREAK_EPISODES,RAW,RAW_CBE,PHRASES,NUM_GROUPS,STORAGE_KEY,state,buildSeeded,loadState,saveState,coreWords,selectedWords,matchesAnswer,spanishKey,buildCard,matchesCardAnswer,buildPhraseQueue,episodePhrases,reviewWord,reviewPhrase,exportProgress,importProgress};`, ctx);
   ctx.api.loadState();
   return {a:ctx.api, storage};
 }
@@ -193,4 +193,23 @@ test('new English noun cards accept an omitted article while Spanish dictation c
   const museum=a.coreWords(1013).find(w=>w.spanish==='el museo');
   assert.ok(a.matchesCardAnswer('museum',{...museum,ex:'typed',answer:museum.english}));
   assert.ok(!a.matchesCardAnswer('museo',{...museum,ex:'dictation',answer:museum.spanish}));
+});
+
+test('verb drills accept the displayed pronouns and short forms, and check which person was prompted',()=>{
+  const {a}=app();
+  const card=(verb,english)=>a.VERBS.find(([label])=>label.startsWith(verb+' —'))[1].find(row=>row.en===english);
+  for (const [,forms] of a.VERBS) for (const row of forms) {
+    assert.ok(a.matchesVerbAnswer(row.form,row));
+    for (const example of row.examples) assert.ok(a.matchesVerbAnswer(example,row));
+  }
+  const he=card('ser','he is'), we=card('ser','we are');
+  assert.ok(a.matchesVerbAnswer('él es',he));
+  assert.ok(!a.matchesVerbAnswer('ella es',he));
+  assert.ok(!a.matchesVerbAnswer('él eres',he));
+  assert.ok(a.matchesVerbAnswer('nosotras somos',we));
+  const likes=card('gustar','he likes it');
+  assert.ok(a.matchesVerbAnswer('a él le gusta',likes));
+  assert.ok(!a.matchesVerbAnswer('él gusta',likes));
+  assert.ok(!a.matchesVerbAnswer('a él gusta',likes));
+  assert.ok(!a.matchesVerbAnswer('él toma',card('tomar','Take! (informal command to one person)')));
 });
