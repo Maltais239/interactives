@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Spanish Practice · A language journal</title>
 <meta name="theme-color" content="#243e64">
-<meta name="description" content="Your Spanish practice journal: vocabulary, listening, verbs, phrases and sentence building, with Coffee Break Spanish episodes 1–12.">
+<meta name="description" content="Your Spanish practice journal: vocabulary, listening, verbs, phrases and sentence building, with Coffee Break Spanish episodes 1–15.">
 <style>
 :root{
   --green:#b63f2b;--gd:#913321;--gs:#f3d8c9;--gxs:#fbefe5;
@@ -296,7 +296,7 @@ body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;background:var(--bg
       <div class="journal-eyebrow">YOUR SPANISH PRACTICE JOURNAL</div>
       <h1>A little Spanish.<br><em>A little more you.</em></h1>
       <p>Small, steady practice for the conversations ahead.</p>
-      <div class="journal-courses"><span>3 Minute Spanish</span><span>Coffee Break Spanish · 1–12</span><span>Audio: Latin American Spanish</span></div>
+      <div class="journal-courses"><span>3 Minute Spanish</span><span>Coffee Break Spanish · 1–15</span><span>Audio: Latin American Spanish</span></div>
     </div>
     <div class="journal-stamp" aria-hidden="true"><span>ES</span><small>UN POCO<br>CADA DÍA</small></div>
   </div>
@@ -324,7 +324,7 @@ body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;background:var(--bg
     </div>
   </div>
 </main>
-<script src="coffee-break-data.js?v=20261114-1"></script>
+<script src="coffee-break-data.js?v=20261125-1"></script>
 <script>
 const NUMBER_LESSON_ID = 7;
 const NUMBER_PACKS = ['Numbers 0–20', 'Numbers 21–99', 'Numbers 100+'];
@@ -479,11 +479,22 @@ const RAW_CBE = [
 // Append missing Coffee Break entries without changing existing spellings,
 // translations, lesson IDs or word progress keys.
 const spanishKey = t => String(t).normalize('NFC').toLowerCase().replace(/[¿?¡!.;:]/g,'').replace(/\s+/g,' ').trim();
+// Only reviewed forms of the same vocabulary item share mastery. Keep accents,
+// meaningful commas and distinct expressions (e.g. café and café con leche).
+const lessonWordKeys = new Map();
 for (const ep of COFFEE_BREAK_EPISODES) {
   let lesson = RAW_CBE.find(([id]) => id === ep.episode);
   if (!lesson) { lesson = [ep.episode, []]; RAW_CBE.push(lesson); }
   const seen = new Set(lesson[1].map(([sp]) => spanishKey(sp)));
-  for (const [sp,en] of [...ep.notes.map(n => [n.spanish,n.english]), ...ep.components]) {
+  const vocabNotes = ep.notes.filter(n => n.kind !== 'phrase');
+  const pairs = [...vocabNotes.map(n => [n.spanish, n.english]), ...ep.components];
+  if (vocabNotes.some(n => n.kind === 'word')) {
+    for (const [sp] of pairs) lessonWordKeys.set(spanishKey(sp), spanishKey(sp));
+    for (const note of vocabNotes) for (const form of note.alsoWritten || []) {
+      lessonWordKeys.set(spanishKey(form), spanishKey(note.spanish));
+    }
+  }
+  for (const [sp,en] of pairs) {
     if (!seen.has(spanishKey(sp))) { lesson[1].push([sp,en]); seen.add(spanishKey(sp)); }
   }
 }
@@ -620,12 +631,21 @@ const PHRASES=[
   ['Hemos esperado mucho tiempo.','We have waited a long time.'],
 ];
 // New Coffee Break sentences also appear in phrase recall and gap-fill.
-const phraseKeys = new Set(PHRASES.map(([sp]) => spanishKey(sp)));
+const phraseByKey = new Map(PHRASES.map(([sp], i) => [spanishKey(sp), i]));
+const episodePhrases = new Map();
 for (const ep of COFFEE_BREAK_EPISODES) {
-  for (const {spanish,english} of ep.notes) {
-    if (spanish.trim().split(/\s+/).length < 2 || phraseKeys.has(spanishKey(spanish))) continue;
-    PHRASES.push([spanish,english]); phraseKeys.add(spanishKey(spanish));
+  const indexes = new Set();
+  for (const {spanish, english, kind} of ep.notes) {
+    const isPhrase = kind ? kind === 'phrase' : spanish.trim().split(/\s+/).length >= 2;
+    if (!isPhrase) continue;
+    const key = spanishKey(spanish);
+    if (!phraseByKey.has(key)) {
+      phraseByKey.set(key, PHRASES.length);
+      PHRASES.push([spanish, english]);
+    }
+    indexes.add(phraseByKey.get(key));
   }
+  if (indexes.size) episodePhrases.set(ep.episode, [...indexes]);
 }
 
 const STORAGE_KEY = 'tmSpanish_v2';
@@ -684,28 +704,37 @@ const esc      = t => String(t??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').r
 // ── Word factory ──────────────────────────────────────────────────────────────
 // pack=null means core lesson word; pack='Pack name' means expansion word
 const makeWord = (lessonId,sp,en,pack=null) =>
-  ({id:uid(),lessonId,spanish:sp,english:en,pack,note:coffeeNote(lessonId,sp),attempts:0,correct:0,level:0,dueAt:todayISO(),lastReviewedAt:'',mastered:false});
-const numberKey = word => NUMBER_WORDS.has(norm(word.spanish)) ? `number:${norm(word.spanish)}` : null;
-const uniquePracticeWords = words => [...new Map(words.map(word=>[numberKey(word)||word.id,word])).values()];
+  ({id:uid(),lessonId,spanish:sp,english:en,pack,sharedKey:lessonWordKeys.get(spanishKey(sp)),note:coffeeNote(lessonId,sp),attempts:0,correct:0,level:0,dueAt:todayISO(),lastReviewedAt:'',mastered:false});
+function sharedWordKey(word) {
+  const number = norm(word.spanish);
+  if (NUMBER_WORDS.has(number)) return 'number:' + number;
+  return word.sharedKey;
+}
+const uniquePracticeWords = words => [...new Map(words.map(word=>[sharedWordKey(word)||word.id,word])).values()];
 
-// Preserve each lesson's membership and old backup keys while sharing number progress.
-function syncNumberProgress(lessons) {
-  const numbers=new Map();
+// Keep lesson membership, saved IDs and backup keys while syncing review history.
+function syncSharedWordProgress(lessons, legacy = false) {
+  const groups=new Map();
   for(const lesson of lessons) for(const word of lesson.vocab) {
-    const key=numberKey(word);
+    const key=sharedWordKey(word);
     if(!key) continue;
-    const copies=numbers.get(key)||[];
+    const copies=groups.get(key)||[];
     copies.push(word);
-    numbers.set(key,copies);
+    groups.set(key,copies);
   }
-  for(const copies of numbers.values()) {
+  for(const [key, copies] of groups) {
     const reviewed=copies.filter(word=>word.attempts>0 || word.level>0 || word.mastered);
     if(!reviewed.length) continue;
-    const latest=reviewed.reduce((best,word)=>{
+    const history=reviewed.reduce((best,word)=>{
+      // Previously independent lesson cards can have different mastery levels.
+      if (legacy && !key.startsWith('number:')) {
+        const levelDifference = (word.mastered ? 6 : word.level) - (best.mastered ? 6 : best.level);
+        if (levelDifference) return levelDifference > 0 ? word : best;
+      }
       const difference=(Date.parse(word.lastReviewedAt)||0)-(Date.parse(best.lastReviewedAt)||0);
       return difference>0 || (!difference && word.level>best.level) ? word : best;
     });
-    const progress={...progressRow(latest),attempts:Math.max(...reviewed.map(w=>progressCount(w.attempts))),correct:Math.max(...reviewed.map(w=>progressCount(w.correct)))};
+    const progress={...progressRow(history),attempts:Math.max(...reviewed.map(w=>progressCount(w.attempts))),correct:Math.max(...reviewed.map(w=>progressCount(w.correct)))};
     copies.forEach(word=>Object.assign(word,progress));
   }
 }
@@ -765,7 +794,7 @@ function mergeSeeded(seeded, saved) {
       const english=correction(w);
       const seed = seedLookup.get(`${norm(w.spanish)}|${norm(english)}`);
       // Preserve the original progress ID and all review history.
-      return {...w, english, pack: seed ? seed.pack : (w.pack ?? null), note: seed?.note ?? w.note ?? ''};
+      return {...w, english, sharedKey:seed?.sharedKey, pack: seed ? seed.pack : (w.pack ?? null), note: seed?.note ?? w.note ?? ''};
     });
     const seen = new Set(merged.map(w=>`${norm(w.spanish)}|${norm(w.english)}`));
     sl.vocab.filter(w=>!seen.has(`${norm(w.spanish)}|${norm(w.english)}`)).forEach(w=>merged.push(w));
@@ -779,6 +808,7 @@ const state = {
   tab:'practice', lessons:[], selLessons:[], selPacks:[],
   started:false,
   rev:{queue:[],idx:0,correct:0,total:0,reveal:false,typed:'',lastResult:'',showPraise:null},
+  phraseEpisodes:[], // Empty means the full phrase bank.
   phraseProgress:[], // SRS progress per phrase, indexed parallel to PHRASES
   phraseRev:{queue:[],idx:0,correct:0,total:0,reveal:false,typed:'',lastResult:'',started:false},
   verbDrill:{queue:[],idx:0,reveal:false,correct:0,total:0}, // simple drill, no SRS
@@ -814,7 +844,7 @@ function initChallengeProgress(saved=[]) {
 
 function saveState(progress = state) {
   const { lessons, selLessons, selPacks, phraseProgress, challengeProgress, challengeResetAt } = progress;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ lessons, selLessons, selPacks, phraseProgress, challengeProgress, challengeResetAt }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ lessons, selLessons, selPacks, phraseProgress, challengeProgress, challengeResetAt, sharedVocabulary:1 }));
 }
 
 function loadState() {
@@ -824,7 +854,7 @@ function loadState() {
   try {
     const p = JSON.parse(raw);
     state.lessons          = mergeSeeded(seeded, p.lessons||[]);
-    syncNumberProgress(state.lessons);
+    syncSharedWordProgress(state.lessons, !p.sharedVocabulary);
     state.selLessons       = (p.selLessons||[]).map(Number);
     state.selPacks         = p.selPacks||[];
     state.phraseProgress   = initPhraseProgress(p.phraseProgress||[]);
@@ -872,8 +902,8 @@ function allPacks() {
 
 function selectedWords() {
   const map = new Map();
-  selLessons().forEach(id => coreWords(id).forEach(w=>map.set(w.id,{...w,lessonTitle:getLesson(id)?.title||''})));
   selPacks().forEach(k  => { const s=parseKey(k); packWords(s).forEach(w=>map.set(w.id,{...w,lessonTitle:getLesson(s.lessonId)?.title||''})); });
+  selLessons().forEach(id => coreWords(id).forEach(w=>map.set(w.id,{...w,lessonTitle:getLesson(id)?.title||''})));
   return uniquePracticeWords([...map.values()]);
 }
 
@@ -888,9 +918,9 @@ function reviewWord(id,rating) {
     if(rating==='good') { n.correct++; n.level=Math.min(6,n.level+2); n.dueAt=addDays(now,INTERVALS[Math.min(6,n.level)]||3); }
     if(rating==='easy') { n.correct++; n.level=Math.min(6,n.level+3); n.dueAt=addDays(now,(INTERVALS[Math.min(6,n.level)]||7)+7); }
     n.mastered=n.level>=6; l.vocab[i]=n;
-    const key=numberKey(n);
+    const key=sharedWordKey(n);
     if(key) for(const lesson of state.lessons) for(const word of lesson.vocab) {
-      if(numberKey(word)===key) Object.assign(word,progressRow(n));
+      if(sharedWordKey(word)===key) Object.assign(word,progressRow(n));
     }
     break;
   }
@@ -904,8 +934,18 @@ function sampleChoices(correct,pool,field,n=4) {
   return shuffle(choices);
 }
 
+// Accept the noun alone when a lesson gives its English meaning with an article.
+function matchesCardAnswer(typed, card) {
+  if (matchesAnswer(typed, card.answer)) return true;
+  if (!card.sharedKey || card.ex !== 'typed' || card.answer !== card.english) return false;
+  return splitAns(card.answer).some(meaning => {
+    const bare = meaning.replace(/^(?:a|an|the)\s+/i, '');
+    return bare !== meaning && matchesAnswer(typed, bare);
+  });
+}
+
 function buildCard(word,i,pool) {
-  const p   = pool.length>=4?pool:allWords();
+  const p   = pool.length>=4?pool:uniquePracticeWords([...allWords(), ...pool]);
   const dir = i%2===0?'es-en':'en-es';
   // cloze = gap-fill in a real sentence context (~1 in 5 cards when phrases available)
   const hasPhrases = typeof PHRASES !== 'undefined' && PHRASES.length > 0;
@@ -1022,7 +1062,6 @@ function refreshVoiceControls() {
     preferred ? 'Your choice is saved on this browser.' :
     `${practiceSettings.voice?'Saved voice unavailable. ':''}Automatic uses ${voiceLabel(voices[0])}.`;
 }
-window.speechSynthesis?.addEventListener('voiceschanged',refreshVoiceControls);
 function currentListeningTurn() {
   if(state.tab!=='practice') return null;
   const review=state.numDrill.active?state.numDrill:(state.started?state.rev:null);
@@ -1086,6 +1125,8 @@ function renderPractice() {
 
   const lessons3MS = tilesByCourse('3MS');
   const lessonsCBE = tilesByCourse('CBE');
+  const phraseEpisodes = selLessons().map(id => id - CBE_ID_OFFSET).filter(ep => episodePhrases.has(ep));
+  const phraseCount = phraseEpisodes.length ? phraseIndexes(phraseEpisodes).length : 0;
   const cbeIds = state.lessons.filter(l=>l.course==='CBE'&&coreWords(l.id).length).map(l=>l.id);
   const tmsIds = state.lessons.filter(l=>(l.course||'3MS')==='3MS'&&coreWords(l.id).length).map(l=>l.id);
 
@@ -1101,8 +1142,9 @@ function renderPractice() {
   </details>`;
   const lessonSections = `
     <details class="course-block coffee-course" data-disclosure="coffee" ${openAttr('coffee',true)}>
-      <summary><span><small>COURSE 01</small><strong>Coffee Break Spanish</strong><em>Episodes 1–12</em></span><span class="course-count">${cbeIds.length} episodes</span></summary>
+      <summary><span><small>COURSE 01</small><strong>Coffee Break Spanish</strong><em>Episodes 1–15</em></span><span class="course-count">${cbeIds.length} episodes</span></summary>
       <div class="lesson-grid">${lessonsCBE}</div>
+      ${phraseCount ? `<div class="toolbar" style="margin-top:12px"><button class="btn" style="min-height:44px" id="lessonPhrases">Practise lesson phrases (${phraseCount})</button></div>` : ''}
       <p class="muted small">Episode 12 practises the calendar. <button class="btn" id="episode12Numbers">Practise Episode 12 numbers →</button></p>
       <p class="muted tiny">E9 focuses on its own words and phrases. Select E1–8 separately whenever you want a review.</p>
       ${audit}
@@ -1223,6 +1265,12 @@ function renderPractice() {
         s.has(k)?s.delete(k):s.add(k);
         state.selPacks=[...s]; saveState(); renderPractice();
       });
+    });
+    document.getElementById('lessonPhrases')?.addEventListener('click', () => {
+      buildPhraseQueue(phraseEpisodes);
+      state.tab = 'phrases';
+      render();
+      document.getElementById('pStartBtn').focus();
     });
     document.getElementById('allTMS')?.addEventListener('click',()=>{
       // Add all 3MS lessons that have words, keep existing CBE selections.
@@ -1487,7 +1535,7 @@ function renderReview() {
 
   document.getElementById('checkBtn')?.addEventListener('click',()=>{
     const t=(document.getElementById('ans')?.value||'').trim(); rev.typed=t; rev.total++;
-    const ok=matchesAnswer(t,card.answer);
+    const ok=matchesCardAnswer(t,card);
     if(ok){
       rev.correct++; reviewWord(card.id,'good');
       rev.showPraise=randPraise(); rev.typed=''; rev.reveal=false;
@@ -1629,16 +1677,28 @@ function reviewPhrase(idx,rating) {
   n.mastered=n.level>=6; state.phraseProgress[idx]=n; saveState();
 }
 
-function buildPhraseQueue() {
-  const due=PHRASES.map((_,i)=>i).filter(i=>isDue(state.phraseProgress[i]));
-  const src=due.length?due:PHRASES.map((_,i)=>i);
+function phraseIndexes(episodes) {
+  if (!episodes.length) return PHRASES.map((_, i) => i);
+  return [...new Set(episodes.flatMap(ep => episodePhrases.get(ep) || []))];
+}
+
+function buildPhraseQueue(episodes = state.phraseEpisodes) {
+  state.phraseEpisodes = episodes;
+  const indexes = phraseIndexes(episodes);
+  const due = indexes.filter(i => isDue(state.phraseProgress[i]));
+  const src = due.length ? due : indexes;
   state.phraseRev={queue:shuffle([...src]),idx:0,correct:0,total:0,reveal:false,typed:'',lastResult:'',started:true};
 }
 
 function renderPhrases() {
   const d=document.getElementById('phrasesSection');
-  const pr=state.phraseRev, mastered=state.phraseProgress.filter(p=>p.mastered).length;
-  const due=state.phraseProgress.filter(p=>isDue(p)&&!p.mastered).length;
+  const pr = state.phraseRev, episodes = state.phraseEpisodes;
+  const indexes = phraseIndexes(episodes);
+  const mastered = indexes.filter(i => state.phraseProgress[i].mastered).length;
+  const due = indexes.filter(i => isDue(state.phraseProgress[i])).length;
+  const lessonOptions = COFFEE_BREAK_EPISODES.filter(ep => episodePhrases.has(ep.episode)).map(ep =>
+    `<option value="${ep.episode}" ${episodes.length === 1 && episodes[0] === ep.episode ? 'selected' : ''}>E${ep.episode} · ${esc(ep.title)}</option>`
+  ).join('');
 
   // ── Phrase review card (reveal-then-self-rate) ───────────────────────────
   const reviewArea = () => {
@@ -1691,7 +1751,8 @@ function renderPhrases() {
   };
 
   // ── Phrase list ────────────────────────────────────────────────────────────
-  const list=PHRASES.map(([sp,en],i)=>{
+  const list=indexes.map(i=>{
+    const [sp,en]=PHRASES[i];
     const p=state.phraseProgress[i], st=getStatus(p);
     return `<tr><td style="font-style:italic;">${esc(sp)}</td><td class="muted small">${esc(en)}</td><td><span class="status ${st}">${st}</span></td></tr>`;
   }).join('');
@@ -1701,18 +1762,32 @@ function renderPhrases() {
       <h2 style="margin:0;">Phrases</h2>
       <button class="btn primary" id="pStartBtn">${pr.started?'New session':'Start practice'}</button>
     </div>
+    <label for="phraseScope" style="display:block;margin:12px 0">Phrase set
+      <select id="phraseScope" style="display:block;max-width:100%;min-height:44px;margin-top:4px">
+        <option value="">All phrases</option>
+        ${episodes.length > 1 ? `<option selected value="${episodes.join(',')}">Selected episodes · ${episodes.map(ep=>'E'+ep).join(', ')}</option>` : ''}
+        ${lessonOptions}
+      </select>
+    </label>
     <div class="summary-grid" style="margin-bottom:16px;">
-      <div class="summary-box"><div class="value">${PHRASES.length}</div><div class="muted small">Total phrases</div></div>
+      <div class="summary-box"><div class="value">${indexes.length}</div><div class="muted small">Total phrases</div></div>
       <div class="summary-box"><div class="value">${due}</div><div class="muted small">Due now</div></div>
       <div class="summary-box"><div class="value">${mastered}</div><div class="muted small">Mastered</div></div>
     </div>
     ${reviewArea()}
     <div class="card">
-      <h3>All phrases</h3>
+      <h3>${episodes.length ? 'Lesson phrases' : 'All phrases'}</h3>
       <table class="word-table"><thead><tr><th>Spanish</th><th>English</th><th>Status</th></tr></thead>
       <tbody>${list}</tbody></table>
     </div>`;
 
+  document.getElementById('phraseScope').addEventListener('change', event => {
+    const value = event.target.value;
+    state.phraseEpisodes = value ? value.split(',').map(Number) : [];
+    state.phraseRev = {...pr, started:false, queue:[]};
+    renderPhrases();
+    document.getElementById('phraseScope').focus();
+  });
   document.getElementById('pStartBtn')?.addEventListener('click',()=>{ buildPhraseQueue(); renderPhrases(); });
   document.getElementById('pRestartBtn')?.addEventListener('click',()=>{ buildPhraseQueue(); renderPhrases(); });
 
@@ -2668,7 +2743,7 @@ function exportProgress() {
     entries.filter(([, row]) => row.attempts > 0).map(([key, row]) => [key, progressRow(row, challenge)])
   );
   return {
-    format: PROGRESS_FORMAT, version: 1, challengeResetAt: state.challengeResetAt,
+    format: PROGRESS_FORMAT, version: 1, sharedVocabulary:1, challengeResetAt: state.challengeResetAt,
     words: practiced(state.lessons.flatMap(lesson => lesson.vocab.map(word => [wordProgressKey(lesson, word), word]))),
     phrases: practiced(PHRASES.map((pair, i) => [progressKey(pair), state.phraseProgress[i]])),
     challenges: practiced(CHALLENGES.map((challenge, i) => [challengeProgressKey(challenge), state.challengeProgress[i]]), true),
@@ -2711,10 +2786,10 @@ function importProgress(backup) {
       combineProgress(currentChallenges[i], backup.challenges, challengeProgressKey(challenge), true)),
     challengeResetAt: Math.max(reset, state.challengeResetAt),
   };
-  syncNumberProgress(progress.lessons);
+  syncSharedWordProgress(progress.lessons, !backup.sharedVocabulary);
   saveState(progress);
   Object.assign(state, progress);
-  renderStats();
+  render();
 }
 
 // Video links supplied by Darren. Targets are selective practice, not full lesson coverage.
@@ -2777,6 +2852,7 @@ function renderVideos(){
 function videoSuggestions(){const videos=relatedVideos();return `<details class="video-related"><summary>Watch &amp; practise <span class="muted tiny">${videos.length} scenes match your selected lessons</span></summary><div class="video-related-grid">${videos.slice(0,3).map(v=>videoCard(v,true)).join('')}</div><button class="btn" data-all-videos>Explore all ${VISUAL_LESSONS.length} scenes →</button></details>`;}
 
 loadState(); saveState(); render();
+window.speechSynthesis?.addEventListener('voiceschanged',refreshVoiceControls);
 const progressFile = document.getElementById('progressBackupFile');
 const progressStatus = document.getElementById('progressBackupStatus');
 document.getElementById('saveProgressButton').addEventListener('click', () => {

@@ -6,11 +6,17 @@ The original 3 Minute Spanish practice app, refreshed with Dímelo’s cream,
 terracotta and ink-blue journal style. Vocabulary practice, listening, verb
 drills, phrase recall, sentence building and translation challenges remain.
 
-Coffee Break Spanish now covers Darren’s supplied notes for episodes 1–9 and
-the episode 10 Christmas edition. The in-app **Vocabulary check** maps all
-112 note entries to their practice forms, with spelling and meaning notes.
-Whole phrases and useful component words are available. Episode 9 practices its own 27 words and phrases instead of automatically
-adding all episode 1–8 cards. Select earlier episodes for optional review.
+Coffee Break Spanish covers episodes 1–15. The in-app **Vocabulary check**
+shows the original notes, corrected Spanish, and meanings. Episodes 13–15
+cover directions, places in town, and ordering drinks. Select episodes and
+choose **Practise lesson phrases** for a round using their examples. The
+**Phrases** tab also offers a phrase set picker.
+
+Repeated vocabulary in episodes 13–15 shares progress with the same words
+in earlier lessons and expansion packs, including known article variants.
+The first upgrade carries over the strongest recorded level for each of these
+words. Subsequent reviews update every copy. Full-sentence examples use
+their own phrase history. Episode 9 retains its focused 27-card bank.
 
 Corrections include *fenomenal*, *no*, *diez*, *oficina*, *fotografía*,
 *ingeniero*, *Hasta otra*, and *una tienda*. Both *tu* and *tú* are separate.

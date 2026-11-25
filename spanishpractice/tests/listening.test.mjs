@@ -77,10 +77,11 @@ test('every playback prefers Mexico over a default Spain voice and accepts other
   x.setVoices([spain,colombia]);x.a.playPracticeSpanish('cuatro');assert.equal(x.spoken.at(-1).voice,colombia);
 });
 
-test('an empty or Spain-only voice list keeps the Mexican locale and picks up late-loading voices',()=>{
+test('an empty voice list uses the Mexican locale, then the best listed Spanish voice as devices load voices',()=>{
   const x=setup();
   x.a.playPracticeSpanish('hola');assert.equal(x.spoken.at(-1).lang,'es-MX');assert.equal(x.spoken.at(-1).voice,undefined);
-  x.setVoices([{lang:'es-ES',name:'Spain'}]);x.a.playPracticeSpanish('hola');assert.equal(x.spoken.at(-1).lang,'es-MX');assert.equal(x.spoken.at(-1).voice,undefined);
+  const spain={lang:'es-ES',name:'Spain'};
+  x.setVoices([spain]);x.a.playPracticeSpanish('hola');assert.equal(x.spoken.at(-1).lang,'es-ES');assert.equal(x.spoken.at(-1).voice,spain);
   const mexico={lang:'es-MX',name:'Mexico'};
   x.setVoices([mexico]);x.a.playPracticeSpanish('hola');assert.equal(x.spoken.at(-1).lang,'es-MX');assert.equal(x.spoken.at(-1).voice,mexico);
 });

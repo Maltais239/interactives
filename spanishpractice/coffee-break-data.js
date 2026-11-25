@@ -1191,5 +1191,77 @@ const COFFEE_BREAK_EPISODES = [
       ['invierno','winter'],['primavera','spring'],['verano','summer'],['otoño','fall / autumn'],
     ].map(([spanish,english])=>({original:spanish,spanish,english,note:''})),
     components: [['los días de la semana','the days of the week'],['los meses del año','the months of the year'],['las estaciones','the seasons']],
-  }
+  },
+  coffeeBreakLesson(13, 'Asking for directions', [
+    ['el museo', 'the museum'],
+    ['el banco', 'the bank'],
+    ['el restaurante', 'the restaurant', {alsoWritten: ['restaurante', 'un restaurante']}],
+    ['el mercado', 'the market'],
+    ['la plaza mayor', 'the main square', {original: 'la plaza mayo', note: 'Mayor ends in r. A square named Plaza Mayor takes capital letters.'}],
+    ['la oficina de turismo', 'the tourist information office', {original: 'La oficina de turismo'}],
+    ['la piscina', 'the swimming pool'],
+    ['¿Dónde?', 'Where?'],
+    ['¿Dónde está?', 'Where is it?'],
+    ['mire', 'look (formal command)'],
+    ['Siga todo recto.', 'Keep going straight. / Go straight ahead.'],
+    ['doble', 'turn (formal command)'],
+    ['a la derecha', 'to the right'],
+    ['a la izquierda', 'to the left'],
+  ], [
+    ['Por favor, ¿dónde está el museo?', 'Where is the museum, please?', {original: '¿Por favor, dónde está el museo?'}],
+    ['Está aquí.', 'It’s here.'],
+    ['Está lejos.', 'It’s far away.'],
+    ['El museo está lejos de aquí.', 'The museum is far from here.'],
+  ], [['todo recto', 'straight ahead'], ['lejos de aquí', 'far from here']]),
+  coffeeBreakLesson(14, 'Places in town', [
+    ['el centro comercial', 'the shopping centre / the mall', {original: 'centro comercial', alsoWritten: ['centro comercial']}],
+    ['un bar', 'a bar', {alsoWritten: ['el bar']}],
+    ['un hospital', 'a hospital', {alsoWritten: ['el hospital']}],
+    ['una cafetería', 'a café / a coffee shop', {original: 'a cafetería', alsoWritten: ['la cafetería']}],
+    ['una farmacia', 'a pharmacy', {alsoWritten: ['la farmacia']}],
+    ['al lado de', 'next to / beside'],
+    ['enfrente de', 'across from / opposite'],
+    ['una catedral', 'a cathedral', {original: 'Una catedral.'}],
+  ], [
+    ['¿Dónde está el centro comercial?', 'Where is the shopping centre? / Where is the mall?'],
+    ['¿Hay un bar por aquí?', 'Is there a bar around here?'],
+    ['El centro comercial está cerca del bar.', 'The shopping centre is near the bar.', {original: 'El centro comercial esta cerca del bar'}],
+    ['La farmacia está lejos del mercado.', 'The pharmacy is far from the market.', {original: 'La farmacia esta lejos del mercado'}],
+    ['La piscina está enfrente de la oficina de turismo.', 'The swimming pool is across from the tourist information office.'],
+    ['En la ciudad hay muchas cosas interesantes.', 'There are many interesting things in the city.', {original: 'En la ciudad, hay muchas cosas interesante.', note: 'Interesantes agrees with the plural cosas.'}],
+    ['¿Hay un cine?', 'Is there a movie theatre? / Is there a cinema?'],
+  ], [['el cine', 'the cinema'], ['cerca de', 'near'], ['lejos de', 'far from'], ['la ciudad', 'the city'], ['hay', 'there is / there are']]),
+  coffeeBreakLesson(15, 'Ordering drinks in a café', [
+    ['un café', 'a coffee', {original: 'un cafe', alsoWritten: ['café']}],
+    ['un café con leche', 'a coffee with milk'],
+    ['un café solo', 'a black coffee / an espresso'],
+    ['un cortado', 'an espresso with a dash of milk'],
+    ['un té con leche', 'a tea with milk'],
+    ['un té con limón', 'a tea with lemon'],
+    ['un jugo de naranja', 'an orange juice', {note: 'Jugo is common in Latin America. In Spain you’ll usually hear zumo.'}],
+    ['manzana', 'apple', {alsoWritten: ['una manzana']}],
+    ['piña', 'pineapple', {alsoWritten: ['una piña']}],
+    ['una limonada', 'a lemonade', {original: 'una limonara'}],
+    ['un agua mineral', 'a mineral water', {note: 'Agua is feminine. Its stressed first syllable gives us un agua mineral.'}],
+    ['sin gas', 'still / non-carbonated'],
+    ['con gas', 'sparkling / carbonated'],
+    ['una cerveza', 'a beer'],
+    ['una caña', 'a small draught beer / a small draft beer', {original: 'una caña-Spain', note: 'In Spain, a caña is a small glass of draught beer.'}],
+    ['un vino tinto', 'a red wine', {alsoWritten: ['vino tinto']}],
+    ['un vino blanco', 'a white wine', {alsoWritten: ['vino blanco']}],
+    ['quiero', 'I want / I would like', {original: 'Quiero'}],
+    ['Enseguida.', 'Right away. / Straight away.'],
+  ], [
+    ['Para mí, una Coca-Cola.', 'A Coke for me.', {original: 'para mi un coca cola', note: 'Use mí after para. When ordering the drink, say una Coca-Cola.'}],
+    ['¿Qué van a tomar?', 'What would you like to drink? (to a group)'],
+    ['Para usted y para su amigo.', 'For you and your friend. (formal)'],
+  ], [['un jugo de manzana', 'an apple juice'], ['un jugo de piña', 'a pineapple juice'], ['té', 'tea'], ['la leche', 'milk'], ['para mí', 'for me']])
 ];
+
+// Store original notes once and mark examples for the lesson phrase round.
+function coffeeBreakLesson(episode, title, vocabulary, phrases, components = []) {
+  const notes = (entries, kind) => entries.map(([spanish, english, options = {}]) => ({
+    spanish, english, original: spanish, note: '', kind, ...options,
+  }));
+  return {episode, title, notes: [...notes(vocabulary, 'word'), ...notes(phrases, 'phrase')], components};
+}
