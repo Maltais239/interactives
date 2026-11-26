@@ -4,7 +4,7 @@ A first working version of Darren’s Western Canada K–12 territory workspace.
 
 ## What works
 
-- Interactive map with province and relationship filters, district selection, proposed routes and home base.
+- Interactive map with province and relationship filters, government school-board boundary overlays, district selection, proposed routes and home base.
 - A starter directory of 27 real district/authority names across BC, Alberta, Saskatchewan and Manitoba. This is **not the complete territory or an assigned account list**. Pins use approximate city centres, not verified offices.
 - District briefs: technology footprint, priorities, evidence/source date, renewal timing, contact cadence, assigned-book flag and stakeholders.
 - Contact history with separate last-contact and last-visit dates. A contact can create a follow-up and complete its linked task in one save.
@@ -21,7 +21,7 @@ Your entered records are saved in this browser’s `localStorage`; the app does 
 
 The app is deliberately not added to an app hub. The `noindex` meta tag requests that compliant search engines avoid indexing the app; it is **not access control**, and source in a public repository remains public. GitHub Pages may be public even when the source repository is private.
 
-Map tiles load from CARTO/OpenStreetMap and typography from Google Fonts. These providers receive normal asset requests. District notes are not sent in those requests. Directions links send the selected approximate district coordinates to Google Maps only when opened.
+Map tiles load from OpenStreetMap and typography from Google Fonts. These providers receive normal asset requests. District notes are not sent in those requests. Directions links send the selected approximate district coordinates to Google Maps only when opened.
 
 There are no CRM, Calendar, email, licensing-console or Google internal-system connections. Calendar export downloads a proposed itinerary and does not arrange meetings or travel. Opportunity stages are personal labels rather than Google forecast definitions.
 
@@ -37,7 +37,7 @@ Start with **Demo workspace** to explore. Use **Start my workspace** to remove i
 
 Run `npm test` (Node built-in test runner; no install required). Tests cover backup validation, reference integrity, demo cleanup, dates, contact/visit distinction, relationship states, route order, calendar export, screen-template rendering, contact-to-follow-up saving, reload persistence, HTML escaping and stale-tab protection. These are automated model/template checks, not a substitute for a visual browser review.
 
-The map observes container resizing without replacing stored records or resetting the current map position. Primary touch targets are at least 44 CSS pixels high. Layouts include short-screen and narrow-phone adaptations. The repository’s requested rendered checks at 1024×540, 1366×650, 768×900, 390×667, 320×568 and 640×360 remain unverified: the preview browser was unavailable during this build.
+The map observes container resizing without replacing stored records or resetting the current map position. Primary touch targets are at least 44 CSS pixels high. Layouts include short-screen and narrow-phone adaptations. Use `check-layout.html` for the repository’s required rendered checks at 1024×540, 1366×650, 768×900, 390×667, 320×568 and 640×360. Changing the screen selector resizes the same app without reloading it, so in-progress edits and map position can be checked. The initial release had no completed visual browser review; check results should accompany each subsequent handoff.
 
 ## Public research references
 
@@ -54,3 +54,9 @@ The map observes container resizing without replacing stored records or resettin
 Do not infer paid license counts, active users, renewals, buying priorities or province-wide preferences from a public tools page. Confirm these during discovery. Resources and starter references reviewed for the concept on November 26, 2026.
 
 Third-party code: Leaflet 1.9.4 (BSD-2-Clause) and Lucide (ISC); see `vendor/` for their license notices. Map attribution remains visible in the app.
+
+## Boundary references
+
+Government polygons are bundled separately in `data/boundaries/`, with provenance and coverage notes in its README and manifest. The Layers control toggles public, separate/Catholic and francophone areas, and district reference pins. The basemap uses standard OpenStreetMap tiles rather than the previous CARTO endpoint, which returned API-key placeholder images.
+
+The boundary layers cover more authorities than the starter account directory. Clicking an unlinked polygon can prefill a new public reference record; saving it is optional. The initial pin is an approximate boundary centre, not a verified office. Existing customer records and local browser data are not replaced.
