@@ -1,0 +1,8 @@
+// Bundle only the Lucide glyphs Westward uses. Run with a local Lucide package path.
+const fs=require('node:fs');
+const lucide=require(process.argv[2]);
+const names=['house','map','building-2','phone','target','book-open','hard-drive','triangle-alert','mountain','menu','search','plus','bell','calendar-days','clipboard-check','video','mail','circle-check','inbox','route','map-pin','message-square-plus','check','pencil','trash-2','info','chevron-up','chevron-down','x','calendar-plus','map-pinned','shield-check','user-plus','download','upload','sparkles'];
+const glyphs={};
+for(const name of names){const key=name.split('-').map(s=>s[0].toUpperCase()+s.slice(1)).join('');const glyph=lucide.icons[key];if(!glyph)throw Error('Missing Lucide icon '+name);glyphs[name]=glyph;}
+const runtime=`/* Lucide icon subset. ISC license: see Lucide-LICENSE.txt. */\n(()=>{const icons=${JSON.stringify(glyphs)};const ns='http://www.w3.org/2000/svg';window.lucide={createIcons(){document.querySelectorAll('i[data-lucide]').forEach(node=>{const glyph=icons[node.getAttribute('data-lucide')];if(!glyph)return;const svg=document.createElementNS(ns,'svg');for(const [k,v] of Object.entries({viewBox:'0 0 24 24',fill:'none',stroke:'currentColor','stroke-width':'2','stroke-linecap':'round','stroke-linejoin':'round',class:node.getAttribute('class')||'icon','aria-hidden':'true'}))svg.setAttribute(k,v);for(const [tag,attrs] of glyph){const shape=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))shape.setAttribute(k,String(v));svg.append(shape);}node.replaceWith(svg);});}};})();\n`;
+fs.writeFileSync('vendor/lucide.js',runtime);console.log('Bundled '+names.length+' Lucide icons ('+Buffer.byteLength(runtime)+' bytes)');
