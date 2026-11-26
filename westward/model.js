@@ -1,6 +1,33 @@
 export const KEY='westward.workspace.v1';
 export const PROVINCES={BC:'British Columbia',AB:'Alberta',SK:'Saskatchewan',MB:'Manitoba'};
 export const CHANNELS=['Call','Online meeting','Visit','Email'];
+export function accountProvinces(account){return account?[...new Set([account.province,...(Array.isArray(account.provinces)?account.provinces:[])])].filter(p=>PROVINCES[p]):[];}
+export function inProvince(account,province){return !!account&&(province==='all'||accountProvinces(account).includes(province));}
+export function provinceLabel(account){return accountProvinces(account).join(' / ');}
+export function mergeDirectory(workspace,catalogue,version){
+ const state=structuredClone(workspace),excluded=new Set(Array.isArray(state.directoryExclusions)?state.directoryExclusions:[]);
+ let added=0,linked=0,changed=false;
+ const ids=value=>String(value??'').split(',').map(x=>x.trim()).filter(Boolean);
+ const exact=value=>String(value??'').normalize('NFKC').trim().toLocaleLowerCase('en-CA');
+ for(const entry of catalogue){
+  if(excluded.has(entry.catalogueId))continue;
+  const boundaryIds=new Set(ids(entry.boundaryIds));
+  let account=state.accounts.find(a=>a.catalogueId===entry.catalogueId)||state.accounts.find(a=>a.id===entry.id)||state.accounts.find(a=>ids(a.boundaryIds).some(id=>boundaryIds.has(id)));
+  if(!account){const matches=state.accounts.filter(a=>a.type===entry.type&&accountProvinces(a).some(p=>accountProvinces(entry).includes(p))&&[entry.name,entry.officialName].filter(Boolean).some(name=>exact(name)===exact(a.name)));if(matches.length===1)account=matches[0];}
+  if(account){
+   let enriched=false;
+   for(const key of ['catalogueId','boundaryIds','officialName','hasBoundary'])if((account[key]===undefined||account[key]===null||account[key]==='')&&entry[key]!==undefined&&!Object.is(account[key],entry[key])){account[key]=entry[key];enriched=true;}
+   const provinces=[...new Set([...accountProvinces(account),...accountProvinces(entry)])];
+   if(JSON.stringify(account.provinces)!==JSON.stringify(provinces)){account.provinces=provinces;enriched=true;}
+   if(enriched){linked++;changed=true;}
+  }else{
+   const record=structuredClone(entry);state.accounts.push(record);added++;changed=true;
+  }
+ }
+ if(state.directoryVersion!==version){state.directoryVersion=version;changed=true;}
+ if(!Array.isArray(state.directoryExclusions)){state.directoryExclusions=[];changed=true;}
+ return {state,added,linked,changed};
+}
 export function today(d=new Date()){const p=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Edmonton',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d);return ['year','month','day'].map(k=>p.find(x=>x.type===k).value).join('-');}
 export function addDays(day,n){const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
 export function days(a,b){return Math.round((new Date(b+'T12:00:00Z')-new Date(a+'T12:00:00Z'))/86400000);}
@@ -20,6 +47,8 @@ export function validate(s){
  const date=v=>str(v,10)&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&!isNaN(Date.parse(v+'T12:00:00Z'))&&new Date(v+'T12:00:00Z').toISOString().slice(0,10)===v;
  for(const k of ['accounts','contacts','actions','trips','opportunities','resources']){if(!Array.isArray(s[k])||s[k].length>20000||!s[k].every(x=>x&&str(x.id,100)&&x.id)||new Set(s[k].map(x=>x.id)).size!==s[k].length)throw Error('Invalid or duplicate '+k+' records.');}
  const ids=new Set(s.accounts.map(a=>a.id));
+ if(s.directoryExclusions!==undefined&&(!Array.isArray(s.directoryExclusions)||!s.directoryExclusions.every(id=>str(id,100))))throw Error('Invalid directory exclusions.');
+ if(!s.accounts.every(a=>(a.provinces===undefined||(Array.isArray(a.provinces)&&a.provinces.length>0&&a.provinces.every(p=>PROVINCES[p])))&&(a.catalogueId===undefined||str(a.catalogueId,100))&&(a.boundaryIds===undefined||str(a.boundaryIds,2000))))throw Error('Invalid directory identity or province details.');
  if(!s.accounts.every(a=>str(a.name,200)&&a.name.trim()&&PROVINCES[a.province]&&str(a.city,200)&&Number.isFinite(a.lat)&&Math.abs(a.lat)<=90&&Number.isFinite(a.lng)&&Math.abs(a.lng)<=180&&Number.isFinite(a.cadence)&&a.cadence>0&&Array.isArray(a.stakeholders)&&a.stakeholders.every(x=>str(x.id,100)&&str(x.name,200)&&str(x.role,300)&&(!x.email||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x.email)))))throw Error('Invalid district or stakeholder details.');
  if(!s.actions.every(a=>ids.has(a.accountId)&&str(a.title,500)&&a.title.trim()&&date(a.due)&&CHANNELS.includes(a.channel)&&typeof a.done==='boolean'))throw Error('Invalid next-step details.');
  if(!s.contacts.every(c=>ids.has(c.accountId)&&date(c.date)&&CHANNELS.includes(c.channel)&&str(c.notes??'')&&str(c.person??'',200)))throw Error('Invalid contact details.');

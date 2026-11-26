@@ -5,7 +5,7 @@ A first working version of Darren’s Western Canada K–12 territory workspace.
 ## What works
 
 - Interactive map with province and relationship filters, government school-board boundary overlays, district selection, proposed routes and home base.
-- A starter directory of 27 real district/authority names across BC, Alberta, Saskatchewan and Manitoba. This is **not the complete territory or an assigned account list**. Pins use approximate city centres, not verified offices.
+- A directory of **185 unique public, separate/Catholic and francophone district accounts** across BC, Alberta, Saskatchewan and Manitoba. Province filters include 60 in BC, 63 in Alberta, 27 in Saskatchewan and 37 in Manitoba; the two Lloydminster boards appear in both AB and SK but have one account each. This is a reviewed geographic reference set, **not an assigned book or a complete list of all K–12 institutions**. Pins use approximate city centres or points inside district boundaries, not verified offices.
 - District briefs: technology footprint, priorities, evidence/source date, renewal timing, contact cadence, assigned-book flag and stakeholders.
 - Contact history with separate last-contact and last-visit dates. A contact can create a follow-up and complete its linked task in one save.
 - Next steps with date, contact channel, priority, owner, completion/reopening and editing.
@@ -33,9 +33,11 @@ Start with **Demo workspace** to explore. Use **Start my workspace** to remove i
 
 **Saved in this browser → Export backup** creates a portable JSON file. Import validates its structure and references before asking to replace the current workspace. A stale browser tab will not silently overwrite newer saved records.
 
+Existing 27-account workspaces automatically receive the 158 missing directory records on opening the updated app. The upgrade keeps existing IDs, names, coordinates, notes, assignments, contacts and plans. It reuses custom records with matching boundary IDs, or a unique exact name qualified by province and authority type. Deliberately deleted directory accounts stay excluded. Older JSON backups receive the same upgrade when restored.
+
 ## Checks
 
-Run `npm test` (Node built-in test runner; no install required). Tests cover backup validation, reference integrity, demo cleanup, dates, contact/visit distinction, relationship states, route order, calendar export, screen-template rendering, contact-to-follow-up saving, reload persistence, HTML escaping and stale-tab protection. These are automated model/template checks, not a substitute for a visual browser review.
+Run `npm test` (Node built-in test runner; no install required). Tests cover directory coverage, cross-border identity, repeat-safe workspace upgrades, preservation of existing records, backup validation, reference integrity, demo cleanup, dates, contact/visit distinction, relationship states, route order, calendar export, screen-template rendering, contact-to-follow-up saving, reload persistence, HTML escaping and stale-tab protection. These are automated model/template checks, not a substitute for a visual browser review.
 
 The map observes container resizing without replacing stored records or resetting the current map position. Primary touch targets are at least 44 CSS pixels high. Layouts include short-screen and narrow-phone adaptations. Use `check-layout.html` for the repository’s required rendered checks at 1024×540, 1366×650, 768×900, 390×667, 320×568 and 640×360. Changing the screen selector resizes the same app without reloading it, so in-progress edits and map position can be checked. The initial release had no completed visual browser review; check results should accompany each subsequent handoff.
 
@@ -51,7 +53,7 @@ The map observes container resizing without replacing stored records or resettin
 - [Pembina Trails technology](https://www.pembinatrails.ca/technology)
 - [Saskatoon Public Edsby help](https://www.spsd.sk.ca/edsby-help)
 
-Do not infer paid license counts, active users, renewals, buying priorities or province-wide preferences from a public tools page. Confirm these during discovery. Resources and starter references reviewed for the concept on November 26, 2026.
+Do not infer paid license counts, active users, renewals, buying priorities or province-wide preferences from a public tools page. Confirm these during discovery. Resources and district references reviewed for the concept on November 26, 2026.
 
 Third-party code: Leaflet 1.9.4 (BSD-2-Clause) and Lucide (ISC); see `vendor/` for their license notices. Map attribution remains visible in the app.
 
@@ -59,4 +61,6 @@ Third-party code: Leaflet 1.9.4 (BSD-2-Clause) and Lucide (ISC); see `vendor/` f
 
 Government polygons are bundled separately in `data/boundaries/`, with provenance and coverage notes in its README and manifest. The Layers control toggles public, separate/Catholic and francophone areas, and district reference pins. The basemap uses standard OpenStreetMap tiles rather than the previous CARTO endpoint, which returned API-key placeholder images.
 
-The boundary layers cover more authorities than the starter account directory. Clicking an unlinked polygon can prefill a new public reference record; saving it is optional. The initial pin is an approximate boundary centre, not a verified office. Existing customer records and local browser data are not replaced.
+All 185 source boundary records link to 183 distinct district accounts. SD93 in BC and DSFM in Manitoba remain pin-only because the selected layers supply no matching polygon, bringing the unique directory total to 185. Public, separate/Catholic and francophone boundaries and reference pins start enabled; overlapping layers can be toggled individually. Clicking a polygon opens its district brief. If its account was removed, it can prefill a replacement public reference record for review.
+
+`directory-data.js` is generated public reference data; `data/directory-coverage.json` records its counts and exceptions. `data/directory-overrides.json` retains the original 27 public IDs and approximate pins. After reviewing updated boundaries and crosswalks, run `python3 scripts/build-directory.py` with Shapely installed, then run the tests. New pins use an interior point of the largest source polygon component and are explicitly labelled as office-unconfirmed references. Confirm and update office coordinates before planning travel.
