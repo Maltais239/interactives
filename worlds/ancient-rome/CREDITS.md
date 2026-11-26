@@ -44,3 +44,7 @@ The street stones combine a locally generated pattern of fitted paving and cut b
 [Compare the house fronts and street paving from the same walking viewpoints.](street-comparison.webp)
 
 The four scanned architectural surfaces share two small atlases. The second stores tangent-space normal X and Y and roughness. The lion uses a 2,400-triangle mesh with baked occlusion.
+
+## Landmark assets
+
+[Colosseum model by Colosseum.how](https://www.colosseum.how/3d-model), published by Artur Jakucewicz. The AD 80 GLB is stored with lossless compression in [assets/landmarks](assets/landmarks/README.md). Placement in the walk is pending.
