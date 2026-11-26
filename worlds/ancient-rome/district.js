@@ -1,7 +1,9 @@
 import {masonry} from './masonry.js';
-import {seeded,surface as M} from './texture.js?v=forum2';
+import {seeded,surface as M} from './texture.js?v=street1';
 
-import {forumSlabs,growTree,marketBarrow,herbBed,balcony,capital} from './street.js?v=forum2';
+import {forumSlabs,growTree,marketBarrow,herbBed,balcony,capital} from './street.js?v=street1';
+
+import {streetFront,paintedBand} from './fronts.js?v=street1';
 
 export const stops=[
   {name:'The Forum',x:9.3,z:15.5,yaw:-.34,pitch:.14},
@@ -181,12 +183,6 @@ export function buildDistrict(site){
       face([[l,y(1,l)-.23,2.11],[r,y(1,r)-.29,2.11],[r,y(1,r),2.11],[l,y(1,l),2.11]],k,M.linen);
     }
   }
-  function windowBay(x,y,z,w,h){
-    box(x,y,z,w+.20,h+.21,.12,0xb59a74);box(x,y+.08,z+.075,w,h-.02,.12,0x39342b,M.wood);
-    box(x,y+.10,z+.15,.075,h-.06,.05,timber);box(x,y+h*.61,z+.16,w,.075,.05,timber);
-    box(x,y-.045,z+.075,w+.36,.13,.32,stone);
-    for(const side of [-1,1]){box(x+side*(w*.5+.18),y+.09,z+.09,.27,h-.09,.10,0x846340,M.wood);}
-  }
   function shop(w,d,h,id){
     const color=pick(colors),back=-d;
     if(id%2===0)balcony(g,0,4.05,.17,w*.51,[0xab5843,0x778f89,0xae794a][id/2%3]);
@@ -197,9 +193,17 @@ export function buildDistrict(site){
       box(sign*w*.415,.12,.23,w*.17,1.02,.09,red,M.plaster);
       box(sign*w*.415,1.16,.23,w*.17,.065,.1,0xb98650);
     }
-    wall(0,3.02,-d/2,w,h-3.02,d,color,M.plaster);
+    const winHeight=Math.min(1.30,h-4.13);
+    const upperWindows=[-1,0,1].map(i=>({x:i*w*.30,y:3.86,w:Math.min(.95,w*.14),h:winHeight}));
+    streetFront(g,w,d,3.02,h,color,upperWindows,id+2);
     box(0,2.92,.03,w,.29,.50,timber,M.wood);
-    for(let i=-1;i<=1;i++)windowBay(i*w*.30,4.01,.05,Math.min(.95,w*.14),1.39);
+    paintedBand(g,-w*.49,w*.49,h-.415,.055,.012,cloths[id%cloths.length]);
+    for(const sign of [-1,1]){
+      const x=sign*w*.415;
+      paintedBand(g,x-w*.064,x+w*.064,.28,.037,.282,0xc59e70);
+      paintedBand(g,x-w*.064,x-w*.060,.28,.66,.282,0xc59e70);
+      paintedBand(g,x+w*.060,x+w*.064,.28,.66,.282,0xc59e70);
+    }
     box(0,h-.27,-d/2,w+.29,.24,d+.32,stone);roof(0,h,-d/2,w+.65,d+.64,1.17+R()*.46);
     box(0,.01,-d/2,w,.07,d,0xb49477,M.paving);
     for(const col of [-1,0,1])label(w*.296*col,.37,back+.199,w*.277,2.28,M.fresco);
@@ -219,16 +223,43 @@ export function buildDistrict(site){
     if(id%3===1){pot(w*.38,.03,1.07,.43,0xa86848);pot(w*.36,.03,1.89,.29,0xc48b65);}
   }
   function house(w,d,h,decor=true){
-    const color=pick(colors);
-    wall(0,0,-d/2,w,h,d,color,M.plaster);
-    box(0,.04,.025,w,1.26,.09,pick([red,0xb27c55,0xa68b6f]),M.plaster);
-    box(0,1.34,.06,w,.065,.07,0xd2a46e);box(0,.0,.04,w,.20,.12,shadowStone);
+    const color=pick(colors),plinth=pick([red,0xb27c55,0xa68b6f]);
+    const style=Math.floor(w*13+h*21)%7,door={x:w*.22,y:.015,w:1.10,h:2.23,door:true};
+    const openings=[];
     if(decor){
-      const x=w*.22;
-      box(x,0,.06,1.32,2.45,.19,shadowStone);box(x,.04,.18,1.08,2.20,.10,0x70533a,M.wood);
-      const rows=h>8?2:1;
-      for(let j=0;j<rows;j++)for(let i=0;i<3;i++)windowBay((i-1)*w*.29,3.09+j*2.66,.045,.78,1.23);
+      openings.push(door);
+      if(style%3!==1)openings.push({x:-w*(style%2?.22:.15),y:1.64,w:.68+(style%2)*.23,h:.60,screen:true});
+      for(let row=0;row<(h>8?2:1);row++)for(let i=-1;i<=1;i++){
+        openings.push({x:i*w*.29,y:3.09+row*2.66,w:.78,h:1.23});
+      }
+      streetFront(g,w,d,0,h,color,openings,style);
+    }else wall(0,0,-d/2,w,h,d,color,M.facade);
+    const ends=decor?[[-w/2,door.x-.56],[door.x+.56,w/2]]:[[-w/2,w/2]];
+    for(const [left,right] of ends){
+      const width=right-left,mid=(left+right)/2;
+      box(mid,.04,.025,width,1.26,.09,plinth,M.facade);
+      box(mid,1.32,.06,width,.048,.07,0xd2a46e);
+      box(mid,.0,.04,width,.16,.12,shadowStone);
+      if(decor){
+        const n=Math.max(1,Math.round(width/1.78));
+        for(let i=0;i<n;i++){
+          const l=left+width*i/n+.09,r=left+width*(i+1)/n-.09;
+          const line=style%3===1?0xc69b73:0xb18a67;
+          paintedBand(g,l,r,1.12,.026,.073,line);
+          paintedBand(g,l,l+.024,.29,.85,.073,line);
+          paintedBand(g,r-.024,r,.29,.85,.073,line);
+        }
+      }
+    }
+    if(decor){
+      // A narrow band and small corbels mark the floor behind some street elevations.
+      if(style%3===2){
+        box(0,2.82,.025,w+.05,.11,.15,0xc8ac87);
+        for(let i=-2;i<=2;i++)box(i*w*.19,2.68,.03,.13,.14,.15,0xb99b79);
+      }
       if(h>8)box(0,5.52,.12,w+.13,.16,.33,stone);
+      paintedBand(g,-w*.49,w*.49,h-.54,.09,.009,plinth);
+      paintedBand(g,-w*.49,w*.49,h-.38,.032,.009,plinth);
     }
     box(0,h-.19,-d/2,w+.23,.18,d+.22,shadowStone);roof(0,h,-d/2,w+.52,d+.57,1.21);
   }

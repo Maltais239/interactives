@@ -31,4 +31,8 @@ The following assets from [Poly Haven](https://polyhaven.com/license) are availa
 | [Kloofendal 48d Partly Cloudy](https://polyhaven.com/a/kloofendal_48d_partly_cloudy) | Greg Zaal | Upper sky panorama |
 | [Lion Head](https://polyhaven.com/a/lion_head) | Tina | Adapted sculptural ornament on the fountain |
 
-The four architectural surfaces share two small atlases. The second stores tangent-space normal X and Y and roughness. The lion uses a 2,400-triangle mesh with baked occlusion.
+The street stones combine a locally generated pattern of fitted paving and cut blocks with mineral grain from the credited limestone scan. Colour, surface relief, and roughness follow the same stone edges. The house fronts, shutters, paintwork, and door fittings are interpretive.
+
+[Compare the house fronts and street paving from the same walking viewpoints.](street-comparison.webp)
+
+The four scanned architectural surfaces share two small atlases. The second stores tangent-space normal X and Y and roughness. The lion uses a 2,400-triangle mesh with baked occlusion.

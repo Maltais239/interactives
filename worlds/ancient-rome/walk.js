@@ -1,12 +1,15 @@
-import {buildDistrict,stops as oldStops} from './district.js?v=boarium1';
-import {createRenderer} from './renderer.js?v=boarium1';
+import {buildDistrict,stops as oldStops} from './district.js?v=street1';
+import {createRenderer} from './renderer.js?v=street1';
 
-import {installFountainLion} from './street.js?v=forum2';
+import {installFountainLion} from './street.js?v=street1';
 
 const get=id=>document.getElementById(id),canvas=get('world'),dialog=get('map'),status=get('status');
-const historical=new URLSearchParams(location.search).get('district')!=='vicus';
-const site=historical?await import('./boarium.js?v=boarium1'):null;
-const stops=site?.stops??oldStops,mesh=buildDistrict(site?.buildBoarium),cam={...stops[0],eye:1.69};
+const query=new URLSearchParams(location.search);
+const historical=query.get('district')!=='vicus';
+const site=historical?await import('./boarium.js?v=street1'):null;
+const stops=site?.stops??oldStops,mesh=buildDistrict(site?.buildBoarium);
+const startStop=stops.find(stop=>stop.name.toLowerCase().replaceAll(' ','-')===query.get('stop'))??stops[0];
+const cam={...startStop,eye:1.69};
 if(!historical){
   document.title='Vicus Aureus · Ancient Rome';
   document.querySelector('h1').textContent='Vicus Aureus';document.querySelector('.brand small').textContent='Ancient Rome';

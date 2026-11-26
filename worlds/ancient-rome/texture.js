@@ -1,5 +1,5 @@
 // The district shares four scanned surfaces. All other material layers are drawn locally.
-export const surface = {lime:0, plaster:1, brick:2, paving:3, roof:4, wood:5, linen:6, metal:7, garden:8, mosaic:9, water:10, leaf:11, labels:12,sprig:21,ashlar:22,meander:23,bough:24,fresco:25,herb:26};
+export const surface = {lime:0, plaster:1, brick:2, paving:3, roof:4, wood:5, linen:6, metal:7, garden:8, mosaic:9, water:10, leaf:11, labels:12,sprig:21,ashlar:22,meander:23,bough:24,fresco:25,herb:26, facade:28, flagstone:29};
 export const words=['CONCORDIA','PANIS','OLEVM','VINVM','POMA','VICVS AVREVS','HORTVS','FORVM','SALVE'];
 export function seeded(seed) {
   return () => {seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
@@ -11,7 +11,7 @@ async function imageAsset(name){
   }catch{return null;}
 }
 export async function makeTextures(device) {
-  const [pigment,relief,skyImage,soil]=await Promise.all(['stone-color.webp','stone-relief.webp','day-sky.webp','garden-soil.webp'].map(imageAsset));
+  const [pigment,relief,skyImage,soil,streetStone]=await Promise.all(['stone-color.webp','stone-relief.webp','day-sky.webp','garden-soil.webp','street-stone.webp'].map(imageAsset));
   const size=512, count=surface.herb+1, canvas=document.createElement('canvas');
   canvas.width=canvas.height=size;
   const ctx=canvas.getContext('2d',{willReadFrequently:true}), rng=seeded(714);
@@ -192,22 +192,26 @@ export async function makeTextures(device) {
         ctx.save();ctx.translate(256,256);ctx.scale(1,2.68);ctx.fillText(words[layer-surface.labels],0,2,458);ctx.restore();break;
     }
     if(pigment&&layer<=3)chip(pigment,layer,ctx,size);
+    if(streetStone && (layer===surface.paving || layer===surface.ashlar)){
+      chip(streetStone,layer===surface.paving?0:1,ctx,size);
+    }
     if(soil && layer===surface.garden)ctx.drawImage(soil,0,0,size,size);
     uploadMips(tex,layer,canvas,10);
   }
-  const detailSize=256,detail=device.createTexture({label:'Stone relief and roughness',size:[detailSize,detailSize,4],
-    format:'rgba8unorm',mipLevelCount:9,usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
+  const detailSize=512,detail=device.createTexture({label:'Stone relief and roughness',size:[detailSize,detailSize,5],
+    format:'rgba8unorm',mipLevelCount:10,usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
   canvas.width=canvas.height=detailSize;
-  for(let layer=0;layer<4;layer++){
+  for(let layer=0;layer<5;layer++){
     ctx.fillStyle='#8080cd';ctx.fillRect(0,0,detailSize,detailSize);
-    if(relief)chip(relief,layer,ctx,detailSize);
-    uploadMips(detail,layer,canvas,9);
+    if(relief && layer<4)chip(relief,layer,ctx,detailSize);
+    if(streetStone && layer>=3)chip(streetStone,layer-1,ctx,detailSize);
+    uploadMips(detail,layer,canvas,10);
   }
   const width=skyImage?.width||1,height=skyImage?.height||1;
   const sky=device.createTexture({label:'Daylight sky',size:[width,height],format:'rgba8unorm',
     usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
   canvas.width=width;canvas.height=height;if(skyImage)ctx.drawImage(skyImage,0,0);
   device.queue.writeTexture({texture:sky},ctx.getImageData(0,0,width,height).data,{bytesPerRow:width*4},[width,height]);
-  soil?.close();pigment?.close();relief?.close();skyImage?.close();
+  streetStone?.close();soil?.close();pigment?.close();relief?.close();skyImage?.close();
   return {material:tex,detail,sky,hasSky:!!skyImage};
 }

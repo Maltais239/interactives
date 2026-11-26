@@ -1,4 +1,4 @@
-import {makeTextures} from './texture.js?v=forum2';
+import {makeTextures} from './texture.js?v=street1';
 
 const shader=riverTown=>`
 const riverTown=${riverTown};
@@ -105,9 +105,16 @@ fn airColor(color:vec3f,p:vec3f)->vec3f{
   let haze=1.-exp(-d*.00135-max(d-33.,0.)*.00085);
   return mix(color,vec3f(.80,.83,.845),min(haze,.62));
 }
+// The house fronts and individually modeled flags share the plaster and limestone scans.
+fn colorLayer(layer:u32)->u32{
+  if(layer==28u){return 1u;} if(layer==29u){return 0u;} return min(layer,26u);
+}
+fn stoneUV(uv:vec2f,layer:u32)->vec2f{
+  if(layer==3u){return uv*.55;} if(layer==22u){return uv*.83;} return uv;
+}
 // The reflection probe is rendered only once from the fountain, with the basin omitted.
 @fragment fn capture(i:Vary)->@location(0) vec4f{
-  let c=select(textureSample(materials,paint,i.uv,min(i.layer,26u)),vec4f(1),i.layer==27u);let leaf=i.layer==21u||i.layer==24u||i.layer==26u;
+  let c=select(textureSample(materials,paint,stoneUV(i.uv,i.layer),colorLayer(i.layer)),vec4f(1),i.layer==27u);let leaf=i.layer==21u||i.layer==24u||i.layer==26u;
   if((leaf&&c.a<.20)||i.layer==10u||(!riverTown && distance(i.world.xz,vec2f(7.4,1.2))<2.52&&i.world.y<4.3)){discard;}
   let n=normalize(i.norm);
   return vec4f(airColor(illuminate(i.color*c.rgb,i.world,n,visibility(i.world,n),sunlight(i.world,n),leaf),i.world),1);
@@ -115,12 +122,15 @@ fn airColor(color:vec3f,p:vec3f)->vec3f{
 @fragment fn surface(i:Vary)->@location(0) vec4f{
   let p=i.world;let layer=i.layer;let geometric=normalize(i.norm);var n=geometric;
   let view=normalize(s.eye.xyz-p);let leaf=layer==21u||layer==24u||layer==26u;
-  let c=select(textureSample(materials,paint,i.uv,min(layer,26u)),vec4f(1),layer==27u);
-  let detail=textureSample(relief,paint,i.uv,min(layer,3u)).rgb;
+  let c=select(textureSample(materials,paint,stoneUV(i.uv,layer),colorLayer(layer)),vec4f(1),layer==27u);
+  let surfaceLayer=colorLayer(layer);
+  let detailLayer=select(min(surfaceLayer,3u),4u,layer==22u);
+  let detail=textureSample(relief,paint,stoneUV(i.uv,layer),detailLayer).rgb;
+  let hasRelief=surfaceLayer<=3u || layer==22u;
   let du=dpdx(i.uv);let dv=dpdy(i.uv);
   let a=cross(dpdy(p),n);let b=cross(n,dpdx(p));
   let tangent=a*du.x+b*dv.x;let bitangent=a*du.y+b*dv.y;
-  if(layer<=3u){
+  if(hasRelief){
     let xy=detail.rg*2.-1.;let strength=select(select(.76,.27,layer==0u && abs(geometric.y)<.82),1.12,layer==3u);
     let inv=inverseSqrt(max(max(dot(tangent,tangent),dot(bitangent,bitangent)),.0000000001));
     n=normalize(n*sqrt(max(.08,1.-dot(xy,xy)))+(tangent*xy.x+bitangent*xy.y)*inv*strength);
@@ -130,7 +140,24 @@ fn airColor(color:vec3f,p:vec3f)->vec3f{
   let access=visibility(p,geometric)*mix(ground,1.,smoothstep(.06,2.4,p.y));
   var pigment=c.rgb;
   if(layer==0u && abs(geometric.y)<.82){pigment=mix(vec3f(.88),pigment,.39);}
-  var base=weather(pigment*i.color,p,layer);
+  var base=weather(pigment*i.color,p,surfaceLayer);
+  if(layer==28u){
+    let wall=vec2f(select(p.z,p.x,abs(geometric.z)>abs(geometric.x)),p.y);
+    let wash=noise(wall*vec2f(.88,1.31))*.52+noise(wall*3.9)*.33+noise(wall*12.)*.15;
+    let splashes=1.-smoothstep(.18,1.22,p.y);
+    let fleck=smoothstep(.62,.80,wash+splashes*.10);
+    base=mix(base*(.94+.12*wash),vec3f(.68,.60,.49),fleck*(.13+.22*splashes));
+    // Small losses in the lower coat reveal rough aggregate under the limewash.
+    let grit=textureSampleGrad(materials,paint,i.uv*1.8,2u,du*1.8,dv*1.8).rgb;
+    let broken=noise(wall*2.4)*.56+noise(wall*8.)*.28+grit.r*.16;
+    let chip=smoothstep(.66,.74,broken)*splashes;
+    base=mix(base,vec3f(.64,.54,.43)*(.51+.54*grit),chip*.75);
+  }
+  if(layer==29u){
+    // The scan supplies the fine grain. Broad wear follows each flag's near-flat face.
+    let grain=noise(p.xz*1.85);
+    base*=.93+.10*grain;
+  }
   if(riverTown && (layer==3u || layer==0u || layer==22u)){
     // Low-frequency variation crosses texture tiles. Damp masonry follows the waterline.
     let warp=vec2f(noise(p.xz*.075),noise(p.zx*.091+4.))*1.8;
@@ -145,7 +172,11 @@ fn airColor(color:vec3f,p:vec3f)->vec3f{
   }
   var out=illuminate(base,p,n,access,sun,leaf);
   let halfVec=normalize(s.sun.xyz+view);
-  if(layer<=3u){out+=vec3f(.034,.029,.020)*pow(max(dot(n,halfVec),0.),mix(55.,10.,detail.b))*sun*(1.-detail.b);}
+  if(hasRelief){out+=vec3f(.034,.029,.020)*pow(max(dot(n,halfVec),0.),mix(55.,10.,detail.b))*sun*(1.-detail.b);}
+  if(riverTown && layer==22u){
+    let tide=1.-smoothstep(-8.56,-7.93+.28*noise(p.xz*.71),p.y);
+    out+=tide*sun*vec3f(.21,.19,.16)*pow(max(dot(n,halfVec),0.),42.);
+  }
   if(layer==7u){
     let reflected=textureSampleLevel(forumReflection,paint,reflect(-view,n),2.7).rgb;
     let facing=1.-clamp(dot(n,view),0.,1.);

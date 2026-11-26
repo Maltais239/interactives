@@ -1,11 +1,11 @@
 // Small street details are grown from a fixed seed, in metres.
-import {surface as M,seeded} from './texture.js?v=forum2';
+import {surface as M,seeded} from './texture.js?v=street1';
 const tau=Math.PI*2;
 const palette=(list,r)=>list[Math.floor(r()*list.length)];
 const shade=(color,k)=>[16,8,0].reduce((v,s)=>v+(Math.min(255,Math.round((color>>s&255)*k))<<s),0);
 
 export function forumSlabs(g){
-  const random=seeded(4512);
+  const random=seeded(4512), wear=seeded(80139);
   for(let z=-13.55;z<24;){
     const next=Math.min(24,z+.64+random()*.57);
     for(let x=-13.32;x<12.68;){
@@ -17,16 +17,30 @@ export function forumSlabs(g){
           [right-chip(),north],[left+chip(),north],[left,north+chip()],[left,south-chip()]];
         const cx=(left+right)/2,cz=(north+south)/2,h=.036+random()*.010;
         const shiftX=random()*16,shiftY=random()*16,tilt=(random()-.5)*.008;
-        const top=outline.map(([a,b])=>[a+Math.sign(cx-a)*.016,h+(a-cx)*tilt,b+Math.sign(cz-b)*.016]);
-        const base=outline.map(([a,b])=>[a,.014,b]);
         const color=shade(palette([0xe1d5c2,0xdad0bf,0xddd1bd,0xd8cdbb],random),.94+.085*random());
-        const uv=p=>[p[0]/2.0+shiftX,p[2]/2.0+shiftY];
-        const center=[cx,h,cz];
-        for(let k=0;k<8;k++){
-          const j=(k+1)%8, tri=[center,top[k],top[j]];
-          g.face(tri,color,M.lime,tri.map(uv));
-          g.face([base[k],base[j],top[j],top[k]],shade(color,.91),M.lime);
+        const uv=p=>[p[0]/1.35+shiftX,p[2]/1.35+shiftY];
+        const zTilt=(wear()-.5)*.010, crown=.003+wear()*.006;
+        function piece(points,tint,settle){
+          const mx=points.reduce((v,p)=>v+p[0],0)/points.length;
+          const mz=points.reduce((v,p)=>v+p[1],0)/points.length;
+          const height=(x,z)=>h+(x-cx)*tilt+(z-cz)*zTilt+settle;
+          const top=points.map(([x,z])=>[x+Math.sign(mx-x)*Math.min(.014,Math.abs(mx-x)*.18),
+            height(x,z),z+Math.sign(mz-z)*Math.min(.014,Math.abs(mz-z)*.18)]);
+          const base=points.map(([x,z])=>[x,.014,z]),center=[mx,height(mx,mz)+crown,mz];
+          for(let k=0;k<points.length;k++){
+            const j=(k+1)%points.length,tri=[center,top[k],top[j]];
+            g.face(tri,tint,M.flagstone,tri.map(uv));
+            g.face([base[k],base[j],top[j],top[k]],shade(tint,.87),M.lime);
+          }
         }
+        if(wear()<.14 && right-left>.58 && south-north>.35){
+          // One corner has settled separately. Both pieces keep the original stone grain.
+          const corner=1+2*Math.floor(wear()*4), ring=outline.slice(corner).concat(outline.slice(0,corner));
+          const between=(a,b,t)=>a.map((v,j)=>v+(b[j]-v)*t);
+          const a=between(ring[7],ring[0],.57), b=between(ring[1],ring[2],.36);
+          piece([a,ring[0],ring[1],b],shade(color,.96),-.009);
+          piece([b,...ring.slice(2),a],color,0);
+        }else piece(outline,color,0);
       }
       x=end;
     }

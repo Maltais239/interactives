@@ -1,7 +1,7 @@
 // Local metres, east = +x, north = -z. The reference point is 41.88900 N, 12.48084 E.
 // The main Portunus rectangle excludes the projecting staircase in the mapped outline.
-import {surface as M,seeded} from './texture.js?v=forum2';
-import {growTree,marketBarrow,forumSlabs} from './street.js?v=forum2';
+import {surface as M,seeded} from './texture.js?v=street1';
+import {growTree,marketBarrow,forumSlabs} from './street.js?v=street1';
 const PI=Math.PI,TAU=PI*2,rad=PI/180;
 export const port={x:5.65,z:-26.29,yaw:-162.55*rad};
 export const hercules={x:-6.52,z:28.80};
@@ -14,6 +14,8 @@ export const stops=[
   {name:'Temple of Portunus',x:-8.8,z:-52.9,yaw:2.68,pitch:.20},
   {name:'Tiber landing',x:-42.6,z:21,yaw:-.55,pitch:-.215},
   {name:'Cattle market',x:18.65,z:28.8,yaw:-.94,pitch:-.02},
+  {name:'Market street',x:16.5,z:7.4,yaw:1.02,pitch:-.11},
+  {name:'Southern houses',x:8,z:53.3,yaw:2.90,pitch:.20},
   {name:'Pons Aemilius',x:-96,z:bridgeZ(-96),yaw:2.19,pitch:-.025}
 ];
 const stone=0xe2d7c1,pale=0xf3ead5,tufa=0xaa9680,wood=0x816047,bronze=0x897456;
@@ -33,6 +35,7 @@ export function withinDistrict(x,z){
 export function placeAt(x,z){
   if(onBridge(x,z)&&x<bank(z)+4)return 'Pons Aemilius';
   if(x<bank(z)+14)return 'Tiber landing';
+  if(z>52 && x>-26 && x<36)return 'Southern houses';
   if(x>8&&z>15&&z<32)return 'Cattle market';
   if(Math.hypot(x-hercules.x,z-hercules.z)<29)return 'Hercules Victor';
   if(Math.hypot(x-port.x,z-port.z)<31)return 'Temple of Portunus';
