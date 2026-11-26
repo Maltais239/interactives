@@ -1,11 +1,12 @@
 // A single indexed mesh holds the district. Colliders use the same local frames.
 export function masonry(){
   const data=[],indices=[],blocks=[],stairs=[];
-  let tx=0,tz=0,angle=0,cs=1,sn=0;
-  function frame(x,z,yaw,draw){
-    const saved=[tx,tz,angle,cs,sn];
+  let ty=0,tx=0,tz=0,angle=0,cs=1,sn=0;
+  function frame(x,z,yaw,draw,elevation=0){
+    const saved=[tx,tz,angle,cs,sn,ty];
+    ty+=elevation;
     tx+=x*cs+z*sn;tz+=z*cs-x*sn;angle+=yaw;cs=Math.cos(angle);sn=Math.sin(angle);
-    draw();[tx,tz,angle,cs,sn]=saved;
+    draw();[tx,tz,angle,cs,sn,ty]=saved;
   }
   const rgb=hex=>[(hex>>16&255)/255,(hex>>8&255)/255,(hex&255)/255];
   const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
@@ -13,7 +14,7 @@ export function masonry(){
   function unit(a){const l=Math.hypot(...a)||1;return a.map(v=>v/l);}
   function vert(p,n,uv,color,mat){
     const [x,y,z]=p,[a,b,c]=n;
-    data.push(tx+x*cs+z*sn,y,tz+z*cs-x*sn,a*cs+c*sn,b,c*cs-a*sn,uv[0],uv[1],...color,mat);
+    data.push(tx+x*cs+z*sn,y+ty,tz+z*cs-x*sn,a*cs+c*sn,b,c*cs-a*sn,uv[0],uv[1],...color,mat);
   }
   function face(pts,color,mat=0,uv=null,normals=null){
     const i=data.length/12,n=unit(cross(sub(pts[1],pts[0]),sub(pts[2],pts[0]))),c=rgb(color);
@@ -32,7 +33,7 @@ export function masonry(){
     if(y>.08)face([[l,b,n],[r,b,n],[r,b,s],[l,b,s]],c,mat);
   }
   function block(x,z,w,d,bottom=-2,top=24){
-    blocks.push({x:tx+x*cs+z*sn,z:tz+z*cs-x*sn,hx:w/2,hz:d/2,c:cs,s:sn,bottom,top});
+    blocks.push({x:tx+x*cs+z*sn,z:tz+z*cs-x*sn,hx:w/2,hz:d/2,c:cs,s:sn,bottom:bottom+ty,top:top+ty});
   }
   function wall(x,y,z,w,h,d,c,mat=0){box(x,y,z,w,h,d,c,mat);block(x,z,w,d,y,y+h);}
   function post(x,y,z,profile,c,mat=0,N=18,flutes=0){
@@ -58,7 +59,7 @@ export function masonry(){
     for(let i=0;i<sides;i++)face([point(a,i),point(a,i+1),point(b,i+1),point(b,i)],c,mat);
   }
   function ramp(x,z,w,d,front,back){
-    stairs.push({x:tx+x*cs+z*sn,z:tz+z*cs-x*sn,hx:w/2,hz:d/2,c:cs,s:sn,front,back});
+    stairs.push({x:tx+x*cs+z*sn,z:tz+z*cs-x*sn,hx:w/2,hz:d/2,c:cs,s:sn,front:front+ty,back:back+ty});
   }
   function label(x,y,z,w,h,layer){
     face([[x-w/2,y,z],[x+w/2,y,z],[x+w/2,y+h,z],[x-w/2,y+h,z]],0xffffff,layer,[[0,1],[1,1],[1,0],[0,0]]);

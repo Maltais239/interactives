@@ -1,19 +1,19 @@
-import {buildDistrict,stops as oldStops} from './district.js?v=quarter1';
-import {createRenderer} from './renderer.js?v=quarter1';
+import {buildDistrict,stops as oldStops} from './district.js?v=city1';
+import {createRenderer} from './renderer.js?v=city1';
 
-import {installFountainLion} from './street.js?v=quarter1';
+import {installFountainLion} from './street.js?v=city1';
 
 const get=id=>document.getElementById(id),canvas=get('world'),dialog=get('map'),status=get('status');
 const query=new URLSearchParams(location.search);
 const historical=query.get('district')!=='vicus';
-const site=historical?await import('./boarium.js?v=quarter1'):null;
+const site=historical?await import('./boarium.js?v=city1'):null;
 const stops=site?.stops??oldStops,mesh=buildDistrict(site?.buildBoarium);
-const startStop=stops.find(stop=>stop.name.toLowerCase().replaceAll(' ','-')===query.get('stop'))??stops[0];
+const startStop=stops.find(stop=>stop.name.toLowerCase().replaceAll(' ','-')===query.get('stop'))??(site?stops.find(s=>s.name==='Hercules Victor'):stops[0]);
 const cam={...startStop,eye:1.69};
 if(!historical){
   document.title='Vicus Aureus · Ancient Rome';
   document.querySelector('h1').textContent='Vicus Aureus';document.querySelector('.brand small').textContent='Ancient Rome';
-  document.querySelector('.eyebrow').textContent='Vicus Aureus';get('siteNotes').hidden=true;
+  document.querySelector('.eyebrow').textContent='Vicus Aureus';get('siteNotes').hidden=true;get('mapScope').hidden=true;
   get('otherDistrict').textContent='Explore the Forum Boarium';get('otherDistrict').href='?district=boarium';
 }
 cam.eye=(mesh.groundHeight?.(cam.x,cam.z)??.025)+1.66;
@@ -29,6 +29,7 @@ function heightAt(x,z){
 function free(x,z,feet){
   const inside=site?site.withinDistrict(x,z):x>=-25.5&&x<=40.3&&z>=-40.4&&z<=27.3;
   if(!inside||Math.abs(heightAt(x,z)-feet)>.31)return false;
+  if(site?.citySolid(x,z))return false;
   for(const b of mesh.blocks){
     if(b.top<=feet+.29||b.bottom>=feet+1.73)continue;
     const dx=x-b.x,dz=z-b.z,lx=Math.abs(dx*b.c-dz*b.s),lz=Math.abs(dx*b.s+dz*b.c);
@@ -80,9 +81,11 @@ function locationName(){
   if(cam.x>17)return 'East lane';
   return 'The Forum';
 }
+let localPlan=false;
+get('mapScope').onclick=()=>{localPlan=!localPlan;get('mapScope').textContent=localPlan?'City map':'Forum Boarium detail';drawPlan();};
 function drawPlan(){
   const c=get('plan'),p=c.getContext('2d'),scale=6.25,ox=283,oz=287;
-  if(site){site.drawSitePlan(p,c.width,c.height,cam);return;}
+  if(site){site.drawSitePlan(p,c.width,c.height,cam,localPlan);return;}
   const pos=(x,z)=>[ox+x*scale,oz+z*scale];
   p.fillStyle='#e7d9ba';p.fillRect(0,0,c.width,c.height);
   p.save();p.translate(ox,oz);p.scale(scale,scale);
@@ -118,7 +121,7 @@ document.addEventListener('keyup',e=>keys.delete(e.code));
 get('retry').onclick=()=>location.reload();
 function fail(message){ready=false;get('openMap').disabled=true;get('message').textContent=message;get('retry').hidden=false;status.hidden=false;}
 async function start(){
-  if(site)await site.installCattle(mesh);else await installFountainLion(mesh);
+  if(site){await site.installCattle(mesh);get('message').textContent='Loading the Colosseum…';await site.installColosseum(mesh);}else await installFountainLion(mesh);
   const render=await createRenderer(canvas,mesh,fail);
   let last=0,time=0,hud=0;
   ready=true;get('openMap').disabled=false;

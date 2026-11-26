@@ -1,5 +1,5 @@
 // Small street details are grown from a fixed seed, in metres.
-import {surface as M,seeded} from './texture.js?v=quarter1';
+import {surface as M,seeded} from './texture.js?v=city1';
 const tau=Math.PI*2;
 const palette=(list,r)=>list[Math.floor(r()*list.length)];
 const shade=(color,k)=>[16,8,0].reduce((v,s)=>v+(Math.min(255,Math.round((color>>s&255)*k))<<s),0);

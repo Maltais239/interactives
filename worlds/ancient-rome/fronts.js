@@ -1,6 +1,6 @@
 // Street-facing openings are cut into the plaster skin in local metres (+Z faces the street).
 // The solid wall immediately behind the reveals also closes the building for navigation.
-import {surface as M} from './texture.js?v=quarter1';
+import {surface as M} from './texture.js?v=city1';
 
 const reveal=.26;
 const shutterPaint=[0x86705a,0x697b69,0x85634b,0x907352,0x7e5e49];

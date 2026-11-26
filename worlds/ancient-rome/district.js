@@ -1,9 +1,9 @@
-import {masonry} from './masonry.js';
-import {seeded,surface as M} from './texture.js?v=quarter1';
+import {masonry} from './masonry.js?v=city1';
+import {seeded,surface as M} from './texture.js?v=city1';
 
-import {forumSlabs,growTree,marketBarrow,herbBed,balcony,capital} from './street.js?v=quarter1';
+import {forumSlabs,growTree,marketBarrow,herbBed,balcony,capital} from './street.js?v=city1';
 
-import {streetFront,paintedBand} from './fronts.js?v=quarter1';
+import {streetFront,paintedBand} from './fronts.js?v=city1';
 
 export const stops=[
   {name:'The Forum',x:9.3,z:15.5,yaw:-.34,pitch:.14},

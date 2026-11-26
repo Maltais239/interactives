@@ -1,7 +1,7 @@
 // An interpretive working quarter. Local +X follows the street and +Z faces out toward it.
-import { surface as M, seeded } from './texture.js?v=quarter1';
-import { streetFront, paintedBand } from './fronts.js?v=quarter1';
-import { balcony, herbBed } from './street.js?v=quarter1';
+import { surface as M, seeded } from './texture.js?v=city1';
+import { streetFront, paintedBand } from './fronts.js?v=city1';
+import { balcony, herbBed } from './street.js?v=city1';
 
 const pi = Math.PI;
 let planBlocks = [];

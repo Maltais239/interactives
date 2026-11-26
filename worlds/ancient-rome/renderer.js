@@ -1,4 +1,4 @@
-import {makeTextures} from './texture.js?v=quarter1';
+import {makeTextures} from './texture.js?v=city1';
 
 const shader=riverTown=>`
 const riverTown=${riverTown};
@@ -112,14 +112,14 @@ fn airColor(color:vec3f,p:vec3f)->vec3f{
 }
 // The house fronts and individually modeled flags share the plaster and limestone scans.
 fn colorLayer(layer:u32)->u32{
-  if(layer==30u){return 6u;} if(layer==28u){return 1u;} if(layer==29u){return 0u;} return min(layer,26u);
+  if(layer==34u){return 10u;} if(layer==31u){return 0u;} if(layer==30u){return 6u;} if(layer==28u){return 1u;} if(layer==29u){return 0u;} return min(layer,26u);
 }
 fn stoneUV(uv:vec2f,layer:u32)->vec2f{
   if(layer==3u){return uv*.55;} if(layer==22u){return uv*.83;} return uv;
 }
 // The reflection probe is rendered only once from the fountain, with the basin omitted.
 @fragment fn capture(i:Vary)->@location(0) vec4f{
-  let c=select(textureSample(materials,paint,stoneUV(i.uv,i.layer),colorLayer(i.layer)),vec4f(1),i.layer==27u);let leaf=i.layer==21u||i.layer==24u||i.layer==26u;
+  let c=select(textureSample(materials,paint,stoneUV(i.uv,i.layer),colorLayer(i.layer)),vec4f(1),i.layer==27u || i.layer==32u);let leaf=i.layer==21u||i.layer==24u||i.layer==26u;
   if((leaf&&c.a<.20)||i.layer==10u||(!riverTown && distance(i.world.xz,vec2f(7.4,1.2))<2.52&&i.world.y<4.3)){discard;}
   let n=normalize(i.norm);
   return vec4f(airColor(illuminate(i.color*c.rgb,i.world,n,visibility(i.world,n),sunlight(i.world,n),leaf),i.world),1);
@@ -127,7 +127,7 @@ fn stoneUV(uv:vec2f,layer:u32)->vec2f{
 @fragment fn surface(i:Vary)->@location(0) vec4f{
   let p=i.world;let layer=i.layer;let geometric=normalize(i.norm);var n=geometric;
   let view=normalize(s.eye.xyz-p);let leaf=layer==21u||layer==24u||layer==26u;
-  let c=select(textureSample(materials,paint,stoneUV(i.uv,layer),colorLayer(layer)),vec4f(1),layer==27u);
+  let c=select(textureSample(materials,paint,stoneUV(i.uv,layer),colorLayer(layer)),vec4f(1),layer==27u || layer==32u);
   let surfaceLayer=colorLayer(layer);
   let detailLayer=select(min(surfaceLayer,3u),4u,layer==22u);
   let detail=textureSample(relief,paint,stoneUV(i.uv,layer),detailLayer).rgb;
@@ -141,7 +141,8 @@ fn stoneUV(uv:vec2f,layer:u32)->vec2f{
     n=normalize(n*sqrt(max(.08,1.-dot(xy,xy)))+(tangent*xy.x+bitangent*xy.y)*inv*strength);
   }
   if(leaf&&c.a<.10){discard;}
-  let sun=sunlight(p,geometric);let ground=textureSampleLevel(contact,paint,p.xz/128.+.5,0.).r;
+  let sun=sunlight(p,geometric);let groundUV=p.xz/128.+.5;
+  let ground=select(1.,textureSampleLevel(contact,paint,clamp(groundUV,vec2f(0),vec2f(1)),0.).r,all(groundUV>=vec2f(0))&&all(groundUV<=vec2f(1)));
   let access=visibility(p,geometric)*mix(ground,1.,smoothstep(.06,2.4,p.y));
   var pigment=c.rgb;
   if(layer==0u && abs(geometric.y)<.82){pigment=mix(vec3f(.88),pigment,.39);}
@@ -188,7 +189,13 @@ fn stoneUV(uv:vec2f,layer:u32)->vec2f{
     out=mix(out,reflected*vec3f(.77,.65,.44),.19+.29*facing*facing);
     out+=vec3f(.43,.32,.16)*pow(max(dot(n,halfVec),0.),68.)*sun;
   }
-  if(riverTown && layer==10u){
+  if(layer==34u){
+    let t=s.eye.w;let ripple=normalize(vec3f(.022*sin(p.x*5.+p.z*1.8-t*2.),1.,.022*cos(p.z*6.-t*1.5)));
+    let reflected=skyColor(reflect(-view,ripple));
+    let fres=.04+.96*pow(1.-max(dot(ripple,view),0.),4.);
+    out=mix(vec3f(.19,.37,.31)*( .75+.25*sun),reflected,.18+.70*fres);
+    out+=vec3f(.5)*sun*pow(max(dot(ripple,halfVec),0.),80.);
+  }else if(riverTown && layer==10u){
     let t=s.eye.w;let xz=p.xz;
     let warp=noise(xz*.096-vec2f(0.,t*.034))*4.8+noise(xz*.28+t*.04)*1.25;
     let d=distance(p,s.eye.xyz);let micro=1.-smoothstep(16.,76.,d);
@@ -263,14 +270,13 @@ export async function createRenderer(canvas,mesh,onLost){
   device.queue.writeTexture({texture:contact},gc.getImageData(0,0,512,512).data,{bytesPerRow:2048},[512,512]);
   const sun=normalize([.77,.91,.34]);
   const skyDirections=[[.04,1,.03],[.86,.66,.1],[-.86,.66,-.1],[.1,.61,.88],[-.1,.61,-.88]].map(normalize);
-  function lightMatrix(direction){
+  function lightMatrix(direction,extent=mesh.shadowRadius??55,focus=mesh.reflectionOrigin?[-29,1,-7]:[3,2,-6]){
     const forward=direction.map(x=>-x),right=normalize(cross(forward,[0,1,0])),up=cross(right,forward);
-    const extent=mesh.shadowRadius??55,focus=mesh.reflectionOrigin?[-29,1,-7]:[3,2,-6];
     const eye=direction.map((v,i)=>v*(extent+38)+focus[i]);
     const ortho=[1/extent,0,0,0,0,1/(extent-2),0,0,0,0,-1/(extent*2+68),0,0,0,0,1];
     return multiply(ortho,view(eye,forward,right,up));
   }
-  const skyMatrices=skyDirections.map(lightMatrix),skyData=new Float32Array(100);
+  const skyMatrices=skyDirections.map(d=>lightMatrix(d,mesh.skyRadius??mesh.shadowRadius??55,mesh.skyFocus??(mesh.reflectionOrigin?[-29,1,-7]:[3,2,-6]))),skyData=new Float32Array(100);
   for(let j=0;j<5;j++){skyData.set(skyMatrices[j],j*16);skyData.set(skyDirections[j],80+j*4);}
   const skyUniform=buffer(skyData,GPUBufferUsage.UNIFORM);
   const skyDepth=device.createTexture({label:'Static sky visibility',size:[640,640,5],format:'depth24plus',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
@@ -282,7 +288,7 @@ export async function createRenderer(canvas,mesh,onLost){
     return device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:ubo}},
       ...bindings.map(binding=>({binding,resource:resources[binding]}))]});
   }
-  const bindGroups=[group(pipelines[0],uniform,[1,2,3,4,5,6,7,8,10]),group(pipelines[1],uniform,[1,2]),group(pipelines[2],uniform,[2,9])];
+  const bindGroups=[group(pipelines[0],uniform,[1,2,3,4,5,6,7,8,9,10]),group(pipelines[1],uniform,[1,2]),group(pipelines[2],uniform,[2,9])];
   const params=new Float32Array(52);params.set(lightMatrix(sun),16);params.set([...sun,Number(hasSky)],48);
   device.queue.writeBuffer(uniform,0,params);
   function draw(pass,pipeline,bindings){
@@ -327,6 +333,7 @@ export async function createRenderer(canvas,mesh,onLost){
   device.queue.submit([enc.finish()]);for(const u of temporary)u.destroy();probeDepth.destroy();
   const validation=await device.popErrorScope();if(validation)throw Error(validation.message);
   let color,depth,cv,dv,lastFrame=0,elapsed=0,timedFrames=0,resolution=1;
+  let shadowX=Infinity,shadowZ=Infinity;
   // Change resolution only after sustained pressure. Ignore time spent in the map or a hidden tab.
   function frameBudget(now){
     const frame=now-lastFrame;lastFrame=now;
@@ -347,12 +354,19 @@ export async function createRenderer(canvas,mesh,onLost){
       color=device.createTexture({size:[width,height],format,sampleCount:samples,usage:GPUTextureUsage.RENDER_ATTACHMENT});cv=color.createView();
       depth=device.createTexture({size:[width,height],format:'depth24plus',sampleCount:samples,usage:GPUTextureUsage.RENDER_ATTACHMENT});dv=depth.createView();
     }
-    const a=width/height,t=Math.tan((a<1?70:61)*Math.PI/360),near=.08,far=mesh.reflectionOrigin?350:220;
+    const a=width/height,t=Math.tan((a<1?70:61)*Math.PI/360),near=.08,far=mesh.viewDistance??(mesh.reflectionOrigin?350:220);
     const front=[Math.sin(cam.yaw)*Math.cos(cam.pitch),Math.sin(cam.pitch),-Math.cos(cam.yaw)*Math.cos(cam.pitch)],right=[Math.cos(cam.yaw),0,Math.sin(cam.yaw)],up=cross(right,front),eye=[cam.x,cam.eye,cam.z];
     const proj=[1/(t*a),0,0,0,0,1/t,0,0,0,0,far/(near-far),-1,0,0,near*far/(near-far),0];
     params.set(multiply(proj,view(eye,front,right,up)),0);params.set([...eye,time],32);params.set([...front,t],36);params.set([...right,a],40);params.set([...up,Number(!compact && resolution>.83)],44);
+    const redrawShadows=mesh.cityShadows && Math.hypot(cam.x-shadowX,cam.z-shadowZ)>16;
+    if(redrawShadows){shadowX=cam.x;shadowZ=cam.z;params.set(lightMatrix(sun,115,[cam.x,cam.eye,cam.z]),16);}
     device.queue.writeBuffer(uniform,0,params);
-    const cmd=device.createCommandEncoder(),pass=cmd.beginRenderPass({colorAttachments:[{view:cv,resolveTarget:ctx.getCurrentTexture().createView(),loadOp:'clear',clearValue:{r:.7,g:.8,b:.83,a:1},storeOp:'discard'}],
+    const cmd=device.createCommandEncoder();
+    if(redrawShadows){
+      const shadePass=cmd.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:shadowView,depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'store'}});
+      draw(shadePass,pipelines[1],bindGroups[1]);shadePass.end();
+    }
+    const pass=cmd.beginRenderPass({colorAttachments:[{view:cv,resolveTarget:ctx.getCurrentTexture().createView(),loadOp:'clear',clearValue:{r:.7,g:.8,b:.83,a:1},storeOp:'discard'}],
       depthStencilAttachment:{view:dv,depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'discard'}});
     pass.setPipeline(pipelines[2]);pass.setBindGroup(0,bindGroups[2]);pass.draw(3);
     pass.setPipeline(pipelines[0]);pass.setBindGroup(0,bindGroups[0]);pass.setVertexBuffer(0,vertices);pass.setIndexBuffer(indices,'uint32');pass.drawIndexed(count);pass.end();device.queue.submit([cmd.finish()]);

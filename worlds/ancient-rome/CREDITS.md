@@ -1,6 +1,6 @@
 # Ancient Rome
 
-The default walk explores the Forum Boarium around AD 10. The district map also links to Vicus Aureus, the original imagined neighborhood. Buildings, boats, stalls, vegetation, paving, and water are generated locally in JavaScript and rendered with WebGPU.
+The walk connects the Forum Boarium, Roman Forum, Palatine palace, and Colosseum in an interpretive reconstruction around AD 100. The district map also links to Vicus Aureus, the original imagined neighborhood. Buildings, boats, stalls, vegetation, paving, and water are generated locally in JavaScript and rendered with WebGPU.
 
 ## Forum Boarium reconstruction
 
@@ -19,7 +19,7 @@ The ground plane uses metres east and south of 41.88900° N, 12.48084° E. The m
 
 ## Market Street and courtyard
 
-The connected shop block, taller residence, potter’s workshop, loading porch, and merchants’ courtyard are interpretive reconstructions for the walk around AD 10. Their locations and household details illustrate everyday activity. The cistern, storage bays, baskets, work stool, pottery shelves, carrying frame, lamp, and pegged laundry are generated locally. The gate and courtyard gallery have modeled arch barrels. The map uses their actual collision footprints.
+The connected shop block, taller residence, potter’s workshop, loading porch, and merchants’ courtyard are interpretive reconstructions for the walk around AD 100. Their locations and household details illustrate everyday activity. The cistern, storage bays, baskets, work stool, pottery shelves, carrying frame, lamp, and pegged laundry are generated locally. The gate and courtyard gallery have modeled arch barrels. The map uses their actual collision footprints.
 
 [Walk along Market Street](https://maltais239.github.io/interactives/worlds/ancient-rome/?stop=market-street) or [enter the merchants’ courtyard](https://maltais239.github.io/interactives/worlds/ancient-rome/?stop=merchants-courtyard).
 
@@ -47,4 +47,19 @@ The four scanned architectural surfaces share two small atlases. The second stor
 
 ## Landmark assets
 
-[Colosseum model by Colosseum.how](https://www.colosseum.how/3d-model), published by Artur Jakucewicz. The AD 80 GLB is stored with lossless compression in [assets/landmarks](assets/landmarks/README.md). Placement in the walk is pending.
+[Colosseum model by Colosseum.how](https://www.colosseum.how/3d-model), published by Artur Jakucewicz. The AD 80 GLB is stored with lossless compression in [assets/landmarks](assets/landmarks/README.md). The walk loads an optimized derivative from the separate landmark asset folder.
+
+
+## Roman Forum, Palatine, and connecting routes
+
+The Roman Forum and Palatine palace are generated in `imperial-city.js`. Their architecture is an interpretive reconstruction. Relative positions and walking distances use the same local metre coordinates as the Forum Boarium. Terrain, connecting streets, elevations, roof forms, individual buildings, and minor details are approximate. The Forum includes interpretations of the temples of Saturn, Castor and Pollux, Julius Caesar and Vesta, the Curia, the basilicas Julia and Aemilia, and the Rostra. The Palatine interpretation includes reception halls, porticoes and an octagonal fountain court.
+
+- [The Roman Forum, Parco archeologico del Colosseo](https://colosseo.it/en/area/the-roman-forum/)
+- [Castor, Aedes, Digital Augustan Rome](https://www.digitalaugustanrome.org/records/castor-aedes-forum/)
+- [Palatium, Parco archeologico del Colosseo](https://colosseo.it/en/itineraries/palatium-living-on-the-palatine-from-the-foundation-of-rome-to-the-modern-age/)
+
+The Colosseum uses the saved [Colosseum.how reconstruction](https://www.colosseum.how/3d-model). An offline derivative simplifies triangles, quantizes positions and normals, and retains the source colours. The source's separate display ground and foundation are replaced by this world's terrain and forecourt. The complete supplied GLB remains available in the credited asset folder.
+
+[Walk to the Colosseum](https://maltais239.github.io/interactives/worlds/ancient-rome/?stop=colosseum), [visit the Roman Forum](https://maltais239.github.io/interactives/worlds/ancient-rome/?stop=roman-forum), or [enter the Palatine palace](https://maltais239.github.io/interactives/worlds/ancient-rome/?stop=palatine-palace).
+
+![Arrival at the Colosseum in the expanded walk](colosseum-walk.webp)

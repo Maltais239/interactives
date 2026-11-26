@@ -1,8 +1,10 @@
 // Local metres, east = +x, north = -z. The reference point is 41.88900 N, 12.48084 E.
 // The main Portunus rectangle excludes the projecting staircase in the mapped outline.
-import {surface as M,seeded} from './texture.js?v=quarter1';
-import {growTree,marketBarrow,forumSlabs} from './street.js?v=quarter1';
-import {buildMarketQuarter,drawMarketPlan} from './market-quarter.js?v=quarter1';
+import {surface as M,seeded} from './texture.js?v=city1';
+import {growTree,marketBarrow,forumSlabs} from './street.js?v=city1';
+import {buildMarketQuarter,drawMarketPlan} from './market-quarter.js?v=city1';
+import {buildCity,cityStops,cityHeight,cityInside,cityPlace,installColosseum,citySolid,drawCityPlan} from './imperial-city.js?v=city1';
+export {installColosseum,citySolid};
 const PI=Math.PI,TAU=PI*2,rad=PI/180;
 export const port={x:5.65,z:-26.29,yaw:-162.55*rad};
 export const hercules={x:-6.52,z:28.80};
@@ -11,6 +13,7 @@ export const bank=z=>-48+.22*z;
 const bridgeWidth=8.6,riverY=-8.65;
 const onBridge=(x,z)=>Math.abs(z-bridgeZ(x))*Math.cos(bridgeAngle)<bridgeWidth/2;
 export const stops=[
+  ...cityStops,
   {name:'Hercules Victor',x:11.6,z:48.9,yaw:-.76,pitch:.20},
   {name:'Temple of Portunus',x:-8.8,z:-52.9,yaw:2.68,pitch:.20},
   {name:'Tiber landing',x:-42.6,z:21,yaw:-.55,pitch:-.215},
@@ -24,18 +27,21 @@ const stone=0xe2d7c1,pale=0xf3ead5,tufa=0xaa9680,wood=0x816047,bronze=0x897456;
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
 const quayHeight=u=>-6.12+6.12*clamp((u-4)/13.5,0,1);
 export function groundHeight(x,z){
+  if(x>101 || z< -135)return cityHeight(x,z);
   const u=x-bank(z);
   let y=z< -4||z>30?0:quayHeight(u);
   if(onBridge(x,z)&&x<bank(z)+19)y=Math.max(y,.04);
   return y+.025;
 }
 export function withinDistrict(x,z){
+  if(cityInside(x,z))return true;
   if(x>36.5 && x<49 && z> -6 && z<10.15)return true;
   if(z< -65||z>56||x>36.5)return false;
   if(x<bank(z)+.27)return onBridge(x,z)&&x> -198;
   return true;
 }
 export function placeAt(x,z){
+  if(x>150 || z< -130)return cityPlace(x,z);
   if(x>29 && z>-5.8 && z<10.1)return 'Merchants’ courtyard';
   if(onBridge(x,z)&&x<bank(z)+4)return 'Pons Aemilius';
   if(x<bank(z)+14)return 'Tiber landing';
@@ -272,7 +278,7 @@ export function buildBoarium(g,kit){
   buildMarketQuarter(g,kit);
   for(let i=0;i<6;i++){
     g.frame(-19+i*9.3,61,PI,()=>kit.house(7.9+rng()*1.25,8.1,5.1+rng()*2.8));
-    g.frame(-30+i*11,-71,0,()=>kit.house(8.2+rng()*1.2,9.3,6.2+rng()*2.4));
+    g.frame(i===5?52:-30+i*11,-71,0,()=>kit.house(8.2+rng()*1.2,9.3,6.2+rng()*2.4));
   }
   for(const z of [-57,-42,-27,33,48,63])g.frame(52,z,-PI/2,()=>kit.house(10,8,6.3+rng()*3.1,false));
   for(const [x,z,a] of [[18.5,2,-1.0],[18.8,14,-1.85],[19,-11,-1.5]])marketBarrow(g,x,z,a);
@@ -305,9 +311,10 @@ export function buildBoarium(g,kit){
     const z=-240+k*13,centerX=-240-16*Math.sin(k*.38),floor=-2;
     g.post(centerX,floor,z,[[0,43],[5,40],[11+5*Math.sin(k*.48),25],[14+5*Math.sin(k*.48),11],[15+5*Math.sin(k*.48),.02]],0x9f9d79,M.garden,16);
   }
+  buildCity(g,kit);
   return g;
 }
-export function drawSitePlan(p,w,h,cam){
+export function drawLocalPlan(p,w,h,cam){
   const scale=Math.min((w-42)/244,(h-48)/132),ox=w-51-42*scale,oz=h*.53;
   p.fillStyle='#eee1c9';p.fillRect(0,0,w,h);
   const pt=(x,z)=>[ox+x*scale,oz+z*scale];
@@ -331,6 +338,11 @@ export function drawSitePlan(p,w,h,cam){
   for(const [s,x,z] of names){p.strokeText(s,...pt(x,z));p.fillStyle='#463d31';p.fillText(s,...pt(x,z));}
   p.save();p.translate(...pt(cam.x,cam.z));p.rotate(cam.yaw);p.beginPath();
   p.moveTo(0,-12);p.lineTo(8,9);p.lineTo(0,5);p.lineTo(-8,9);p.closePath();p.fillStyle='#aa472a';p.strokeStyle='#fff2d7';p.lineWidth=2;p.fill();p.stroke();p.restore();
+}
+
+export function drawSitePlan(p,w,h,cam,local=false){
+ if(local)return drawLocalPlan(p,w,h,cam);
+ return drawCityPlan(p,w,h,cam);
 }
 
 export async function installCattle(g){
