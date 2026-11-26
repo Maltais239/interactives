@@ -37,6 +37,8 @@ Start with **Demo workspace** to explore. Use **Start my workspace** to remove i
 
 Run `npm test` (Node built-in test runner; no install required). Tests cover backup validation, reference integrity, demo cleanup, dates, contact/visit distinction, relationship states, route order, calendar export, screen-template rendering, contact-to-follow-up saving, reload persistence, HTML escaping and stale-tab protection. These are automated model/template checks, not a substitute for a visual browser review.
 
+The map observes container resizing without replacing stored records or resetting the current map position. Primary touch targets are at least 44 CSS pixels high. Layouts include short-screen and narrow-phone adaptations. The repository’s requested rendered checks at 1024×540, 1366×650, 768×900, 390×667, 320×568 and 640×360 remain unverified: the preview browser was unavailable during this build.
+
 ## Public research references
 
 - [BC district directory](https://studentsuccess.gov.bc.ca/all/school-districts)
