@@ -1,9 +1,9 @@
 import {masonry} from './masonry.js';
-import {seeded,surface as M} from './texture.js?v=street1';
+import {seeded,surface as M} from './texture.js?v=quarter1';
 
-import {forumSlabs,growTree,marketBarrow,herbBed,balcony,capital} from './street.js?v=street1';
+import {forumSlabs,growTree,marketBarrow,herbBed,balcony,capital} from './street.js?v=quarter1';
 
-import {streetFront,paintedBand} from './fronts.js?v=street1';
+import {streetFront,paintedBand} from './fronts.js?v=quarter1';
 
 export const stops=[
   {name:'The Forum',x:9.3,z:15.5,yaw:-.34,pitch:.14},
@@ -183,7 +183,7 @@ export function buildDistrict(site){
       face([[l,y(1,l)-.23,2.11],[r,y(1,r)-.29,2.11],[r,y(1,r),2.11],[l,y(1,l),2.11]],k,M.linen);
     }
   }
-  function shop(w,d,h,id){
+  function shop(w,d,h,id,roofed=true){
     const color=pick(colors),back=-d;
     if(id%2===0)balcony(g,0,4.05,.17,w*.51,[0xab5843,0x778f89,0xae794a][id/2%3]);
     wall(0,0,back,w,h,.38,color,M.plaster);
@@ -204,7 +204,7 @@ export function buildDistrict(site){
       paintedBand(g,x-w*.064,x-w*.060,.28,.66,.282,0xc59e70);
       paintedBand(g,x+w*.060,x+w*.064,.28,.66,.282,0xc59e70);
     }
-    box(0,h-.27,-d/2,w+.29,.24,d+.32,stone);roof(0,h,-d/2,w+.65,d+.64,1.17+R()*.46);
+    box(0,h-.27,-d/2,w+.29,.24,d+.32,stone);if(roofed)roof(0,h,-d/2,w+.65,d+.64,1.17+R()*.46);
     box(0,.01,-d/2,w,.07,d,0xb49477,M.paving);
     for(const col of [-1,0,1])label(w*.296*col,.37,back+.199,w*.277,2.28,M.fresco);
     box(0,1.17,back+.25,w*.89,.13,.32,timber,M.wood);

@@ -1,5 +1,5 @@
 // The district shares four scanned surfaces. All other material layers are drawn locally.
-export const surface = {lime:0, plaster:1, brick:2, paving:3, roof:4, wood:5, linen:6, metal:7, garden:8, mosaic:9, water:10, leaf:11, labels:12,sprig:21,ashlar:22,meander:23,bough:24,fresco:25,herb:26, facade:28, flagstone:29};
+export const surface = {lime:0, plaster:1, brick:2, paving:3, roof:4, wood:5, linen:6, metal:7, garden:8, mosaic:9, water:10, leaf:11, labels:12,sprig:21,ashlar:22,meander:23,bough:24,fresco:25,herb:26, facade:28, flagstone:29,hanging:30};
 export const words=['CONCORDIA','PANIS','OLEVM','VINVM','POMA','VICVS AVREVS','HORTVS','FORVM','SALVE'];
 export function seeded(seed) {
   return () => {seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};

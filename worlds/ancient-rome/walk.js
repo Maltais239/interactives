@@ -1,12 +1,12 @@
-import {buildDistrict,stops as oldStops} from './district.js?v=street1';
-import {createRenderer} from './renderer.js?v=street1';
+import {buildDistrict,stops as oldStops} from './district.js?v=quarter1';
+import {createRenderer} from './renderer.js?v=quarter1';
 
-import {installFountainLion} from './street.js?v=street1';
+import {installFountainLion} from './street.js?v=quarter1';
 
 const get=id=>document.getElementById(id),canvas=get('world'),dialog=get('map'),status=get('status');
 const query=new URLSearchParams(location.search);
 const historical=query.get('district')!=='vicus';
-const site=historical?await import('./boarium.js?v=street1'):null;
+const site=historical?await import('./boarium.js?v=quarter1'):null;
 const stops=site?.stops??oldStops,mesh=buildDistrict(site?.buildBoarium);
 const startStop=stops.find(stop=>stop.name.toLowerCase().replaceAll(' ','-')===query.get('stop'))??stops[0];
 const cam={...startStop,eye:1.69};

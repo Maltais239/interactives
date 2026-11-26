@@ -1,4 +1,4 @@
-import {makeTextures} from './texture.js?v=street1';
+import {makeTextures} from './texture.js?v=quarter1';
 
 const shader=riverTown=>`
 const riverTown=${riverTown};
@@ -20,6 +20,11 @@ struct Attr { @location(0) pos:vec3f, @location(1) norm:vec3f, @location(2) uv:v
 struct Vary { @builtin(position) clip:vec4f, @location(0) world:vec3f, @location(1) norm:vec3f, @location(2) uv:vec2f, @location(3) color:vec3f, @location(4) @interpolate(flat) layer:u32 }
 @vertex fn geometry(i:Attr)->Vary{
   var o:Vary;var pos=i.pos;
+  if(i.layer==30.){
+    let pinned=i.uv.y*i.uv.y;
+    pos.x+=pinned*.045*sin(s.eye.w*.85+pos.z*2.4);
+    pos.z+=pinned*.035*sin(s.eye.w*1.17+pos.x*1.8);
+  }
   if(i.layer==27.){
     let head=smoothstep(.41,1.08,i.uv.x)*smoothstep(.41,.85,i.uv.y);
     let phase=s.eye.w*.71+floor(i.pos.x*.17);
@@ -107,7 +112,7 @@ fn airColor(color:vec3f,p:vec3f)->vec3f{
 }
 // The house fronts and individually modeled flags share the plaster and limestone scans.
 fn colorLayer(layer:u32)->u32{
-  if(layer==28u){return 1u;} if(layer==29u){return 0u;} return min(layer,26u);
+  if(layer==30u){return 6u;} if(layer==28u){return 1u;} if(layer==29u){return 0u;} return min(layer,26u);
 }
 fn stoneUV(uv:vec2f,layer:u32)->vec2f{
   if(layer==3u){return uv*.55;} if(layer==22u){return uv*.83;} return uv;

@@ -17,6 +17,14 @@ The ground plane uses metres east and south of 41.88900° N, 12.48084° E. The m
 | [Effective Water Simulation from Physical Models, Mark Finch](https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-1-effective-water-simulation-physical-models) | Long geometric waves and fine, distance-filtered surface ripples |
 | [Black Bull, Grab3D](https://grab3d.com/models/animals/bull/) | CC0 cattle model adapted to 2,198 triangles, baked vertex colours and two coat variations. Modern visual reference for the illustrative pen |
 
+## Market Street and courtyard
+
+The connected shop block, taller residence, potter’s workshop, loading porch, and merchants’ courtyard are interpretive reconstructions for the walk around AD 10. Their locations and household details illustrate everyday activity. The cistern, storage bays, baskets, work stool, pottery shelves, carrying frame, lamp, and pegged laundry are generated locally. The gate and courtyard gallery have modeled arch barrels. The map uses their actual collision footprints.
+
+[Walk along Market Street](https://maltais239.github.io/interactives/worlds/ancient-rome/?stop=market-street) or [enter the merchants’ courtyard](https://maltais239.github.io/interactives/worlds/ancient-rome/?stop=merchants-courtyard).
+
+![Laundry and storage bays inside the merchants’ courtyard](market-courtyard.webp)
+
 ## Shared materials and Vicus Aureus assets
 
 The following assets from [Poly Haven](https://polyhaven.com/license) are available under CC0. Compact derivatives are served alongside the game.
