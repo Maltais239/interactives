@@ -1,6 +1,6 @@
 import {KEY,PROVINCES,CHANNELS,today,addDays,days,lastContact,actions,status,routeKm,routeURL,tripPoints,safeURL,clearDemo,validate,calendar} from './model.js';
 import {initial} from './seed.js';
-import {addBoundaryLayers,readBoundaryManifest} from './boundaries.js?v=1';
+import {addBoundaryLayers,readBoundaryManifest} from './boundaries.js?v=2';
 const $=(q,r=document)=>r.querySelector(q),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ico=n=>`<i class="icon" data-lucide="${n}" aria-hidden="true"></i>`,uid=()=>crypto.randomUUID();
 const nav=[['today','house','Today'],['territory','map','Territory'],['accounts','building-2','Accounts'],['visits','phone','Visits & calls'],['opportunities','target','Opportunities'],['resources','book-open','Resources']];

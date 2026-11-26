@@ -17,6 +17,8 @@ export async function addBoundaryLayers(map,options){
  const overlays={...Object.fromEntries(Object.entries(groups).map(([key,group])=>[titles[key],group])),[titles.pins]:options.pins};
  for(const [key,group] of Object.entries(groups))if(options.visibility[key])group.addTo(map);
  const control=L.control.layers({},overlays,{collapsed:true,position:'topright'}).addTo(map);
+ const fitControl=()=>{control.getContainer().style.maxHeight=Math.max(100,map.getSize().y-20)+'px';};
+ map.on('resize',fitControl);fitControl();
  const controlList=control.getContainer().querySelector('.leaflet-control-layers-list');
  const note=document.createElement('p');note.className='boundary-control-note';note.textContent='Government boundary overview. Different authority types can overlap.';controlList.append(note);
  const sources=document.createElement('button');sources.type='button';sources.className='boundary-sources';sources.textContent='Boundary sources & coverage';sources.addEventListener('click',options.onSources);controlList.append(sources);
