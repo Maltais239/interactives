@@ -308,9 +308,34 @@ function packedMesh() {
   };
 }
 
+// A world-space ambient shadow mask for the bases of trunks, rocks and bridge supports.
+const contactBounds=[-42,-112,44,26];
+const contactSize=[512,768];
+function groundContact(footprints){
+  const [width,rows]=contactSize,[minX,minZ,maxX,maxZ]=contactBounds;
+  const sx=width/(maxX-minX),sz=rows/(maxZ-minZ);
+  const pixels=new Uint8Array(width*rows);
+  for(const [x,z,rx,rz,strength] of footprints){
+    const cx=(x-minX)*sx,cz=(z-minZ)*sz;
+    const ax=Math.max(1,rx*sx),az=Math.max(1,rz*sz);
+    const xmax=Math.min(width-1,Math.ceil(cx+ax*1.75)),zmax=Math.min(rows-1,Math.ceil(cz+az*1.75));
+    for(let tz=Math.max(0,Math.floor(cz-az*1.75));tz<=zmax;tz++){
+      const dz=(tz+.5-cz)/az;
+      for(let tx=Math.max(0,Math.floor(cx-ax*1.75));tx<=xmax;tx++){
+        const dx=(tx+.5-cx)/ax;
+        const a=1-smooth(.37,1.73,Math.hypot(dx,dz));
+        const i=tz*width+tx;
+        pixels[i]=Math.max(pixels[i],Math.round(strength*255*a));
+      }
+    }
+  }
+  return pixels;
+}
+
 function build(low) {
   const tiles = new Map();
   const water = low?null:packedMesh();
+  const footprints=[];
   let target,targetTile;
   function bucket(x,z) {
     const ix=Math.floor(x/11),iz=Math.floor(z/11),key=ix+','+iz;
@@ -334,13 +359,14 @@ function build(low) {
       rows.vertex(c,nc,color,material,winds?.[2]??wind,uvs?.[2]);
     }
   }
-  function quad(a,b,c,d,color,material,w=0,normal){
+  function quad(a,b,c,d,color,material,w=0,normal,uvs){
+    const first=uvs?[uvs[0],uvs[1],uvs[2]]:undefined,second=uvs?[uvs[0],uvs[2],uvs[3]]:undefined;
     if(normal&&Array.isArray(normal[0])){
-      tri(a,b,c,color,material,w,[normal[0],normal[1],normal[2]]);
-      tri(a,c,d,color,material,w,[normal[0],normal[2],normal[3]]);
+      tri(a,b,c,color,material,w,[normal[0],normal[1],normal[2]],first);
+      tri(a,c,d,color,material,w,[normal[0],normal[2],normal[3]],second);
     }else{
-      tri(a,b,c,color,material,w,normal);
-      tri(a,c,d,color,material,w,normal);
+      tri(a,b,c,color,material,w,normal,first);
+      tri(a,c,d,color,material,w,normal,second);
     }
   }
   const ypoint=(x,z)=>[x,height(x,z),z];
@@ -351,28 +377,51 @@ function build(low) {
     const normal=unit([a[1]+b[1]-c[1]-d[1],2*step,a[1]+d[1]-b[1]-c[1]]);
     const foot=1-smooth(.65,1.36,pathDistance(x+step*.5,z+step*.5));
     const shade=low?soil.map((v,i)=>lerp(v,[.31,.231,.164][i],foot)):soil;
-    quad(a,b,c,d,tint(shade,random(.93,1.06)),0,0,normal);
+    const earth=tint(shade,random(.93,1.06));
+    const submerged=point=>point[1]<groundwater+creekRise(point[2])-.046;
+    if(low&&submerged(a)&&submerged(b)&&submerged(c)&&submerged(d))continue;
+    quad(a,b,c,d,earth,0,0,normal);
+  }
+  function bankWidth(z,side){
+    let bottom=1.3,top=3.65;
+    const center=river(z),surface=groundwater+creekRise(z);
+    for(let j=0;j<8;j++){
+      const middle=(bottom+top)*.5;
+      if(height(center+side*middle,z)<surface+.024)bottom=middle;
+      else top=middle;
+    }
+    return side*top;
   }
   for(let z=-88;z<24;z+=.65){
     bucket(river(z),z);
-    const a=river(z),b=river(z+.65),width=low?2.30:3.45;
+    const a=river(z),b=river(z+.65);
     const y=groundwater+creekRise(z),y2=groundwater+creekRise(z+.65);
     const rapid=z>-37.05&&z<-34.8;
-    const cells=low?6:1;
+    const cells=low?4:1;
+    const west=low?bankWidth(z,-1):-3.45,east=low?bankWidth(z,1):3.45;
+    const westNext=low?bankWidth(z+.65,-1):-3.45,eastNext=low?bankWidth(z+.65,1):3.45;
     for(let i=0;i<cells;i++){
-      const left=lerp(-width,width,i/cells),right=lerp(-width,width,(i+1)/cells);
+      const left=i/cells,right=(i+1)/cells;
       const material=rapid&&i%2===0?13:3;
-      quad([a+left,y,z],[b+left,y2,z+.65],[b+right,y2,z+.65],[a+right,y,z],creek,material);
+      quad([a+lerp(west,east,left),y,z],[b+lerp(westNext,eastNext,left),y2,z+.65],
+        [b+lerp(westNext,eastNext,right),y2,z+.65],[a+lerp(west,east,right),y,z],creek,material);
     }
   }
   function rock(x,y,z,rx,ry,rz,shade=wetRock,small=false,material=2) {
     bucket(x,z);
+    if(!low&&rx>.19&&Math.abs(y-height(x,z))<ry+.14){
+      footprints.push([x,z,rx*.88+.07,rz*.90+.07,material===12?.27:.58]);
+    }
     const rings=[], rows=small?3:low?4:7, cols=small?6:low?7:12;
     for(let j=0;j<=rows;j++){
       const lat=Math.PI*j/rows,r=Math.sin(lat);
       rings.push(Array.from({length:cols},(_,i)=>{
-        const t=i*TAU/cols,k=1+.14*Math.sin(t*3+y)*r+.076*Math.sin(t*7+lat*3);
-        return [x+Math.cos(t)*r*rx*k,y+Math.cos(lat)*ry*k,z+Math.sin(t)*r*rz*k];
+        const t=i*TAU/cols;
+        const shape=x*.47+z*.73;
+        const k=1+.15*Math.sin(t*3+shape)*r+.066*Math.sin(t*5+lat*3+shape);
+        const yShape=Math.sign(Math.cos(lat))*Math.abs(Math.cos(lat))**.65;
+        return [x+Math.cos(t)*r*rx*k,y+yShape*ry*k-.08*ry*Math.cos(t+shape)*r,
+          z+Math.sin(t)*r*rz*k];
       }));
     }
     const normal=p=>unit([(p[0]-x)/(rx*rx),(p[1]-y)/(ry*ry),(p[2]-z)/(rz*rz)]);
@@ -533,7 +582,9 @@ function build(low) {
         const prev=rings[j][(i+sides-1)%sides],next=rings[j][(i+1)%sides];
         return unit(cross(sub(rings[Math.min(j+1,rings.length-1)][i],rings[Math.max(j-1,0)][i]),sub(next,prev)));
       };
-      quad(rings[j][i],rings[j+1][i],rings[j+1][k],rings[j][k],tint(col,value),1,0,[normal(j,i),normal(j+1,i),normal(j+1,k),normal(j,k)]);
+      const u=i/sides*r*TAU/13,v=(i+1)/sides*r*TAU/13;
+      quad(rings[j][i],rings[j+1][i],rings[j+1][k],rings[j][k],tint(col,value),17,0,
+        [normal(j,i),normal(j+1,i),normal(j+1,k),normal(j,k)],[[u,0],[u,0],[v,0],[v,0]]);
     }
     if(!featured||low)return;
     // Uneven strips separate from the trunk surface and catch the light along torn edges.
@@ -556,8 +607,10 @@ function build(low) {
         const edge=strip(lerp(start,end,.53),right,.026);
         const top=strip(end,lerp(left,right,.53),.012);
         const tone=tint(col,random(.68,1.29));
-        quad(bottom,l,top,fold,tone,1);
-        quad(bottom,fold,top,edge,tint(tone,.66),1);
+        const uv=f=>[(i+f)/sides*r*TAU/13,0];
+        const seam=uv((left+right)*.5),ridge=uv(lerp(left,right,.68)),peak=uv(lerp(left,right,.53));
+        quad(bottom,l,top,fold,tone,17,0,undefined,[seam,uv(left),peak,ridge]);
+        quad(bottom,fold,top,edge,tint(tone,.79),17,0,undefined,[seam,ridge,peak,uv(right)]);
       }
     }
   }
@@ -579,13 +632,19 @@ function build(low) {
       return [Math.cos(theta)*-sa,Math.sin(theta),Math.cos(theta)*ca];
     };
     for(let i=0;i<sections.length-1;i++)for(let j=0;j<6;j++){
-      quad(sections[i][j],sections[i][j+1],sections[i+1][j+1],sections[i+1][j],tint(bark,.68+i*.059),1,0,[normal(j),normal(j+1),normal(j+1),normal(j)]);
+      quad(sections[i][j],sections[i][j+1],sections[i+1][j+1],sections[i+1][j],tint(bark,.68+i*.059),16,0,[normal(j),normal(j+1),normal(j+1),normal(j)]);
+      if(!low&&j===0){
+        const p=sections[i][3];
+        const spread=radius*(1-i/sections.length)*.53+.11;
+        footprints.push([p[0],p[2],spread,spread,.40]);
+      }
     }
   }
 
   const trunks=[];
   function tree(x,z,h,r,snag=false,featured=false) {
     bucket(x,z);trunks.push([x,z,r]);
+    if(!low)footprints.push([x,z,r*1.19,r*1.23,.71]);
     const y=height(x,z), p=random(0,TAU), col=tint(bark,random(.68,1.26));
     const lean=random(-.8,.8), leanZ=random(-.45,.45);
     const trunk=t=>[x+t*lean,y+t*h,z+t*leanZ];
@@ -776,10 +835,12 @@ function build(low) {
     const z=random(-33,-18),x=trail(z)+random(-2.8,2.8);
     if(Math.abs(x-river(z))<2.55)continue;
     const a=random(0,TAU),l=random(.028,.132),cx=Math.cos(a),sz=Math.sin(a);
-    const wx=sz*.009,wz=-cx*.009,tx=x+cx*l,tz=z+sz*l,y=height(x,z)+.017;
+    const wx=sz*.0029,wz=-cx*.0029,tx=x+cx*l,tz=z+sz*l,y=height(x,z)+.013;
+    const ex=x+cx*l*.56,ez=z+sz*l*.56,ey=height(ex,ez)+.023;
+    const tone=tint([.443,.275,.153],random(.53,1.2));
     bucket(x,z);
-    tri([x+wx,y,z+wz],[tx,height(tx,tz)+.019,tz],[x-wx,y,z-wz],
-        tint([.43,.246,.128],random(.53,1.2)),4);
+    quad([x+wx,y,z+wz],[x-wx,y,z-wz],[ex-wx*.78,ey,ez-wz*.78],[ex+wx*.78,ey,ez+wz*.78],tone,4);
+    tri([ex-wx*.78,ey,ez-wz*.78],[tx,height(tx,tz)+.012,tz],[ex+wx*.78,ey,ez+wz*.78],tint(tone,.92),4);
   }
 
   // Young hemlocks and salmonberry thickets close the gaps below the old canopy.
@@ -846,6 +907,36 @@ function build(low) {
     }
   }
   seed=placementSeed;
+  // Sediment and needles gather in patches beside the tread and behind rocks.
+  const floorSeed=seed;
+  seed=187557;
+  for(let i=0;i<(low?190:630);i++){
+    const z=random(-79,9),side=i%2===0?-1:1;
+    const margin=random(.45,3.25),x=trail(z)+side*margin;
+    if(Math.abs(x-river(z))<2.25)continue;
+    const density=Math.sin(x*2.8+z*.56)*Math.cos(z*.91-x*.33);
+    if(margin>1&&density<-.03)continue;
+    const r=random(.025,margin>1.15?.21:.096);
+    const color=i%3===0?[.40,.341,.271]:i%3===1?[.294,.335,.309]:[.35,.332,.287];
+    rock(x,height(x,z)-r*.15,z,r,r*random(.35,.64),r*random(.72,1.40),tint(color,random(.8,1.14)),true);
+  }
+  for(let i=0;i<(low?110:335);i++){
+    const z=random(-43,-17),x=river(z)+random(-9.1,8.6);
+    if(pathDistance(x,z)<1.01||Math.abs(x-river(z))<2.90)continue;
+    const streak=Math.sin(x*1.4+z*1.18)+Math.sin(x*2.59-z*.72);
+    if(streak<.12)continue;
+    const radius=random(.051,.19),y=height(x,z)-radius*.014;
+    const color=tint([.269,.347,.131],random(.70,1.18));
+    rock(x,y,z,radius,radius*random(.13,.26),radius*random(.65,1.48),color,true,12);
+  }
+  for(let i=0;i<(low?32:100);i++){
+    const a=random(0,TAU),distance=random(1.35,3.0);
+    const x=heroX+Math.cos(a)*distance,z=heroZ+Math.sin(a)*distance,r=random(.044,.17);
+    if(pathDistance(x,z)<.94)continue;
+    rock(x,height(x,z),z,r,r*.23,r*1.06,tint([.265,.338,.137],random(.65,1.18)),true,12);
+  }
+  seed=floorSeed;
+
   const fallZ=-87.7,fallX=river(fallZ), fallTop=8.3;
   for(let i=0;i<(low?44:82);i++){
     const side=i%2===0?1:-1, x=fallX+side*random(2.6,17),z=fallZ+random(-8,1.7);
@@ -872,7 +963,7 @@ function build(low) {
     const y=random(-.28,.14)+random(0,1.58)*(1-d/4),r=random(.009,.038);
     tri([x-r,y,z],[x+r,y+r*.24,z],[x,y+r*1.37,z],[.73,.82,.70],8,.24);
   }
-  return {tiles:[...tiles.values()],trunks,water};
+  return {tiles:[...tiles.values()],trunks,water,contact:low?null:groundContact(footprints)};
 }
 
 const uniforms=`
@@ -902,6 +993,19 @@ float tread(float x,float z){
   float approach=-27.7+max(0.,-3.8-dx)*.89-max(0.,dx-3.8)*.64;
   if(abs(dx)>2.52&&abs(dx)<8.2&&abs(z+27.7)<6.5)d=min(d,abs(z-approach)*.76);
   return d;
+}
+float groundAt(vec2 at){
+  float x=at.x,z=at.y;
+  float across=abs(x-riverAt(z));
+  float bank=clamp((across-1.45)/2.7,0.,1.);
+  float path=smoothstep(.30,2.4,tread(x,z));
+  float rise=waterLevel(z)+.32;
+  float mound=path*bank*(.83*sin((x-z)*.26)*sin((x-z)*.26)*smoothstep(2.9,8.4,across)
+    +max(0.,x-riverAt(z)-8.2)*.14);
+  float ripple=.027*sin(x*1.9+z*1.23)+.025*cos(x*2.7-z*1.4);
+  return -.64+rise*(1.-.24*bank)+mound+bank*(.94+path*(.31*sin(x*.39+z*.31)
+    +.19*cos(x*.72-z*.21)+.24*sin(z*.12))+ripple)+.12*(1.-bank)*sin(z*.29+x*.51)
+    +max(0.,-z-87.)*(.40+.09*cos(x*.3))+max(0.,across-15.)*.13;
 }
 float hash(vec3 p){
   p=fract(p*.3183099+vec3(.1,.19,.27))*17.;
@@ -962,6 +1066,15 @@ void main(){
   p.z+=wind*cos(time*.86+P.x*.35+P.y*.3)*.29;
   if(m==8.)p.y+=.5*fract(time*(.75+fract(P.x*9.)*.62)+P.z*.47);
   vec3 d=p-eye;
+  if((m==0.||m==2.)&&p.y<.22){
+    float creekX=3.+sin(p.z*.076)*3.+sin(p.z*.035)*2.;
+    float level=-.32+.54*(1.-smoothstep(-36.5,-34.65,p.z));
+    if(p.y<level&&abs(p.x-creekX)<3.45){
+      float bend=clamp(level-p.y,0.,.55);
+      d.x+=bend*sin(p.z*9.1+p.x*6.3-time*3.8)*.056;
+      d.z+=bend*sin(p.x*13.1-p.z*8.2+time*4.4)*.041;
+    }
+  }
   float z=dot(d,fw);
   gl_Position=vec4(dot(d,rt)*scale.x,dot(d,up)*scale.y,z*1.001-.16,z);
 }`;
@@ -973,13 +1086,21 @@ float sunlight(vec3 p,vec3 n){
   float sunPatch=mix(.24,.92,smoothstep(.35,.68,cloud));
   float edge=min(min(clip.x,1.-clip.x),min(clip.y,1.-clip.y));
   if(edge<=.003||clip.z<0.||clip.z>1.)return sunPatch;
-  float depth=clip.z-(.00083+.00145*(1.-max(0.,dot(n,SUN))));
+  float facing=max(0.,dot(n,SUN));
+  float depth=clip.z-(.00061+.00126*(1.-facing));
   vec2 texel=1./vec2(textureSize(shadowMap,0));
   float light=texture(shadowMap,vec3(clip.xy-texel*.72,depth))
       +texture(shadowMap,vec3(clip.xy+texel*.72,depth))
       +texture(shadowMap,vec3(clip.xy+vec2(-.72,.72)*texel,depth))
       +texture(shadowMap,vec3(clip.xy+vec2(.72,-.72)*texel,depth));
-  return mix(sunPatch,light*.25*(.57+.43*sunPatch),smoothstep(.003,.077,edge));
+  if(highDetail){
+    light+=texture(shadowMap,vec3(clip.xy+vec2(0.,1.68)*texel,depth));
+    light+=texture(shadowMap,vec3(clip.xy+vec2(0.,-1.68)*texel,depth));
+    light+=texture(shadowMap,vec3(clip.xy+vec2(1.68,0.)*texel,depth));
+    light+=texture(shadowMap,vec3(clip.xy+vec2(-1.68,0.)*texel,depth));
+    light*=.5;
+  }
+  return mix(sunPatch,light*.25*(.56+.44*sunPatch),smoothstep(.003,.077,edge));
 }
 `;
 const fragment=`
@@ -992,6 +1113,9 @@ ${uniforms}
 ${shaderBase}
 ${surfaceLighting}
 ${foliageSampling}
+uniform sampler2D contactMap;
+const vec2 CONTACT_MIN=vec2(${contactBounds.slice(0,2).map(x=>x.toFixed(1)).join(',')});
+const vec2 CONTACT_SCALE=1./vec2(${[contactBounds[2]-contactBounds[0],contactBounds[3]-contactBounds[1]].map(x=>x.toFixed(1)).join(',')});
 vec3 bumpNormal(vec3 N,float h,float power){
   vec3 dx=dFdx(p),dy=dFdy(p);
   vec3 a=cross(dy,N),b=cross(N,dx);
@@ -1014,43 +1138,84 @@ void main(){
   float relief=0.,bump=0.;
   vec3 col=c;
   float above=max(N.y,0.);
-  if(m==1.||m==9.||m==10.){
-    vec3 axis=m==9.?p.xzy:m==10.?p.yxz:p;
-    float waviness=noise(vec3(axis.x*2.1,axis.y*.88,axis.z*2.1))*.72;
-    vec3 q=vec3(axis.x*15.+waviness,axis.y*.71,axis.z*15.-waviness);
-    float fiber=noise(q*vec3(3.05,.72,3.05));
-    float flakes=noise(q*vec3(.37,1.7,.37));
-    float valley=smoothstep(.18,.53,noise(q)*.78+fiber*.22);
-    relief=(valley*.61+fiber*.21+flakes*.13+fine*.05)*.093;
-    bump=.71*distDetail;
-    col*=.29+.66*valley+.16*fiber+.17*flakes;
-    col=mix(col,col*vec3(1.20,.87,.69),smoothstep(.47,.74,flakes)*.63);
-    float lichen=noise(p*2.1)*.7+fleck*.3;
-    col=mix(col,vec3(.23,.29,.123)*(.59+.42*valley),smoothstep(.61,.77,lichen)*.76);
+  bool wood=m==1.||m==9.||m==10.||m==16.||m==17.;
+  bool stoneSurface=m==2.||m==12.;
+  bool forestFloor=m==0.||m==4.;
+  float ambientMask=0.,aboveGround=0.,wet=0.;
+  if(wood||stoneSurface||forestFloor){
+    ambientMask=texture(contactMap,(p.xz-CONTACT_MIN)*CONTACT_SCALE).r;
+    if(wood||stoneSurface)aboveGround=max(0.,p.y-groundAt(p.xz));
+    wet=(1.-smoothstep(2.62,3.70,abs(p.x-riverAt(p.z))))*(1.-smoothstep(.0,.42,p.y-waterLevel(p.z)));
+  }
+  float occlusion=1.,sheen=0.,gloss=32.;
+  if(wood){
+    vec3 axis=m==9.?p.xzy:m==10.||m==16.?p.yxz:p;
+    float along=axis.y,across=axis.x*.79+axis.z*.61;
+    if(m==17.)across=leafUV.x*13.;
+    float fold=noise(vec3(across*2.91,along*1.44,4.));
+    float run=across*18.7+fold*1.97+.49*noise(vec3(across*12.6,along*3.7,7.));
+    float lining=noise(vec3(run*3.8,along*1.45,1.8));
+    float grooveShape=1.-abs(fract(run)-.50)*2.;
+    float fade=smoothstep(.30,.76,noise(vec3(floor(run)*.53,along*2.1,1.3)));
+    float crack=(1.-smoothstep(.024,.25,grooveShape))*fade;
+    float blade=noise(vec3(run*.68,along*.83,4.));
+    float threads=noise(vec3(across*79.+fold*1.22,along*4.2,5.));
+    relief=.018*blade+.008*lining+.006*threads-.008*crack;
+    bump=.58*distDetail;
+    vec3 amber=mix(col*vec3(.78,.82,.82),col*vec3(1.34,1.23,1.12),blade);
+    vec3 fibers=amber*(.73+.23*lining+.20*threads-.22*crack);
+    float pale=smoothstep(.51,.76,noise(p*3.2)*.75+mottling*.25);
+    col=mix(fibers,vec3(.36,.31,.248)*(.72+.25*lining),pale*.43);
+    if(m==1.||m==16.||m==17.){
+      float mossField=noise(p*3.4)*.64+noise(p*1.07)*.36;
+      float growth=(1.-smoothstep(.048,1.09,aboveGround))*smoothstep(.34,.76,mossField);
+      if(m==16.)growth=max(growth,.73*smoothstep(.28,.67,mossField)*smoothstep(.18,.66,above));
+      col=mix(col,vec3(.247,.326,.113)*(.64+.64*fleck+.26*fine),growth*.88);
+      relief=mix(relief,.015*fleck+.008*fine,growth);
+      occlusion=(1.-.12*crack)*(1.-ambientMask*.39*exp(-aboveGround*2.25));
+    }
   }
   if(m==2.||m==12.){
-    float strata=noise(vec3(p.x*3.3,p.y*12.,p.z*3.3));
-    float coat=m==12.?1.:smoothstep(.51,.72,mottling*.68+above*.31+fleck*.10);
-    if(p.y<-.35)coat*=.24;
-    float fibers=noise(p*17.)*.65+fine*.35;
-    relief=mix(strata,fibers,coat)*.046;
-    bump=.6*distDetail;
-    col*=.58+.25*strata+.24*fleck+.11*fine;
-    col=mix(col,vec3(.257,.332,.120)*(.58+.53*fibers+.20*mottling),coat*.83);
+    float lay=p.y+p.x*.125-p.z*.103;
+    float bed=noise(vec3(p.x*2.3,lay*14.,p.z*2.3));
+    float pore=noise(p*17.);
+    float shale=smoothstep(.25,.67,bed*.73+pore*.27);
+    float mossEdge=mottling*.51+above*.34+fleck*.21;
+    float coat=m==12.?1.:smoothstep(.51,.77,mossEdge)*(1.-wet*.82);
+    relief=mix(.020*shale+.012*pore,.010*fleck+.013*fine,coat);
+    bump=.56*distDetail;
+    vec3 stone=mix(col*vec3(.73,.82,.84),col*vec3(1.16,1.11,1.04),shale);
+    float pale=smoothstep(.77,.94,noise(vec3(p.x*6.1,lay*25.,p.z*6.1)));
+    stone=mix(stone,vec3(.52,.51,.451),pale*.44);
+    col=mix(stone,vec3(.247,.332,.109)*(.52+.54*pore+.33*mottling),coat*.91);
+    col*=1.-.33*wet*(1.-coat);
+    sheen=wet*(1.-coat)*.075;
+    gloss=mix(18.,49.,wet);
+    occlusion=1.-ambientMask*.62*exp(-aboveGround*5.0);
   }
   if(m==0.||m==4.){
-    float d=tread(p.x,p.z)+(mottling-.5)*.29;
-    float foot=1.-smoothstep(.62,1.15,d);
-    float moss=smoothstep(.32,.74,mottling*.56+noise(p*.42)*.51+fleck*.08);
-    vec3 humus=mix(vec3(.19,.137,.092),vec3(.33,.261,.188),mottling);
-    vec3 floor=mix(humus,vec3(.268,.332,.122),moss*(1.-foot*.91));
-    float chip=smoothstep(.44,.79,noise(vec3(p.x*21.+p.z*9.,p.y*29.,p.z*83.)));
-    floor=mix(floor,vec3(.405,.234,.114),chip*(.13+.20*(1.-foot)));
-    if(m==0.)col=floor*(.74+.27*fleck+.24*fine);
-    else col*=.74+.31*fleck;
-    if(p.y<-.34)col=mix(col,vec3(.22,.222,.158)*(.66+.37*mottling+.25*fleck),.58);
-    relief=(fine*.40+fleck*.35+chip*.25)*.034;
-    bump=.63*distDetail;
+    float d=tread(p.x,p.z)+(mottling-.5)*.42;
+    float foot=1.-smoothstep(.52,1.25,d);
+    float moisture=noise(p*.42)*.55+mottling*.33+fleck*.12;
+    float moss=smoothstep(.44,.70,moisture)*(1.-foot*.95)*(1.-wet*.68);
+    float grit=noise(p*39.);
+    float flake=noise(vec3(p.x*21.+p.z*9.,p.y*39.,p.z*83.));
+    float needles=smoothstep(.62,.83,flake)*(.2+.80*fleck)*(1.-foot*.43);
+    vec3 darkEarth=mix(vec3(.18,.125,.084),vec3(.275,.212,.151),mottling);
+    vec3 worn=mix(vec3(.232,.172,.121),vec3(.358,.281,.212),fleck);
+    vec3 floor=mix(darkEarth,worn,foot);
+    floor=mix(floor,vec3(.256,.327,.125)*(.66+fleck*.43+fine*.23),moss);
+    floor=mix(floor,vec3(.454,.278,.155),needles*.57);
+    floor*=.84+.19*fleck+.15*grit;
+    if(m==0.){
+      float submerged=smoothstep(.02,.17,waterLevel(p.z)-p.y)*wet;
+      vec3 silt=mix(vec3(.184,.201,.146),vec3(.371,.353,.257),fleck);
+      col=mix(floor,silt*(.77+.27*grit),submerged*.89);
+    }else col*=.77+.31*fleck;
+    col=mix(col,col*vec3(.71,.81,.77),wet*.60);
+    relief=.008*grit+.010*fleck+.009*needles+.012*moss;
+    bump=.58*distDetail;
+    occlusion=1.-ambientMask*.82;
   }
   if(m==5.||m==6.||cutout){
     col*=textureTone*(.81+.23*fleck+.12*fine);
@@ -1063,7 +1228,13 @@ void main(){
   if(highDetail)N=bumpNormal(N,relief,bump);
   float direct=sunlight(p,N);
   float diffuse=max(dot(N,SUN),0.);
-  vec3 lit=col*(vec3(.73,.81,.76)*(.44+.26*above)+vec3(1.38,1.23,.91)*diffuse*direct);
+  vec3 fill=mix(vec3(.66,.70,.61),vec3(.77,.85,.83),above);
+  vec3 lit=col*(fill*(.47+.23*above)*occlusion+vec3(1.42,1.25,.95)*diffuse*direct);
+  if(sheen>0.){
+    float sky=max(0.,reflect(ray,N).y);
+    float gleam=pow(max(0.,dot(reflect(-SUN,N),-ray)),gloss);
+    lit+=sheen*(.13*sky*vec3(.66,.83,.87)+gleam*direct*vec3(1.,.89,.71));
+  }
   if(m==5.||m==6.||cutout){
     lit+=col*vec3(.72,.88,.42)*max(.12,-dot(N,SUN))*direct*.80;
     lit+=vec3(.035,.045,.024)*pow(max(0.,dot(reflect(-SUN,N),-ray)),21.)*direct;
@@ -1072,8 +1243,8 @@ void main(){
     float caustic=sin(p.x*27.+p.z*16.4+sin(p.z*11.+time*2.9)*1.45)
       *sin(p.z*23.7-p.x*18.+sin(p.x*14.-time*3.)*1.7);
     float depth=waterLevel(p.z)-p.y;
-    lit=lit*vec3(.79,.86,.77)*exp(-depth*.25)
-      +vec3(.19,.22,.13)*pow(max(0.,caustic),5.)*(.25+.55*direct)*exp(-depth*1.16);
+    lit=lit*vec3(.76,.88,.84)*exp(-depth*.36)
+      +vec3(.20,.22,.16)*pow(max(0.,caustic),5.)*(.16+.54*direct)*exp(-depth*1.5);
   }
   if(m==7.){
     float stream=noise(vec3(p.x*24.,p.y*3.1+time*7.6,p.z*4.));
@@ -1084,7 +1255,7 @@ void main(){
   outColor=vec4(outputColor(air(lit,p,ray,dist)),1.);
 }`;
 const foamStones=riffles.map(([offset,z,r])=>{
-  return 'foam=max(foam,wake(vec3('+[river(z)+offset,z,r].map(v=>v.toFixed(4)).join(',')+'),p.xz));';
+  return 'foam=max(foam,wake(vec3('+[river(z)+offset,z,r].map(v=>v.toFixed(4)).join(',')+'),p.xz,grain));';
 }).join('\n');
 const waterFragment=`
 precision highp float;
@@ -1094,41 +1265,75 @@ out vec4 outColor;
 ${uniforms}
 ${shaderBase}
 ${surfaceLighting}
-float wake(vec3 stone,vec2 at){
+uniform sampler2D reflectionMap;
+uniform bool hasReflection;
+uniform float reflectionPlane;
+
+float wake(vec3 stone,vec2 at,float ripple){
   vec2 d=(at-stone.xy)/stone.z;
-  float radius=length(d*vec2(1.,1.15));
-  float collar=1.-smoothstep(.03,.45,abs(radius-.88));
-  float tail=(1.-smoothstep(.03,.30,abs(abs(d.x)-.64+d.y*.1)))*smoothstep(.0,.6,d.y)*(1.-smoothstep(.84,3.8,d.y));
-  return collar*.68+tail;
+  float radius=length(d*vec2(1.0,1.13));
+  float bow=(1.-smoothstep(.055,.20,abs(radius-.83)))*(1.-smoothstep(-.37,.45,d.y));
+  float downstream=smoothstep(.12,.68,d.y)*(1.-smoothstep(1.4,3.1,d.y));
+  float bend=.64+.092*d.y+.09*sin(d.y*2.7+d.x*3.8+ripple*3.);
+  float outside=abs(abs(d.x)-bend);
+  float tail=downstream*(1.-smoothstep(.032,.22,outside));
+  return bow*.69+tail*.78;
 }
 void main(){
   vec3 ray=normalize(p-eye);
   float dist=length(p-eye);
-  float f=noise(vec3(p.x*3.8,p.z*3.19-time*1.72,8.));
-  float s=sin(p.z*16.+p.x*8.6-time*6.9+f*5.);
-  float t=sin(p.z*25.-p.x*12.4-time*9.8+f*6.);
-  vec3 N=normalize(vec3(s*.053-t*.033,1.,s*.092+t*.051));
-  vec3 reflected=reflect(ray,N);
-  float fresnel=.018+.79*pow(1.-clamp(-dot(ray,N),0.,1.),4.1);
-  float canopy=noise(vec3((p.xz+reflected.xz*(3.5+max(reflected.y,0.)*9.))*.67,4.));
-  float dapple=sunlight(p,N);
-  vec3 reflectCol=mix(vec3(.09,.15,.12),skyColor(reflected),smoothstep(.28,.74,canopy)*.84);
-  float glint=pow(max(dot(reflected,SUN),0.),120.)*(.21+.79*dapple);
-  float flash=pow(max(0.,s*.66+t*.34),9.)*smoothstep(.56,.83,canopy);
+  float sideways=p.x-riverAt(p.z),along=p.z;
+  vec2 stream=vec2(sideways,along);
+  float speed=m==13.?2.3:1.;
+  float advection=along-time*.62*speed;
+  float grain=noise(vec3(stream.x*4.2,advection*3.4,8.1));
+  float drift=noise(vec3(stream.x*1.6,advection*.78,2.2));
+  float primary=sin(sideways*6.6+along*13.8-time*4.2*speed+drift*4.1);
+  float secondary=sin(sideways*13.4-along*24.1+time*7.4*speed+grain*3.4);
+  float crossRipple=sin(sideways*31.3+advection*8.1+drift*6.);
+  vec3 S=normalize(vec3(.031*primary-.018*secondary+.014*crossRipple,1.,
+    .077*primary+.038*secondary+.011*crossRipple));
+  vec3 reflected=reflect(ray,S);
+  float incidence=clamp(-dot(ray,S),0.,1.);
+  float fresnel=.038+.86*pow(1.-incidence,3.25);
+  float woods=noise(vec3((p.xz+reflected.xz*8.)*.54,3.4));
+  vec3 reflectCol=mix(vec3(.081,.125,.101),skyColor(reflected),smoothstep(.28,.81,woods)*.86);
+  if(hasReflection){
+    vec3 v=p-eye;
+    float depth=max(.12,dot(v,fw));
+    vec2 image=(vec2(dot(v,rt),dot(v,up))*scale/depth)*.5+.5;
+    image+=vec2(S.x*.49,S.z*.38);
+    float border=min(min(image.x,1.-image.x),min(image.y,1.-image.y));
+    float coverage=smoothstep(-.014,.042,border)*(1.-smoothstep(.14,.52,abs(p.y-reflectionPlane)));
+    vec3 mirror=pow(texture(reflectionMap,clamp(image,.001,.999)).rgb,vec3(1./.81));
+    reflectCol=mix(reflectCol,mirror*vec3(.85,.95,.97),coverage*.96);
+  }
+  float direct=sunlight(p,S);
+  float glint=pow(max(dot(reflected,SUN),0.),84.)*(.23+.77*direct);
+  float coarseGlint=pow(max(dot(reflected,SUN),0.),21.)*.034*direct;
   float foam=0.;
   ${foamStones}
-  float threads=sin(p.x*23.+f*10.+p.z*6.-time*4.)*.5+.5;
-  foam=smoothstep(.26,.86,foam*(.35+.85*threads))*.85;
-  float white=smoothstep(.73,.95,f)*.13+flash*.20+glint*.68+foam*.88;
+  float cells=noise(vec3(sideways*16.3,advection*9.2,7.4));
+  float thread=sin(sideways*31.3+advection*12.9+grain*7.)*.5+.5;
+  float bubbles=smoothstep(.31,.77,cells*.68+thread*.32);
+  float white=smoothstep(.23,.94,foam*(.48+1.05*bubbles))*.56;
   if(m==13.){
-    float stream=noise(vec3(p.x*17.,p.z*4.-time*5.1,8.));
-    white+=.52*smoothstep(.23,.76,stream)*(1.-smoothstep(.74,2.5,abs(p.x-riverAt(p.z))));
+    float streamLines=noise(vec3(sideways*13.2,advection*7.1,8.));
+    white+=.42*smoothstep(.27,.75,streamLines*.69+cells*.31)*
+      (1.-smoothstep(.79,2.55,abs(sideways)));
   }
-  float opacity=clamp(.055+fresnel*.60+white,0.,.92);
-  vec3 col=mix(vec3(.086,.137,.108),reflectCol,clamp(fresnel*2.+.13,0.,1.));
-  col=mix(col,vec3(.77,.84,.79),clamp(white*1.26,0.,.88));
+  float bank=1.-smoothstep(1.01,2.81,abs(sideways));
+  float body=.055+bank*.075;
+  // The bed remains visible head-on. Trunks and sky emerge at grazing angles.
+  float opacity=clamp(body+fresnel*.86+white*.85+glint*.42,0.,.95);
+  float skyRipple=smoothstep(.36,.92,primary*.37+secondary*.26+drift*.70);
+  vec3 col=mix(vec3(.063,.139,.127),reflectCol,clamp(fresnel*1.44+.31,0.,1.));
+  col+=vec3(.16,.24,.23)*skyRipple*(.19+.70*direct);
+  col+=vec3(1.,.87,.64)*(glint*.45+coarseGlint);
+  col=mix(col,vec3(.723,.789,.731),white*.87);
   outColor=vec4(outputColor(air(col,p,ray,dist)),opacity);
-}`;
+}
+`;
 
 function graphics(gl,model) {
   function compile(type,source){
@@ -1147,6 +1352,30 @@ function graphics(gl,model) {
       scale:location('scale'),time:location('time'),detail:location('highDetail')};
   }
   const world=program(vertex,fragment),water=program(vertex,waterFragment);
+  const reflectedForest=program(vertex,`
+    precision highp float;
+    in vec3 p,n,c;
+    in vec2 leafUV;
+    flat in float m;
+    out vec4 outColor;
+    ${uniforms}
+    ${shaderBase}
+    ${foliageSampling}
+    uniform float reflectionPlane;
+    void main(){
+      if(p.y<reflectionPlane+.017||m==8.)discard;
+      vec3 ray=normalize(p-eye),col=c;
+      if(m==14.||m==15.){
+        vec4 leaf=foliageColor(leafUV);
+        if(leaf.a<.28)discard;
+        col*=leaf.rgb*1.35;
+      }
+      vec3 N=normalize(n);
+      if(dot(N,ray)>0.)N=-N;
+      float light=.45+.21*abs(N.y)+.28*max(0.,dot(N,SUN));
+      float shade=.78+.24*noise(p*vec3(5.,2.,5.));
+      outColor=vec4(outputColor(air(col*light*shade,p,ray,length(p-eye))),1.);
+    }`);
   const sky=program(`out vec2 uv;void main(){
     uv=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2))*2.-1.;gl_Position=vec4(uv,.9999,1.);
   }`,`precision highp float;in vec2 uv;out vec4 col;${uniforms}${shaderBase}
@@ -1213,7 +1442,7 @@ function graphics(gl,model) {
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
   gl.generateMipmap(gl.TEXTURE_2D);
   gl.activeTexture(gl.TEXTURE0);
-  for(const material of [world,depth]){
+  for(const material of [world,depth,reflectedForest]){
     gl.useProgram(material.p);
     gl.uniform1i(gl.getUniformLocation(material.p,'foliageAtlas'),1);
   }
@@ -1228,20 +1457,94 @@ function graphics(gl,model) {
   gl.deleteFramebuffer(framebuffer);
   gl.deleteProgram(depth.p);
   gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+  const contactTexture=gl.createTexture();
+  gl.activeTexture(gl.TEXTURE2);
+  gl.bindTexture(gl.TEXTURE_2D,contactTexture);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.R8,...contactSize,0,gl.RED,gl.UNSIGNED_BYTE,model.contact);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  model.contact=null;
+  gl.useProgram(world.p);gl.uniform1i(gl.getUniformLocation(world.p,'contactMap'),2);
+  gl.useProgram(water.p);gl.uniform1i(gl.getUniformLocation(water.p,'reflectionMap'),3);
+  gl.activeTexture(gl.TEXTURE0);
   function setup(p,v){
     gl.useProgram(p.p);gl.uniform3fv(p.eye,v.eye);gl.uniform3fv(p.fw,v.fw);gl.uniform3fv(p.rt,v.rt);
     gl.uniform3fv(p.up,v.up);gl.uniform2f(p.scale,v.sx,v.sy);gl.uniform1f(p.time,v.time);gl.uniform1i(p.detail,v.detail);
   }
-  return v=>{
-    gl.viewport(0,0,canvas.width,canvas.height);gl.clear(gl.DEPTH_BUFFER_BIT);
-    gl.disable(gl.DEPTH_TEST);setup(sky,v);gl.bindVertexArray(skyVAO);gl.drawArrays(gl.TRIANGLES,0,3);
-    gl.enable(gl.DEPTH_TEST);setup(world,v);
+  // Only the creek samples this small reflection pass. Terrain retains the main depth buffer.
+  const reflectionBuffer=gl.createFramebuffer(),reflectionTexture=gl.createTexture();
+  const reflectionDepth=gl.createRenderbuffer();
+  let mirrorWidth=0,mirrorHeight=0,mirrorComplete=false;
+  const reflectedView={eye:new Float32Array(3),fw:new Float32Array(3),rt:new Float32Array(3),
+    up:new Float32Array(3),sx:1,sy:1,time:0,detail:false};
+  const reflectionHeight=gl.getUniformLocation(reflectedForest.p,'reflectionPlane');
+  const waterHeight=gl.getUniformLocation(water.p,'reflectionPlane');
+  const waterReflection=gl.getUniformLocation(water.p,'hasReflection');
+  function renderMirror(v,plane){
+    const width=Math.max(1,Math.round(canvas.width*.40)),height=Math.max(1,Math.round(canvas.height*.40));
+    if(width!==mirrorWidth||height!==mirrorHeight){
+      mirrorWidth=width;mirrorHeight=height;
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D,reflectionTexture);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,width,height,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+      gl.bindFramebuffer(gl.FRAMEBUFFER,reflectionBuffer);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,reflectionTexture,0);
+      gl.bindRenderbuffer(gl.RENDERBUFFER,reflectionDepth);
+      gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,width,height);
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,reflectionDepth);
+      mirrorComplete=gl.checkFramebufferStatus(gl.FRAMEBUFFER)===gl.FRAMEBUFFER_COMPLETE;
+      gl.activeTexture(gl.TEXTURE0);
+    }else if(mirrorComplete){
+      gl.bindFramebuffer(gl.FRAMEBUFFER,reflectionBuffer);
+    }
+    if(!mirrorComplete){
+      gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+      return false;
+    }
+    reflectedView.eye.set(v.eye);
+    reflectedView.eye[1]=2*plane-v.eye[1];
+    reflectedView.fw.set(v.fw);reflectedView.fw[1]=-v.fw[1];
+    reflectedView.rt.set(v.rt);
+    reflectedView.up.set(v.up);reflectedView.up[1]=-v.up[1];
+    reflectedView.sx=v.sx;reflectedView.sy=v.sy;reflectedView.time=v.time;
+    gl.viewport(0,0,width,height);gl.clear(gl.DEPTH_BUFFER_BIT);
+    gl.disable(gl.DEPTH_TEST);setup(sky,reflectedView);
+    gl.bindVertexArray(skyVAO);gl.drawArrays(gl.TRIANGLES,0,3);
+    gl.enable(gl.DEPTH_TEST);setup(reflectedForest,reflectedView);
+    gl.uniform1f(reflectionHeight,plane);
+    drawTiles(v,56);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    return true;
+  }
+  gl.activeTexture(gl.TEXTURE3);
+  gl.bindTexture(gl.TEXTURE_2D,reflectionTexture);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.activeTexture(gl.TEXTURE0);
+
+  function drawTiles(v,range){
     for(const tile of model.tiles){
       const dx=tile.x-v.eye[0],dz=tile.z-v.eye[2],ahead=dx*v.fw[0]+dz*v.fw[2];
-      if(dx*dx+dz*dz>115**2||ahead<-21||Math.abs(dx*v.rt[0]+dz*v.rt[2])>ahead/v.sx+30)continue;
+      if(dx*dx+dz*dz>range**2||ahead<-21||Math.abs(dx*v.rt[0]+dz*v.rt[2])>ahead/v.sx+30)continue;
       gl.bindVertexArray(tile.vao);gl.drawArrays(gl.TRIANGLES,0,tile.count);
     }
+  }
+  return v=>{
+    const distanceToCreek=Math.abs(v.eye[0]-river(v.eye[2]));
+    const plane=groundwater+creekRise(v.eye[2]);
+    const mirror=v.detail&&distanceToCreek<13&&v.fw[1]<.23&&renderMirror(v,plane);
+    gl.viewport(0,0,canvas.width,canvas.height);gl.clear(gl.DEPTH_BUFFER_BIT);
+    gl.disable(gl.DEPTH_TEST);setup(sky,v);gl.bindVertexArray(skyVAO);gl.drawArrays(gl.TRIANGLES,0,3);
+    gl.enable(gl.DEPTH_TEST);setup(world,v);drawTiles(v,115);
     gl.enable(gl.BLEND);gl.depthMask(false);setup(water,v);
+    gl.uniform1i(waterReflection,mirror);gl.uniform1f(waterHeight,plane);
     gl.bindVertexArray(waterMesh.vao);gl.drawArrays(gl.TRIANGLES,0,waterMesh.count);
     gl.depthMask(true);gl.disable(gl.BLEND);
   };
@@ -1329,9 +1632,11 @@ function software(ctx,model){
       const streak=.19*Math.sin(row[i]*22+row[i+1]*.46+clock*9)+.085*Math.cos(row[i]*37+clock*11);
       r+=streak;g+=streak;b+=streak;
     }
-    if(type===3){
-      const ripple=Math.max(0,Math.sin(row[i]*14+row[i+2]*5+clock*3))**4*.13;
-      r+=ripple;g+=ripple;b+=ripple;
+    if(type===3||type===13){
+      const phase=row[i]*4.6+row[i+2]*7.2-clock*(type===13?5.7:2.9);
+      const ripple=(.5+.5*Math.sin(phase+1.42*Math.sin(row[i]*1.7+row[i+2]*.8)))**3;
+      const shimmer=ripple*(type===13?.13:.041);
+      r+=shimmer*.83;g+=shimmer;b+=shimmer*1.12;
     }
     const color=[r,g,b].map((n,j)=>clamp(Math.round(n*255*shade*(1-fog)+fogCol[j]*fog),0,255));
     buckets[clamp(Math.floor(z*2),0,150)].push({points,color,z, type});
@@ -1411,7 +1716,7 @@ function software(ctx,model){
         ctx.fillStyle='rgb('+c.join(',')+')';ctx.beginPath();ctx.moveTo(p[0],p[1]);
         for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i],p[i+1]);
         ctx.closePath();ctx.fill();
-        if(type===0||type===2||type===3||type===4||type===7){
+        if(type===0||type===2||type===3||type===4||type===7||type===13){
           ctx.lineWidth=.55;ctx.strokeStyle=ctx.fillStyle;ctx.stroke();
         }
       }
