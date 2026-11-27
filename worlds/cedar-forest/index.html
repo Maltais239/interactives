@@ -92,16 +92,18 @@ const wetRock=[.34,.369,.282];
 const groundwater=-.32;
 
 // Opaque meshes use packed 24-byte vertices. The software renderer uses float rows.
-// Two frond patterns and two cedar sprays, generated once for both colour and shadows.
+// Fern fronds, cedar sprays and hemlock needles share one generated texture.
 // A small gutter around each tile keeps the silhouettes separate during mipmapping.
 const foliageTileSize=512;
 const foliageGutter=12;
 const foliageAtlasSize=foliageTileSize*2;
 
+const foliageHeight=tile=>tile<2?foliageTileSize:foliageTileSize/2;
+const foliageRow=tile=>tile<2?0:foliageTileSize+Math.floor((tile-2)/2)*(foliageTileSize/2);
 function foliageUV(tile,u,v){
-  const inset=foliageGutter+.5,span=foliageTileSize-2*inset;
-  return [((tile%2)*foliageTileSize+inset+u*span)/foliageAtlasSize,
-    (Math.floor(tile/2)*foliageTileSize+inset+v*span)/foliageAtlasSize];
+  const inset=foliageGutter+.5;
+  return [((tile%2)*foliageTileSize+inset+u*(foliageTileSize-2*inset))/foliageAtlasSize,
+    (foliageRow(tile)+inset+v*(foliageHeight(tile)-2*inset))/foliageAtlasSize];
 }
 
 function foliagePixels(){
@@ -117,11 +119,11 @@ function foliagePixels(){
   }
   function paint(polygon,red,green,blue){
     const x0=(tile%2)*foliageTileSize+foliageGutter+.5;
-    const y0=Math.floor(tile/2)*foliageTileSize+foliageGutter+.5;
-    const span=foliageTileSize-2*foliageGutter-1;
-    const vertices=polygon.map(([x,y])=>[x0+x*span,y0+y*span]);
+    const y0=foliageRow(tile)+foliageGutter+.5;
+    const span=foliageTileSize-2*foliageGutter-1,height=foliageHeight(tile)-2*foliageGutter-1;
+    const vertices=polygon.map(([x,y])=>[x0+x*span,y0+y*height]);
     const ymin=Math.max(y0|0,Math.floor(Math.min(...vertices.map(p=>p[1]))));
-    const ymax=Math.min(y0+span+1,Math.ceil(Math.max(...vertices.map(p=>p[1]))));
+    const ymax=Math.min(y0+height+1,Math.ceil(Math.max(...vertices.map(p=>p[1]))));
     const edges=[];
     for(let y=ymin;y<ymax;y++){
       edges.length=0;
@@ -186,36 +188,96 @@ function foliagePixels(){
     const a=rachis(.916),b=rachis(.991);
     paint([a,[.949,a[1]-.022],b,[.949,a[1]+.021]],183,204,155);
   }
-  for(tile=2;tile<4;tile++){
-    const tiers=tile===2?10:9;
-    const stem=t=>[t,.50+.055*t*Math.sin(t*3.6+tile*.76)];
-    for(let j=0;j<14;j++){
-      stroke(stem(j/14),stem((j+1)/14),lerp(.012,.002,j/14),lerp(.012,.002,(j+1)/14),[159,165,114]);
+  // Draw the canopy from branching twigs. Each terminal twig has overlapping,
+  // curved scales sized to the stem, with a narrower and finer growing tip.
+  function scaleSprig(point,length,thickness,tone){
+    const pieces=Math.max(4,Math.ceil(length*59));
+    for(let j=0;j<pieces;j++){
+      const t=j/pieces,u=(j+1)/pieces;
+      const a=point(t),b=point(u),dx=b[0]-a[0],dy=b[1]-a[1];
+      const span=Math.hypot(dx,dy)||1;
+      const taper=lerp(1,.38,t);
+      const green=176*tone*(.88+.19*t);
+      stroke(a,b,thickness*.24*taper,thickness*.19*taper,
+        [137*tone,green,105*tone]);
+      for(const side of [-1,1]){
+        const x=dx/span,y=dy/span;
+        const sideAt=side<0?.25:0;
+        const base=[a[0]+dx*sideAt,a[1]+dy*sideAt];
+        const w=thickness*taper*jitter(.67,1.20)*side;
+        const tip=[base[0]+dx*jitter(1.08,1.73)-y*w*.56,
+          base[1]+dy*jitter(1.08,1.73)+x*w*.56];
+        const back=[base[0]+dx*.33-y*w,base[1]+dy*.33+x*w];
+        const front=[base[0]+dx*.83-y*w*.88,base[1]+dy*.83+x*w*.88];
+        const color=tone*jitter(.83,1.16)*(.89+.24*t);
+        paint([base,back,front,tip,[base[0]+dx*.85+y*w*.23,base[1]+dy*.85-x*w*.23]],
+          153*color,183*color,112*color);
+      }
     }
-    for(let j=0;j<tiers;j++)for(const side of [-1,1]){
-      const t=.104+.77*(j+(side===1?.43:0))/tiers,base=stem(t);
-      const reach=.435*Math.sin(Math.PI*(.16+t*.81))**.80*(1.11-.45*t)*jitter(.73,1.13);
-      const advance=lerp(.14,.062,t)*jitter(.77,1.19);
-      const twig=s=>[base[0]+advance*(.59*s+.41*s*s),base[1]+side*reach*s];
-      const fingers=8+Math.floor(jitter(0,3));
-      for(let k=0;k<fingers;k++){
-        const a=(k+.25)/fingers,u=twig(a),v=twig(Math.min(1,(k+1.2)/fingers));
-        stroke(u,v,lerp(.006,.001,a),lerp(.006,.001,(k+1)/fingers),[167,178,120]);
-        for(const sign of [-1,1]){
-          const length=.034*(1-.65*a)*jitter(.66,1.22);
-          const width=lerp(.012,.004,a)*jitter(.72,1.14);
-          const end=[u[0]+advance*.13+sign*length,u[1]+side*reach*.13*(1-.44*a)];
-          const dx=end[0]-u[0],dy=end[1]-u[1],mag=Math.hypot(dx,dy)||1;
-          const rx=-dy/mag*width,ry=dx/mag*width;
-          const mid=[lerp(u[0],end[0],.55),lerp(u[1],end[1],.55)];
-          const tone=jitter(.78,1.14)*(.85+.22*a);
-          paint([u,[mid[0]+rx,mid[1]+ry],end,[mid[0]-rx,mid[1]-ry]],
-            Math.round(163*tone),Math.round(193*tone),Math.round(132*tone));
-          stroke(u,end,width*.29,.0007,[190,209,147]);
+  }
+  for(tile=2;tile<5;tile++){
+    const spread=jitter(.87,1.15),centerline=jitter(-.09,.09);
+    const stem=t=>[.014+t*.954,.49+centerline*Math.sin(t*3.7)+.033*t*t];
+    for(let j=0;j<15;j++){
+      stroke(stem(j/15),stem((j+1)/15),lerp(.013,.002,j/15),lerp(.013,.002,(j+1)/15),[146,160,100]);
+    }
+    for(const side of [-1,1]){
+      const shoots=7+Math.floor(jitter(0,4));
+      for(let j=0;j<shoots;j++){
+        const t=.105+.76*(j+jitter(.0,.88))/shoots;
+        const base=stem(t);
+        const sweep=lerp(.237,.085,t)*jitter(.69,1.35);
+        const span=(.16+.23*Math.sin((t+.09)*Math.PI))*spread
+          *(1.-.32*t)*jitter(.64,1.27)*side;
+        const lateral=s=>[base[0]+sweep*(.51*s+.49*s*s),base[1]+span*(1.24*s-.24*s*s)];
+        const shootTone=jitter(.73,1.11)+t*.09;
+        scaleSprig(lateral,Math.hypot(sweep,span),.014,shootTone);
+        const forks=4+Math.floor(jitter(0,4));
+        for(let k=0;k<forks;k++){
+          const s=(k+jitter(.53,1.27))/(forks+1);
+          const fork=lateral(s),direction=k%2===0?-1:1;
+          const advance=(.133-.065*s)*jitter(.48,1.19)*direction;
+          const lift=span*(1.-.72*s)*jitter(.25,.49);
+          const sprig=v=>[fork[0]+advance*v+sweep*.19*v*v,
+            fork[1]+lift*v+span*.055*Math.sin(v*Math.PI)];
+          scaleSprig(sprig,Math.hypot(advance,lift),.013*jitter(.74,1.14),shootTone*jitter(.87,1.09));
+          if(k%3===1){
+            const split=sprig(.44);
+            const tip=v=>[split[0]+advance*.46*v,split[1]+lift*1.09*v];
+            scaleSprig(tip,Math.hypot(advance*.46,lift),.009,shootTone*.94);
+          }
         }
       }
     }
-    stroke(stem(.90),stem(.993),.010,.001,[196,214,151]);
+    scaleSprig(s=>stem(.85+.15*s),.15,.011,1.08);
+  }
+
+  // The young hemlocks have fine, separate needles along their twigs.
+  tile=5;
+  for(const side of [-1,1]){
+    const shoots=8;
+    for(let j=0;j<shoots;j++){
+      const t=.06+.88*(j+jitter(.04,.88))/shoots;
+      const base=[t,.50+.036*Math.sin(t*6)];
+      const reach=(.36*Math.max(0,Math.sin((t+.10)*Math.PI))**.73)*jitter(.74,1.20)*side;
+      const sweep=(.172-.09*t)*jitter(.68,1.20);
+      const twig=s=>[base[0]+sweep*s,base[1]+reach*s*(1.12-.12*s)];
+      for(let k=0;k<18;k++){
+        const s=k/18,a=twig(s),b=twig((k+1)/18);
+        const tone=(.82+s*.20)*jitter(.84,1.16);
+        stroke(a,b,.006,.004,[143*tone,151*tone,104*tone]);
+        for(const direction of [-1,1]){
+          const len=(.068-.039*s)*jitter(.68,1.27)*direction;
+          const end=[a[0]+len+sweep*.09,a[1]+reach*.15*(1-.44*s)];
+          stroke(a,end,.0075*jitter(.65,1.25)*(1.-.28*s),.001,[152*tone,178*tone,124*tone]);
+        }
+      }
+    }
+  }
+  for(let i=0;i<12;i++){
+    const a=i/12,b=(i+1)/12;
+    stroke([a,.50+.036*Math.sin(a*6)],[b,.50+.036*Math.sin(b*6)],lerp(.008,.002,a),
+      lerp(.008,.002,b),[159,169,111]);
   }
   return pixels;
 }
@@ -249,11 +311,14 @@ function packedMesh() {
 function build(low) {
   const tiles = new Map();
   const water = low?null:packedMesh();
-  let target;
+  let target,targetTile;
   function bucket(x,z) {
-    let ix=Math.floor(x/11), iz=Math.floor(z/11), key=ix+','+iz;
-    if(!tiles.has(key))tiles.set(key,{x:(ix+.5)*11,z:(iz+.5)*11,rows:low?[]:packedMesh()});
-    target=tiles.get(key).rows;
+    const ix=Math.floor(x/11),iz=Math.floor(z/11),key=ix+','+iz;
+    if(!tiles.has(key)){
+      tiles.set(key,{x:(ix+.5)*11,z:(iz+.5)*11,rows:low?[]:packedMesh(),sprigs:low?[]:null});
+    }
+    targetTile=tiles.get(key);
+    target=targetTile.rows;
   }
   function tri(a,b,c,color,material,wind=0,normal,uvs) {
     const n=normal??unit(cross(sub(b,a),sub(c,a)));
@@ -370,34 +435,40 @@ function build(low) {
     }
   }
 
-  function cedarSprays(x,y,z,r,angle,dark,detailed=false){
+  function cedarSprays(x,y,z,r,angle,dark,detailed=false,hemlock=false){
     const jostle=plantVariation(detailed&&!low?1144:172);
-    const sprays=low?3:detailed?7:5;
+    const sprays=low?3:detailed?8:5;
+    const facing=jostle(-.29,.29)+angle;
+    const spread=jostle(1.5,2.5);
+    const fanSeed=Math.floor(jostle(0,3));
     for(let i=0;i<sprays;i++){
-      const center=i/(sprays-1)-.5;
-      const a=angle+center*jostle(1.89,2.75)+jostle(-.17,.17);
-      const len=r*jostle(.61,1.19),dx=Math.cos(a),dz=Math.sin(a);
-      const fan=len*jostle(.27,.43),sag=jostle(.19,.45);
-      const bend=jostle(-.20,.20),lift=jostle(-.075,.28),roll=jostle(-.45,.45);
-      const spread=r*center*.19,anchor=[x-dz*spread,y+Math.abs(center)*r*.089,z+dx*spread];
-      const tone=dark*jostle(.81,1.15);
-      const color=[.165*tone,.266*tone,.124*tone];
-      const point=t=>[anchor[0]+len*(dx*t-dz*bend*t*t),
-        anchor[1]+len*(lift*t-sag*t*t),anchor[2]+len*(dz*t+dx*bend*t*t)];
-      const width=t=>fan*(.71+.29*Math.sin(Math.PI*t));
-      const wind=t=>.075+.15*t;
+      const along=i/(sprays-1);
+      const a=facing+(along-.5)*spread+jostle(-.48,.48);
+      const len=r*jostle(.49,1.08)*(i%3===0?1.17:1),dx=Math.cos(a),dz=Math.sin(a);
+      const fan=len*jostle(.26,.40),sag=jostle(.13,.51);
+      const bend=jostle(-.23,.23),lift=jostle(-.18,.39),roll=jostle(-.72,.72);
+      const spreadFromCenter=r*(along-.50)*.37;
+      const advance=r*jostle(-.16,.24);
+      const anchor=[x-dz*spreadFromCenter+dx*advance,y+r*jostle(-.13,.11),
+        z+dx*spreadFromCenter+dz*advance];
+      const tone=dark*jostle(.86,1.12);
+      const color=hemlock?[.138*tone,.239*tone,.129*tone]:[.153*tone,.257*tone,.119*tone];
+      const point=t=>[
+        anchor[0]+len*(dx*t-dz*bend*t*t),
+        anchor[1]+len*(lift*t-sag*t*t),anchor[2]+len*(dz*t+dx*bend*t*t)
+      ];
+      const width=t=>fan*(.82+.18*Math.sin(Math.PI*t));
+      const wind=t=>.045+.165*t*t;
+      const pattern=hemlock?5:2+(i+fanSeed)%3;
       if(!low){
-        leafRibbon(point,width,t=>roll+.38*t,detailed?6:4,i%2+2,color,15,wind,.13);
+        const turn=jostle(-.8,.8);
+        leafRibbon(point,width,t=>roll+turn*t,detailed?7:4,pattern,color,15,wind,.18);
       }else{
-        for(let j=0;j<7;j++){
-          const t=(j+.58)/7,mid=point(t),next=point(Math.min(1,t+.13));
-          const w=width(t)*Math.sin(Math.PI*t)**.74;
-          for(const side of [-1,1]){
-            const end=[mid[0]+dx*w*.37-dz*w*side,mid[1]-.16*w,mid[2]+dz*w*.37+dx*w*side];
-            const edge=[lerp(mid[0],end[0],.57)-dx*w*.20,lerp(mid[1],end[1],.57),lerp(mid[2],end[2],.57)-dz*w*.20];
-            quad(mid,edge,end,next,tint(color,1.02+side*.13),5,wind(t));
-          }
-        }
+        const transverse=fan*Math.cos(roll);
+        targetTile.sprigs.push({
+          start:point(0),middle:point(.5),end:point(1),
+          across:[-dz*transverse,fan*Math.sin(roll),dx*transverse],pattern
+        });
       }
     }
   }
@@ -724,7 +795,7 @@ function build(low) {
         const a=s+j*2.22+k*TAU/3,px=x+bend*t,pz=z-.13*t;
         const start=[px,y+h*t,pz],tip=[px+Math.cos(a)*l,y+h*t-l*.23,pz+Math.sin(a)*l];
         limb(start,tip,.012+l*.013,.004,tint(bark,.72),4,s);
-        cedarSprays(lerp(px,tip[0],.75),tip[1]+.04,lerp(pz,tip[2],.75),l*.7,a,random(.75,1.21));
+        cedarSprays(lerp(px,tip[0],.75),tip[1]+.04,lerp(pz,tip[2],.75),l*.7,a,random(.75,1.21),false,true);
       }
     }
   }
@@ -935,7 +1006,8 @@ void main(){
   vec3 textureTone=vec3(1.);
   if(cutout){
     vec4 leaf=foliageColor(leafUV);
-    if(leaf.a<mix(.43,.22,smoothstep(15.,70.,dist)))discard;
+    float coverage=m==15.?mix(.39,.15,smoothstep(11.,64.,dist)):mix(.43,.22,smoothstep(15.,70.,dist));
+    if(leaf.a<coverage)discard;
     textureTone=leaf.rgb*1.31;
   }
   float mottling=noise(p*1.69),fleck=noise(p*6.3),fine=distDetail>.01?noise(p*25.):.5;
@@ -1177,6 +1249,27 @@ function graphics(gl,model) {
 
 function software(ctx,model){
   const buckets=Array.from({length:151},()=>[]);
+  // Reuse the detailed canopy silhouettes in the canvas fallback.
+  const canopy=foliagePixels();
+  const sprigImages=Array.from({length:4},(_,i)=>{
+    const tile=i+2;
+    const sprite=document.createElement('canvas');
+    sprite.width=foliageTileSize-2*foliageGutter;
+    sprite.height=foliageHeight(tile)-2*foliageGutter;
+    const brush=sprite.getContext('2d');
+    const image=brush.createImageData(sprite.width,sprite.height);
+    for(let y=0;y<sprite.height;y++)for(let x=0;x<sprite.width;x++){
+      const start=4*((foliageRow(tile)+foliageGutter+y)*foliageAtlasSize
+        +(tile%2)*foliageTileSize+foliageGutter+x);
+      const at=4*(y*sprite.width+x);
+      image.data[at]=canopy[start]*.28;
+      image.data[at+1]=canopy[start+1]*.43;
+      image.data[at+2]=canopy[start+2]*.25;
+      image.data[at+3]=canopy[start+3];
+    }
+    brush.putImageData(image,0,0);
+    return sprite;
+  });
   for(const t of model.tiles)t.rows=new Float32Array(t.rows);
   let w,h,clock;
   const sun=[-.39,.73,-.56];
@@ -1243,6 +1336,36 @@ function software(ctx,model){
     const color=[r,g,b].map((n,j)=>clamp(Math.round(n*255*shade*(1-fog)+fogCol[j]*fog),0,255));
     buckets[clamp(Math.floor(z*2),0,150)].push({points,color,z, type});
   }
+  function projectSprig(sprig,v){
+    const [cx,cy,cz]=sprig.middle;
+    const move=Math.sin(clock*1.2+cz*.37+cy*.46)*.088;
+    const offset=[cx-v.eye[0]+move*.5,cy-v.eye[1],cz-v.eye[2]];
+    const depth=dot(offset,v.fw);
+    if(depth<.65||depth>73)return;
+    const px=dot(offset,v.rt)/depth,py=dot(offset,v.up)/depth;
+    const projectAxis=axis=>{
+      const dz=dot(axis,v.fw);
+      return [(dot(axis,v.rt)-px*dz)*v.sx*w*.5/depth,
+        -(dot(axis,v.up)-py*dz)*v.sy*h*.5/depth];
+    };
+    // Approximate perspective at the centre so a tip approaching the camera
+    // cannot stretch the entire texture across the screen.
+    const length=sub(sprig.end,sprig.start);
+    length[0]+=move;
+    const depthRadius=.5*Math.abs(dot(length,v.fw))+Math.abs(dot(sprig.across,v.fw));
+    if(depth-depthRadius<.8)return;
+    const [ax,ay]=projectAxis(length),[bx,by]=projectAxis(sprig.across.map(n=>n*2));
+    const cxScreen=w*.5*(1+px*v.sx),cyScreen=h*.5*(1-py*v.sy);
+    const x=cxScreen-(ax+bx)*.5,y=cyScreen-(ay+by)*.5;
+    const radiusX=(Math.abs(ax)+Math.abs(bx))*.5,radiusY=(Math.abs(ay)+Math.abs(by))*.5;
+    const area=Math.abs(ax*by-ay*bx),span=Math.hypot(ax,ay)*Math.hypot(bx,by);
+    if(cxScreen+radiusX<0||cxScreen-radiusX>w||cyScreen+radiusY<0||cyScreen-radiusY>h
+      ||radiusX>w*.49||radiusY>h*.49||area<Math.max(.45,span*.13))return;
+    buckets[clamp(Math.floor(depth*2),0,150)].push({
+      z:depth,sprite:sprigImages[sprig.pattern-2],transform:[ax,ay,bx,by,x,y]
+    });
+  }
+
   return v=>{
     w=canvas.width;h=canvas.height;clock=v.time;
     background(v);
@@ -1251,6 +1374,7 @@ function software(ctx,model){
     for(const tile of model.tiles){
       const tx=tile.x-ex,tz=tile.z-ez;
       if(tx*tx+tz*tz>73**2||tx*fx+tz*fz<-17||Math.abs(tx*rx+tz*rz)>(tx*fx+tz*fz)/v.sx+17)continue;
+      for(const sprig of tile.sprigs)projectSprig(sprig,v);
       const row=tile.rows;
       for(let j=0;j<row.length;j+=33){
         const type=row[j+9];
@@ -1275,7 +1399,15 @@ function software(ctx,model){
     for(let k=buckets.length-1;k>=0;k--){
       const bucket=buckets[k];
       bucket.sort((a,b)=>b.z-a.z);
-      for(const {points:p,color:c,type} of bucket){
+      for(const {points:p,color:c,type,sprite,transform,z} of bucket){
+        if(sprite){
+          ctx.setTransform(...transform);
+          ctx.globalAlpha=.91*Math.exp(-Math.max(0,z-7)*.017);
+          ctx.drawImage(sprite,0,0,1,1);
+          ctx.resetTransform();
+          ctx.globalAlpha=1;
+          continue;
+        }
         ctx.fillStyle='rgb('+c.join(',')+')';ctx.beginPath();ctx.moveTo(p[0],p[1]);
         for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i],p[i+1]);
         ctx.closePath();ctx.fill();
