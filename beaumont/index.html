@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beaumont Curling Club — Darren + Jeff + Brad</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Outfit:wght@400;600;700;800&family=Roboto+Mono:wght@400;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{--bg:#211812;--surface:#2b2019;--raised:#34271f;--line:#5a4030;--cream:#fff2df;--muted:#c9ac8f;--faint:#947a65;--amber:#f2a33a;--green:#77a866}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--cream);font-family:"Outfit",system-ui,sans-serif} body{min-height:100vh} button{font:inherit}
+.wrap{max-width:1500px;margin:0 auto;padding:18px 18px 40px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.brand h1{font-family:"Fraunces",Georgia,serif;font-size:44px;line-height:1;margin:0;letter-spacing:-.5px}.brand h1 span{color:var(--amber)}
+.brand .sub{color:var(--muted);font-size:13px;letter-spacing:.13em;text-transform:uppercase;margin-top:7px}
+.rule{height:3px;border-radius:3px;background:linear-gradient(90deg,var(--amber),transparent 70%);margin:0 0 16px}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.btn{border:1px solid var(--line);background:transparent;color:var(--cream);font-weight:700;padding:9px 13px;border-radius:10px;cursor:pointer}.btn:hover{filter:brightness(1.12)}
+.summary{color:var(--muted);font-size:13px}.local-note{font-size:11.5px;color:var(--faint)}.btn.offline-ready{background:var(--green);border-color:var(--green);color:#142010}.btn.offline-working{opacity:.75;cursor:wait}
+.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:start}.col{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;min-width:0}
+.colhead{position:sticky;top:0;z-index:2;background:linear-gradient(180deg,var(--surface) 85%,rgba(43,32,25,.94));padding:16px 16px 12px;border-bottom:1px solid var(--line)}
+.coltitle{display:flex;align-items:baseline;justify-content:space-between;gap:10px}.coltitle h2{font-family:"Fraunces",Georgia,serif;margin:0;font-size:25px}
+.count{font-weight:800;color:var(--amber);font-size:13px;white-space:nowrap}.note{font-size:12px;color:var(--faint);margin-top:4px}
+.list{padding:4px 10px 10px;min-height:90px}.song{display:grid;grid-template-columns:32px 30px minmax(0,1fr) 34px;gap:8px;align-items:center;padding:8px 4px;border-bottom:1px solid rgba(90,64,48,.55);border-radius:9px}
+.song:hover{background:rgba(255,255,255,.025)}.song.done{opacity:.5}.song.done .title{text-decoration:line-through}
+.play-toggle,.lyrics-btn,.drag-handle{border:0;background:transparent;color:var(--muted);display:grid;place-items:center;border-radius:8px;min-width:28px;min-height:34px}
+.play-toggle{cursor:pointer}.check{width:23px;height:23px;border:2px solid var(--line);border-radius:7px;display:grid;place-items:center;color:#2a1c0b;font-weight:900}.song.done .check{background:var(--amber);border-color:var(--amber)}.song.done .check:after{content:"✓"}
+.drag-handle{cursor:grab;font-size:18px;letter-spacing:-3px;user-select:none;touch-action:none}.drag-handle:active{cursor:grabbing}
+.song-main{border:0;background:transparent;color:inherit;text-align:left;padding:5px 2px;min-width:0;cursor:pointer;border-radius:8px}.song-main:hover .title{color:var(--amber)}
+.title{font-size:15.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.meta{font-size:11.8px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lyrics-btn{cursor:pointer;font-size:17px}.lyrics-btn:hover,.drag-handle:hover,.play-toggle:hover{background:var(--raised);color:var(--cream)}
+.alt .colhead{border-top:3px solid var(--amber)}.set1 .colhead,.set2 .colhead,.set3 .colhead{border-top:3px solid rgba(242,163,58,.55)}
+.sortable-ghost{opacity:.18!important}.sortable-chosen{background:var(--raised)!important}.sortable-drag{box-shadow:0 12px 30px rgba(0,0,0,.45);border:1px solid var(--amber)}
+.footer{margin-top:14px;color:var(--faint);font-size:12px;text-align:center}
+.qr-modal{position:fixed;inset:0;background:rgba(12,8,6,.86);z-index:120;display:none;align-items:center;justify-content:center;padding:20px}
+.qr-modal.open{display:flex}
+.qr-card{width:min(430px,100%);background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px;text-align:center;box-shadow:0 22px 70px rgba(0,0,0,.55)}
+.qr-card h2{font-family:"Fraunces",Georgia,serif;font-size:28px;margin:0 0 6px}.qr-card p{color:var(--muted);font-size:13px;margin:0 0 16px}
+#qr-code{display:flex;justify-content:center;background:white;padding:14px;border-radius:14px;width:max-content;margin:0 auto 16px}
+#qr-code img,#qr-code canvas{display:block}
+.qr-url{font-size:11px;color:var(--faint);overflow-wrap:anywhere;margin-bottom:14px}
+.audience-only{max-width:1500px;margin:0 auto;padding:20px}
+.audience-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.audience-col{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px}
+.audience-col h2{font-family:"Fraunces",Georgia,serif;font-size:25px;margin:0 0 10px;color:var(--amber)}
+.audience-song{font-size:17px;font-weight:700;padding:9px 4px;border-bottom:1px solid rgba(90,64,48,.5)}
+.audience-song:last-child{border-bottom:0}
+@media(max-width:900px){.audience-grid{grid-template-columns:1fr}.audience-only{padding:12px}.audience-col{padding:14px}.audience-song{font-size:16px;padding:8px 2px}}
+.modal{position:fixed;inset:0;background:rgba(12,8,6,.84);z-index:100;display:none;padding:18px}.modal.open{display:flex}
+.sheet{width:min(1180px,100%);height:100%;margin:auto;background:var(--surface);border:1px solid var(--line);border-radius:18px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+.sheet-head{padding:14px 16px 11px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start}.sheet-title-wrap{flex:1;min-width:0}
+.sheet-title{font-family:"Fraunces",Georgia,serif;font-size:26px;font-weight:800;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sheet-meta{font-size:12.5px;color:var(--muted);margin-top:5px}.sheet-source{font-size:10.5px;color:var(--faint);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.close-btn{border:1px solid var(--line);background:transparent;color:var(--cream);border-radius:10px;width:42px;height:42px;font-size:22px;cursor:pointer;flex:none}
+.sheet-tools{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px 14px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.08)}
+.tool-btn{border:1px solid var(--line);background:var(--raised);color:var(--cream);border-radius:9px;padding:8px 11px;font-weight:700;cursor:pointer}.tool-btn.active{background:var(--amber);color:#2a1c0b;border-color:var(--amber)}.tool-btn:disabled{opacity:.35;cursor:not-allowed}
+.sheet-position{margin-left:auto;color:var(--faint);font-size:12px;font-weight:700}.sheet-body{flex:1;overflow:auto;padding:18px 20px 70px;background:#1d1510}
+.lyrics{margin:0;color:#fff6e8;font-family:"Roboto Mono","Courier New",monospace;font-size:16px;line-height:1.48;white-space:pre;min-width:max-content}.lyrics.loading,.lyrics.missing{font-family:"Outfit",system-ui,sans-serif;white-space:normal;min-width:0;color:var(--muted)}
+.sheet-nav{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid var(--line);background:var(--surface)}.sheet-nav .next{text-align:right}
+.nav-btn{border:1px solid var(--line);background:transparent;color:var(--cream);border-radius:9px;padding:9px 12px;font-weight:700;cursor:pointer}.nav-btn:disabled{opacity:.3;cursor:not-allowed}.nav-label{font-size:12px;color:var(--faint);white-space:nowrap}
+@media(max-width:900px){.grid{grid-template-columns:1fr}.colhead{position:static}.modal{padding:0}.sheet{height:100%;border-radius:0;border:0}}
+@media(min-width:901px){
+  .wrap{padding:12px 12px 20px}
+  header{margin-bottom:8px}
+  .brand h1{font-size:38px}
+  .brand .sub{font-size:12px;margin-top:4px}
+  .rule{margin-bottom:10px}
+  .grid{gap:12px}
+  .colhead{padding:10px 14px 8px}
+  .coltitle h2{font-size:22px}
+  .count{font-size:12px}
+  .note{font-size:11px;margin-top:1px}
+  .list{padding:2px 8px 6px;max-height:calc(100vh - 155px);overflow:auto;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+  .song{grid-template-columns:25px 23px minmax(0,1fr) 26px;gap:5px;padding:2px 2px;border-radius:6px}
+  .play-toggle,.lyrics-btn,.drag-handle{min-width:23px;min-height:26px;border-radius:6px}
+  .check{width:19px;height:19px;border-radius:6px}
+  .drag-handle{font-size:15px}
+  .song-main{display:flex;align-items:baseline;gap:7px;padding:3px 2px}
+  .title{font-size:13.5px;flex:0 1 auto}
+  .meta{font-size:10.5px;margin-top:0;flex:1 1 auto}
+  .lyrics-btn{font-size:15px}
+  .footer{margin-top:8px;font-size:11px}
+}
+@media(max-width:520px){.wrap{padding:14px 10px 30px}.brand h1{font-size:38px}.song{grid-template-columns:30px 28px minmax(0,1fr) 32px;gap:5px}.title{font-size:14.5px}.sheet-head{padding:12px}.sheet-title{font-size:22px}.sheet-tools{padding:8px;gap:5px}.tool-btn{padding:8px 9px;font-size:12px}.sheet-body{padding:14px 10px 70px}.sheet-position{width:100%;margin-left:0}}
+
+/* Three performance sets and one reserve bank, using the Laurier visual system. */
+.brand h1{font-size:clamp(1.9rem,3.3vw,2.75rem);line-height:1.08;overflow-wrap:anywhere}
+.brand .sub{font-size:.8125rem}
+.btn,.tool-btn,.nav-btn,.close-btn{min-height:44px}
+.btn,.tool-btn,.nav-btn{font-size:.875rem}
+.grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.coltitle{flex-wrap:wrap;gap:4px 10px}
+.coltitle h2{font-size:1.375rem}
+.count{font-size:.8125rem}
+.note,.local-note,.footer{font-size:.75rem}
+.song{grid-template-columns:32px 30px minmax(0,1fr) 32px;gap:3px;padding:1px 2px}
+.play-toggle,.lyrics-btn,.drag-handle,.song-main{min-height:44px}
+.song-main{display:block;padding:4px 2px}
+.title{font-size:1rem}
+.meta{font-size:.78125rem;margin-top:2px}
+.check{width:21px;height:21px}
+.summary{font-size:.875rem}
+.sheet-meta,.sheet-position,.nav-label{font-size:.8125rem}
+.sheet-source{font-size:.75rem}
+button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+@media(min-width:1201px){
+  .wrap{height:100vh;height:100dvh;display:flex;flex-direction:column;padding:12px}
+  header,.rule,.footer{flex:none}
+  .grid{flex:1;min-height:0;align-items:stretch}
+  .col{display:flex;flex-direction:column;min-height:0}
+  .colhead{flex:none}
+  .list{flex:1;min-height:90px;max-height:none;overflow:auto}
+}
+@media(min-width:701px) and (max-width:1200px){
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .list{max-height:460px;max-height:min(460px,65dvh);overflow:auto}
+  .colhead{position:static}
+}
+@media(max-width:700px){
+  .grid{grid-template-columns:minmax(0,1fr)}
+  .list{max-height:none;overflow:visible}
+  .toolbar{width:100%;gap:7px}
+  .toolbar>div{width:100%}
+  .btn{flex:1 1 auto;padding:8px 10px}
+  .brand .sub{letter-spacing:.08em}
+  .sheet-nav{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:6px;padding:8px}
+  .nav-btn{padding:8px;font-size:.8125rem}
+  .sheet-title{white-space:normal;font-size:1.375rem}
+  .sheet-head{padding:10px}
+  .sheet-tools{padding:7px;gap:5px}
+}
+@media(max-height:420px){
+  .modal{padding:0}.sheet{border-radius:0}
+  .sheet-head{padding:6px 10px}.sheet-title{font-size:1.25rem}
+  .sheet-meta{margin-top:2px}.sheet-source{display:none}
+  .sheet-tools{padding:4px 8px;gap:4px}
+  .sheet-position{width:auto;margin-left:auto}
+  .sheet-nav{padding:4px 8px}.sheet-body{padding:10px 12px 40px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div class="brand"><h1><span>Beaumont Curling Club</span></h1><div class="sub">Darren + Jeff + Brad · three sets + reserves</div></div>
+<div class="toolbar"><div><div class="summary" id="summary"></div><div class="local-note">drag order + played checks save only on this device · <span id="offline-status">offline not prepared</span></div></div><button class="btn" id="offline-btn" type="button">Prepare Offline</button><button class="btn" id="audience-qr" type="button">Audience QR</button><button class="btn" id="reset-order" type="button">Reset set order</button><button class="btn" id="reset-played" type="button">Reset played</button></div></header>
+<div class="rule"></div><main class="grid" id="grid"></main><div class="footer">☰ drag · tap the song title or ♪ for chords/lyrics · tap the box when played</div>
+</div>
+<div class="qr-modal" id="qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-title">
+  <div class="qr-card">
+    <h2 id="qr-title">Audience Setlist</h2>
+    <p>Scan to see the current three-set order. Reserve songs stay private.</p>
+    <div id="qr-code"></div>
+    <div class="qr-url" id="qr-url"></div>
+    <button class="btn" id="close-qr" type="button">Close</button>
+  </div>
+</div>
+<div class="modal" id="lyrics-modal" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+<div class="sheet"><div class="sheet-head"><div class="sheet-title-wrap"><div class="sheet-title" id="sheet-title">Song</div><div class="sheet-meta" id="sheet-meta"></div><div class="sheet-source" id="sheet-source"></div></div><button class="close-btn" id="close-sheet" type="button" aria-label="Close chord sheet">×</button></div>
+<div class="sheet-tools"><button class="tool-btn" id="font-down" type="button">A−</button><button class="tool-btn" id="font-up" type="button">A+</button><button class="tool-btn" id="scroll-slower" type="button">Slower</button><button class="tool-btn" id="auto-scroll" type="button">▶ Auto</button><button class="tool-btn" id="scroll-faster" type="button">Faster</button><div class="sheet-position" id="sheet-position"></div></div>
+<div class="sheet-body" id="sheet-body"><pre class="lyrics" id="lyrics-text"></pre></div>
+<div class="sheet-nav"><div><button class="nav-btn" id="prev-song" type="button">← Previous</button></div><div class="nav-label" id="nav-label"></div><div class="next"><button class="nav-btn" id="next-song" type="button">Next →</button></div></div></div>
+</div>
+<script>
+const DEFAULT_SETS=[
+  {
+    "id": "set1",
+    "title": "Set 1",
+    "note": "20 songs",
+    "cls": "set1",
+    "songs": [
+      [
+        "Get Back",
+        "The Beatles",
+        "A"
+      ],
+      [
+        "You Wreck Me",
+        "Tom Petty",
+        "D"
+      ],
+      [
+        "Pride and Joy",
+        "Stevie Ray Vaughan",
+        "E"
+      ],
+      [
+        "Ahead by a Century",
+        "The Tragically Hip",
+        "D"
+      ],
+      [
+        "All Apologies",
+        "Nirvana",
+        "D · capo 2"
+      ],
+      [
+        "Cleopatra",
+        "The Lumineers",
+        "Ab · capo 1"
+      ],
+      [
+        "Don't Want to Wait",
+        "Darren Maltais",
+        ""
+      ],
+      [
+        "Blank Space",
+        "Ryan Adams",
+        "C"
+      ],
+      [
+        "Five Dollar Bill",
+        "Corb Lund",
+        "A"
+      ],
+      [
+        "Real Love Baby",
+        "Father John Misty",
+        "D"
+      ],
+      [
+        "King of the Road",
+        "Roger Miller",
+        "Bb"
+      ],
+      [
+        "Something in the Orange",
+        "Zach Bryan",
+        "Em"
+      ],
+      [
+        "Island in the Sun",
+        "Weezer",
+        "Em"
+      ],
+      [
+        "That's All Right Mama",
+        "Elvis / Beatles",
+        "A"
+      ],
+      [
+        "Green River",
+        "Creedence Clearwater Revival",
+        "E"
+      ],
+      [
+        "Dancing in the Dark",
+        "Bruce Springsteen",
+        "G"
+      ],
+      [
+        "Ophelia",
+        "The Band",
+        "C"
+      ],
+      [
+        "Folsom Prison Blues",
+        "Johnny Cash",
+        "E"
+      ],
+      [
+        "Still Falling",
+        "Jeff McLellan",
+        "C"
+      ],
+      [
+        "Johnny B. Goode",
+        "Chuck Berry",
+        "A"
+      ]
+    ]
+  },
+  {
+    "id": "set2",
+    "title": "Set 2",
+    "note": "20 songs",
+    "cls": "set2",
+    "songs": [
+      [
+        "Blister in the Sun",
+        "Violent Femmes",
+        "G"
+      ],
+      [
+        "American Girl",
+        "Tom Petty",
+        "D"
+      ],
+      [
+        "Day Tripper",
+        "The Beatles",
+        "E"
+      ],
+      [
+        "Faith",
+        "Wham!",
+        "B"
+      ],
+      [
+        "Harvest Moon",
+        "Neil Young",
+        "G"
+      ],
+      [
+        "No Bright Light",
+        "Darren Maltais",
+        "E"
+      ],
+      [
+        "Where Is My Mind?",
+        "Pixies",
+        "E"
+      ],
+      [
+        "Colors",
+        "Black Pumas",
+        "F#m"
+      ],
+      [
+        "I'm on Fire",
+        "Whitehorse",
+        "E"
+      ],
+      [
+        "Steal My Kisses",
+        "Ben Harper",
+        "G"
+      ],
+      [
+        "It Takes a Lot to Laugh, It Takes a Train to Cry",
+        "Bob Dylan",
+        "Ab"
+      ],
+      [
+        "Big River",
+        "Johnny Cash",
+        "F"
+      ],
+      [
+        "Back to Black",
+        "Amy Winehouse",
+        "Dm"
+      ],
+      [
+        "Oh Boy",
+        "Buddy Holly",
+        "A"
+      ],
+      [
+        "Norwegian Wood",
+        "The Beatles",
+        "D"
+      ],
+      [
+        "Tonight in Black and White",
+        "Jeff McLellan",
+        "D"
+      ],
+      [
+        "Hand It Over",
+        "Darren Maltais",
+        "G"
+      ],
+      [
+        "Wagon Wheel",
+        "Old Crow Medicine Show",
+        "G"
+      ],
+      [
+        "Don't Walk Away Eileen",
+        "Sam Roberts",
+        "C"
+      ],
+      [
+        "I Need Never Get Old",
+        "Nathaniel Rateliff",
+        "G"
+      ]
+    ]
+  },
+  {
+    "id": "set3",
+    "title": "Set 3",
+    "note": "20 songs",
+    "cls": "set3",
+    "songs": [
+      [
+        "Hungry Like the Wolf",
+        "Duran Duran",
+        "E"
+      ],
+      [
+        "What'd I Say",
+        "Ray Charles",
+        "E"
+      ],
+      [
+        "Dirty Old Town",
+        "The Pogues",
+        "D"
+      ],
+      [
+        "Bobcaygeon",
+        "The Tragically Hip",
+        "G"
+      ],
+      [
+        "Hasn't Hit Me Yet",
+        "Blue Rodeo",
+        "E · capo 2"
+      ],
+      [
+        "Flowers in Your Hair",
+        "The Lumineers",
+        "G"
+      ],
+      [
+        "Wanted Dead or Alive",
+        "Bon Jovi",
+        "C"
+      ],
+      [
+        "Those Days",
+        "Darren Maltais",
+        "G"
+      ],
+      [
+        "Fishin' in the Dark",
+        "Nitty Gritty Dirt Band",
+        "D"
+      ],
+      [
+        "Tennessee Whiskey",
+        "Chris Stapleton",
+        "E"
+      ],
+      [
+        "Cry Me a River",
+        "Justin Timberlake",
+        "Em"
+      ],
+      [
+        "You Can't Judge a Book by the Cover",
+        "Bo Diddley",
+        "A"
+      ],
+      [
+        "Runaround Sue",
+        "Dion",
+        "D · capo 2"
+      ],
+      [
+        "No Diggity",
+        "Blackstreet",
+        "Gm"
+      ],
+      [
+        "I Shot the Sheriff",
+        "Bob Marley",
+        "F#m"
+      ],
+      [
+        "Driving My Life Away",
+        "Eddie Rabbitt",
+        ""
+      ],
+      [
+        "Copperhead Road",
+        "Steve Earle",
+        "D"
+      ],
+      [
+        "Cadillac Ranch",
+        "Nitty Gritty Dirt Band",
+        "E"
+      ],
+      [
+        "Blow at High Dough",
+        "The Tragically Hip",
+        "B"
+      ],
+      [
+        "Sob",
+        "Nathaniel Rateliff & the Night Sweats",
+        "F"
+      ]
+    ]
+  },
+  {
+    "id": "alt",
+    "title": "Reserve Bank",
+    "note": "pull from here if needed",
+    "cls": "alt",
+    "songs": [
+      [
+        "A Simple Thing",
+        "Darren Maltais",
+        ""
+      ],
+      [
+        "Another Road Home",
+        "Jeff McLellan",
+        ""
+      ],
+      [
+        "Beautiful Things",
+        "Darren Maltais",
+        "E"
+      ],
+      [
+        "Before Our Graves",
+        "Jeff McLellan",
+        "G"
+      ],
+      [
+        "Blitzkrieg Bop",
+        "The Ramones",
+        ""
+      ],
+      [
+        "Blue Christmas",
+        "Elvis Presley",
+        ""
+      ],
+      [
+        "Brown Eyed Girl",
+        "Van Morrison",
+        ""
+      ],
+      [
+        "Christmas (Baby Please Come Home)",
+        "Darlene Love",
+        ""
+      ],
+      [
+        "Corinna",
+        "Taj Mahal",
+        "A"
+      ],
+      [
+        "Creep",
+        "Radiohead",
+        "G"
+      ],
+      [
+        "Do I Ever Cross Your Mind",
+        "Justin Townes Earle",
+        "D"
+      ],
+      [
+        "Friends in Low Places",
+        "Garth Brooks",
+        ""
+      ],
+      [
+        "Guitar Town",
+        "Steve Earle",
+        ""
+      ],
+      [
+        "Havens to Hendrix",
+        "Jeff McLellan",
+        ""
+      ],
+      [
+        "I Walk The Line",
+        "Johnny Cash",
+        ""
+      ],
+      [
+        "I Wonder",
+        "Darren Maltais",
+        ""
+      ],
+      [
+        "Is Your Heart a Map",
+        "Darren Maltais",
+        ""
+      ],
+      [
+        "Jambalaya",
+        "Hank Williams Sr.",
+        ""
+      ],
+      [
+        "Jingle Bell Rock",
+        "Bobby Helms",
+        ""
+      ],
+      [
+        "Just Another Number",
+        "Darren Maltais",
+        ""
+      ],
+      [
+        "Layla",
+        "Derek and the Dominos",
+        ""
+      ],
+      [
+        "Life of Sin",
+        "Sturgill Simpson",
+        "E"
+      ],
+      [
+        "Little Bones",
+        "The Tragically Hip",
+        ""
+      ],
+      [
+        "Little Lion Man",
+        "Mumford & Sons",
+        ""
+      ],
+      [
+        "Lonesome Grave",
+        "Darren Maltais",
+        ""
+      ],
+      [
+        "Me and Julio Down by the Schoolyard",
+        "Paul Simon",
+        ""
+      ],
+      [
+        "Memento",
+        "Darren Maltais",
+        ""
+      ],
+      [
+        "Midnight Rider",
+        "Allman Brothers Band",
+        ""
+      ],
+      [
+        "My Babe",
+        "Willie Dixon",
+        "F"
+      ],
+      [
+        "Paper Planes",
+        "M.I.A.",
+        "D · ♩=86"
+      ],
+      [
+        "Paranoid",
+        "Black Sabbath",
+        "Em"
+      ],
+      [
+        "Ring of Fire",
+        "Johnny Cash",
+        ""
+      ],
+      [
+        "Rocket Man",
+        "Elton John",
+        "Em"
+      ],
+      [
+        "Santa Bring My Baby Back To Me",
+        "Elvis Presley",
+        ""
+      ],
+      [
+        "Santa Claus Is Coming To Town",
+        "Bruce Springsteen",
+        ""
+      ],
+      [
+        "Seven Nation Army",
+        "The White Stripes",
+        ""
+      ],
+      [
+        "Spark",
+        "Darren Maltais",
+        ""
+      ],
+      [
+        "Squeezebox",
+        "The Who",
+        ""
+      ],
+      [
+        "Sunflower",
+        "Post Malone & Swae Lee",
+        "C"
+      ],
+      [
+        "The Thrill Is Gone",
+        "B.B. King",
+        "Bm"
+      ],
+      [
+        "Twist and Shout",
+        "The Beatles",
+        ""
+      ]
+    ]
+  }
+];
+const LYRIC_FILES={
+  "Get Back": "Get Back.txt",
+  "You Wreck Me": "You Wreck Me.txt",
+  "Pride and Joy": "Pride And Joy.txt",
+  "Ahead by a Century": "Ahead By A Century.txt",
+  "All Apologies": "ALL APOLOGIES.txt",
+  "Cleopatra": "Cleopatra.txt",
+  "Don't Want to Wait": "Don't Want to Wait.txt",
+  "Blank Space": "Blank Space.txt",
+  "Five Dollar Bill": "Five Dollar Bill.txt",
+  "Real Love Baby": "REAL LOVE BABY.txt",
+  "King of the Road": "KING OF THE ROAD.txt",
+  "Something in the Orange": "SOMETHING IN THE ORANGE.txt",
+  "Don't Walk Away Eileen": "Dont Walk Away Eileen.txt",
+  "That's All Right Mama": "Thats All Right Mama.txt",
+  "Green River": "Green River.txt",
+  "Dancing in the Dark": "Dancing In The Dark.txt",
+  "Ophelia": "Ophelia.txt",
+  "Folsom Prison Blues": "Folsom Prison Blues.txt",
+  "Still Falling": "Still Falling.txt",
+  "I Need Never Get Old": "I Need Never Get Old.txt",
+  "Johnny B. Goode": "Johnny B Goode.txt",
+  "Blister in the Sun": "Blister In The Sun.txt",
+  "American Girl": "American Girl.txt",
+  "Day Tripper": "Day Tripper.txt",
+  "Faith": "Faith.txt",
+  "Blow at High Dough": "Blow At High Dough.txt",
+  "Harvest Moon": "Harvest Moon.txt",
+  "No Bright Light": "No Bright Light.txt",
+  "Colors": "Colors.txt",
+  "Tennessee Whiskey": "Tennessee Whiskey.txt",
+  "I'm on Fire": "I'm On Fire.txt",
+  "Steal My Kisses": "Steal My Kisses.txt",
+  "It Takes a Lot to Laugh, It Takes a Train to Cry": "It Takes a Lot to Laugh, It Takes a Train to Cry.txt",
+  "Big River": "Big River.txt",
+  "Copperhead Road": "Copperhead Road.txt",
+  "Back to Black": "Back To Black.txt",
+  "Oh Boy": "Oh Boy.txt",
+  "Norwegian Wood": "Norwegian Wood (This Bird Has Flown).txt",
+  "Tonight in Black and White": "Tonight in Black and White.txt",
+  "Hand It Over": "Hand it over.txt",
+  "Island in the Sun": "Island In The Sun.txt",
+  "Wagon Wheel": "Wagon Wheel.txt",
+  "Dirty Old Town": "Dirty Old Town.txt",
+  "What'd I Say": "What’d I Say.txt",
+  "Bobcaygeon": "Bobcaygeon.txt",
+  "Hungry Like the Wolf": "Hungry Like The Wolf.txt",
+  "Wanted Dead or Alive": "Wanted Dead Or Alive.txt",
+  "Those Days": "Those Days.txt",
+  "Fishin' in the Dark": "Fishin In The Dark.txt",
+  "Paper Planes": "Paper Planes.txt",
+  "Cry Me a River": "Cry Me A River.txt",
+  "You Can't Judge a Book by the Cover": "You Cant Judge A Book By The Cover.txt",
+  "Sob": "Sob.txt",
+  "Runaround Sue": "Runaround Sue.txt",
+  "Rocket Man": "Rocket Man.txt",
+  "No Diggity": "No Diggity.txt",
+  "Cadillac Ranch": "CADILLAC RANCH.txt",
+  "I Shot the Sheriff": "I Shot The Sheriff.txt",
+  "Driving My Life Away": "Driving My Life Away.docx",
+  "Life of Sin": "Life Of Sin.txt",
+  "Paranoid": "Paranoid.txt",
+  "Beautiful Things": "Beautiful things.txt",
+  "Corinna": "Corinna.txt",
+  "Creep": "Creep.txt",
+  "My Babe": "My Babe.txt",
+  "The Thrill Is Gone": "The Thrill Is Gone.txt",
+  "Before Our Graves": "Before Our Graves.txt",
+  "Flowers in Your Hair": "Flowers In Your Hair.txt",
+  "Sunflower": "Sunflower.txt",
+  "Hasn't Hit Me Yet": "Hasnt Hit Me Yet.txt",
+  "Where Is My Mind?": "Where Is My Mind.txt",
+  "Me and Julio Down by the Schoolyard": "Me and Julio Down By the School Yard.txt",
+  "Do I Ever Cross Your Mind": "Do I Ever Cross Your Mind.txt",
+  "A Simple Thing": "Simple Thing.txt",
+  "Another Road Home": "Another Road Home.txt",
+  "Blitzkrieg Bop": "Blitzkrieg Bop.txt",
+  "Blue Christmas": "Blue Christmas.txt",
+  "Brown Eyed Girl": "Brown Eyed Girl.txt",
+  "Christmas (Baby Please Come Home)": "Christmas (Baby Please Come Home).txt",
+  "Friends in Low Places": "Friends In Low Places.txt",
+  "Guitar Town": "Guitar Town.txt",
+  "I Walk The Line": "I Walk The Line.txt",
+  "I Wonder": "I wonder.txt",
+  "Is Your Heart a Map": "Is your Heart a Map_.txt",
+  "Jambalaya": "Jambalaya.txt",
+  "Jingle Bell Rock": "Jingle Bell Rock.txt",
+  "Just Another Number": "Just Another Number.txt",
+  "Layla": "LAYLA ACOUSTIC LIVE.txt",
+  "Little Bones": "LITTLE BONES CHORDS by The Tragically Hip @ Ultimate-Guitar.Com.txt",
+  "Little Lion Man": "Little Lion Man.txt",
+  "Lonesome Grave": "Lonesome Grave.txt",
+  "Memento": "Memento.txt",
+  "Midnight Rider": "Midnight Rider.txt",
+  "Ring of Fire": "Ring Of Fire.txt",
+  "Santa Bring My Baby Back To Me": "Santa Bring My Baby Back To Me.txt",
+  "Santa Claus Is Coming To Town": "Santa Claus Is Coming To Town.txt",
+  "Seven Nation Army": "SEVEN NATION ARMY.txt",
+  "Spark": "Spark.txt",
+  "Twist and Shout": "TWIST AND SHOUT CHORDS (ver 2) by The Beatles @ Ultimate-Guitar.Com.txt",
+  "Squeezebox": "Squeezebox.txt"
+};
+const RAW_BASE="../songfiles/";
+const AUDIENCE_MODE=new URLSearchParams(window.location.search).get("audience")==="1";
+const ORDER_KEY="beaumont:gig:order:v1",PLAYED_KEY="beaumont:gig:played:v1",OLD_PLAYED_KEY="beaumont:gig:played:v0",FONT_KEY="beaumont:gig:lyrics-font",SPEED_KEY="beaumont:gig:scroll-delay",OFFLINE_KEY="beaumont:gig:offline-ready:v1";
+const deepClone=x=>JSON.parse(JSON.stringify(x)); const allPublishedTitles=()=>DEFAULT_SETS.flatMap(s=>s.songs.map(x=>x[0]));
+function loadOrder(){try{const saved=JSON.parse(localStorage.getItem(ORDER_KEY)||"null");if(!Array.isArray(saved)||saved.length!==DEFAULT_SETS.length)return deepClone(DEFAULT_SETS);const a=allPublishedTitles().slice().sort(),b=saved.flatMap(s=>(s.songs||[]).map(x=>x[0])).slice().sort();if(a.length!==b.length)return deepClone(DEFAULT_SETS);for(let i=0;i<a.length;i++)if(a[i]!==b[i])return deepClone(DEFAULT_SETS);return saved}catch(e){return deepClone(DEFAULT_SETS)}}
+let sets=loadOrder(),played={};try{played=JSON.parse(localStorage.getItem(PLAYED_KEY)||"{}")||{};if(!Object.keys(played).length){const old=JSON.parse(localStorage.getItem(OLD_PLAYED_KEY)||"{}")||{};Object.keys(old).forEach(k=>{if(old[k]){const p=k.split(":");if(p.length>=3)played[p.slice(2).join(":")]=true}});if(Object.keys(played).length)localStorage.setItem(PLAYED_KEY,JSON.stringify(played))}}catch(e){played={}}
+let sortables=[],currentSongTitle=null,scrollTimer=null,lyricsFont=Math.max(12,Math.min(28,parseInt(localStorage.getItem(FONT_KEY)||"16",10)||16)),scrollDelay=Math.max(12,Math.min(140,parseInt(localStorage.getItem(SPEED_KEY)||"50",10)||50));const lyricCache=new Map();
+function saveOrder(){try{localStorage.setItem(ORDER_KEY,JSON.stringify(sets))}catch(e){}} function savePlayed(){try{localStorage.setItem(PLAYED_KEY,JSON.stringify(played))}catch(e){}}
+function findSong(title){for(let si=0;si<sets.length;si++){const i=sets[si].songs.findIndex(s=>s[0]===title);if(i>=0)return{setIndex:si,index:i,song:sets[si].songs[i]}}return null}
+function updateStats(){let md=0,mt=0;sets.forEach((set,si)=>{const d=set.songs.filter(s=>played[s[0]]).length,c=document.querySelector('[data-count-for="'+set.id+'"]');if(c)c.textContent=d+"/"+set.songs.length+" played";if(set.id!=="alt"){md+=d;mt+=set.songs.length}});document.getElementById("summary").textContent=md+"/"+mt+" main-set songs played"}
+function render(){sortables.forEach(s=>{try{s.destroy()}catch(e){}});sortables=[];const grid=document.getElementById("grid");grid.innerHTML="";sets.forEach(set=>{const col=document.createElement("section");col.className="col "+set.cls;const head=document.createElement("div");head.className="colhead";const tr=document.createElement("div");tr.className="coltitle";const h=document.createElement("h2");h.textContent=set.title;const count=document.createElement("div");count.className="count";count.dataset.countFor=set.id;tr.append(h,count);const note=document.createElement("div");note.className="note";note.textContent=set.id==="alt"?set.songs.length+" songs · drag into any set":set.songs.length+" songs";head.append(tr,note);const list=document.createElement("div");list.className="list";list.id="list-"+set.id;list.dataset.setId=set.id;set.songs.forEach(song=>{const titleText=song[0],artist=song[1],key=song[2],row=document.createElement("div");row.className="song"+(played[titleText]?" done":"");row.dataset.title=titleText;const pb=document.createElement("button");pb.className="play-toggle";pb.type="button";pb.setAttribute("aria-label","Mark "+titleText+" played");pb.setAttribute("aria-pressed",played[titleText]?"true":"false");const check=document.createElement("span");check.className="check";pb.appendChild(check);pb.addEventListener("click",e=>{e.stopPropagation();if(played[titleText])delete played[titleText];else played[titleText]=true;savePlayed();row.classList.toggle("done",!!played[titleText]);pb.setAttribute("aria-pressed",played[titleText]?"true":"false");updateStats()});const handle=document.createElement("button");handle.className="drag-handle";handle.type="button";handle.setAttribute("aria-label","Drag "+titleText);handle.title="Drag to move · use arrow keys to reorder or move between sets";handle.textContent="☰";handle.addEventListener("keydown",e=>{if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)){e.preventDefault();moveSongWithKeys(titleText,e.key)}});const main=document.createElement("button");main.className="song-main";main.type="button";const title=document.createElement("div");title.className="title";title.textContent=titleText;const meta=document.createElement("div");meta.className="meta";meta.textContent=[artist,key].filter(Boolean).join(" · ");main.append(title,meta);main.addEventListener("click",()=>openSong(titleText));const lb=document.createElement("button");lb.className="lyrics-btn";lb.type="button";lb.title="Chords / lyrics";lb.setAttribute("aria-label","Open chords and lyrics for "+titleText);lb.textContent="♪";lb.addEventListener("click",()=>openSong(titleText));row.append(pb,handle,main,lb);list.appendChild(row)});col.append(head,list);grid.appendChild(col)});if(window.Sortable){sets.forEach(set=>{const el=document.getElementById("list-"+set.id);if(!el)return;sortables.push(new Sortable(el,{group:"beaumont-songs",animation:180,handle:".drag-handle",delay:120,delayOnTouchOnly:true,touchStartThreshold:4,forceFallback:true,fallbackOnBody:true,ghostClass:"sortable-ghost",chosenClass:"sortable-chosen",dragClass:"sortable-drag",scroll:true,scrollSensitivity:60,scrollSpeed:16,onEnd:()=>{syncSetsFromDom();if(navigator.vibrate){try{navigator.vibrate(35)}catch(e){}}}}))})}updateStats()}
+function moveSongWithKeys(title,key){
+  const found=findSong(title);if(!found)return;
+  const source=sets[found.setIndex].songs;
+  if(key==="ArrowUp"||key==="ArrowDown"){
+    const next=found.index+(key==="ArrowUp"?-1:1);
+    if(next<0||next>=source.length)return;
+    [source[found.index],source[next]]=[source[next],source[found.index]];
+  }else{
+    const next=found.setIndex+(key==="ArrowLeft"?-1:1);
+    if(next<0||next>=sets.length)return;
+    sets[next].songs.push(source.splice(found.index,1)[0]);
+  }
+  saveOrder();render();
+  const row=[...document.querySelectorAll('.song')].find(el=>el.dataset.title===title);
+  row?.querySelector('.drag-handle')?.focus();
+}
+function syncSetsFromDom(){const m=new Map(DEFAULT_SETS.flatMap(s=>s.songs).map(s=>[s[0],s]));sets=sets.map(set=>{const el=document.getElementById("list-"+set.id),titles=el?Array.from(el.children).map(r=>r.dataset.title):[];return{...set,songs:titles.map(t=>m.get(t)).filter(Boolean)}});saveOrder();updateStats()}
+function stopAutoScroll(){if(scrollTimer)clearInterval(scrollTimer);scrollTimer=null;const b=document.getElementById("auto-scroll");b.textContent="▶ Auto";b.classList.remove("active")} function startAutoScroll(){stopAutoScroll();const body=document.getElementById("sheet-body"),b=document.getElementById("auto-scroll");b.textContent="⏸ Auto";b.classList.add("active");scrollTimer=setInterval(()=>{body.scrollTop+=1;if(body.scrollTop+body.clientHeight>=body.scrollHeight-3)stopAutoScroll()},scrollDelay)} function restartAutoIfNeeded(){if(scrollTimer)startAutoScroll()} function applyFont(){document.getElementById("lyrics-text").style.fontSize=lyricsFont+"px";try{localStorage.setItem(FONT_KEY,String(lyricsFont))}catch(e){}}
+
+let swRegistration=null;
+function chartUrl(file){return new URL("../songfiles/"+encodeURIComponent(file),window.location.href).href}
+function offlineCoreUrls(){
+  const urls=[new URL("./index.html",window.location.href).href];
+  Object.values(LYRIC_FILES).forEach(file=>urls.push(chartUrl(file)));
+  return [...new Set(urls)];
+}
+function offlineExtraUrls(){
+  return [
+    "https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
+  ];
+}
+async function swRequest(type,urls){
+  if(!("serviceWorker" in navigator)) throw new Error("Service workers are not supported on this device.");
+  if(!swRegistration) swRegistration=await navigator.serviceWorker.ready;
+  const worker=swRegistration.active||swRegistration.waiting||swRegistration.installing||navigator.serviceWorker.controller;
+  if(!worker) throw new Error("Offline worker is not ready yet.");
+  return new Promise((resolve,reject)=>{
+    const channel=new MessageChannel();
+    const timer=setTimeout(()=>reject(new Error("Offline setup timed out.")),120000);
+    channel.port1.onmessage=e=>{clearTimeout(timer);resolve(e.data||{})};
+    worker.postMessage({type,urls},[channel.port2]);
+  });
+}
+function setOfflineUi(state,detail){
+  const btn=document.getElementById("offline-btn"),status=document.getElementById("offline-status");
+  if(!btn||!status)return;
+  btn.classList.remove("offline-ready","offline-working");
+  if(state==="ready"){
+    btn.textContent="✓ Offline Ready";
+    btn.classList.add("offline-ready");
+    status.textContent=detail||("all "+Object.keys(LYRIC_FILES).length+" charts saved");
+  }else if(state==="working"){
+    btn.textContent="Saving…";
+    btn.classList.add("offline-working");
+    status.textContent=detail||"downloading charts";
+  }else if(state==="partial"){
+    btn.textContent="Refresh Offline";
+    status.textContent=detail||"offline copy needs refresh";
+  }else{
+    btn.textContent="Prepare Offline";
+    status.textContent=detail||"offline not prepared";
+  }
+}
+async function refreshOfflineStatus(){
+  try{
+    const result=await swRequest("CHECK_URLS",offlineCoreUrls());
+    const chartCount=Object.keys(LYRIC_FILES).length;
+    if(result.ok)setOfflineUi("ready","all "+chartCount+" charts saved");
+    else if(result.cached>1)setOfflineUi("partial",Math.max(0,result.cached-1)+"/"+chartCount+" charts saved");
+    else setOfflineUi("idle","offline not prepared");
+  }catch(e){
+    setOfflineUi("idle","offline setup unavailable");
+  }
+}
+async function prepareOffline(){
+  const btn=document.getElementById("offline-btn");
+  if(btn)btn.disabled=true;
+  const chartCount=Object.keys(LYRIC_FILES).length;
+  setOfflineUi("working","saving "+chartCount+" chord charts…");
+  try{
+    if(navigator.storage&&navigator.storage.persist){try{await navigator.storage.persist()}catch(e){}}
+    const core=await swRequest("CACHE_URLS",offlineCoreUrls());
+    // Dragging, QR and DOCX support are useful but not required for the core
+    // offline gig experience. Cache them best-effort without failing readiness.
+    try{await swRequest("CACHE_URLS",offlineExtraUrls())}catch(e){}
+    if(core.ok){
+      try{localStorage.setItem(OFFLINE_KEY,new Date().toISOString())}catch(e){}
+      setOfflineUi("ready","all "+chartCount+" charts saved");
+    }else{
+      const saved=Math.max(0,(core.cached||0)-1);
+      setOfflineUi("partial",saved+"/"+chartCount+" charts saved");
+      alert("A few chord charts could not be saved yet. Tap Refresh Offline while connected to Wi-Fi to retry.");
+    }
+  }catch(e){
+    setOfflineUi("partial","offline setup needs an internet connection");
+    alert("Offline setup could not finish. Connect to the internet and tap Prepare Offline again.");
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+}
+async function initOffline(){
+  if(!("serviceWorker" in navigator)){setOfflineUi("idle","offline mode unsupported");return}
+  try{
+    swRegistration=await navigator.serviceWorker.register("./sw.js");
+    await navigator.serviceWorker.ready;
+    await refreshOfflineStatus();
+  }catch(e){setOfflineUi("idle","offline setup unavailable")}
+}
+
+async function loadLyrics(title){if(lyricCache.has(title))return lyricCache.get(title);const file=LYRIC_FILES[title];if(!file){const r={ok:false,text:"No chord sheet is currently linked for this song. The song remains in the reserve bank so it is not forgotten.",file:null};lyricCache.set(title,r);return r}const url=RAW_BASE+encodeURIComponent(file);try{if(/\.txt$/i.test(file)){const res=await fetch(url,{cache:"no-store"});if(!res.ok)throw new Error("HTTP "+res.status);const r={ok:true,text:await res.text(),file};lyricCache.set(title,r);return r}if(/\.docx$/i.test(file)){const res=await fetch(url,{cache:"no-store"});if(!res.ok)throw new Error("HTTP "+res.status);const buf=await res.arrayBuffer();if(!window.mammoth)throw new Error("DOCX reader unavailable");const out=await window.mammoth.extractRawText({arrayBuffer:buf});const r={ok:true,text:out.value,file};lyricCache.set(title,r);return r}return{ok:false,text:"This chord sheet format cannot be displayed in Beaumont Curling Club yet.",file}}catch(e){return{ok:false,text:"Couldn't load this chord sheet. Try again with a connection.",file}}}
+async function openSong(title){stopAutoScroll();currentSongTitle=title;const f=findSong(title);if(!f)return;const s=f.song,modal=document.getElementById("lyrics-modal"),text=document.getElementById("lyrics-text");document.getElementById("sheet-title").textContent=s[0];document.getElementById("sheet-meta").textContent=[s[1],s[2]].filter(Boolean).join(" · ");document.getElementById("sheet-source").textContent="";document.getElementById("sheet-position").textContent=sets[f.setIndex].title+" · "+(f.index+1)+" of "+sets[f.setIndex].songs.length;document.getElementById("nav-label").textContent=sets[f.setIndex].title;document.getElementById("prev-song").disabled=f.index===0;document.getElementById("next-song").disabled=f.index===sets[f.setIndex].songs.length-1;text.className="lyrics loading";text.textContent="Loading chord sheet…";document.getElementById("sheet-body").scrollTop=0;modal.classList.add("open");applyFont();const r=await loadLyrics(title);if(currentSongTitle!==title)return;text.className=r.ok?"lyrics":"lyrics missing";text.textContent=r.text;document.getElementById("sheet-source").textContent=r.file?"GitHub · songfiles/"+r.file:"No linked file";document.getElementById("sheet-body").scrollTop=0}
+function moveModalSong(d){const f=findSong(currentSongTitle);if(!f)return;const n=f.index+d;if(n<0||n>=sets[f.setIndex].songs.length)return;openSong(sets[f.setIndex].songs[n][0])} function closeSong(){stopAutoScroll();currentSongTitle=null;document.getElementById("lyrics-modal").classList.remove("open")}
+document.getElementById("close-sheet").addEventListener("click",closeSong);document.getElementById("lyrics-modal").addEventListener("click",function(e){if(e.target===this)closeSong()});document.getElementById("prev-song").addEventListener("click",()=>moveModalSong(-1));document.getElementById("next-song").addEventListener("click",()=>moveModalSong(1));document.getElementById("font-down").addEventListener("click",()=>{lyricsFont=Math.max(12,lyricsFont-1);applyFont()});document.getElementById("font-up").addEventListener("click",()=>{lyricsFont=Math.min(28,lyricsFont+1);applyFont()});document.getElementById("auto-scroll").addEventListener("click",()=>{scrollTimer?stopAutoScroll():startAutoScroll()});document.getElementById("scroll-slower").addEventListener("click",()=>{scrollDelay=Math.min(140,scrollDelay+10);try{localStorage.setItem(SPEED_KEY,String(scrollDelay))}catch(e){}restartAutoIfNeeded()});document.getElementById("scroll-faster").addEventListener("click",()=>{scrollDelay=Math.max(12,scrollDelay-10);try{localStorage.setItem(SPEED_KEY,String(scrollDelay))}catch(e){}restartAutoIfNeeded()});
+function audienceUrl(){
+  const titles=allPublishedTitles();
+  const order=sets.filter(set=>set.id!=="alt").map(set=>set.songs.map(song=>titles.indexOf(song[0])));
+  return window.location.origin+window.location.pathname+"?audience=1#sets="+encodeURIComponent(JSON.stringify(order));
+}
+function audienceSets(){
+  const main=DEFAULT_SETS.filter(set=>set.id!=="alt");
+  try{
+    const raw=new URLSearchParams(window.location.hash.slice(1)).get("sets");
+    if(!raw)return main;
+    const order=JSON.parse(raw),songs=DEFAULT_SETS.flatMap(set=>set.songs);
+    if(!Array.isArray(order)||order.length!==main.length||order.some(list=>!Array.isArray(list)))return main;
+    const ids=order.flat();
+    if(new Set(ids).size!==ids.length||ids.some(i=>!Number.isInteger(i)||i<0||i>=songs.length))return main;
+    return main.map((set,i)=>({...set,songs:order[i].map(id=>songs[id])}));
+  }catch(e){return main}
+}
+function openAudienceQr(){
+  const modal=document.getElementById("qr-modal"),box=document.getElementById("qr-code"),url=audienceUrl();
+  box.innerHTML="";document.getElementById("qr-url").textContent=url;modal.classList.add("open");
+  if(window.QRCode)new QRCode(box,{text:url,width:260,height:260,colorDark:"#211812",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
+  else box.textContent=url;
+}
+function closeAudienceQr(){document.getElementById("qr-modal")?.classList.remove("open")}
+function renderAudience(){
+  document.title="Beaumont Curling Club — Tonight's Songs";
+  document.body.innerHTML='<main class="audience-only"><header class="brand"><h1><span>Beaumont Curling Club</span></h1></header><div class="audience-grid" id="audience-grid"></div></main>';
+  const grid=document.getElementById("audience-grid");
+  audienceSets().forEach(set=>{
+    const col=document.createElement("section");col.className="audience-col";
+    const h=document.createElement("h2");h.textContent=set.title;col.appendChild(h);
+    set.songs.forEach(song=>{const row=document.createElement("div");row.className="audience-song";row.textContent=song[0];col.appendChild(row)});
+    grid.appendChild(col);
+  });
+}
+document.getElementById("offline-btn").addEventListener("click",prepareOffline);
+document.getElementById("audience-qr").addEventListener("click",openAudienceQr);
+document.getElementById("close-qr").addEventListener("click",closeAudienceQr);
+document.getElementById("qr-modal").addEventListener("click",function(e){if(e.target===this)closeAudienceQr()});
+document.getElementById("reset-order").addEventListener("click",()=>{if(confirm("Restore the published Beaumont Curling Club set order and move every song back to its original column?")){sets=deepClone(DEFAULT_SETS);try{localStorage.removeItem(ORDER_KEY)}catch(e){}render()}});document.getElementById("reset-played").addEventListener("click",()=>{if(confirm("Clear all played checkmarks?")){played={};savePlayed();render()}});
+document.addEventListener("keydown",e=>{const open=document.getElementById("lyrics-modal")?.classList.contains("open");if(e.key==="Escape")closeAudienceQr();if(e.key==="Escape"&&open)closeSong();if(!open)return;if(e.key==="ArrowLeft"&&!document.getElementById("prev-song").disabled)moveModalSong(-1);if(e.key==="ArrowRight"&&!document.getElementById("next-song").disabled)moveModalSong(1)});
+let wakeLock=null;async function keepAwake(){if(!("wakeLock" in navigator)||document.visibilityState!=="visible"||wakeLock)return;try{wakeLock=await navigator.wakeLock.request("screen");wakeLock.addEventListener("release",()=>{wakeLock=null})}catch(e){}}keepAwake();document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")keepAwake()});document.addEventListener("pointerdown",keepAwake,{once:true});
+if(AUDIENCE_MODE){renderAudience()}else{render();applyFont();initOffline()}
+</script>
+</body>
+</html>
