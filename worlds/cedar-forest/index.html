@@ -378,7 +378,7 @@ function build(low) {
   function tri(a,b,c,color,material,wind=0,normal,uvs) {
     if(hiddenTree)return;
     const n=normal??unit(cross(sub(b,a),sub(c,a)));
-    const rows=low?target:material===7?falls:material===3||material===13?water:target;
+    const rows=low?target:(material===7||material===21||material===22)?falls:material===3||material===13?water:target;
     const perVertex=Array.isArray(n[0]);
     const na=perVertex?n[0]:n,nb=perVertex?n[1]:n,nc=perVertex?n[2]:n;
     if(low){
@@ -1010,28 +1010,68 @@ function build(low) {
     rock(x,height(x,z)+r*random(.13,.68),z,r,r*random(.61,1.31),r*random(.77,1.48),
       tint([.321,.350,.286],random(.8,1.12)));
   }
-  function spill(sections){
+  // Follow the contours of the ledges with individual streams and space between them.
+  const current=plantVariation(0);
+  function spill(knots,count,brightness){
     bucket(fallX,-88);
-    for(let j=0;j<sections.length-1;j++){
-      const coords=(s,u)=>{
-        const [x,y,z,w]=sections[s];
-        const edge=u*2-1;
-        return [fallX+x+edge*w,y+.06*Math.cos(u*6.4+s*.8),z+.083*Math.sin(u*8.9+s*.68)];
-      };
-      for(let i=0;i<(low?7:16);i++){
-        const cells=low?7:16,u=i/cells,v=(i+1)/cells;
-        const a=j/(sections.length-1),b=(j+1)/(sections.length-1);
-        quad(coords(j,u),coords(j,v),coords(j+1,v),coords(j+1,u),
-          [.335,.448,.421],7,0,undefined,[[u,a],[v,a],[v,b],[u,b]]);
+    const last=knots.length-1;
+    function channel(t){
+      const along=t*last,at=Math.min(last-1,Math.floor(along)),f=along-at;
+      const before=knots[Math.max(0,at-1)],a=knots[at],b=knots[at+1],after=knots[Math.min(last,at+2)];
+      return a.map((x,k)=>{
+        const d=b[k]-x,d0=(b[k]-before[k])*.37,d1=(after[k]-x)*.37;
+        return x+f*(d0+f*(3*d-2*d0-d1+f*(-2*d+d0+d1)));
+      });
+    }
+    function drawStream(across,filamentWidth,material){
+      const plume=material===22;
+      const sweep=current(-.17,.17),setback=current(-.071,.117)-(plume?.075:0),phase=current(0,TAU);
+      const start=current(0,.04),end=current(.965,1),reach=end-start;
+      const tone=tint([.568,.683,.645],current(.73,1.24)*brightness);
+      const segments=low?13:26;
+      let previous;
+      for(let j=0;j<=segments;j++){
+        const u=j/segments,t=start+u*reach;
+        const [x,y,z,w]=channel(t);
+        const ledge=1-.26*Math.exp(-(((t-.64)*10)**2));
+        const move=Math.sin(t*6.7+phase)*.065+Math.sin(t*16.9+phase)*.028;
+        const drift=across*w*(.72+.31*t)+sweep*t*t+move*smooth(.04,.27,t);
+        const split=.81+.27*Math.sin(t*16.5+phase)+.22*Math.cos(t*33.2-phase);
+        const spread=filamentWidth*(plume?(.68+.56*t)*w:(split+.44*t)*ledge);
+        const cx=fallX+x+drift,cy=y+Math.sin(t*5+phase)*.044,cz=z+setback+.041*Math.sin(t*8.3+phase);
+        const left=[cx-spread,cy,cz-.008],right=[cx+spread,cy,cz+.008];
+        if(previous){
+          quad(previous.left,previous.right,right,left,tone,material,0,undefined,
+            [[0,previous.u],[1,previous.u],[1,u],[0,u]]);
+        }
+        previous={left,right,u};
       }
     }
+    if(!low){
+      drawStream(-.34,.52,22);drawStream(.31,.63,22);
+    }
+    for(let i=0;i<count;i++){
+      const band=(i+current(.08,.95))/count;
+      const across=band*2-1+.078*Math.sin(band*TAU*3);
+      drawStream(across,current(.013,.041)*(1.05-.34*Math.abs(across)),7);
+    }
   }
-  spill([[-.75,7.77,-91.40,.52],[-.71,7.22,-90.30,.59],[-.73,6.73,-89.00,.63],
-    [-.52,5.24,-88.66,.62],[-.35,3.90,-87.54,.81],[-.38,3.76,-86.98,.88],
-    [-.43,2.76,-86.73,.75],[-.36,1.53,-86.44,.71],[-.21,.25,-85.83,.85]]);
-  spill([[1.23,7.66,-91.12,.34],[1.37,7.18,-90.00,.36],[1.57,6.73,-89.13,.47],
-    [1.82,5.71,-88.80,.46],[2.14,4.23,-87.84,.58],[2.39,3.69,-86.83,.67],
-    [2.46,2.46,-86.49,.62],[2.49,1.21,-86.06,.70],[2.61,.24,-85.48,.91]]);
+  spill([[-.63,7.51,-91.47,.46],[-.59,7.20,-90.32,.52],[-.60,6.73,-89.01,.61],
+    [-.43,5.21,-88.65,.57],[-.29,3.98,-87.58,.73],[-.22,3.75,-87.00,.90],
+    [-.18,2.74,-86.71,.80],[.01,1.51,-86.43,.81],[.26,.24,-85.83,.97]],low?17:46,1.0);
+  spill([[.88,7.48,-91.26,.29],[.96,7.17,-90.00,.31],[1.10,6.71,-89.13,.39],
+    [1.32,5.66,-88.79,.46],[1.56,4.22,-87.84,.56],[1.81,3.68,-86.83,.68],
+    [1.95,2.45,-86.52,.60],[1.86,1.19,-86.07,.72],[1.77,.24,-85.48,.96]],low?13:32,.91);
+
+  // Soft, low spray sits around the impact and dissolves as it rises.
+  if(!low){
+    bucket(fallX,-85.66);
+    for(let i=0;i<21;i++){
+      const center=[fallX+current(-.56,2.83),pondLevel+current(.03,.39),current(-86.04,-85.11)];
+      const properties=[current(.19,.67),current(.24,.65),current(.04,.94)];
+      quad(center,center,center,center,properties,21,0,[0,0,1],[[0,0],[1,0],[1,1],[0,1]]);
+    }
+  }
 
   // A small, weedy freshwater basin with shoals, cobbles and fallen timber.
   for(let i=0;i<(low?175:655);i++){
@@ -1260,6 +1300,18 @@ void main(){
   float wind=MW.y/255.;
   p.x+=wind*(sin(time*1.16+P.z*.36+P.y*.43)*.35+sin(time*.49+P.x*.27)*.46);
   p.z+=wind*cos(time*.86+P.x*.35+P.y*.3)*.29;
+  if(m==7.){
+    p.x+=sin(p.y*5.7+time*6.4+C.r*41.)*.017;
+    p.z+=sin(p.y*7.1+time*6.8+C.r*29.)*.012;
+  }
+  if(m==21.){
+    float rise=fract(time*(.33+C.z*.15)+C.z);
+    vec2 offset=UV*2.-1.;
+    p.y+=rise*.51;
+    p.x+=rise*(C.z-.42)*.60;
+    p.z+=rise*.46;
+    p+=rt*offset.x*C.r*(.86+rise*.53)+up*offset.y*C.g*(.49+rise*.33);
+  }
   if(m==8.)p.y+=.5*fract(time*(.75+fract(P.x*9.)*.62)+P.z*.47);
   vec3 d=p-eye;
   if((m==0.||m==2.)&&p.y<.22){
@@ -1531,10 +1583,10 @@ void main(){
   float thread=sin(sideways*31.3+advection*12.9+grain*7.)*.5+.5;
   float bubbles=smoothstep(.31,.77,cells*.68+thread*.32);
   float white=smoothstep(.23,.94,foam*(.48+1.05*bubbles))*.56;
-  float impact=min(length((p.xz-vec2(${(fallX-.21).toFixed(5)},-85.83))*vec2(.70,.86)),
-    length((p.xz-vec2(${(fallX+2.61).toFixed(5)},-85.48))*vec2(.75,.84)));
+  float impact=min(length((p.xz-vec2(${(fallX+.26).toFixed(5)},-85.83))*vec2(.70,.86)),
+    length((p.xz-vec2(${(fallX+1.77).toFixed(5)},-85.48))*vec2(.75,.84)));
   float burst=sin(impact*19.-time*5.7+grain*4.)*.5+.5;
-  white+=.47*(1.-smoothstep(.16,1.68,impact))*smoothstep(.34,.82,bubbles*.8+burst*.42);
+  white+=.51*(1.-smoothstep(.14,1.60,impact))*smoothstep(.34,.82,bubbles*.8+burst*.42);
   if(m==13.){
     float streamLines=noise(vec3(sideways*13.2,advection*7.1,8.));
     white+=.42*smoothstep(.27,.75,streamLines*.69+cells*.31)*
@@ -1572,25 +1624,46 @@ function graphics(gl,model) {
   const world=program(vertex,fragment),water=program(vertex,waterFragment);
   const cascade=program(vertex,`
     precision highp float;
-    in vec3 p,n;
+    in vec3 p,n,c;
     in vec2 leafUV;
+    flat in float m;
     out vec4 outColor;
     ${uniforms}
     ${shaderBase}
     void main(){
-      float u=leafUV.x,v=leafUV.y,fall=p.y+time*3.05;
-      float streaks=noise(vec3(u*27.+p.z*.72,fall*1.37,3.));
-      float ribbons=noise(vec3(u*9.7,fall*.44,7.));
-      float filament=smoothstep(.39,.78,streaks*.70+ribbons*.30);
-      float edge=smoothstep(0.,.114,u)*(1.-smoothstep(.89,1.,u));
-      float landing=smoothstep(.88,.998,v);
-      float ledge=exp(-((v-.65)*14.)*((v-.65)*14.));
-      vec3 ray=normalize(p-eye);
-      float facing=abs(dot(ray,normalize(n)));
-      float spray=filament*(.28+.45*landing+.23*ledge);
-      vec3 wet=mix(vec3(.154,.264,.229),vec3(.68,.78,.73),spray);
-      float alpha=edge*(.18+filament*.43+landing*.15+.07*(1.-facing));
-      outColor=vec4(outputColor(air(wet,p,ray,length(p-eye))),alpha);
+      vec3 delta=p-eye,ray=normalize(delta);
+      float u=leafUV.x,v=leafUV.y;
+      if(m==21.){
+        vec2 center=leafUV*2.-1.;
+        float grain=noise(vec3(center*2.6,time*.23+c.z*8.));
+        float cloud=(1.-smoothstep(.15,1.,length(center)))*smoothstep(.14,.78,grain);
+        float rise=fract(time*(.33+c.z*.15)+c.z);
+        float opacity=cloud*sin(rise*3.14159)*.24;
+        outColor=vec4(outputColor(air(vec3(.59,.69,.63),p,ray,length(delta))),opacity);
+        return;
+      }
+      float seed=c.r*43.;
+      float fall=p.y+time*(2.9+fract(seed)*1.63);
+      float grains=noise(vec3(seed+u*.48,fall*2.16,p.z*.69));
+      float streak=noise(vec3(seed*.34+p.z*.14,fall*.48,7.));
+      float flow=smoothstep(.22,.79,grains*.39+streak*.61);
+      float roundness=1.-abs(u*2.-1.);
+      float center=smoothstep(0.,.87,roundness);
+      float endFade=smoothstep(.01,.14,v)*(1.-smoothstep(.97,1.,v));
+      float landing=smoothstep(.83,.989,v);
+      float ledge=.19*exp(-((v-.65)*12.)*((v-.65)*12.));
+      float glint=pow(max(0.,dot(reflect(-SUN,normalize(n)),-ray)),17.);
+      float aeration=clamp(.13+.49*flow+.27*landing+ledge,0.,1.);
+      vec3 tint=mix(vec3(.25,.39,.347),vec3(.73,.84,.80),aeration);
+      tint*=.91+.14*c.g;
+      tint+=glint*.04;
+      float alpha=center*endFade*(.12+.46*flow+.17*landing+ledge);
+      if(m==22.){
+        float vapor=smoothstep(.08,.85,noise(vec3(u*6.8+seed*.18,fall*.66+v*2.,3.3)));
+        tint=mix(vec3(.28,.42,.36),vec3(.62,.74,.69),vapor);
+        alpha=center*endFade*(.085+vapor*.24)*(1.+ledge*.5);
+      }
+      outColor=vec4(outputColor(air(tint,p,ray,length(delta))),alpha);
     }`);
   const reflectedForest=program(vertex,`
     precision highp float;
@@ -1997,7 +2070,7 @@ function software(ctx,model){
           ctx.globalAlpha=1;
           continue;
         }
-        ctx.globalAlpha=type===7?.56:underwater&&(type===3||type===13)?.44:1;
+        ctx.globalAlpha=type===7?.65:underwater&&(type===3||type===13)?.44:1;
         ctx.fillStyle='rgb('+c.join(',')+')';ctx.beginPath();ctx.moveTo(p[0],p[1]);
         for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i],p[i+1]);
         ctx.closePath();ctx.fill();
