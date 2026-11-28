@@ -113,9 +113,31 @@ button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
   .list{flex:1;min-height:90px;max-height:none;overflow:auto}
 }
 @media(min-width:701px) and (max-width:1200px){
-  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .list{max-height:460px;max-height:min(460px,65dvh);overflow:auto}
-  .colhead{position:static}
+  .wrap{padding:8px 8px 16px}
+  header{gap:8px;margin-bottom:6px;align-items:center}
+  .brand{display:flex;align-items:baseline;gap:6px 12px;flex-wrap:wrap}
+  .brand h1{font-size:1.75rem}
+  .brand .sub{margin-top:0;font-size:.75rem;letter-spacing:.07em}
+  .toolbar{width:100%;gap:6px}
+  .toolbar>div{flex:1 1 260px}
+  .toolbar .btn{padding:7px 9px}
+  .rule{margin-bottom:8px}
+  .grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .col{border-radius:12px}
+  .colhead{position:static;padding:8px 10px 6px}
+  .coltitle{gap:4px 6px}
+  .coltitle h2{font-size:1.25rem}
+  .note{margin-top:2px}
+  .list{padding:2px 4px 4px;max-height:var(--tablet-list-height,calc(100vh - 220px));max-height:var(--tablet-list-height,calc(100dvh - 220px));overflow:auto;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+  .song{grid-template-columns:26px 24px minmax(0,1fr) 26px;gap:2px;padding:0 1px}
+  .song-main{padding:2px 0}
+  .play-toggle,.drag-handle,.lyrics-btn{min-width:0}
+  .alt{grid-column:1/-1}
+  .alt .list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:12px;max-height:320px;max-height:min(320px,45dvh)}
+  .footer{margin-top:8px}
+}
+@media(min-width:701px) and (max-width:880px){
+  .toolbar>div{flex-basis:100%}
 }
 @media(max-width:700px){
   .grid{grid-template-columns:minmax(0,1fr)}
@@ -1101,7 +1123,25 @@ document.getElementById("qr-modal").addEventListener("click",function(e){if(e.ta
 document.getElementById("reset-order").addEventListener("click",()=>{if(confirm("Restore the published Beaumont Curling Club set order and move every song back to its original column?")){sets=deepClone(DEFAULT_SETS);try{localStorage.removeItem(ORDER_KEY)}catch(e){}render()}});document.getElementById("reset-played").addEventListener("click",()=>{if(confirm("Clear all played checkmarks?")){played={};savePlayed();render()}});
 document.addEventListener("keydown",e=>{const open=document.getElementById("lyrics-modal")?.classList.contains("open");if(e.key==="Escape")closeAudienceQr();if(e.key==="Escape"&&open)closeSong();if(!open)return;if(e.key==="ArrowLeft"&&!document.getElementById("prev-song").disabled)moveModalSong(-1);if(e.key==="ArrowRight"&&!document.getElementById("next-song").disabled)moveModalSong(1)});
 let wakeLock=null;async function keepAwake(){if(!("wakeLock" in navigator)||document.visibilityState!=="visible"||wakeLock)return;try{wakeLock=await navigator.wakeLock.request("screen");wakeLock.addEventListener("release",()=>{wakeLock=null})}catch(e){}}keepAwake();document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")keepAwake()});document.addEventListener("pointerdown",keepAwake,{once:true});
-if(AUDIENCE_MODE){renderAudience()}else{render();applyFont();initOffline()}
+function fitTabletSets(){
+  const root=document.documentElement;
+  if(!window.matchMedia("(min-width:701px) and (max-width:1200px)").matches){
+    root.style.removeProperty("--tablet-list-height");return;
+  }
+  const list=document.querySelector(".grid > .col:not(.alt) .list");
+  if(!list)return;
+  const top=list.getBoundingClientRect().top+window.scrollY;
+  const height=Math.max(120,Math.floor(window.innerHeight-top-64))+"px";
+  if(root.style.getPropertyValue("--tablet-list-height")!==height)root.style.setProperty("--tablet-list-height",height);
+}
+function initTabletSizing(){
+  fitTabletSets();
+  window.addEventListener("resize",fitTabletSets);
+  if(window.visualViewport)window.visualViewport.addEventListener("resize",fitTabletSets);
+  if(window.ResizeObserver){const header=document.querySelector(".wrap > header");if(header)new ResizeObserver(fitTabletSets).observe(header)}
+  if(document.fonts)document.fonts.ready.then(fitTabletSets);
+}
+if(AUDIENCE_MODE){renderAudience()}else{render();applyFont();initTabletSizing();initOffline()}
 </script>
 </body>
 </html>
