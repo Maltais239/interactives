@@ -1,4 +1,4 @@
-const CACHE_NAME = "beaumont-offline-v4";
+const CACHE_NAME = "beaumont-offline-v5";
 const INDEX_URL = new URL("./index.html", self.location.href).href;
 const APP_PATH = new URL("./", self.location.href).pathname;
 
