@@ -1,4 +1,4 @@
-const CACHE_NAME = "beaumont-offline-v6";
+const CACHE_NAME = "beaumont-offline-v7";
 const INDEX_URL = new URL("./index.html", self.location.href).href;
 const APP_PATH = new URL("./", self.location.href).pathname;
 
@@ -125,4 +125,5 @@ self.addEventListener("fetch", event => {
     }
   })());
 });
+
 
