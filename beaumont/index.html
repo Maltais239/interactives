@@ -138,21 +138,35 @@ button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
   .sheet-position{width:auto;margin-left:auto}
   .sheet-nav{padding:4px 8px}.sheet-body{padding:10px 12px 40px}
 }
+
+/* Separate sharing links for the audience and the band. */
+.btn.qr-trigger{border-color:var(--amber);color:var(--amber)}
+.qr-modal{padding:12px}
+.qr-card{padding:18px;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow-y:auto}
+.qr-card p{font-size:.875rem;line-height:1.4;margin-bottom:12px}
+#qr-code{padding:12px;max-width:100%;margin-bottom:12px;color:var(--bg)}
+#qr-code img,#qr-code canvas{max-width:100%;height:auto}
+.qr-url{display:block;width:100%;min-height:44px;border:1px solid var(--line);background:var(--bg);color:var(--cream);border-radius:8px;padding:8px;font:inherit;font-size:.8125rem;text-overflow:ellipsis;margin-bottom:10px}
+.qr-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.qr-actions .btn{flex:1 1 auto;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.qr-status{font-size:.8125rem;color:var(--muted);line-height:1.4;min-height:1.4em;margin-top:8px}
+.qr-url:focus-visible,.qr-actions a:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 </style>
 </head>
 <body>
 <div class="wrap">
 <header><div class="brand"><h1><span>Beaumont Curling Club</span></h1><div class="sub">Massey Sound · three sets + reserves</div></div>
-<div class="toolbar"><div><div class="summary" id="summary"></div><div class="local-note">drag order + played checks save only on this device · <span id="offline-status">offline not prepared</span></div></div><button class="btn" id="offline-btn" type="button">Prepare Offline</button><button class="btn" id="audience-qr" type="button">Audience QR</button><button class="btn" id="reset-order" type="button">Reset set order</button><button class="btn" id="reset-played" type="button">Reset played</button></div></header>
+<div class="toolbar"><div><div class="summary" id="summary"></div><div class="local-note">drag order + played checks save only on this device · <span id="offline-status">offline not prepared</span></div></div><button class="btn" id="offline-btn" type="button">Prepare Offline</button><button class="btn qr-trigger" id="audience-qr" type="button" title="View-only song list for the audience">Audience QR</button><button class="btn qr-trigger" id="band-qr" type="button" title="Full setlist app for the band">Band QR</button><button class="btn" id="reset-order" type="button">Reset set order</button><button class="btn" id="reset-played" type="button">Reset played</button></div></header>
 <div class="rule"></div><main class="grid" id="grid"></main><div class="footer">☰ drag · tap the song title or ♪ for chords/lyrics · tap the box when played</div>
 </div>
 <div class="qr-modal" id="qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-title">
   <div class="qr-card">
     <h2 id="qr-title">Audience Setlist</h2>
-    <p>Scan to see the current three-set order. Only the three sets are shown.</p>
-    <div id="qr-code"></div>
-    <div class="qr-url" id="qr-url"></div>
-    <button class="btn" id="close-qr" type="button">Close</button>
+    <p id="qr-description">Scan to see the current three sets. View-only song titles.</p>
+    <div id="qr-code" role="img" aria-label="Setlist QR code"></div>
+    <input class="qr-url" id="qr-url" type="text" readonly aria-label="Setlist link">
+    <div class="qr-actions"><a class="btn" id="open-qr-link" href="?audience=1" target="_blank" rel="noopener">Open link</a><button class="btn" id="copy-qr-link" type="button">Copy link</button><button class="btn" id="close-qr" type="button">Close</button></div>
+    <div class="qr-status" id="qr-status" role="status" aria-live="polite"></div>
   </div>
 </div>
 <div class="modal" id="lyrics-modal" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
@@ -1007,33 +1021,68 @@ async function loadLyrics(title){if(lyricCache.has(title))return lyricCache.get(
 async function openSong(title){stopAutoScroll();currentSongTitle=title;const f=findSong(title);if(!f)return;const s=f.song,modal=document.getElementById("lyrics-modal"),text=document.getElementById("lyrics-text");document.getElementById("sheet-title").textContent=s[0];document.getElementById("sheet-meta").textContent=[s[1],s[2]].filter(Boolean).join(" · ");document.getElementById("sheet-source").textContent="";document.getElementById("sheet-position").textContent=sets[f.setIndex].title+" · "+(f.index+1)+" of "+sets[f.setIndex].songs.length;document.getElementById("nav-label").textContent=sets[f.setIndex].title;document.getElementById("prev-song").disabled=f.index===0;document.getElementById("next-song").disabled=f.index===sets[f.setIndex].songs.length-1;text.className="lyrics loading";text.textContent="Loading chord sheet…";document.getElementById("sheet-body").scrollTop=0;modal.classList.add("open");applyFont();const r=await loadLyrics(title);if(currentSongTitle!==title)return;text.className=r.ok?"lyrics":"lyrics missing";text.textContent=r.text;document.getElementById("sheet-source").textContent=r.file?"GitHub · songfiles/"+r.file:"No linked file";document.getElementById("sheet-body").scrollTop=0}
 function moveModalSong(d){const f=findSong(currentSongTitle);if(!f)return;const n=f.index+d;if(n<0||n>=sets[f.setIndex].songs.length)return;openSong(sets[f.setIndex].songs[n][0])} function closeSong(){stopAutoScroll();currentSongTitle=null;document.getElementById("lyrics-modal").classList.remove("open")}
 document.getElementById("close-sheet").addEventListener("click",closeSong);document.getElementById("lyrics-modal").addEventListener("click",function(e){if(e.target===this)closeSong()});document.getElementById("prev-song").addEventListener("click",()=>moveModalSong(-1));document.getElementById("next-song").addEventListener("click",()=>moveModalSong(1));document.getElementById("font-down").addEventListener("click",()=>{lyricsFont=Math.max(12,lyricsFont-1);applyFont()});document.getElementById("font-up").addEventListener("click",()=>{lyricsFont=Math.min(28,lyricsFont+1);applyFont()});document.getElementById("auto-scroll").addEventListener("click",()=>{scrollTimer?stopAutoScroll():startAutoScroll()});document.getElementById("scroll-slower").addEventListener("click",()=>{scrollDelay=Math.min(140,scrollDelay+10);try{localStorage.setItem(SPEED_KEY,String(scrollDelay))}catch(e){}restartAutoIfNeeded()});document.getElementById("scroll-faster").addEventListener("click",()=>{scrollDelay=Math.max(12,scrollDelay-10);try{localStorage.setItem(SPEED_KEY,String(scrollDelay))}catch(e){}restartAutoIfNeeded()});
+function publicAppUrl(){
+  const url=new URL(window.location.href);url.search="";url.hash="";return url.href;
+}
 function audienceUrl(){
   const titles=allPublishedTitles();
-  const order=sets.filter(set=>set.id!=="alt").map(set=>set.songs.map(song=>titles.indexOf(song[0])));
-  return window.location.origin+window.location.pathname+"?audience=1#sets="+encodeURIComponent(JSON.stringify(order));
+  const order=sets.filter(set=>set.id!=="alt").map(set=>set.songs.map(song=>titles.indexOf(song[0]).toString(36)).join(".")).join("~");
+  return publicAppUrl()+"?audience=1#order="+order;
 }
+function bandUrl(){return publicAppUrl()}
 function audienceSets(){
   const main=DEFAULT_SETS.filter(set=>set.id!=="alt");
   try{
-    const raw=new URLSearchParams(window.location.hash.slice(1)).get("sets");
-    if(!raw)return main;
-    const order=JSON.parse(raw),songs=DEFAULT_SETS.flatMap(set=>set.songs);
+    const params=new URLSearchParams(window.location.hash.slice(1));
+    const compact=params.get("order"),legacy=params.get("sets");
+    if(!compact&&!legacy)return main;
+    let order;
+    if(compact){
+      if(!/^[0-9a-z.~]+$/.test(compact))return main;
+      order=compact.split("~").map(list=>list?list.split(".").map(id=>parseInt(id,36)):[]);
+    }else order=JSON.parse(legacy);
+    const songs=DEFAULT_SETS.flatMap(set=>set.songs);
     if(!Array.isArray(order)||order.length!==main.length||order.some(list=>!Array.isArray(list)))return main;
     const ids=order.flat();
     if(new Set(ids).size!==ids.length||ids.some(i=>!Number.isInteger(i)||i<0||i>=songs.length))return main;
     return main.map((set,i)=>({...set,songs:order[i].map(id=>songs[id])}));
   }catch(e){return main}
 }
-function openAudienceQr(){
-  const modal=document.getElementById("qr-modal"),box=document.getElementById("qr-code"),url=audienceUrl();
-  box.innerHTML="";document.getElementById("qr-url").textContent=url;modal.classList.add("open");
-  if(window.QRCode)new QRCode(box,{text:url,width:260,height:260,colorDark:"#211812",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
-  else box.textContent=url;
+let qrReturnFocus=null;
+function openShareQr(kind){
+  const isBand=kind==="band",modal=document.getElementById("qr-modal"),box=document.getElementById("qr-code"),url=isBand?bandUrl():audienceUrl();
+  qrReturnFocus=document.activeElement;
+  document.getElementById("qr-title").textContent=isBand?"Band Setlist":"Audience Setlist";
+  document.getElementById("qr-description").textContent=isBand
+    ?"Scan to open the full band app: sets, reserves, keys, chords and lyrics."
+    :"Scan to see these three sets in their current order. View-only song titles.";
+  document.getElementById("qr-url").value=url;
+  document.getElementById("open-qr-link").href=url;
+  document.getElementById("qr-status").textContent="";
+  box.innerHTML="";box.setAttribute("aria-label",isBand?"QR code for the full band app":"QR code for the view-only audience setlist");
+  modal.classList.add("open");
+  const size=Math.floor(Math.min(280,Math.max(140,window.innerWidth-120),Math.max(140,window.innerHeight-260)));
+  try{
+    if(!window.QRCode)throw new Error("QR library unavailable");
+    new QRCode(box,{text:url,width:size,height:size,colorDark:"#211812",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
+  }catch(e){box.textContent="Use Open link or Copy link below.";document.getElementById("qr-status").textContent="The QR code could not load. The link is still available."}
+  document.getElementById("close-qr").focus();
 }
-function closeAudienceQr(){document.getElementById("qr-modal")?.classList.remove("open")}
+function openAudienceQr(){openShareQr("audience")}
+function openBandQr(){openShareQr("band")}
+async function copyQrLink(){
+  const field=document.getElementById("qr-url"),status=document.getElementById("qr-status");
+  try{await navigator.clipboard.writeText(field.value);status.textContent="Link copied."}
+  catch(e){field.focus();field.select();status.textContent="Link selected. Use your device’s Copy command."}
+}
+function closeAudienceQr(){
+  const modal=document.getElementById("qr-modal");
+  if(!modal?.classList.contains("open"))return;
+  modal.classList.remove("open");qrReturnFocus?.focus();
+}
 function renderAudience(){
   document.title="Beaumont Curling Club — Tonight's Songs";
-  document.body.innerHTML='<main class="audience-only"><header class="brand"><h1><span>Beaumont Curling Club</span></h1></header><div class="audience-grid" id="audience-grid"></div></main>';
+  document.body.innerHTML='<main class="audience-only"><header class="brand"><h1><span>Beaumont Curling Club</span></h1><div class="sub">Massey Sound · view-only setlist</div></header><div class="audience-grid" id="audience-grid"></div></main>';
   const grid=document.getElementById("audience-grid");
   audienceSets().forEach(set=>{
     const col=document.createElement("section");col.className="audience-col";
@@ -1044,6 +1093,9 @@ function renderAudience(){
 }
 document.getElementById("offline-btn").addEventListener("click",prepareOffline);
 document.getElementById("audience-qr").addEventListener("click",openAudienceQr);
+document.getElementById("band-qr").addEventListener("click",openBandQr);
+document.getElementById("copy-qr-link").addEventListener("click",copyQrLink);
+document.getElementById("qr-modal").addEventListener("keydown",e=>{if(e.key!=="Tab")return;const items=[...e.currentTarget.querySelectorAll("a[href],button,input")].filter(el=>!el.disabled),first=items[0],last=items.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}});
 document.getElementById("close-qr").addEventListener("click",closeAudienceQr);
 document.getElementById("qr-modal").addEventListener("click",function(e){if(e.target===this)closeAudienceQr()});
 document.getElementById("reset-order").addEventListener("click",()=>{if(confirm("Restore the published Beaumont Curling Club set order and move every song back to its original column?")){sets=deepClone(DEFAULT_SETS);try{localStorage.removeItem(ORDER_KEY)}catch(e){}render()}});document.getElementById("reset-played").addEventListener("click",()=>{if(confirm("Clear all played checkmarks?")){played={};savePlayed();render()}});
