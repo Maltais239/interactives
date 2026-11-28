@@ -17,6 +17,8 @@ main{position:fixed;left:clamp(23px,8vw,130px);top:50%;transform:translateY(-43%
 h1{font:400 clamp(68px,11vw,155px)/.8 Georgia,serif;letter-spacing:-.078em;margin:22px 0 24px}h1 em{font-weight:400;color:#e4e9b9}p{margin:0;line-height:1.45;font-size:14px;color:#e1e7d0}.primary{margin-top:25px;border:0;border-radius:999px;background:#e9eccd;color:#1d2e1d;font-weight:750;padding:13px 21px;display:flex;gap:24px;align-items:center}.primary:hover{background:#fcf8e0}
 #place{display:block;margin-top:4px;font:400 clamp(21px,3vw,30px) Georgia,serif}#hint{max-width:240px;text-align:right;font-size:11px;color:var(--soft)}body:not(.walk) .explore{display:none}.walk #intro{display:none}.walk .veil{background:radial-gradient(ellipse at 57% 42%,transparent 42%,#09180f50 100%)}
 #help{position:fixed;right:clamp(19px,4.4vw,72px);top:max(68px,calc(env(safe-area-inset-top) + 52px));width:min(310px,calc(100vw - 38px));border:1px solid var(--line);border-radius:16px;background:#16281eef;padding:17px;box-shadow:0 6px 28px #06100875}#help{max-height:calc(100dvh - 82px);overflow:auto}#help p{font-size:14px;margin:0 0 12px}.destinations{display:grid;gap:6px}.destinations button{text-align:left}
+#dive{position:fixed;bottom:max(74px,calc(env(safe-area-inset-bottom) + 57px));right:clamp(12px,4.4vw,72px);z-index:1}
+.swimming footer{color:#e0f3ed}
 .touch{display:none}#stick{display:none;position:fixed;bottom:max(80px,calc(env(safe-area-inset-bottom) + 64px));left:22px;width:100px;height:100px;border:1px solid var(--line);border-radius:50%;background:#20352482;place-items:center;touch-action:none}#stick i{width:35px;height:35px;border-radius:50%;background:#e8eccd78;pointer-events:none}
 @media(pointer:coarse){.desktop{display:none}.touch{display:initial}.walk #stick{display:grid}#hint{max-width:130px}}
 @media(max-width:490px){
@@ -31,7 +33,8 @@ h1{font:400 clamp(68px,11vw,155px)/.8 Georgia,serif;letter-spacing:-.078em;margi
 <canvas id="view" aria-label="First-person rainforest view"></canvas><div class="veil"></div>
 <header><div class="wordmark"><span class="icon" aria-hidden="true">♧</span><span class="small">Under the Cedars</span></div><div class="actions"><button class="pill explore" id="follow" hidden aria-pressed="false">Follow trail</button><button class="pill" id="quality" aria-pressed="true">High detail</button><button class="pill" id="menu" aria-expanded="false" aria-controls="help">Explore</button></div></header>
 <main id="intro"><div class="kicker small">Pacific Northwest rainforest</div><h1>Under<br><em>the Cedars</em></h1><p>Follow the creek through an old-growth forest to a hidden waterfall.</p><button class="primary" id="enter">Enter the forest</button></main>
-<aside id="help" hidden><p class="desktop">Use WASD to walk and drag or use the arrow keys to look around.</p><p class="touch">Use the left pad to walk. Drag the forest to look around.</p><div class="destinations" aria-label="Jump to a landmark"><button class="pill" data-stop="0">Cedar trailhead</button><button class="pill" data-stop="1">Creek crossing</button><button class="pill" data-stop="2">Old-growth grove</button><button class="pill" data-stop="3">Hidden falls</button></div></aside>
+<aside id="help" hidden><p class="desktop">Use WASD to walk and drag or use the arrow keys to look around.</p><p class="touch">Use the left pad to walk. Drag the forest to look around.</p><div class="destinations" aria-label="Jump to a landmark"><button class="pill" data-stop="0">Cedar trailhead</button><button class="pill" data-stop="1">Creek crossing</button><button class="pill" data-stop="2">Old-growth grove</button><button class="pill" data-stop="3">Hidden falls</button><button class="pill" data-stop="4">Mountain pond</button></div></aside>
+<button id="dive" class="pill" hidden>Dive into pond</button>
 <div id="stick" aria-hidden="true"><i></i></div>
 <footer><div><span class="small">Pacific Northwest</span><output id="place">Creek crossing</output></div><span id="hint" class="small">A walk through old growth</span></footer>
 <p id="error" hidden role="alert" style="position:fixed;bottom:80px;left:20px;background:#172b1e;padding:12px">The forest view could not start in this browser.</p>
@@ -60,6 +63,30 @@ function pathDistance(x,z){
   const approach=nearBridge?Math.abs(z-bridgeApproachZ(x))*.76:8;
   return Math.min(approach,Math.abs(x-trail(z)));
 }
+const fallX=river(-87.7);
+const pondX=fallX+5.95,pondZ=-77.8,pondRX=10.45,pondRZ=10.5,pondLevel=.22;
+const pondEntry={x:pondX+4.96,z:pondZ+5.76,yaw:-.82};
+function pondRadius(x,z){
+  const a=(x-pondX)/pondRX,b=(z-pondZ)/pondRZ;
+  return Math.hypot(a,b)*(1+.055*Math.sin(a*5.8+b*3.7)+.033*Math.cos(b*7.1-a*4.3));
+}
+function pondBottom(x,z,r){
+  const shoulder=smooth(.20,.99,r);
+  const grit=.12*Math.sin(x*.83+z*1.36)+.14*Math.cos(z*.72-x*.41);
+  return pondLevel-4.2*(1-shoulder)+.23*smooth(.87,1.10,r)+grit*(1-smooth(.68,1.00,r));
+}
+function troutPose(i,time,pose){
+  const a=time*(.22+(i%4)*.027)+i*2.39996;
+  const r=.54+(i%3)*.095,dx=Math.cos(a),dz=Math.sin(a);
+  pose[0]=pondX+dx*pondRX*r*.76;
+  pose[2]=pondZ+dz*pondRZ*r*.73;
+  const depth=-.64-(i%5)*.34+Math.sin(a*1.65+i)*.22;
+  pose[1]=Math.max(height(pose[0],pose[2])+.34,depth);
+  pose[3]=Math.atan2(-dz*pondRX*.76,dx*pondRZ*.73);
+  pose[4]=.57+(i%4)*.128;
+  return pose;
+}
+
 const heroX=bridgeX-7.88,heroZ=-27.55;
 const creekRise=z=>.54*(1-smooth(-36.5,-34.65,z));
 const riffles=[[-.64,-22.25,.77],[1.36,-24.3,.57],[-.43,-30.2,.66],[.68,-33.8,.86],
@@ -77,10 +104,12 @@ function height(x,z){
     +Math.max(0,x-river(z)-8.2)*.14);
   const bedRise=creekRise(z)*(1-.24*bank);
   const ripple=.027*Math.sin(x*1.9+z*1.23)+.025*Math.cos(x*2.7-z*1.4);
-  return -.64+bedRise+mound+bank*(.94+path*(.31*Math.sin(x*.39+z*.31)+.19*Math.cos(x*.72-z*.21)+.24*Math.sin(z*.12))+ripple)
+  const land=-.64+bedRise+mound+bank*(.94+path*(.31*Math.sin(x*.39+z*.31)+.19*Math.cos(x*.72-z*.21)+.24*Math.sin(z*.12))+ripple)
     +.12*(1-bank)*Math.sin(z*.29+x*.51)
     +Math.max(0,-z-87)*(.40+.09*Math.cos(x*.3))
     +Math.max(0,Math.abs(x-river(z))-15)*.13;
+  const radius=pondRadius(x,z);
+  return radius<1.21?lerp(land,pondBottom(x,z,radius),1-smooth(.95,1.21,radius)):land;
 }
 
 let seed=72109;
@@ -335,8 +364,9 @@ function groundContact(footprints){
 function build(low) {
   const tiles = new Map();
   const water = low?null:packedMesh();
+  const falls=low?null:packedMesh();
   const footprints=[];
-  let target,targetTile;
+  let target,targetTile,hiddenTree=false;
   function bucket(x,z) {
     const ix=Math.floor(x/11),iz=Math.floor(z/11),key=ix+','+iz;
     if(!tiles.has(key)){
@@ -346,8 +376,9 @@ function build(low) {
     target=targetTile.rows;
   }
   function tri(a,b,c,color,material,wind=0,normal,uvs) {
+    if(hiddenTree)return;
     const n=normal??unit(cross(sub(b,a),sub(c,a)));
-    const rows=(material===3||material===13)&&!low?water:target;
+    const rows=low?target:material===7?falls:material===3||material===13?water:target;
     const perVertex=Array.isArray(n[0]);
     const na=perVertex?n[0]:n,nb=perVertex?n[1]:n,nc=perVertex?n[2]:n;
     if(low){
@@ -379,7 +410,7 @@ function build(low) {
     const shade=low?soil.map((v,i)=>lerp(v,[.31,.231,.164][i],foot)):soil;
     const earth=tint(shade,random(.93,1.06));
     const submerged=point=>point[1]<groundwater+creekRise(point[2])-.046;
-    if(low&&submerged(a)&&submerged(b)&&submerged(c)&&submerged(d))continue;
+    if(low&&pondRadius(x,z)>1.1&&submerged(a)&&submerged(b)&&submerged(c)&&submerged(d))continue;
     quad(a,b,c,d,earth,0,0,normal);
   }
   function bankWidth(z,side){
@@ -392,19 +423,33 @@ function build(low) {
     }
     return side*top;
   }
+  function waterSides(z){
+    const center=river(z);
+    let left=center+(low?bankWidth(z,-1):-3.45),right=center+(low?bankWidth(z,1):3.45);
+    if(pondRadius(pondX,z)<1.038){
+      for(const side of [-1,1]){
+        let inside=0,outside=pondRX*1.21;
+        for(let i=0;i<8;i++){
+          const r=(inside+outside)*.5;
+          if(pondRadius(pondX+side*r,z)<1.048)inside=r;else outside=r;
+        }
+        const edge=pondX+side*outside;
+        if(side<0)left=Math.min(left,edge);else right=Math.max(right,edge);
+      }
+    }
+    return [left,right];
+  }
   for(let z=-88;z<24;z+=.65){
     bucket(river(z),z);
-    const a=river(z),b=river(z+.65);
+    const [west,east]=waterSides(z),[westNext,eastNext]=waterSides(z+.65);
     const y=groundwater+creekRise(z),y2=groundwater+creekRise(z+.65);
     const rapid=z>-37.05&&z<-34.8;
-    const cells=low?4:1;
-    const west=low?bankWidth(z,-1):-3.45,east=low?bankWidth(z,1):3.45;
-    const westNext=low?bankWidth(z+.65,-1):-3.45,eastNext=low?bankWidth(z+.65,1):3.45;
+    const cells=low?Math.max(4,Math.ceil((east-west)*.64)):1;
     for(let i=0;i<cells;i++){
       const left=i/cells,right=(i+1)/cells;
       const material=rapid&&i%2===0?13:3;
-      quad([a+lerp(west,east,left),y,z],[b+lerp(westNext,eastNext,left),y2,z+.65],
-        [b+lerp(westNext,eastNext,right),y2,z+.65],[a+lerp(west,east,right),y,z],creek,material);
+      quad([lerp(west,east,left),y,z],[lerp(westNext,eastNext,left),y2,z+.65],
+        [lerp(westNext,eastNext,right),y2,z+.65],[lerp(west,east,right),y,z],creek,material);
     }
   }
   function rock(x,y,z,rx,ry,rz,shade=wetRock,small=false,material=2) {
@@ -412,14 +457,18 @@ function build(low) {
     if(!low&&rx>.19&&Math.abs(y-height(x,z))<ry+.14){
       footprints.push([x,z,rx*.88+.07,rz*.90+.07,material===12?.27:.58]);
     }
-    const rings=[], rows=small?3:low?4:7, cols=small?6:low?7:12;
+    const rings=[],rounded=Math.max(rx,ry,rz)>.46;
+    const shadeVariation=plantVariation(small?18:low?28:84);
+    const nearFalls=z<-69&&z>-98;
+    const rows=small?3:rounded?(low?6:nearFalls?12:9):low?4:7;
+    const cols=small?6:rounded?(low?11:nearFalls?22:17):low?7:12;
     for(let j=0;j<=rows;j++){
       const lat=Math.PI*j/rows,r=Math.sin(lat);
       rings.push(Array.from({length:cols},(_,i)=>{
         const t=i*TAU/cols;
         const shape=x*.47+z*.73;
-        const k=1+.15*Math.sin(t*3+shape)*r+.066*Math.sin(t*5+lat*3+shape);
-        const yShape=Math.sign(Math.cos(lat))*Math.abs(Math.cos(lat))**.65;
+        const k=1+r*(.083*Math.sin(t*3+shape)+.039*Math.sin(t*5+lat*3+shape));
+        const yShape=Math.sign(Math.cos(lat))*Math.abs(Math.cos(lat))**.83;
         return [x+Math.cos(t)*r*rx*k,y+yShape*ry*k-.08*ry*Math.cos(t+shape)*r,
           z+Math.sin(t)*r*rz*k];
       }));
@@ -427,7 +476,7 @@ function build(low) {
     const normal=p=>unit([(p[0]-x)/(rx*rx),(p[1]-y)/(ry*ry),(p[2]-z)/(rz*rz)]);
     for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){
       const k=(i+1)%cols;
-      quad(rings[j][i],rings[j+1][i],rings[j+1][k],rings[j][k],tint(shade,random(.91,1.07)),material,0,[normal(rings[j][i]),normal(rings[j+1][i]),normal(rings[j+1][k]),normal(rings[j][k])]);
+      quad(rings[j][i],rings[j+1][i],rings[j+1][k],rings[j][k],tint(shade,shadeVariation(.95,1.05)),material,0,[normal(rings[j][i]),normal(rings[j+1][i]),normal(rings[j+1][k]),normal(rings[j][k])]);
     }
   }
   for(let i=0;i<(low?165:370);i++){
@@ -486,6 +535,7 @@ function build(low) {
 
   function cedarSprays(x,y,z,r,angle,dark,detailed=false,hemlock=false){
     const jostle=plantVariation(detailed&&!low?1144:172);
+    if(hiddenTree)return;
     const sprays=low?3:detailed?8:5;
     const facing=jostle(-.29,.29)+angle;
     const spread=jostle(1.5,2.5);
@@ -525,6 +575,7 @@ function build(low) {
   function fern(x,y,z,r,featured=false,cluster=false){
     bucket(x,z);
     const jostle=plantVariation(cluster?0:low?81:featured?441:133);
+    if(y<pondLevel-.06&&pondRadius(x,z)<1.015)return;
     const fronds=low?(featured?6:5):featured?12:cluster?8:9;
     const spin=jostle(0,TAU),health=jostle(.82,1.13);
     for(let i=0;i<fronds;i++){
@@ -633,7 +684,7 @@ function build(low) {
     };
     for(let i=0;i<sections.length-1;i++)for(let j=0;j<6;j++){
       quad(sections[i][j],sections[i][j+1],sections[i+1][j+1],sections[i+1][j],tint(bark,.68+i*.059),16,0,[normal(j),normal(j+1),normal(j+1),normal(j)]);
-      if(!low&&j===0){
+      if(!low&&!hiddenTree&&j===0){
         const p=sections[i][3];
         const spread=radius*(1-i/sections.length)*.53+.11;
         footprints.push([p[0],p[2],spread,spread,.40]);
@@ -643,8 +694,9 @@ function build(low) {
 
   const trunks=[];
   function tree(x,z,h,r,snag=false,featured=false) {
+    hiddenTree=pondRadius(x,z)<.99;
     bucket(x,z);trunks.push([x,z,r]);
-    if(!low)footprints.push([x,z,r*1.19,r*1.23,.71]);
+    if(!low&&!hiddenTree)footprints.push([x,z,r*1.19,r*1.23,.71]);
     const y=height(x,z), p=random(0,TAU), col=tint(bark,random(.68,1.26));
     const lean=random(-.8,.8), leanZ=random(-.45,.45);
     const trunk=t=>[x+t*lean,y+t*h,z+t*leanZ];
@@ -673,6 +725,7 @@ function build(low) {
         }
       }
     }
+    hiddenTree=false;
   }
   tree(heroX,heroZ,38,1.52,false,true);
   tree(bridgeX+5.58,-32.6,34,1.20,false,true);
@@ -937,33 +990,138 @@ function build(low) {
   }
   seed=floorSeed;
 
-  const fallZ=-87.7,fallX=river(fallZ), fallTop=8.3;
-  for(let i=0;i<(low?44:82);i++){
-    const side=i%2===0?1:-1, x=fallX+side*random(2.6,17),z=fallZ+random(-8,1.7);
-    const crest=4.0+Math.cos((x-fallX)*.16)*2.8+random(0,3);
-    rock(x,random(.5,crest),z,random(1.3,3.9),random(1.8,5.1),random(1.4,4.8));
+  // Water-rounded ledges and slabs set the course of the two branches of the falls.
+  for(const [x,y,z,rx,ry,rz] of [
+    [-5.1,2.8,-89.7,3.3,4.1,3.6],[-2.9,4.3,-91.2,3.2,3.55,3.2],
+    [1.3,4.29,-91.8,3.4,3.55,3.2],[4.9,3.26,-90.9,3.7,3.9,3.8],
+    [7.6,2.32,-90,3.35,2.9,2.95],[-4.9,1.2,-86.9,2.25,2.35,2.95],
+    [-3.2,2.81,-89.2,1.75,2.19,2.25],[-.85,4.0,-89.63,2.12,1.78,1.49],
+    [1.93,4.32,-90.5,2.35,2.30,1.74],[.2,2.37,-88.2,1.96,1.47,1.44],
+    [3.3,1.92,-88.35,2.23,1.91,1.56],[5.25,.64,-87.2,1.92,1.48,1.42],
+    [-1.98,.65,-86.32,1.34,1.37,1.50],[.75,-.22,-85.68,1.02,.66,1.06],
+    [2.93,-.35,-85.35,1.35,.80,1.25],[-2.44,-.08,-84.61,.91,.57,1.2]
+  ]){
+    rock(fallX+x,y,z,rx,ry,rz,[.288,.322,.293]);
   }
-  for(let i=0;i<13;i++){
-    const x=fallX+random(-3.9,3.8),z=fallZ+random(-5.4,-2.55);
-    rock(x,random(3,5.1),z,random(1.1,2.6),random(1.9,4.1),random(1.7,2.8));
+  for(let i=0;i<(low?19:53);i++){
+    const x=fallX+random(-13,18),z=random(-97,-86.1);
+    if(Math.abs(x-fallX)<4.6&&z>-92)continue;
+    const r=random(.56,2.12);
+    rock(x,height(x,z)+r*random(.13,.68),z,r,r*random(.61,1.31),r*random(.77,1.48),
+      tint([.321,.350,.286],random(.8,1.12)));
   }
-  bucket(fallX,fallZ);
-  for(let i=0;i<22;i++){
-    const u=i/22,v=(i+1)/22, col=tint([.70,.83,.75],random(.72,1.13));
-    const sheet=(t,k)=>[fallX+(2*t-1)*(1.44+k*.70)+.12*Math.sin(t*20+k*2),lerp(fallTop,.26,k),fallZ+k*2.25+.21*Math.sin(t*18+k*1.18)];
-    for(let s=0;s<5;s++)quad(sheet(u,s/5),sheet(v,s/5),sheet(v,(s+1)/5),sheet(u,(s+1)/5),col,7);
+  function spill(sections){
+    bucket(fallX,-88);
+    for(let j=0;j<sections.length-1;j++){
+      const coords=(s,u)=>{
+        const [x,y,z,w]=sections[s];
+        const edge=u*2-1;
+        return [fallX+x+edge*w,y+.06*Math.cos(u*6.4+s*.8),z+.083*Math.sin(u*8.9+s*.68)];
+      };
+      for(let i=0;i<(low?7:16);i++){
+        const cells=low?7:16,u=i/cells,v=(i+1)/cells;
+        const a=j/(sections.length-1),b=(j+1)/(sections.length-1);
+        quad(coords(j,u),coords(j,v),coords(j+1,v),coords(j+1,u),
+          [.335,.448,.421],7,0,undefined,[[u,a],[v,a],[v,b],[u,b]]);
+      }
+    }
   }
-  for(let i=0;i<32;i++){
-    const a=i*TAU/32,b=a+TAU/32;
-    const pool=t=>[fallX+Math.cos(t)*4.3,groundwater+creekRise(fallZ)+.025,fallZ+3.6+Math.sin(t)*4.3];
-    tri([fallX,groundwater+creekRise(fallZ)+.025,fallZ+3.6],pool(a),pool(b),[.30,.49,.43],3);
+  spill([[-.75,7.77,-91.40,.52],[-.71,7.22,-90.30,.59],[-.73,6.73,-89.00,.63],
+    [-.52,5.24,-88.66,.62],[-.35,3.90,-87.54,.81],[-.38,3.76,-86.98,.88],
+    [-.43,2.76,-86.73,.75],[-.36,1.53,-86.44,.71],[-.21,.25,-85.83,.85]]);
+  spill([[1.23,7.66,-91.12,.34],[1.37,7.18,-90.00,.36],[1.57,6.73,-89.13,.47],
+    [1.82,5.71,-88.80,.46],[2.14,4.23,-87.84,.58],[2.39,3.69,-86.83,.67],
+    [2.46,2.46,-86.49,.62],[2.49,1.21,-86.06,.70],[2.61,.24,-85.48,.91]]);
+
+  // A small, weedy freshwater basin with shoals, cobbles and fallen timber.
+  for(let i=0;i<(low?175:655);i++){
+    const a=random(0,TAU),r=Math.sqrt(rand()),x=pondX+Math.cos(a)*pondRX*r,z=pondZ+Math.sin(a)*pondRZ*r;
+    if(pondRadius(x,z)>1.025)continue;
+    const size=random(.031,.173)*(i%22===0?3.9:1);
+    const colors=[[.39,.383,.311],[.263,.315,.281],[.43,.362,.287],[.313,.35,.356]];
+    rock(x,height(x,z)+size*.09,z,size,size*random(.43,.75),size*random(.77,1.27),
+      tint(colors[i%colors.length],random(.72,1.24)),size<.23);
   }
-  for(let i=0;i<(low?110:265);i++){
-    const a=random(0,TAU),d=random(.18,3),x=fallX+Math.cos(a)*d,z=fallZ+3.25+Math.sin(a)*d*.62;
-    const y=random(-.28,.14)+random(0,1.58)*(1-d/4),r=random(.009,.038);
-    tri([x-r,y,z],[x+r,y+r*.24,z],[x,y+r*1.37,z],[.73,.82,.70],8,.24);
+  for(const [dx,dz,s] of [[-2.9,3.0,1.17],[1.74,-2.1,1.22],[5.4,3.57,.88],[-5.9,-3.82,.95],[7.8,-1.65,1.18],[-4.3,6.1,.68]]){
+    const x=pondX+dx,z=pondZ+dz;
+    rock(x,height(x,z)+s*.20,z,s,s*.54,s*.88,[.325,.361,.308]);
   }
-  return {tiles:[...tiles.values()],trunks,water,contact:low?null:groundContact(footprints)};
+  for(const [dx,dz,l,a] of [[-2.0,1.5,5.4,.28],[5.01,-2.8,3.9,2.35]]){
+    const x=pondX+dx,z=pondZ+dz;
+    const a0=[x,height(x,z)+.56,z],dx2=l*Math.cos(a),dz2=l*Math.sin(a);
+    const a1=[x+dx2,height(x+dx2,z+dz2)+.21,z+dz2];
+    bucket(x,z);limb(a0,a1,.27,.15,[.253,.194,.132],13,1.9,10);
+    for(let j=0;j<4;j++){
+      const u=.26+j*.18;
+      const base=[lerp(a0[0],a1[0],u),lerp(a0[1],a1[1],u),lerp(a0[2],a1[2],u)];
+      const side=j%2?1:-1;
+      limb(base,[base[0]+side*dz2*.17,base[1]+.21+j*.08,base[2]-side*dx2*.17],
+        .072,.014,[.285,.209,.137],7,j,10);
+    }
+  }
+  for(let i=0;i<(low?65:156);i++){
+    const a=random(0,TAU),r=random(.28,1.02),x=pondX+Math.cos(a)*pondRX*r,z=pondZ+Math.sin(a)*pondRZ*r;
+    const radius=pondRadius(x,z),y=height(x,z),shore=radius>.82;
+    if(y>pondLevel+.17||(!shore&&Math.sin(x*1.09+z*1.22)+Math.cos(x*.74-z*1.32)<.19))continue;
+    if(y>pondLevel-.36&&shore&&z>pondEntry.z-1&&x>pondEntry.x-1)continue;
+    bucket(x,z);
+    for(let j=0;j<(low?4:7);j++){
+      const a2=random(0,TAU),u=Math.cos(a2),v=Math.sin(a2);
+      const length=random(.28,shore?1.12:.81),width=random(.019,.043);
+      const blade=t=>[x+u*length*t*t*.68,y+length*(t-.20*t*t),z+v*length*t*t*.68];
+      const steps=5;
+      for(let k=0;k<steps;k++){
+        const t=k/steps,s=(k+1)/steps,base=blade(t),tip=blade(s);
+        const edge=(p,vv,sign)=>[p[0]-v*vv*sign,p[1],p[2]+u*vv*sign];
+        const w0=width*(1-t)**.64,w1=width*(1-s)**.64;
+        quad(edge(base,w0,-1),edge(base,w0,1),edge(tip,w1,1),edge(tip,w1,-1),
+          tint(shore?[.251,.346,.142]:[.151,.311,.143],random(.77,1.20)),6,.025+.046*t);
+      }
+    }
+  }
+
+  for(let i=0;i<(low?32:108);i++){
+    const a=random(0,TAU),r=Math.sqrt(rand())*.84;
+    const x=pondX+Math.cos(a)*pondRX*r,z=pondZ+Math.sin(a)*pondRZ*r;
+    const lo=height(x,z)+.15,y=random(lo,pondLevel-.58),size=random(.006,.022);
+    bucket(x,z);
+    tri([x-size,y,z-size*.3],[x+size,y+.003,z+size*.3],[x,y+size*1.43,z],[.39,.54,.385],8,.06);
+  }
+
+  // Bake one trout and reuse the same mesh for the small school.
+  const fish=low?[]:packedMesh();
+  function fishTri(a,b,c,tone,body=false){
+    const face=unit(cross(sub(b,a),sub(c,a)));
+    const normal=p=>body?unit([p[0]/.111,p[1]/.132,.77*smooth(.174,.362,p[2])-.37*smooth(.12,.35,-p[2])]):face;
+    const color=p=>{
+      const upper=smooth(-.068,.098,p[1]),stripe=(1-smooth(.009,.064,Math.abs(p[1]-.013)))*.46;
+      return [lerp(.51,.231,upper)+stripe*.20,lerp(.48,.294,upper)-stripe*.11,lerp(.365,.151,upper)];
+    };
+    if(low)for(const p of [a,b,c])fish.push(...p,...normal(p),...tint(color(p),tone),20,0);
+    else for(const p of [a,b,c])fish.vertex(p,normal(p),tint(color(p),tone),20,0);
+  }
+  const profile=[[-.38,.021,.044],[-.31,.046,.066],[-.22,.084,.105],[-.09,.111,.128],
+    [.07,.111,.124],[.19,.086,.103],[.29,.043,.061],[.342,.010,.018],[.358,.001,.004]];
+  const sides=low?7:15;
+  const rings=profile.map(([z,w,h])=>Array.from({length:sides},(_,i)=>{
+    const a=i*TAU/sides;
+    return [Math.cos(a)*w,Math.sin(a)*h,z];
+  }));
+  for(let j=0;j<rings.length-1;j++)for(let i=0;i<sides;i++){
+    const k=(i+1)%sides,a=rings[j][i],b=rings[j][k],c=rings[j+1][k],d=rings[j+1][i];
+    fishTri(a,b,c,1,true);fishTri(a,c,d,1,true);
+  }
+  const fin=(points,tone)=>{fishTri(points[0],points[1],points[2],tone);if(points[3])fishTri(points[0],points[2],points[3],tone);};
+  fin([[0,.038,-.36],[.007,.138,-.555],[0,.019,-.485],[0,-.113,-.541]],.74);
+  fin([[0,.103,.003],[0,.227,-.091],[0,.122,-.171],[0,.089,-.191]],.79);
+  fin([[0,-.06,-.24],[0,-.133,-.299],[0,-.052,-.325]],.73);
+  for(const side of [-1,1]){
+    const x=.077*side;
+    fin([[x,-.035,.184],[x*2.08,-.146,.039],[x*1.34,-.055,-.017]],.87);
+    fin([[x*.7,-.074,-.075],[x*1.49,-.152,-.159],[x*.81,-.069,-.179]],.83);
+  }
+
+  return {tiles:[...tiles.values()],trunks:trunks.filter(([x,z])=>pondRadius(x,z)>=.99),water,falls,fish,contact:low?null:groundContact(footprints)};
 }
 
 const uniforms=`
@@ -971,6 +1129,15 @@ uniform vec3 eye,fw,rt,up;
 uniform vec2 scale;
 uniform float time;
 uniform bool highDetail;
+`;
+const pondShader=`
+const vec2 POND=vec2(${pondX.toFixed(6)},${pondZ.toFixed(6)});
+const float POND_LEVEL=${pondLevel.toFixed(3)};
+float pondAt(vec2 p){
+  vec2 d=(p-POND)/vec2(${pondRX.toFixed(3)},${pondRZ.toFixed(3)});
+  return length(d)*(1.+.055*sin(d.x*5.8+d.y*3.7)+.033*cos(d.y*7.1-d.x*4.3));
+}
+bool divingEye(vec3 e){return e.y<POND_LEVEL-.047&&pondAt(e.xz)<1.02;}
 `;
 const sun=[.467,.778,-.420];
 const lightRight=unit(cross([0,1,0],sun)),lightUp=unit(cross(sun,lightRight));
@@ -984,6 +1151,7 @@ vec3 lightClip(vec3 point){
 `;
 const shaderBase=`
 ${lightProjection}
+${pondShader}
 float waterLevel(float z){return -.32+.54*(1.-smoothstep(-36.5,-34.65,z));}
 float riverAt(float z){return 3.+sin(z*.076)*3.+sin(z*.035)*2.;}
 float tread(float x,float z){
@@ -1003,9 +1171,14 @@ float groundAt(vec2 at){
   float mound=path*bank*(.83*sin((x-z)*.26)*sin((x-z)*.26)*smoothstep(2.9,8.4,across)
     +max(0.,x-riverAt(z)-8.2)*.14);
   float ripple=.027*sin(x*1.9+z*1.23)+.025*cos(x*2.7-z*1.4);
-  return -.64+rise*(1.-.24*bank)+mound+bank*(.94+path*(.31*sin(x*.39+z*.31)
+  float land=-.64+rise*(1.-.24*bank)+mound+bank*(.94+path*(.31*sin(x*.39+z*.31)
     +.19*cos(x*.72-z*.21)+.24*sin(z*.12))+ripple)+.12*(1.-bank)*sin(z*.29+x*.51)
     +max(0.,-z-87.)*(.40+.09*cos(x*.3))+max(0.,across-15.)*.13;
+  float radius=pondAt(at);
+  if(radius>=1.21)return land;
+  float grit=(.12*sin(x*.83+z*1.36)+.14*cos(z*.72-x*.41))*(1.-smoothstep(.68,1.,radius));
+  float bed=POND_LEVEL-4.2*(1.-smoothstep(.20,.99,radius))+.23*smoothstep(.87,1.1,radius)+grit;
+  return mix(land,bed,1.-smoothstep(.95,1.21,radius));
 }
 float hash(vec3 p){
   p=fract(p*.3183099+vec3(.1,.19,.27))*17.;
@@ -1032,6 +1205,19 @@ float lightShaft(vec3 ray,float travel,vec3 origin,float width){
   return exp(-dot(away,away)/(width*width))*fade/sqrt(side);
 }
 vec3 air(vec3 col,vec3 point,vec3 ray,float travel){
+  if(divingEye(eye)){
+    vec3 filtered=col*vec3(.89,1.24,1.11)*exp(-travel*vec3(.052,.017,.030));
+    vec3 haze=mix(vec3(.078,.206,.173),vec3(.218,.385,.300),smoothstep(-.45,.82,ray.y));
+    float fog=1.-exp(-travel*(.046+.023*max(0.,.12-point.y)));
+    vec3 result=mix(filtered,haze,fog);
+    if(highDetail){
+      float shafts=.57*lightShaft(ray,travel,vec3(POND.x+1.8,.22,POND.y+2.9),.73)
+        +.38*lightShaft(ray,travel,vec3(POND.x-1.65,.22,POND.y+3.25),.62)
+        +.29*lightShaft(ray,travel,vec3(POND.x+.75,.22,POND.y-2.7),.94);
+      result+=vec3(.20,.29,.22)*shafts;
+    }
+    return result;
+  }
   float extinction=travel*(.010+.005*exp(-max(point.y,0.)*.46));
   float fog=1.-exp(-extinction*min(1.,travel*.059));
   vec3 haze=mix(vec3(.29,.365,.329),vec3(.43,.49,.44),pow(max(0.,dot(ray,SUN)),3.));
@@ -1056,11 +1242,21 @@ layout(location=2)in vec3 C;
 layout(location=3)in vec2 MW;
 layout(location=4)in vec2 UV;
 ${uniforms}
-out vec3 p,n,c;
+${pondShader}
+uniform vec3 fishPosition,fishDirection;
+uniform vec2 fishState;
+out vec3 p,n,c,fishLocal;
 out vec2 leafUV;
 flat out float m;
 void main(){
-  p=P;n=N;c=C;m=MW.x;leafUV=UV;
+  p=P;n=N;c=C;m=MW.x;leafUV=UV;fishLocal=P;
+  if(m==20.){
+    float wag=sin(time*8.9+P.z*10.2+fishState.y)*.078*smoothstep(.02,.47,-P.z);
+    vec3 f=vec3(P.x+wag,P.y,P.z)*fishState.x;
+    vec3 side=vec3(fishDirection.z,0.,-fishDirection.x);
+    p=fishPosition+side*f.x+vec3(0.,f.y,0.)+fishDirection*f.z;
+    n=side*N.x+vec3(0.,N.y,0.)+fishDirection*N.z;
+  }
   float wind=MW.y/255.;
   p.x+=wind*(sin(time*1.16+P.z*.36+P.y*.43)*.35+sin(time*.49+P.x*.27)*.46);
   p.z+=wind*cos(time*.86+P.x*.35+P.y*.3)*.29;
@@ -1069,7 +1265,7 @@ void main(){
   if((m==0.||m==2.)&&p.y<.22){
     float creekX=3.+sin(p.z*.076)*3.+sin(p.z*.035)*2.;
     float level=-.32+.54*(1.-smoothstep(-36.5,-34.65,p.z));
-    if(p.y<level&&abs(p.x-creekX)<3.45){
+    if(p.y<level&&(abs(p.x-creekX)<3.45||pondAt(p.xz)<1.04)&&!divingEye(eye)){
       float bend=clamp(level-p.y,0.,.55);
       d.x+=bend*sin(p.z*9.1+p.x*6.3-time*3.8)*.056;
       d.z+=bend*sin(p.x*13.1-p.z*8.2+time*4.4)*.041;
@@ -1105,7 +1301,7 @@ float sunlight(vec3 p,vec3 n){
 `;
 const fragment=`
 precision highp float;
-in vec3 p,n,c;
+in vec3 p,n,c,fishLocal;
 in vec2 leafUV;
 flat in float m;
 out vec4 outColor;
@@ -1145,7 +1341,7 @@ void main(){
   if(wood||stoneSurface||forestFloor){
     ambientMask=texture(contactMap,(p.xz-CONTACT_MIN)*CONTACT_SCALE).r;
     if(wood||stoneSurface)aboveGround=max(0.,p.y-groundAt(p.xz));
-    wet=(1.-smoothstep(2.62,3.70,abs(p.x-riverAt(p.z))))*(1.-smoothstep(.0,.42,p.y-waterLevel(p.z)));
+    wet=max(1.-smoothstep(2.62,3.70,abs(p.x-riverAt(p.z))),1.-smoothstep(.98,1.08,pondAt(p.xz)))*(1.-smoothstep(.0,.42,p.y-waterLevel(p.z)));
   }
   float occlusion=1.,sheen=0.,gloss=32.;
   if(wood){
@@ -1239,19 +1435,27 @@ void main(){
     lit+=col*vec3(.72,.88,.42)*max(.12,-dot(N,SUN))*direct*.80;
     lit+=vec3(.035,.045,.024)*pow(max(0.,dot(reflect(-SUN,N),-ray)),21.)*direct;
   }
-  if(p.y<waterLevel(p.z)-.006&&abs(p.x-riverAt(p.z))<3.45&&m!=7.&&m!=8.){
+  if(p.y<waterLevel(p.z)-.006&&(abs(p.x-riverAt(p.z))<3.45||pondAt(p.xz)<1.04)&&m!=7.&&m!=8.){
+    bool pond=pondAt(p.xz)<1.04;
+    float gleam=pond?.31:.16;
     float caustic=sin(p.x*27.+p.z*16.4+sin(p.z*11.+time*2.9)*1.45)
       *sin(p.z*23.7-p.x*18.+sin(p.x*14.-time*3.)*1.7);
     float depth=waterLevel(p.z)-p.y;
     lit=lit*vec3(.76,.88,.84)*exp(-depth*.36)
-      +vec3(.20,.22,.16)*pow(max(0.,caustic),5.)*(.16+.54*direct)*exp(-depth*1.5);
+      +vec3(.23,.29,.20)*pow(max(0.,caustic),pond?3.8:5.)*(gleam+.54*direct)*exp(-depth*(pond?.46:1.5));
+    if(pond&&divingEye(eye)){
+      float light=noise(vec3((p.xz+(POND_LEVEL-p.y)*SUN.xz/SUN.y)*.47,5.2));
+      lit+=col*(.19+.28*smoothstep(.20,.74,light))*exp(-depth*.24);
+    }
   }
-  if(m==7.){
-    float stream=noise(vec3(p.x*24.,p.y*3.1+time*7.6,p.z*4.));
-    float sheets=noise(vec3(p.x*8.,p.y*.94+time*3.6,p.z*8.));
-    lit=mix(vec3(.26,.39,.36),vec3(.78,.85,.77),smoothstep(.15,.81,stream*.73+sheets*.27));
+  if(m==20.){
+    float marking=smoothstep(.73,.90,noise(fishLocal*52.));
+    lit=mix(lit,lit*vec3(.31,.34,.27),marking*.94);
+    float luster=pow(max(0.,dot(reflect(-SUN,N),-ray)),14.);
+    lit+=vec3(.17,.22,.16)*luster*.49;
+    float iris=length((abs(fishLocal)-vec3(.063,.021,.249))*vec3(1.,1.,.82));
+    lit=mix(lit,vec3(.020,.027,.019),1.-smoothstep(.018,.029,iris));
   }
-  if(m==8.)lit=c*.74;
   outColor=vec4(outputColor(air(lit,p,ray,dist)),1.);
 }`;
 const foamStones=riffles.map(([offset,z,r])=>{
@@ -1283,9 +1487,19 @@ void main(){
   vec3 ray=normalize(p-eye);
   float dist=length(p-eye);
   float sideways=p.x-riverAt(p.z),along=p.z;
+  float pond=1.-smoothstep(.88,1.068,pondAt(p.xz));
+  if(abs(sideways)>3.45&&pond<.002)discard;
+  if(divingEye(eye)){
+    float rip=sin(p.x*19.+p.z*14.-time*3.9)*sin(p.z*13.-p.x*8.+time*3.1);
+    float rim=pow(1.-abs(ray.y),3.7);
+    vec3 sky=vec3(.34,.49,.40)+vec3(.20,.28,.20)*rip*.23;
+    vec3 skin=mix(sky,vec3(.087,.179,.143),rim);
+    outColor=vec4(outputColor(air(skin,p,ray,dist)),.32+rim*.45);
+    return;
+  }
   vec2 stream=vec2(sideways,along);
   float speed=m==13.?2.3:1.;
-  float advection=along-time*.62*speed;
+  float advection=along-time*mix(.62,.20,pond)*speed;
   float grain=noise(vec3(stream.x*4.2,advection*3.4,8.1));
   float drift=noise(vec3(stream.x*1.6,advection*.78,2.2));
   float primary=sin(sideways*6.6+along*13.8-time*4.2*speed+drift*4.1);
@@ -1317,6 +1531,10 @@ void main(){
   float thread=sin(sideways*31.3+advection*12.9+grain*7.)*.5+.5;
   float bubbles=smoothstep(.31,.77,cells*.68+thread*.32);
   float white=smoothstep(.23,.94,foam*(.48+1.05*bubbles))*.56;
+  float impact=min(length((p.xz-vec2(${(fallX-.21).toFixed(5)},-85.83))*vec2(.70,.86)),
+    length((p.xz-vec2(${(fallX+2.61).toFixed(5)},-85.48))*vec2(.75,.84)));
+  float burst=sin(impact*19.-time*5.7+grain*4.)*.5+.5;
+  white+=.47*(1.-smoothstep(.16,1.68,impact))*smoothstep(.34,.82,bubbles*.8+burst*.42);
   if(m==13.){
     float streamLines=noise(vec3(sideways*13.2,advection*7.1,8.));
     white+=.42*smoothstep(.27,.75,streamLines*.69+cells*.31)*
@@ -1352,6 +1570,28 @@ function graphics(gl,model) {
       scale:location('scale'),time:location('time'),detail:location('highDetail')};
   }
   const world=program(vertex,fragment),water=program(vertex,waterFragment);
+  const cascade=program(vertex,`
+    precision highp float;
+    in vec3 p,n;
+    in vec2 leafUV;
+    out vec4 outColor;
+    ${uniforms}
+    ${shaderBase}
+    void main(){
+      float u=leafUV.x,v=leafUV.y,fall=p.y+time*3.05;
+      float streaks=noise(vec3(u*27.+p.z*.72,fall*1.37,3.));
+      float ribbons=noise(vec3(u*9.7,fall*.44,7.));
+      float filament=smoothstep(.39,.78,streaks*.70+ribbons*.30);
+      float edge=smoothstep(0.,.114,u)*(1.-smoothstep(.89,1.,u));
+      float landing=smoothstep(.88,.998,v);
+      float ledge=exp(-((v-.65)*14.)*((v-.65)*14.));
+      vec3 ray=normalize(p-eye);
+      float facing=abs(dot(ray,normalize(n)));
+      float spray=filament*(.28+.45*landing+.23*ledge);
+      vec3 wet=mix(vec3(.154,.264,.229),vec3(.68,.78,.73),spray);
+      float alpha=edge*(.18+filament*.43+landing*.15+.07*(1.-facing));
+      outColor=vec4(outputColor(air(wet,p,ray,length(p-eye))),alpha);
+    }`);
   const reflectedForest=program(vertex,`
     precision highp float;
     in vec3 p,n,c;
@@ -1374,7 +1614,8 @@ function graphics(gl,model) {
       if(dot(N,ray)>0.)N=-N;
       float light=.45+.21*abs(N.y)+.28*max(0.,dot(N,SUN));
       float shade=.78+.24*noise(p*vec3(5.,2.,5.));
-      outColor=vec4(outputColor(air(col*light*shade,p,ray,length(p-eye))),1.);
+      float fog=1.-exp(-length(p-eye)*.018);
+      outColor=vec4(outputColor(mix(col*light*shade,vec3(.34,.43,.37),fog)),1.);
     }`);
   const sky=program(`out vec2 uv;void main(){
     uv=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2))*2.-1.;gl_Position=vec4(uv,.9999,1.);
@@ -1413,8 +1654,8 @@ function graphics(gl,model) {
     const {vao,count}=upload(tile.rows);
     tile.vao=vao;tile.count=count;delete tile.rows;
   }
-  const waterMesh=upload(model.water);
-  model.water=null;
+  const waterMesh=upload(model.water),cascadeMesh=upload(model.falls),fishMesh=upload(model.fish);
+  model.water=null;model.falls=null;model.fish=null;
 
   // The sun stays fixed, so the forest shadow map only needs to be drawn once.
   const size=Math.min(2048,gl.getParameter(gl.MAX_TEXTURE_SIZE));
@@ -1529,6 +1770,21 @@ function graphics(gl,model) {
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   gl.activeTexture(gl.TEXTURE0);
 
+  const fishPosition=gl.getUniformLocation(world.p,'fishPosition');
+  const fishDirection=gl.getUniformLocation(world.p,'fishDirection');
+  const fishState=gl.getUniformLocation(world.p,'fishState');
+  const pose=new Float32Array(5);
+  function drawTrout(v){
+    if(Math.hypot(v.eye[0]-pondX,v.eye[2]-pondZ)>28)return;
+    gl.bindVertexArray(fishMesh.vao);
+    for(let i=0;i<9;i++){
+      troutPose(i,v.time,pose);
+      gl.uniform3f(fishPosition,pose[0],pose[1],pose[2]);
+      gl.uniform3f(fishDirection,Math.sin(pose[3]),0,Math.cos(pose[3]));
+      gl.uniform2f(fishState,pose[4],i*2.39996);
+      gl.drawArrays(gl.TRIANGLES,0,fishMesh.count);
+    }
+  }
   function drawTiles(v,range){
     for(const tile of model.tiles){
       const dx=tile.x-v.eye[0],dz=tile.z-v.eye[2],ahead=dx*v.fw[0]+dz*v.fw[2];
@@ -1539,13 +1795,18 @@ function graphics(gl,model) {
   return v=>{
     const distanceToCreek=Math.abs(v.eye[0]-river(v.eye[2]));
     const plane=groundwater+creekRise(v.eye[2]);
-    const mirror=v.detail&&distanceToCreek<13&&v.fw[1]<.23&&renderMirror(v,plane);
+    const distanceToPond=pondRadius(v.eye[0],v.eye[2]);
+    const underwater=v.eye[1]<pondLevel-.047&&distanceToPond<1.02;
+    const mirror=v.detail&&!underwater&&(distanceToCreek<13||distanceToPond<1.45)&&v.fw[1]<.23&&renderMirror(v,plane);
     gl.viewport(0,0,canvas.width,canvas.height);gl.clear(gl.DEPTH_BUFFER_BIT);
     gl.disable(gl.DEPTH_TEST);setup(sky,v);gl.bindVertexArray(skyVAO);gl.drawArrays(gl.TRIANGLES,0,3);
-    gl.enable(gl.DEPTH_TEST);setup(world,v);drawTiles(v,115);
+    gl.enable(gl.DEPTH_TEST);setup(world,v);drawTiles(v,115);drawTrout(v);
     gl.enable(gl.BLEND);gl.depthMask(false);setup(water,v);
     gl.uniform1i(waterReflection,mirror);gl.uniform1f(waterHeight,plane);
     gl.bindVertexArray(waterMesh.vao);gl.drawArrays(gl.TRIANGLES,0,waterMesh.count);
+    if(Math.abs(v.eye[2]+86)<42){
+      setup(cascade,v);gl.bindVertexArray(cascadeMesh.vao);gl.drawArrays(gl.TRIANGLES,0,cascadeMesh.count);
+    }
     gl.depthMask(true);gl.disable(gl.BLEND);
   };
 }
@@ -1574,9 +1835,16 @@ function software(ctx,model){
     return sprite;
   });
   for(const t of model.tiles)t.rows=new Float32Array(t.rows);
-  let w,h,clock;
+  const fishRows=new Float32Array(model.fish),pose=new Float32Array(5);
+  let w,h,clock,underwater=false;
   const sun=[-.39,.73,-.56];
   function background(v){
+    if(underwater){
+      const waterGlow=ctx.createLinearGradient(0,0,0,h);
+      waterGlow.addColorStop(0,'#345d50');waterGlow.addColorStop(1,'#173c33');
+      ctx.fillStyle=waterGlow;ctx.fillRect(0,0,w,h);
+      return;
+    }
     const y=clamp(.45+v.pitch*.68,.10,.96);
     const g=ctx.createLinearGradient(0,0,0,h);
     g.addColorStop(0,'#526743');g.addColorStop(y,'#a2ac7c');g.addColorStop(1,'#384a2e');
@@ -1624,12 +1892,12 @@ function software(ctx,model){
        (points[1]<0&&points[3]<0&&points[5]<0&&points.length===6)||(points[1]>h&&points[3]>h&&points[5]>h&&points.length===6))return;
     if(points.length===6&&Math.abs((points[2]-points[0])*(points[5]-points[1])-(points[3]-points[1])*(points[4]-points[0]))<.24)return;
     const ny=row[i+4], normal=row[i+3]*sun[0]+ny*sun[1]+row[i+5]*sun[2];
-    const fog=1-Math.exp(-Math.max(0,z)*.025);
+    const fog=1-Math.exp(-Math.max(0,z)*(underwater?.095:.025));
     const shade=.64+.34*Math.abs(normal)+.2*Math.max(ny,0);
-    const fogCol=[139,155,114];
+    const fogCol=underwater?[43,91,75]:[139,155,114];
     let r=row[i+6],g=row[i+7],b=row[i+8];
     if(type===7){
-      const streak=.19*Math.sin(row[i]*22+row[i+1]*.46+clock*9)+.085*Math.cos(row[i]*37+clock*11);
+      const streak=.042*Math.sin(row[i]*14+row[i+1]*1.86+clock*6)+.024*Math.cos(row[i]*25+clock*8);
       r+=streak;g+=streak;b+=streak;
     }
     if(type===3||type===13){
@@ -1638,7 +1906,7 @@ function software(ctx,model){
       const shimmer=ripple*(type===13?.13:.041);
       r+=shimmer*.83;g+=shimmer;b+=shimmer*1.12;
     }
-    const color=[r,g,b].map((n,j)=>clamp(Math.round(n*255*shade*(1-fog)+fogCol[j]*fog),0,255));
+    const color=[r,g,b].map((n,j)=>clamp(Math.round(n*255*shade*(underwater?[.79,.97,.91][j]:1)*(1-fog)+fogCol[j]*fog),0,255));
     buckets[clamp(Math.floor(z*2),0,150)].push({points,color,z, type});
   }
   function projectSprig(sprig,v){
@@ -1673,6 +1941,7 @@ function software(ctx,model){
 
   return v=>{
     w=canvas.width;h=canvas.height;clock=v.time;
+    underwater=v.eye[1]<pondLevel-.047&&pondRadius(v.eye[0],v.eye[2])<1.02;
     background(v);
     for(const bucket of buckets)bucket.length=0;
     const [ex,ey,ez]=v.eye,[fx,fy,fz]=v.fw,[rx,,rz]=v.rt,[ux,uy,uz]=v.up;
@@ -1701,6 +1970,21 @@ function software(ctx,model){
         polygon(v,row,j,xa*rx+za*rz,xa*ux+ya*uy+za*uz,z0,xb*rx+zb*rz,xb*ux+yb*uy+zb*uz,z1,xc*rx+zc*rz,xc*ux+yc*uy+zc*uz,z2);
       }
     }
+    if(underwater){
+      for(let i=0;i<9;i++){
+        troutPose(i,v.time,pose);
+        const forward=Math.sin(pose[3]),across=Math.cos(pose[3]),size=pose[4];
+        const ox=pose[0]-ex,oy=pose[1]-ey,oz=pose[2]-ez;
+        for(let j=0;j<fishRows.length;j+=33){
+          const project=index=>{
+            const u=fishRows[index]*size,t=fishRows[index+2]*size;
+            const x=ox+across*u+forward*t,y=oy+fishRows[index+1]*size,z=oz-forward*u+across*t;
+            return [x*rx+z*rz,x*ux+y*uy+z*uz,x*fx+y*fy+z*fz];
+          };
+          polygon(v,fishRows,j,...project(j),...project(j+11),...project(j+22));
+        }
+      }
+    }
     for(let k=buckets.length-1;k>=0;k--){
       const bucket=buckets[k];
       bucket.sort((a,b)=>b.z-a.z);
@@ -1713,12 +1997,14 @@ function software(ctx,model){
           ctx.globalAlpha=1;
           continue;
         }
+        ctx.globalAlpha=type===7?.56:underwater&&(type===3||type===13)?.44:1;
         ctx.fillStyle='rgb('+c.join(',')+')';ctx.beginPath();ctx.moveTo(p[0],p[1]);
         for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i],p[i+1]);
         ctx.closePath();ctx.fill();
         if(type===0||type===2||type===3||type===4||type===7||type===13){
           ctx.lineWidth=.55;ctx.strokeStyle=ctx.fillStyle;ctx.stroke();
         }
+        ctx.globalAlpha=1;
       }
     }
 
@@ -1729,7 +2015,8 @@ const stops=[
   {z:5,yaw:-.09,pitch:.14,name:'Cedar trailhead'},
   {z:-22.82,x:bridgeX-6.65,yaw:.94,pitch:-.125,name:'Creek crossing'},
   {z:-49.2,yaw:-.16,pitch:.19,name:'Old-growth grove'},
-  {z:-77.3,x:river(-87.7)-4.4,yaw:.40,pitch:.17,name:'Hidden falls'},
+  {z:-79.13,x:fallX-4.57,yaw:.47,pitch:.09,name:'Hidden falls'},
+  {z:pondZ+7.2,x:pondX+7.9,yaw:pondEntry.yaw,pitch:-.085,name:'Mountain pond'},
 ];
 let gl;
 try{gl=canvas.getContext('webgl2',{alpha:false,antialias:!matchMedia('(pointer:coarse)').matches});}catch{}
@@ -1758,7 +2045,8 @@ function run(){
   };
   const coarse=matchMedia('(pointer:coarse)').matches;
   const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const state={x:0,z:0,yaw:0,pitch:0,started:false,following:false,step:0};
+  const state={x:0,z:0,yaw:0,pitch:0,started:false,following:false,step:0,swimming:false,depth:-1,swimY:0};
+  const diveButton=$('dive');
   const pressed=new Set(), stick={x:0,y:0,id:null};
   const keyset=new Set(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']);
   let place=0,time=0,last=performance.now(),renderAt=0,groundY, dragging=null,lastX=0,lastY=0;
@@ -1768,19 +2056,44 @@ function run(){
   function setFollowing(on){
     state.following=on;$('follow').textContent=on?'Pause trail':'Follow trail';$('follow').setAttribute('aria-pressed',String(on));
   }
+  function updateDive(){
+    const withinReach=pondRadius(state.x,state.z)<1.44;
+    diveButton.hidden=!state.started||(!state.swimming&&!withinReach);
+    $('follow').hidden=!state.started||state.swimming;
+  }
   function enter(){
-    state.started=true;document.body.classList.add('walk');$('follow').hidden=false;
-    $('hint').textContent=coarse?'Drag to look around':'WASD to walk · Drag to look';
+    state.started=true;document.body.classList.add('walk');
+    $('hint').textContent=state.swimming?(coarse?'Look up or down to steer':'WASD to swim · Space / C for depth'):
+      (coarse?'Drag to look around':'WASD to walk · Drag to look');
+    updateDive();
     focusView();
   }
   function jump(i){
     const s=stops[i];
+    state.swimming=false;state.depth=-1;
+    document.body.classList.remove('swimming');
+    diveButton.textContent='Dive into pond';
     state.x=s.x??trail(s.z);state.z=s.z;state.yaw=s.yaw;state.pitch=s.pitch;state.step=0;
     setFollowing(false);groundY=walkingFloor(state.x,state.z)+1.66;
     $('place').value=s.name;place=i;
+    updateDive();
   }
   jump(1);
   $('enter').onclick=enter;
+  function dive(){
+    if(state.swimming){jump(4);enter();return}
+    if(pondRadius(state.x,state.z)>=1.44)return;
+    if(pondRadius(state.x,state.z)>.88||height(state.x,state.z)>pondLevel-1.18){
+      state.x=pondEntry.x;state.z=pondEntry.z;state.yaw=pondEntry.yaw;
+    }
+    state.swimming=true;state.pitch=-.13;state.depth=-1;
+    state.swimY=clamp(pondLevel-.99,height(state.x,state.z)+.54,pondLevel-.14);
+    groundY=state.swimY;
+    document.body.classList.add('swimming');
+    diveButton.textContent='Return to shore';
+    setFollowing(false);enter();
+  }
+  diveButton.onclick=dive;
   function menu(on){
     $('help').hidden=!on;$('menu').setAttribute('aria-expanded',String(on));
   }
@@ -1794,7 +2107,9 @@ function run(){
   };
   addEventListener('keydown',e=>{
     if(e.code==='Escape'&&!$('help').hidden){menu(false);$('menu').focus();return}
-    if(!state.started||!keyset.has(e.code)||e.target.matches('button'))return;
+    if(e.code==='Escape'&&state.swimming){dive();return}
+    const depthKey=state.swimming&&(e.code==='Space'||e.code==='KeyC');
+    if(!state.started||(!keyset.has(e.code)&&!depthKey)||e.target.matches('button'))return;
     e.preventDefault();setFollowing(false);pressed.add(e.code);
   });
   addEventListener('keyup',e=>pressed.delete(e.code));
@@ -1828,6 +2143,11 @@ function run(){
   }));
   function walk(x,z){
     x=clamp(x,-30,32);z=clamp(z,-85.35,18);
+    if(state.swimming){
+      if(pondRadius(x,z)>.964||height(x,z)>pondLevel-.70)return;
+      state.x=x;state.z=z;
+      return;
+    }
     if(model.trunks.some(t=>Math.hypot(x-t[0],z-t[1])<t[2]*1.02+.22))return;
     if(Math.abs(x-bridgeX)<3.80){
       const side=Math.abs(z-bridgeZ);
@@ -1857,14 +2177,28 @@ function run(){
         const f=key('KeyW')-key('KeyS')+stick.y,s=key('KeyD')-key('KeyA')+stick.x;
         const moves=Math.hypot(s,f);
         if(moves>.02){
-          const stride=dt*3.45/Math.max(1,moves);
-          const dx=(Math.sin(state.yaw)*f+Math.cos(state.yaw)*s)*stride;
-          const dz=(-Math.cos(state.yaw)*f+Math.sin(state.yaw)*s)*stride;
+          const stride=dt*(state.swimming?2.15:3.45)/Math.max(1,moves);
+          const forward=state.swimming?f*Math.cos(state.pitch):f;
+          const dx=(Math.sin(state.yaw)*forward+Math.cos(state.yaw)*s)*stride;
+          const dz=(-Math.cos(state.yaw)*forward+Math.sin(state.yaw)*s)*stride;
           walk(state.x+dx,state.z);walk(state.x,state.z+dz);state.step+=dt*8.9*moves;
         }
       }
-      const current=state.z<-69?3:state.z<-39?2:state.z<-19?1:0;
-      if(current!==place){place=current;$('place').value=stops[place].name}
+      if(state.swimming){
+        const forward=key('KeyW')-key('KeyS')+stick.y;
+        const depthControl=key('Space')-key('KeyC');
+        state.swimY=clamp(state.swimY+dt*(Math.sin(state.pitch)*forward*1.78+depthControl*1.55),
+          height(state.x,state.z)+.54,pondLevel-.14);
+        const depth=Math.round((pondLevel-state.swimY)*10);
+        if(depth!==state.depth){
+          state.depth=depth;$('place').value='Mountain pond · '+(depth/10).toFixed(1)+' m';
+        }
+      }else{
+        const nearPond=state.x>pondX+.8&&pondRadius(state.x,state.z)<1.52;
+        const current=nearPond?4:state.z<-69?3:state.z<-39?2:state.z<-19?1:0;
+        if(current!==place){place=current;$('place').value=stops[place].name}
+      }
+      updateDive();
     }
     if(document.hidden||(!gl&&now-renderAt<40)){requestAnimationFrame(frame);return}
     renderAt=now;
@@ -1876,7 +2210,8 @@ function run(){
     const sn=Math.sin(heading),cs=Math.cos(heading),sp=Math.sin(pitch),cp=Math.cos(pitch);
     const floor=walkingFloor(state.x,state.z);
     const bob=reduced?0:Math.sin(state.step)*.032+Math.sin(time*1.21)*.014;
-    groundY=lerp(groundY,Math.max(groundwater-.17,floor)+1.66+bob,Math.min(1,dt*13));
+    const targetY=state.swimming?state.swimY:Math.max(groundwater-.17,floor)+1.66+bob;
+    groundY=lerp(groundY,targetY,Math.min(1,dt*(state.swimming?8:13)));
     const sy=coarse&&h>w?1.12:1.49;
     view.eye[0]=state.x;view.eye[1]=groundY;view.eye[2]=state.z;
     view.fw[0]=sn*cp;view.fw[1]=sp;view.fw[2]=-cs*cp;
