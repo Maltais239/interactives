@@ -930,7 +930,6 @@ const TAB_LINKS={
     ["Play-along tab", "https://www.songsterr.com/a/wsa/pixies-where-is-my-mind-tab-s14912"]
   ]
 };
-const RAW_BASE="../songfiles/";
 const AUDIENCE_MODE=new URLSearchParams(window.location.search).get("audience")==="1";
 const ORDER_KEY="beaumont:gig:order:v3",PLAYED_KEY="beaumont:gig:played:v1",OLD_PLAYED_KEY="beaumont:gig:played:v0",FONT_KEY="beaumont:gig:lyrics-font",SPEED_KEY="beaumont:gig:scroll-delay",OFFLINE_KEY="beaumont:gig:offline-ready:v1";
 const deepClone=x=>JSON.parse(JSON.stringify(x));
@@ -970,7 +969,7 @@ function loadOrder(){
   }catch(e){return deepClone(DEFAULT_SETS)}
 }
 let sets=loadOrder(),played={};try{played=JSON.parse(localStorage.getItem(PLAYED_KEY)||"{}")||{};if(!Object.keys(played).length){const old=JSON.parse(localStorage.getItem(OLD_PLAYED_KEY)||"{}")||{};Object.keys(old).forEach(k=>{if(old[k]){const p=k.split(":");if(p.length>=3)played[p.slice(2).join(":")]=true}});if(Object.keys(played).length)localStorage.setItem(PLAYED_KEY,JSON.stringify(played))}}catch(e){played={}}
-let sortables=[],currentSongTitle=null,scrollTimer=null,lyricsFont=Math.max(12,Math.min(28,parseInt(localStorage.getItem(FONT_KEY)||"16",10)||16)),scrollDelay=Math.max(12,Math.min(140,parseInt(localStorage.getItem(SPEED_KEY)||"50",10)||50));const lyricCache=new Map();
+let sortables=[],currentSongTitle=null,scrollTimer=null,lyricsFont=Math.max(12,Math.min(28,parseInt(localStorage.getItem(FONT_KEY)||"16",10)||16)),scrollDelay=Math.max(12,Math.min(140,parseInt(localStorage.getItem(SPEED_KEY)||"50",10)||50));
 function saveOrder(){try{localStorage.setItem(ORDER_KEY,JSON.stringify(sets))}catch(e){}} function savePlayed(){try{localStorage.setItem(PLAYED_KEY,JSON.stringify(played))}catch(e){}}
 function findSong(title){for(let si=0;si<sets.length;si++){const i=sets[si].songs.findIndex(s=>s[0]===title);if(i>=0)return{setIndex:si,index:i,song:sets[si].songs[i]}}return null}
 function updateStats(){let md=0,mt=0;sets.forEach((set,si)=>{const d=set.songs.filter(s=>played[s[0]]).length,c=document.querySelector('[data-count-for="'+set.id+'"]');if(c){c.textContent=d+"/"+set.songs.length+" played";const note=c.closest(".colhead").querySelector(".note");if(note)note.textContent=set.id==="alt"?set.songs.length+" songs · drag into any set":set.songs.length+" songs"}if(set.id!=="alt"){md+=d;mt+=set.songs.length}});document.getElementById("summary").textContent=md+"/"+mt+" main-set songs played"}
@@ -1086,7 +1085,33 @@ async function initOffline(){
   }catch(e){setOfflineUi("idle","offline setup unavailable")}
 }
 
-async function loadLyrics(title){if(lyricCache.has(title))return lyricCache.get(title);const file=LYRIC_FILES[title];if(!file){const r={ok:false,text:"No chord sheet is currently linked for this song. The song remains in the reserve bank so it is not forgotten.",file:null};lyricCache.set(title,r);return r}const url=RAW_BASE+encodeURIComponent(file);try{if(/\.txt$/i.test(file)){const res=await fetch(url,{cache:"no-store"});if(!res.ok)throw new Error("HTTP "+res.status);const r={ok:true,text:await res.text(),file};lyricCache.set(title,r);return r}if(/\.docx$/i.test(file)){const res=await fetch(url,{cache:"no-store"});if(!res.ok)throw new Error("HTTP "+res.status);const buf=await res.arrayBuffer();if(!window.mammoth)throw new Error("DOCX reader unavailable");const out=await window.mammoth.extractRawText({arrayBuffer:buf});const r={ok:true,text:out.value,file};lyricCache.set(title,r);return r}return{ok:false,text:"This chord sheet format cannot be displayed in Beaumont Curling Club yet.",file}}catch(e){return{ok:false,text:"Couldn't load this chord sheet. Try again with a connection.",file}}}
+const pendingCharts = new Map();
+async function fetchChart(file) {
+  try {
+    const response = await fetch(chartUrl(file), {cache: "no-store"});
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    if (/\.txt$/i.test(file)) return {ok: true, text: await response.text(), file};
+    if (!window.mammoth) throw new Error("DOCX reader unavailable");
+    const output = await window.mammoth.extractRawText({arrayBuffer: await response.arrayBuffer()});
+    return {ok: true, text: output.value, file};
+  } catch {
+    return {ok: false, text: "Couldn't load this chord sheet. Try again with a connection.", file};
+  }
+}
+async function loadLyrics(title) {
+  const file = LYRIC_FILES[title];
+  if (!file) {
+    return {ok: false, text: "No chord sheet is currently linked for this song. The song remains in the reserve bank so it is not forgotten.", file: null};
+  }
+  if (!/\.(txt|docx)$/i.test(file)) {
+    return {ok: false, text: "This chord sheet format cannot be displayed in Beaumont Curling Club yet.", file};
+  }
+  // Share simultaneous requests, but recheck the file whenever the sheet is reopened.
+  if (!pendingCharts.has(file)) {
+    pendingCharts.set(file, fetchChart(file).finally(() => pendingCharts.delete(file)));
+  }
+  return pendingCharts.get(file);
+}
 function updateChartLinks(title){
   const container=document.getElementById("chart-links");
   container.replaceChildren();
